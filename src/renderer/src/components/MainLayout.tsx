@@ -3,6 +3,7 @@ import Sidebar from './Sidebar'
 import Workspace from './Workspace'
 import UpdateBanner from './UpdateBanner'
 import SnippetPalette from './SnippetPalette'
+import AuthPromptDialog from './AuthPromptDialog'
 import { useShortcuts, useIdleLock } from '../hooks/useShortcuts'
 import { useStore } from '../state/store'
 
@@ -25,6 +26,7 @@ export default function MainLayout(): JSX.Element {
         <Workspace />
       </div>
       {paletteOpen && <SnippetPalette onClose={() => setPaletteOpen(false)} />}
+      <AuthPromptDialog />
     </div>
   )
 }

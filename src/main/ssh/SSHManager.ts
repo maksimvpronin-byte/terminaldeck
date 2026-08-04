@@ -10,6 +10,7 @@ import { IPC } from '../../shared/ipc-channels'
 import { sessionStore } from '../store/SessionStore'
 import { vault } from '../vault/Vault'
 import { makeHostVerifier } from './hostVerifier'
+import { requestAuth } from './authPrompt'
 
 interface LiveConnection {
   id: string
@@ -23,12 +24,26 @@ function agentSockForPlatform(): string | undefined {
   return process.env.SSH_AUTH_SOCK
 }
 
-function resolveAuth(profile: SessionProfile): Pick<
-  ConnectConfig,
-  'password' | 'privateKey' | 'passphrase' | 'agent' | 'agentForward'
+async function resolveAuth(
+  win: BrowserWindow,
+  profile: SessionProfile
+): Promise<
+  Pick<ConnectConfig, 'password' | 'privateKey' | 'passphrase' | 'agent' | 'agentForward'>
 > {
   if (profile.authMethod === 'password') {
-    return { password: profile.secretRef ? vault.getSecret(profile.secretRef) : undefined }
+    let password = profile.secretRef ? vault.getSecret(profile.secretRef) : undefined
+    if (!password) {
+      // Nothing stored: ask, rather than failing authentication silently. This
+      // is also the path for people who deliberately don't save passwords.
+      const answers = await requestAuth(win, {
+        host: `${profile.username}@${profile.host}`,
+        title: 'Password required',
+        fields: [{ prompt: 'Password', echo: false }]
+      })
+      if (!answers) throw new Error('Authentication cancelled')
+      password = answers[0]
+    }
+    return { password }
   }
   if (profile.authMethod === 'privateKey') {
     if (!profile.privateKeyPath) throw new Error('No private key path configured')
@@ -38,6 +53,35 @@ function resolveAuth(profile: SessionProfile): Pick<
   }
   // agent
   return { agent: agentSockForPlatform(), agentForward: profile.agentForward }
+}
+
+/**
+ * Answers keyboard-interactive challenges — the mechanism PAM and 2FA prompts
+ * (Google Authenticator, Duo) arrive through. Without this such hosts simply
+ * cannot be reached.
+ */
+function wireKeyboardInteractive(win: BrowserWindow, client: Client, host: string): void {
+  client.on(
+    'keyboard-interactive',
+    (name, instructions, _lang, prompts, finish: (answers: string[]) => void) => {
+      requestAuth(win, {
+        host,
+        title: name || 'Additional authentication',
+        instructions,
+        fields: prompts.map((p) => ({ prompt: p.prompt, echo: p.echo }))
+      }).then((answers) => finish(answers ?? []))
+    }
+  )
+}
+
+/** Shared connect options: keepalive stops idle sessions dying behind NAT. */
+const COMMON_CONNECT: Partial<ConnectConfig> = {
+  // Generous: the handshake pauses while the user reads a host-key prompt or
+  // types a 2FA code.
+  readyTimeout: 120000,
+  keepaliveInterval: 20000,
+  keepaliveCountMax: 3,
+  tryKeyboard: true
 }
 
 /** Connects to `profile`, hopping through its jump-host chain if configured. Resolves with the final connected Client and the list of every client opened along the way (for cleanup). */
@@ -61,16 +105,16 @@ async function connectChain(
     const hop = hops[i]
     const client = new Client()
     chain.push(client)
-    const auth = resolveAuth(hop)
+    const auth = await resolveAuth(win, hop)
+    wireKeyboardInteractive(win, client, `${hop.username}@${hop.host}`)
     await new Promise<void>((resolve, reject) => {
       client.on('ready', () => resolve())
       client.on('error', (err) => reject(err))
       client.connect({
+        ...COMMON_CONNECT,
         host: hop.host,
         port: hop.port,
         username: hop.username,
-        // Generous: the handshake pauses here while the user reads a host-key prompt.
-        readyTimeout: 120000,
         hostVerifier: makeHostVerifier(win, hop.host, hop.port),
         ...auth,
         ...(sock ? { sock } : {})
@@ -136,15 +180,15 @@ class SSHManager {
               }
             : { agent: agentSockForPlatform() }
 
+      wireKeyboardInteractive(win, client, `${params.username}@${params.host}`)
       await new Promise<void>((resolve, reject) => {
         client.on('ready', () => resolve())
         client.on('error', (err) => reject(err))
         client.connect({
+          ...COMMON_CONNECT,
           host: params.host,
           port: params.port,
           username: params.username,
-          // Generous: the handshake pauses here while the user reads a host-key prompt.
-          readyTimeout: 120000,
           hostVerifier: makeHostVerifier(win, params.host, params.port),
           ...auth
         })

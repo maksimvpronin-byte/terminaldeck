@@ -58,6 +58,12 @@ export const IPC = {
   /** main -> renderer */
   updateState: 'update:state',
 
+  // Interactive auth (password prompt, keyboard-interactive / 2FA)
+  /** main -> renderer */
+  authPrompt: 'auth:prompt',
+  /** renderer -> main, suffixed with the request id */
+  authPromptReply: 'auth:promptReply',
+
   // Session logs
   logsReveal: 'logs:reveal',
 

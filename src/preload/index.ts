@@ -10,7 +10,8 @@ import type {
   SftpEntry,
   SshConfigHost,
   UpdateState,
-  Snippet
+  Snippet,
+  AuthPromptRequest
 } from '../shared/types'
 
 const api = {
@@ -120,6 +121,16 @@ const api = {
       const listener = (_e: unknown, state: UpdateState): void => cb(state)
       ipcRenderer.on(IPC.updateState, listener)
       return () => ipcRenderer.removeListener(IPC.updateState, listener)
+    }
+  },
+  auth: {
+    onPrompt: (cb: (req: AuthPromptRequest) => void): (() => void) => {
+      const listener = (_e: unknown, req: AuthPromptRequest): void => cb(req)
+      ipcRenderer.on(IPC.authPrompt, listener)
+      return () => ipcRenderer.removeListener(IPC.authPrompt, listener)
+    },
+    reply: (requestId: string, answers: string[] | null): void => {
+      ipcRenderer.send(`${IPC.authPromptReply}:${requestId}`, answers)
     }
   },
   clipboard: {

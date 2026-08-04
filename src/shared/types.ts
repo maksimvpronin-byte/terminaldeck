@@ -71,6 +71,21 @@ export interface TerminalResizePayload {
   rows: number
 }
 
+export interface AuthPromptField {
+  prompt: string
+  /** false for secrets, so the field masks input */
+  echo: boolean
+}
+
+export interface AuthPromptRequest {
+  requestId: string
+  /** Which host is asking, so the user knows what they are authenticating to. */
+  host: string
+  title: string
+  instructions?: string
+  fields: AuthPromptField[]
+}
+
 export interface Snippet {
   id: string
   name: string
