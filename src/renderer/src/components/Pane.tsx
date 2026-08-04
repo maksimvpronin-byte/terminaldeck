@@ -11,12 +11,13 @@ export default function Pane({
   node: Extract<PaneNode, { type: 'leaf' }>
 }): JSX.Element {
   const activePaneId = useStore((s) => s.tabs.find((t) => t.id === tabId)?.activePaneId)
+  const isActiveTab = useStore((s) => s.activeTabId === tabId)
   const setActivePane = useStore((s) => s.setActivePane)
   const setPaneConnection = useStore((s) => s.setPaneConnection)
   const splitPane = useStore((s) => s.splitPane)
   const toggleSftp = useStore((s) => s.toggleSftp)
 
-  const isActive = activePaneId === node.id
+  const isActive = isActiveTab && activePaneId === node.id
 
   return (
     <div className={`pane ${isActive ? 'active' : ''}`}>
@@ -38,6 +39,7 @@ export default function Pane({
         <TerminalHost
           target={node.target}
           connectionId={node.connectionId}
+          active={isActive}
           onFocus={() => setActivePane(tabId, node.id)}
           onConnected={(connectionId) => setPaneConnection(tabId, node.id, connectionId)}
         />

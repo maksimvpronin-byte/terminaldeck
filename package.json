@@ -1,6 +1,6 @@
 {
   "name": "terminaldeck",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Cross-platform SSH/SFTP terminal manager (MobaXterm/Royal TSX alternative)",
   "main": "./out/main/index.js",
   "author": "TerminalDeck",

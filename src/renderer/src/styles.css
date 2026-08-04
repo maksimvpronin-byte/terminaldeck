@@ -122,11 +122,17 @@ label {
   display: flex;
   flex-direction: column;
 }
+.titlebar-spacer {
+  height: 28px;
+  flex-shrink: 0;
+  -webkit-app-region: drag;
+}
 .sidebar-header {
   padding: 10px;
   border-bottom: 1px solid var(--border);
   display: flex;
   gap: 6px;
+  -webkit-app-region: no-drag;
 }
 .sidebar-tree {
   flex: 1;
@@ -185,6 +191,12 @@ label {
   border-bottom: 1px solid var(--border);
   overflow-x: auto;
 }
+.tab-panel {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  flex-direction: column;
+}
 .tab {
   display: flex;
   align-items: center;
@@ -214,25 +226,26 @@ label {
   color: var(--text-dim);
 }
 
-.split-container {
+.split-root {
   flex: 1;
-  display: flex;
   min-height: 0;
   min-width: 0;
-}
-.split-container.col {
-  flex-direction: column;
-}
-.split-child {
-  overflow: hidden;
   position: relative;
+  overflow: hidden;
 }
-.split-divider {
+.split-leaf-abs {
+  position: absolute;
+  overflow: hidden;
+}
+.split-divider-abs {
+  position: absolute;
   background: var(--border);
-  flex: 0 0 4px;
+  z-index: 1;
+}
+.split-divider-abs.row {
   cursor: col-resize;
 }
-.split-container.col > .split-divider {
+.split-divider-abs.col {
   cursor: row-resize;
 }
 

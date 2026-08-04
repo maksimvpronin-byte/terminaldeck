@@ -30,6 +30,7 @@ export default function Sidebar(): JSX.Element {
 
   return (
     <div className="sidebar">
+      <div className="titlebar-spacer" />
       <div className="sidebar-header">
         <button className="primary" style={{ flex: 1 }} onClick={() => setEditingSession('new')}>
           + Session

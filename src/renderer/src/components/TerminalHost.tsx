@@ -7,11 +7,18 @@ import type { PaneTarget } from '../state/store'
 interface Props {
   target: PaneTarget
   connectionId?: string
+  active: boolean
   onConnected: (connectionId: string) => void
   onFocus: () => void
 }
 
-export default function TerminalHost({ target, connectionId, onConnected, onFocus }: Props): JSX.Element {
+export default function TerminalHost({
+  target,
+  connectionId,
+  active,
+  onConnected,
+  onFocus
+}: Props): JSX.Element {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const termRef = useRef<Terminal | null>(null)
   const fitRef = useRef<FitAddon | null>(null)
@@ -29,9 +36,10 @@ export default function TerminalHost({ target, connectionId, onConnected, onFocu
     const fit = new FitAddon()
     term.loadAddon(fit)
     term.open(hostRef.current)
-    fit.fit()
+    if (hostRef.current.clientWidth > 0 && hostRef.current.clientHeight > 0) fit.fit()
     termRef.current = term
     fitRef.current = fit
+    if (active) term.focus()
 
     let disposed = false
     let offData: (() => void) | undefined
@@ -76,7 +84,10 @@ export default function TerminalHost({ target, connectionId, onConnected, onFocu
       connect()
     }
 
-    const resizeObserver = new ResizeObserver(() => {
+    const resizeObserver = new ResizeObserver((entries) => {
+      const box = entries[0]?.contentRect
+      // Skip while the pane is hidden (0x0) — fitting then yields bogus cols/rows.
+      if (!box || box.width === 0 || box.height === 0) return
       fit.fit()
       if (connIdRef.current) window.td.ssh.resize(connIdRef.current, term.cols, term.rows)
     })
@@ -89,9 +100,19 @@ export default function TerminalHost({ target, connectionId, onConnected, onFocu
       offError?.()
       resizeObserver.disconnect()
       term.dispose()
+      if (connIdRef.current) window.td.ssh.disconnect(connIdRef.current)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  return <div className="terminal-host" ref={hostRef} onClick={onFocus} />
+  useEffect(() => {
+    if (active) termRef.current?.focus()
+  }, [active])
+
+  function handleClick(): void {
+    onFocus()
+    termRef.current?.focus()
+  }
+
+  return <div className="terminal-host" ref={hostRef} onClick={handleClick} />
 }
