@@ -1,6 +1,6 @@
 {
   "name": "terminaldeck",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Cross-platform SSH/SFTP terminal manager (MobaXterm/Royal TSX alternative)",
   "main": "./out/main/index.js",
   "author": "TerminalDeck",
@@ -10,6 +10,8 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "start": "electron-vite preview",
     "build:mac": "electron-vite build && electron-builder --mac",
     "build:mac:dir": "electron-vite build && electron-builder --mac dir",
@@ -43,6 +45,7 @@
     "electron": "^33.0.0",
     "electron-builder": "^24.13.3",
     "electron-vite": "^2.3.0",
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "vitest": "^2.1.8"
   }
 }

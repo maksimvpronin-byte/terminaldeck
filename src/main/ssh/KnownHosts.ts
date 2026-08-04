@@ -51,7 +51,12 @@ class KnownHosts {
   }
 
   remove(host: string, port: number): void {
-    delete this.data[hostKeyOf(host, port)]
+    this.removeByKey(hostKeyOf(host, port))
+  }
+
+  /** Removes by the stored key, as shown in the trusted-hosts list. */
+  removeByKey(key: string): void {
+    delete this.data[key]
     this.persist()
   }
 

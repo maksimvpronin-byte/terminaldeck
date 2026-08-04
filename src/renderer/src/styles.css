@@ -423,6 +423,14 @@ label {
   padding: 2px 6px;
   font-size: 11px;
 }
+/* Keeps the SVG glyphs optically centred next to the text buttons. */
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 5px;
+  line-height: 0;
+}
 .pane-body {
   flex: 1;
   min-height: 0;
@@ -722,6 +730,63 @@ button.danger:hover {
   gap: 8px;
   margin-top: 6px;
 }
+.settings-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+}
+.settings-tabs button.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+}
+.settings-heading {
+  margin: 6px 0 0;
+  font-size: 13px;
+}
+.settings-note {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+.success-text {
+  color: var(--success);
+  font-size: 12px;
+}
+.known-hosts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.known-host-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 8px;
+  align-items: center;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+.known-host-name {
+  font-size: 12px;
+}
+.known-host-fp {
+  grid-column: 1;
+  font-size: 10px;
+  color: var(--text-dim);
+  font-family: Menlo, Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+.known-host-row button {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
 .theme-preview {
   border: 1px solid var(--border);
   border-radius: 6px;

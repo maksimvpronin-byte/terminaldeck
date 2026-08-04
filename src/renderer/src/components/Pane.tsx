@@ -6,6 +6,7 @@ import { DRAG_MIME, edgeFromPoint, edgeToSplit, type DragItem, type DropEdge } f
 import TerminalHost from './TerminalHost'
 import SftpPanel from './SftpPanel'
 import TunnelsPanel from './TunnelsPanel'
+import { SplitRightIcon, SplitDownIcon, CloseIcon } from './icons'
 
 export default function Pane({
   tabId,
@@ -94,11 +95,19 @@ export default function Pane({
               ⇉
             </label>
           )}
-          <button title="Split right" onClick={() => splitPane(tabId, node.id, 'row')}>
-            ⬓
+          <button
+            className="icon-button"
+            title="Split right (⌘D)"
+            onClick={() => splitPane(tabId, node.id, 'row')}
+          >
+            <SplitRightIcon />
           </button>
-          <button title="Split down" onClick={() => splitPane(tabId, node.id, 'col')}>
-            ⬒
+          <button
+            className="icon-button"
+            title="Split down (⌘⇧D)"
+            onClick={() => splitPane(tabId, node.id, 'col')}
+          >
+            <SplitDownIcon />
           </button>
           <button title="Toggle SFTP browser" onClick={() => toggleSftp(tabId, node.id)}>
             SFTP
@@ -106,8 +115,12 @@ export default function Pane({
           <button title="Toggle port forwarding" onClick={() => toggleTunnels(tabId, node.id)}>
             Tunnels
           </button>
-          <button title="Close pane (⌘W)" onClick={() => closePane(tabId, node.id)}>
-            ✕
+          <button
+            className="icon-button"
+            title="Close pane (⌘W)"
+            onClick={() => closePane(tabId, node.id)}
+          >
+            <CloseIcon />
           </button>
         </div>
       </div>

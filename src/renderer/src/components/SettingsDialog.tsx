@@ -1,16 +1,38 @@
+import { useState } from 'react'
 import { useStore } from '../state/store'
 import { FONT_CHOICES, THEMES, DEFAULT_SETTINGS, themeOf } from '../state/settings'
+import SecuritySettings from './SecuritySettings'
 
 export default function SettingsDialog({ onClose }: { onClose: () => void }): JSX.Element {
   const settings = useStore((s) => s.settings)
   const updateSettings = useStore((s) => s.updateSettings)
   const preview = themeOf(settings)
+  const [tab, setTab] = useState<'terminal' | 'security'>('terminal')
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <h2>Terminal settings</h2>
+        <h2>Settings</h2>
 
+        <div className="settings-tabs">
+          <button
+            className={tab === 'terminal' ? 'active' : ''}
+            onClick={() => setTab('terminal')}
+          >
+            Terminal
+          </button>
+          <button
+            className={tab === 'security' ? 'active' : ''}
+            onClick={() => setTab('security')}
+          >
+            Security
+          </button>
+        </div>
+
+        {tab === 'security' && <SecuritySettings />}
+
+        {tab === 'terminal' && (
+          <>
         <label>
           Font
           <select
@@ -103,9 +125,13 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
             Blinking cursor
           </label>
         </div>
+          </>
+        )}
 
         <div className="modal-actions">
-          <button onClick={() => updateSettings(DEFAULT_SETTINGS)}>Reset to defaults</button>
+          {tab === 'terminal' && (
+            <button onClick={() => updateSettings(DEFAULT_SETTINGS)}>Reset to defaults</button>
+          )}
           <button className="primary" onClick={onClose}>
             Done
           </button>

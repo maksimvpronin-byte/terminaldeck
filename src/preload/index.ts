@@ -18,7 +18,17 @@ const api = {
     create: (password: string): Promise<VaultStatus> => ipcRenderer.invoke(IPC.vaultCreate, password),
     unlock: (password: string): Promise<{ ok: boolean; error?: string; status?: VaultStatus }> =>
       ipcRenderer.invoke(IPC.vaultUnlock, password),
-    lock: (): Promise<VaultStatus> => ipcRenderer.invoke(IPC.vaultLock)
+    lock: (): Promise<VaultStatus> => ipcRenderer.invoke(IPC.vaultLock),
+    changePassword: (
+      current: string,
+      next: string
+    ): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke(IPC.vaultChangePassword, current, next)
+  },
+  knownHosts: {
+    list: (): Promise<Array<{ host: string; fingerprint: string }>> =>
+      ipcRenderer.invoke(IPC.knownHostsList),
+    remove: (host: string): Promise<void> => ipcRenderer.invoke(IPC.knownHostsRemove, host)
   },
   store: {
     load: (): Promise<SessionStoreData> => ipcRenderer.invoke(IPC.storeLoad),

@@ -1,6 +1,6 @@
 import { app } from 'electron'
 import { join } from 'path'
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
+import { readFileSync, writeFileSync, renameSync, existsSync, mkdirSync } from 'fs'
 import { deriveKey, newSalt, encrypt, decrypt, type EncryptedPayload } from './crypto'
 import type { VaultStatus } from '../../shared/types'
 
@@ -14,6 +14,19 @@ interface VaultFile {
 
 function vaultPath(): string {
   return join(app.getPath('userData'), 'vault.json')
+}
+
+/**
+ * Writes via a temp file and rename. A crash partway through a direct write would
+ * leave a truncated vault, losing every stored credential.
+ */
+function writeVaultFile(file: VaultFile): void {
+  const dir = app.getPath('userData')
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+  const target = vaultPath()
+  const tmp = `${target}.tmp`
+  writeFileSync(tmp, JSON.stringify(file, null, 2), 'utf8')
+  renameSync(tmp, target)
 }
 
 export class WrongPasswordError extends Error {
@@ -38,7 +51,7 @@ class Vault {
     const key = deriveKey(password, salt)
     const verifier = encrypt(key, VERIFIER_PLAINTEXT)
     const file: VaultFile = { salt, verifier, secrets: {} }
-    writeFileSync(vaultPath(), JSON.stringify(file, null, 2), 'utf8')
+    writeVaultFile(file)
     this.file = file
     this.key = key
   }
@@ -64,7 +77,32 @@ class Vault {
 
   private persist(): void {
     if (!this.file) return
-    writeFileSync(vaultPath(), JSON.stringify(this.file, null, 2), 'utf8')
+    writeVaultFile(this.file)
+  }
+
+  /**
+   * Re-keys the vault: every secret is decrypted with the old key and re-encrypted
+   * under a key derived from the new password and a fresh salt.
+   */
+  changePassword(current: string, next: string): void {
+    const { key: oldKey, file } = this.requireUnlocked()
+    if (!deriveKey(current, file.salt).equals(oldKey)) throw new WrongPasswordError()
+
+    const plaintexts = new Map<string, string>()
+    for (const [ref, payload] of Object.entries(file.secrets)) {
+      plaintexts.set(ref, decrypt(oldKey, payload))
+    }
+
+    const salt = newSalt()
+    const key = deriveKey(next, salt)
+    const secrets: Record<string, EncryptedPayload> = {}
+    for (const [ref, value] of plaintexts) secrets[ref] = encrypt(key, value)
+
+    const rekeyed: VaultFile = { salt, verifier: encrypt(key, VERIFIER_PLAINTEXT), secrets }
+    // Only adopt the new key once the file is safely on disk.
+    writeVaultFile(rekeyed)
+    this.file = rekeyed
+    this.key = key
   }
 
   private requireUnlocked(): { key: Buffer; file: VaultFile } {

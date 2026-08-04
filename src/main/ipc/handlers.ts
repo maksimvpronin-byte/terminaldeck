@@ -7,6 +7,7 @@ import { sshManager } from '../ssh/SSHManager'
 import { sftpManager } from '../ssh/SFTPManager'
 import { portForwardManager } from '../ssh/PortForwardManager'
 import { readSshConfigHosts } from '../ssh/sshConfig'
+import { knownHosts } from '../ssh/KnownHosts'
 import type {
   SessionProfile,
   SessionGroup,
@@ -57,6 +58,21 @@ export function registerIpcHandlers(): void {
     vault.lock()
     return vault.status()
   })
+  ipcMain.handle(IPC.vaultChangePassword, (_e, current: string, next: string) => {
+    try {
+      vault.changePassword(current, next)
+      return { ok: true }
+    } catch (err) {
+      if (err instanceof WrongPasswordError) return { ok: false, error: err.message }
+      throw err
+    }
+  })
+
+  // --- Trusted host keys ---
+  ipcMain.handle(IPC.knownHostsList, () =>
+    Object.entries(knownHosts.all()).map(([host, fingerprint]) => ({ host, fingerprint }))
+  )
+  ipcMain.handle(IPC.knownHostsRemove, (_e, host: string) => knownHosts.removeByKey(host))
 
   // --- Session store ---
   ipcMain.handle(IPC.storeLoad, () => sessionStore.getAll())

@@ -4,6 +4,11 @@ export const IPC = {
   vaultCreate: 'vault:create',
   vaultUnlock: 'vault:unlock',
   vaultLock: 'vault:lock',
+  vaultChangePassword: 'vault:changePassword',
+
+  // Trusted host keys
+  knownHostsList: 'knownHosts:list',
+  knownHostsRemove: 'knownHosts:remove',
 
   // Session store (groups + saved connections, metadata only)
   storeLoad: 'store:load',
