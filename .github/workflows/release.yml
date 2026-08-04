@@ -6,6 +6,11 @@ on:
       - 'v*'
   workflow_dispatch:
 
+# electron-builder creates the release and uploads to it; the default token is
+# read-only in repositories created after the permissions change.
+permissions:
+  contents: write
+
 jobs:
   build:
     strategy:
