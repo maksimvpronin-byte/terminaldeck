@@ -10,10 +10,16 @@ import {
   splitLeaf,
   setAllBroadcast,
   collectLeaves,
+  collectBroadcastTargets,
   type PaneNode,
   type PaneTarget
 } from './paneTree'
-import type { SessionGroup, SessionProfile, SessionStoreData } from '../../../shared/types'
+import type {
+  SessionGroup,
+  SessionProfile,
+  SessionStoreData,
+  Snippet
+} from '../../../shared/types'
 
 export type { PaneNode, PaneTarget }
 export { collectConnectionIds, collectBroadcastTargets, collectLeaves } from './paneTree'
@@ -46,6 +52,13 @@ interface AppState {
   removeGroup: (id: string) => Promise<void>
   moveSession: (sessionId: string, groupId: string | null) => Promise<void>
   moveGroup: (groupId: string, parentId: string | null) => Promise<void>
+
+  snippets: Snippet[]
+  loadSnippets: () => Promise<void>
+  upsertSnippet: (snippet: Snippet) => Promise<void>
+  removeSnippet: (id: string) => Promise<void>
+  /** Sends text to the focused terminal, or to all broadcast targets when broadcast is on. */
+  sendToTerminals: (text: string, execute: boolean) => number
 
   openTab: (title: string, target: PaneTarget) => string
   closeTab: (tabId: string) => void
@@ -152,6 +165,43 @@ export const useStore = create<AppState>((set, get) => ({
       cursor = groups.find((g) => g.id === cursor)?.parentId ?? null
     }
     await get().upsertGroup({ ...group, parentId })
+  },
+
+  snippets: [],
+
+  loadSnippets: async () => {
+    set({ snippets: await window.td.snippets.list() })
+  },
+
+  upsertSnippet: async (snippet) => {
+    const saved = await window.td.snippets.save(snippet)
+    set((s) => ({
+      snippets: s.snippets.some((x) => x.id === saved.id)
+        ? s.snippets.map((x) => (x.id === saved.id ? saved : x))
+        : [...s.snippets, saved]
+    }))
+  },
+
+  removeSnippet: async (id) => {
+    await window.td.snippets.remove(id)
+    set((s) => ({ snippets: s.snippets.filter((x) => x.id !== id) }))
+  },
+
+  sendToTerminals: (text, execute) => {
+    const s = get()
+    const tab = s.tabs.find((t) => t.id === s.activeTabId)
+    if (!tab) return 0
+    const own = collectLeaves(tab.root).find((l) => l.id === tab.activePaneId)?.connectionId
+    const targets = s.broadcast
+      ? s.tabs.flatMap((t) => collectBroadcastTargets(t.root))
+      : own
+        ? [own]
+        : []
+    // Trailing newline is what actually runs the command; without it the text
+    // just lands on the prompt for the user to review.
+    const payload = execute ? (text.endsWith('\n') ? text : `${text}\n`) : text
+    for (const cid of targets) window.td.ssh.write(cid, payload)
+    return targets.length
   },
 
   openTab: (title, target) => {

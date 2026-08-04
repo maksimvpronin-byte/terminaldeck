@@ -17,6 +17,11 @@ export const IPC = {
   storeSaveGroup: 'store:saveGroup',
   storeDeleteGroup: 'store:deleteGroup',
 
+  // Snippets
+  snippetsList: 'snippets:list',
+  snippetsSave: 'snippets:save',
+  snippetsDelete: 'snippets:delete',
+
   // SSH connection lifecycle
   sshConnect: 'ssh:connect',
   sshQuickConnect: 'ssh:quickConnect',

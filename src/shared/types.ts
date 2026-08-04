@@ -71,6 +71,15 @@ export interface TerminalResizePayload {
   rows: number
 }
 
+export interface Snippet {
+  id: string
+  name: string
+  command: string
+  tags: string[]
+  createdAt: number
+  updatedAt: number
+}
+
 export type UpdateState =
   | { status: 'idle' }
   | { status: 'available'; version: string }

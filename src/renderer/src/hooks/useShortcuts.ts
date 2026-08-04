@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useStore, type PaneNode } from '../state/store'
 
 const IDLE_LOCK_MS = 15 * 60 * 1000
@@ -7,7 +7,10 @@ const IDLE_LOCK_MS = 15 * 60 * 1000
  * Window-level shortcuts. Registered in the capture phase so they win over
  * xterm.js, which otherwise swallows the keystroke into the remote shell.
  */
-export function useShortcuts(): void {
+export function useShortcuts(actions: { openSnippets: () => void }): void {
+  const openSnippetsRef = useRef(actions.openSnippets)
+  openSnippetsRef.current = actions.openSnippets
+
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent): void {
       const mod = e.metaKey || e.ctrlKey
@@ -60,6 +63,12 @@ export function useShortcuts(): void {
           e.preventDefault()
           e.stopPropagation()
           state.lockVault()
+          break
+        }
+        case 'k': {
+          e.preventDefault()
+          e.stopPropagation()
+          openSnippetsRef.current()
           break
         }
         default:

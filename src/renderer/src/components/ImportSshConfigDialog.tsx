@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { nanoid } from 'nanoid'
 import type { SessionProfile, SshConfigHost } from '../../../shared/types'
 import { useStore } from '../state/store'
+import ModalBackdrop from './ModalBackdrop'
 
 export default function ImportSshConfigDialog({ onClose }: { onClose: () => void }): JSX.Element {
   const sessions = useStore((s) => s.sessions)
@@ -80,7 +81,7 @@ export default function ImportSshConfigDialog({ onClose }: { onClose: () => void
   }
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <ModalBackdrop onClose={onClose}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <h2>Import from ~/.ssh/config</h2>
 
@@ -129,6 +130,6 @@ export default function ImportSshConfigDialog({ onClose }: { onClose: () => void
           </button>
         </div>
       </div>
-    </div>
+    </ModalBackdrop>
   )
 }

@@ -8,6 +8,7 @@ import SessionDialog from './SessionDialog'
 import QuickConnectDialog from './QuickConnectDialog'
 import ImportSshConfigDialog from './ImportSshConfigDialog'
 import SettingsDialog from './SettingsDialog'
+import ModalBackdrop from './ModalBackdrop'
 
 const ROOT_TARGET = '__root__'
 const COLLAPSED_KEY = 'terminaldeck.collapsedGroups'
@@ -21,7 +22,11 @@ function loadCollapsed(): Set<string> {
   }
 }
 
-export default function Sidebar(): JSX.Element {
+export default function Sidebar({
+  onOpenSnippets
+}: {
+  onOpenSnippets: () => void
+}): JSX.Element {
   const groups = useStore((s) => s.groups)
   const sessions = useStore((s) => s.sessions)
   const upsertGroup = useStore((s) => s.upsertGroup)
@@ -203,7 +208,10 @@ export default function Sidebar(): JSX.Element {
         <button style={{ flex: 1 }} onClick={() => setShowQuickConnect(true)}>
           Quick connect…
         </button>
-        <button title="Terminal settings" onClick={() => setShowSettings(true)}>
+        <button title="Snippets (⌘K)" onClick={onOpenSnippets}>
+          ⌘
+        </button>
+        <button title="Settings" onClick={() => setShowSettings(true)}>
           ⚙
         </button>
         <button title="Lock vault (⌘L)" onClick={() => lockVault()}>
@@ -256,7 +264,7 @@ export default function Sidebar(): JSX.Element {
       {showSettings && <SettingsDialog onClose={() => setShowSettings(false)} />}
 
       {newGroupParent !== undefined && (
-        <div className="modal-backdrop" onClick={() => setNewGroupParent(undefined)}>
+        <ModalBackdrop onClose={() => setNewGroupParent(undefined)}>
           <div
             className="modal-card"
             style={{ width: 340 }}
@@ -282,7 +290,7 @@ export default function Sidebar(): JSX.Element {
               </button>
             </div>
           </div>
-        </div>
+        </ModalBackdrop>
       )}
     </div>
   )

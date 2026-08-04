@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useStore } from '../state/store'
 import { FONT_CHOICES, THEMES, DEFAULT_SETTINGS, themeOf } from '../state/settings'
 import SecuritySettings from './SecuritySettings'
+import ModalBackdrop from './ModalBackdrop'
 
 export default function SettingsDialog({ onClose }: { onClose: () => void }): JSX.Element {
   const settings = useStore((s) => s.settings)
@@ -10,7 +11,7 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
   const [tab, setTab] = useState<'terminal' | 'security'>('terminal')
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <ModalBackdrop onClose={onClose}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <h2>Settings</h2>
 
@@ -137,6 +138,6 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
           </button>
         </div>
       </div>
-    </div>
+    </ModalBackdrop>
   )
 }

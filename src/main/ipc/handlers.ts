@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto'
 import { IPC } from '../../shared/ipc-channels'
 import { vault, WrongPasswordError } from '../vault/Vault'
 import { sessionStore } from '../store/SessionStore'
+import { snippetStore } from '../store/SnippetStore'
 import { sshManager } from '../ssh/SSHManager'
 import { sftpManager } from '../ssh/SFTPManager'
 import { portForwardManager } from '../ssh/PortForwardManager'
@@ -12,7 +13,8 @@ import type {
   SessionProfile,
   SessionGroup,
   QuickConnectParams,
-  PortForwardRule
+  PortForwardRule,
+  Snippet
 } from '../../shared/types'
 
 function focusedWin(): BrowserWindow {
@@ -91,6 +93,11 @@ export function registerIpcHandlers(): void {
   })
   ipcMain.handle(IPC.storeSaveGroup, (_e, group: SessionGroup) => sessionStore.saveGroup(group))
   ipcMain.handle(IPC.storeDeleteGroup, (_e, id: string) => sessionStore.deleteGroup(id))
+
+  // --- Snippets ---
+  ipcMain.handle(IPC.snippetsList, () => snippetStore.list())
+  ipcMain.handle(IPC.snippetsSave, (_e, snippet: Snippet) => snippetStore.save(snippet))
+  ipcMain.handle(IPC.snippetsDelete, (_e, id: string) => snippetStore.remove(id))
 
   // --- SSH ---
   ipcMain.handle(

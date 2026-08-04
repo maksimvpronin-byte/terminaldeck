@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from 'react'
 import type { SftpEntry } from '../../../shared/types'
+import ModalBackdrop from './ModalBackdrop'
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -438,7 +439,7 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
       )}
 
       {pendingDelete && (
-        <div className="modal-backdrop" onClick={() => setPendingDelete(null)}>
+        <ModalBackdrop onClose={() => setPendingDelete(null)}>
           <div className="modal-card" style={{ width: 380 }} onClick={(e) => e.stopPropagation()}>
             <h2>Delete {pendingDelete.length > 1 ? `${pendingDelete.length} items` : 'item'}?</h2>
             <p>
@@ -458,7 +459,7 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
               </button>
             </div>
           </div>
-        </div>
+        </ModalBackdrop>
       )}
     </div>
   )

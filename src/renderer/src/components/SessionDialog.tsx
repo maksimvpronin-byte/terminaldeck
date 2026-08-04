@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { nanoid } from 'nanoid'
 import type { AuthMethod, PortForwardRule, SessionProfile } from '../../../shared/types'
 import { useStore } from '../state/store'
+import ModalBackdrop from './ModalBackdrop'
 
 interface Props {
   initial?: SessionProfile
@@ -93,7 +94,7 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
   const otherSessions = sessions.filter((s) => s.id !== profile.id)
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <ModalBackdrop onClose={onClose}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <h2>{initial ? 'Edit session' : 'New session'}</h2>
 
@@ -265,6 +266,6 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
           </button>
         </div>
       </div>
-    </div>
+    </ModalBackdrop>
   )
 }

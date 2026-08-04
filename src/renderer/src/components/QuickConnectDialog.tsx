@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { AuthMethod, QuickConnectParams } from '../../../shared/types'
 import { useStore } from '../state/store'
+import ModalBackdrop from './ModalBackdrop'
 
 export default function QuickConnectDialog({ onClose }: { onClose: () => void }): JSX.Element {
   const openTab = useStore((s) => s.openTab)
@@ -37,7 +38,7 @@ export default function QuickConnectDialog({ onClose }: { onClose: () => void })
   }
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <ModalBackdrop onClose={onClose}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <h2>Quick connect</h2>
         <div className="form-row">
@@ -98,6 +99,6 @@ export default function QuickConnectDialog({ onClose }: { onClose: () => void })
           </button>
         </div>
       </div>
-    </div>
+    </ModalBackdrop>
   )
 }

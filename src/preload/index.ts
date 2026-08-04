@@ -9,7 +9,8 @@ import type {
   SessionStoreData,
   SftpEntry,
   SshConfigHost,
-  UpdateState
+  UpdateState,
+  Snippet
 } from '../shared/types'
 
 const api = {
@@ -38,6 +39,11 @@ const api = {
     saveGroup: (group: SessionGroup): Promise<SessionGroup> =>
       ipcRenderer.invoke(IPC.storeSaveGroup, group),
     deleteGroup: (id: string): Promise<void> => ipcRenderer.invoke(IPC.storeDeleteGroup, id)
+  },
+  snippets: {
+    list: (): Promise<Snippet[]> => ipcRenderer.invoke(IPC.snippetsList),
+    save: (snippet: Snippet): Promise<Snippet> => ipcRenderer.invoke(IPC.snippetsSave, snippet),
+    remove: (id: string): Promise<void> => ipcRenderer.invoke(IPC.snippetsDelete, id)
   },
   ssh: {
     connect: (sessionId: string, cols: number, rows: number): Promise<{ connectionId: string }> =>
