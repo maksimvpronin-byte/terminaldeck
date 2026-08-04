@@ -40,3 +40,6 @@ linux:
     - AppImage
     - deb
   category: Development
+  # .deb refuses to build without one; the GitHub noreply address keeps a personal
+  # address out of a publicly distributed package.
+  maintainer: TerminalDeck <maksimvpronin-byte@users.noreply.github.com>
