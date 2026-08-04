@@ -254,6 +254,44 @@ label {
   min-width: 0;
   flex-direction: column;
 }
+.session-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  vertical-align: baseline;
+}
+.tab-colour {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.colour-row {
+  display: flex;
+  gap: 6px;
+}
+.swatch {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid transparent;
+}
+.swatch.none {
+  background: var(--bg-3);
+  border-color: var(--border);
+}
+.swatch.selected {
+  border-color: var(--text);
+}
+.swatch:hover {
+  border-color: var(--text-dim);
+}
+
 .tab-badge {
   font-size: 9px;
   font-weight: 700;

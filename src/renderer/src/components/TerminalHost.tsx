@@ -12,6 +12,8 @@ interface Props {
   target: PaneTarget
   connectionId?: string
   active: boolean
+  /** Restored from a saved layout, so it starts idle rather than connecting. */
+  restored?: boolean
   onConnected: (connectionId: string) => void
   onFocus: () => void
   /** Returns every connection that should receive this pane's keystrokes. */
@@ -26,6 +28,7 @@ export default function TerminalHost({
   target,
   connectionId,
   active,
+  restored,
   onConnected,
   onFocus,
   resolveWriteTargets
@@ -162,6 +165,9 @@ export default function TerminalHost({
     })
 
     if (connIdRef.current) attachListeners(connIdRef.current)
+    // A restored pane waits for the user: dialling out to every saved host at
+    // launch would be surprising, and the vault may still be locked.
+    else if (restored) setClosed(true)
     else connect(generation)
 
     const resizeObserver = new ResizeObserver((entries) => {
@@ -290,7 +296,7 @@ export default function TerminalHost({
       {closed && (
         <div className="terminal-reconnect">
           <button className="primary" onClick={() => connect(generationRef.current)}>
-            Reconnect
+            {restored && !connIdRef.current ? 'Connect' : 'Reconnect'}
           </button>
         </div>
       )}

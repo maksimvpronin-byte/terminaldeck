@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { nanoid } from 'nanoid'
 import type { AuthMethod, PortForwardRule, SessionProfile } from '../../../shared/types'
 import { useStore } from '../state/store'
+import { SESSION_COLOURS } from '../state/colours'
 import ModalBackdrop from './ModalBackdrop'
 
 interface Props {
@@ -200,6 +201,28 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
               </option>
             ))}
           </select>
+        </label>
+
+        <label>
+          Colour
+          <div className="colour-row">
+            <button
+              type="button"
+              className={`swatch none ${!profile.color ? 'selected' : ''}`}
+              title="No colour"
+              onClick={() => set('color', undefined)}
+            />
+            {SESSION_COLOURS.map((c) => (
+              <button
+                type="button"
+                key={c.value}
+                className={`swatch ${profile.color === c.value ? 'selected' : ''}`}
+                style={{ background: c.value }}
+                title={c.name}
+                onClick={() => set('color', c.value)}
+              />
+            ))}
+          </div>
         </label>
 
         <label>

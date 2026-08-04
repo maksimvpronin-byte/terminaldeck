@@ -11,7 +11,11 @@ export type PaneNode =
       id: string
       title: string
       target: PaneTarget
+      /** Copied from the session profile so tabs and panes can be tinted. */
+      color?: string
       connectionId?: string
+      /** Came back from a saved layout: show it idle instead of dialling out on launch. */
+      restored?: boolean
       sftpOpen: boolean
       tunnelsOpen: boolean
       /** Whether this terminal takes part in broadcast input. */
@@ -27,13 +31,14 @@ export type PaneNode =
 
 export type LeafNode = Extract<PaneNode, { type: 'leaf' }>
 
-export function makeLeaf(title: string, target: PaneTarget): LeafNode {
+export function makeLeaf(title: string, target: PaneTarget, color?: string): LeafNode {
   return {
     type: 'leaf',
     id: nanoid(),
     connectionId: undefined,
     title,
     target,
+    color,
     sftpOpen: false,
     tunnelsOpen: false,
     broadcastEnabled: true

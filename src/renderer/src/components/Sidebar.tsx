@@ -62,7 +62,7 @@ export default function Sidebar({
   }
 
   function connect(session: SessionProfile): void {
-    openTab(session.name, { kind: 'session', sessionId: session.id })
+    openTab(session.name, { kind: 'session', sessionId: session.id }, session.color)
   }
 
   async function submitGroup(): Promise<void> {
@@ -130,7 +130,8 @@ export default function Sidebar({
             'row',
             'after',
             s.name,
-            { kind: 'session', sessionId: s.id }
+            { kind: 'session', sessionId: s.id },
+            s.color
           )
         }
       },
@@ -186,7 +187,12 @@ export default function Sidebar({
         onDoubleClick={() => connect(s)}
       >
         <span className="name" onClick={() => connect(s)}>
-          🖥 {s.name}
+          <span
+            className="session-dot"
+            style={s.color ? { background: s.color } : undefined}
+            aria-hidden="true"
+          />
+          {s.name}
         </span>
         <div className="actions">
           <button onClick={() => setEditingSession(s)}>Edit</button>

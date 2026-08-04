@@ -82,7 +82,10 @@ export default function Pane({
       onDrop={onDrop}
     >
       {dropEdge && <div className={`pane-drop-hint ${dropEdge}`} />}
-      <div className={`pane-toolbar ${broadcast && node.broadcastEnabled ? 'broadcasting' : ''}`}>
+      <div
+        className={`pane-toolbar ${broadcast && node.broadcastEnabled ? 'broadcasting' : ''}`}
+        style={node.color ? { borderLeft: `3px solid ${node.color}` } : undefined}
+      >
         <span>{node.title}</span>
         <div className="actions">
           {broadcast && (
@@ -129,6 +132,7 @@ export default function Pane({
           target={node.target}
           connectionId={node.connectionId}
           active={isActive}
+          restored={node.restored}
           onFocus={() => setActivePane(tabId, node.id)}
           onConnected={(connectionId) => setPaneConnection(tabId, node.id, connectionId)}
           resolveWriteTargets={(own) => {

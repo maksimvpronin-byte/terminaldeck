@@ -13,6 +13,7 @@ files:
 asarUnpack:
   - '**/node_modules/ssh2/**'
 mac:
+  icon: resources/icon.png
   target:
     - target: dmg
       arch: [x64, arm64]
@@ -27,6 +28,7 @@ mac:
   # Set to true once APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID exist.
   notarize: false
 win:
+  icon: resources/icon.png
   target:
     - target: nsis
       arch: [x64, arm64]
@@ -36,6 +38,7 @@ nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
 linux:
+  icon: resources/icon.png
   target:
     - AppImage
     - deb

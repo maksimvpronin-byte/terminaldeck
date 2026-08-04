@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { nanoid } from 'nanoid'
 import { loadSettings, saveSettings, type TerminalSettings } from './settings'
+import { loadLayout, saveLayout } from './layout'
 import {
   makeLeaf,
   mapPane,
@@ -60,7 +61,7 @@ interface AppState {
   /** Sends text to the focused terminal, or to all broadcast targets when broadcast is on. */
   sendToTerminals: (text: string, execute: boolean) => number
 
-  openTab: (title: string, target: PaneTarget) => string
+  openTab: (title: string, target: PaneTarget, color?: string) => string
   closeTab: (tabId: string) => void
   setActiveTab: (tabId: string) => void
   setActivePane: (tabId: string, paneId: string) => void
@@ -72,7 +73,8 @@ interface AppState {
     dir: 'row' | 'col',
     position: 'before' | 'after',
     title: string,
-    target: PaneTarget
+    target: PaneTarget,
+    color?: string
   ) => void
   closePane: (tabId: string, paneId: string) => void
   toggleSftp: (tabId: string, paneId: string) => void
@@ -83,11 +85,13 @@ interface AppState {
   resizeSplit: (tabId: string, splitId: string, sizes: [number, number]) => void
 }
 
+const restoredLayout = loadLayout()
+
 export const useStore = create<AppState>((set, get) => ({
   groups: [],
   sessions: [],
-  tabs: [],
-  activeTabId: null,
+  tabs: restoredLayout.tabs,
+  activeTabId: restoredLayout.activeTabId,
   vaultLocked: false,
   broadcast: false,
   settings: loadSettings(),
@@ -204,8 +208,8 @@ export const useStore = create<AppState>((set, get) => ({
     return targets.length
   },
 
-  openTab: (title, target) => {
-    const leaf = makeLeaf(title, target)
+  openTab: (title, target, color) => {
+    const leaf = makeLeaf(title, target, color)
     const tab: WorkspaceTab = { id: nanoid(), title, root: leaf, activePaneId: leaf.id }
     set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }))
     return leaf.id
@@ -240,14 +244,14 @@ export const useStore = create<AppState>((set, get) => ({
   splitPane: (tabId, paneId, dir) => {
     const source = findPane(get().tabs.find((t) => t.id === tabId)?.root ?? null, paneId)
     if (!source || source.type !== 'leaf') return
-    get().splitPaneWith(tabId, paneId, dir, 'after', source.title, source.target)
+    get().splitPaneWith(tabId, paneId, dir, 'after', source.title, source.target, source.color)
   },
 
-  splitPaneWith: (tabId, paneId, dir, position, title, target) => {
+  splitPaneWith: (tabId, paneId, dir, position, title, target, color) => {
     set((s) => ({
       tabs: s.tabs.map((t) => {
         if (t.id !== tabId) return t
-        const newLeaf = makeLeaf(title, target)
+        const newLeaf = makeLeaf(title, target, color)
         const root = splitLeaf(t.root, paneId, dir, position, newLeaf)
         return root ? { ...t, root, activePaneId: newLeaf.id } : t
       })
@@ -329,3 +333,14 @@ export const useStore = create<AppState>((set, get) => ({
     }))
   }
 }))
+
+// Persist the workspace shape whenever it changes, so a restart brings the tabs
+// and splits back. Connections themselves are not restored — see layout.ts.
+let lastTabs = useStore.getState().tabs
+let lastActive = useStore.getState().activeTabId
+useStore.subscribe((state) => {
+  if (state.tabs === lastTabs && state.activeTabId === lastActive) return
+  lastTabs = state.tabs
+  lastActive = state.activeTabId
+  saveLayout(state.tabs, state.activeTabId)
+})

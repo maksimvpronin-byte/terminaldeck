@@ -29,6 +29,10 @@ export default function Workspace(): JSX.Element {
             }}
             onClick={() => setActiveTab(t.id)}
           >
+            {(() => {
+              const colour = collectLeaves(t.root).find((l) => l.color)?.color
+              return colour ? <span className="tab-colour" style={{ background: colour }} /> : null
+            })()}
             <span>{t.title}</span>
             {broadcast && collectLeaves(t.root).some((l) => l.broadcastEnabled) && (
               <span className="tab-badge">⇉</span>
