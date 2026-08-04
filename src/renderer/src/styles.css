@@ -1,0 +1,367 @@
+:root {
+  --bg-0: #17181c;
+  --bg-1: #1e2025;
+  --bg-2: #26282e;
+  --bg-3: #303339;
+  --border: #383b42;
+  --text: #e4e6eb;
+  --text-dim: #9aa0ab;
+  --accent: #5b9dff;
+  --accent-dim: #2e4a75;
+  --danger: #e5534b;
+  --success: #3fb950;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg-0);
+  color: var(--text);
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Ubuntu, Roboto, sans-serif;
+  font-size: 13px;
+  overflow: hidden;
+}
+
+button {
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+button:hover {
+  background: var(--bg-2);
+  border-color: var(--accent);
+}
+button.primary {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+input,
+select {
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 6px 8px;
+}
+input:focus,
+select:focus {
+  outline: 1px solid var(--accent);
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+/* --- gate screens --- */
+.gate {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.gate-card {
+  width: 340px;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.gate-card h1 {
+  font-size: 18px;
+  margin: 0 0 4px;
+}
+.gate-card p {
+  color: var(--text-dim);
+  margin: 0 0 8px;
+  font-size: 12px;
+}
+.error-text {
+  color: var(--danger);
+  font-size: 12px;
+}
+
+/* --- layout --- */
+.app-shell {
+  display: flex;
+  height: 100%;
+}
+.sidebar {
+  width: 260px;
+  min-width: 200px;
+  background: var(--bg-1);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+}
+.sidebar-header {
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 6px;
+}
+.sidebar-tree {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px;
+}
+.tree-group {
+  margin-bottom: 4px;
+}
+.tree-group-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  padding: 6px 6px;
+  cursor: default;
+}
+.tree-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  gap: 6px;
+}
+.tree-item:hover {
+  background: var(--bg-2);
+}
+.tree-item .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tree-item .actions {
+  display: none;
+  gap: 4px;
+}
+.tree-item:hover .actions {
+  display: flex;
+}
+.tree-item .actions button {
+  padding: 2px 6px;
+  font-size: 11px;
+}
+
+.workspace {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.tab-bar {
+  display: flex;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-right: 1px solid var(--border);
+  cursor: pointer;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.tab.active {
+  color: var(--text);
+  background: var(--bg-0);
+}
+.tab .close {
+  opacity: 0.6;
+}
+.tab .close:hover {
+  opacity: 1;
+  color: var(--danger);
+}
+.empty-workspace {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+}
+
+.split-container {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+}
+.split-container.col {
+  flex-direction: column;
+}
+.split-child {
+  overflow: hidden;
+  position: relative;
+}
+.split-divider {
+  background: var(--border);
+  flex: 0 0 4px;
+  cursor: col-resize;
+}
+.split-container.col > .split-divider {
+  cursor: row-resize;
+}
+
+.pane {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid transparent;
+}
+.pane.active {
+  border-color: var(--accent-dim);
+}
+.pane-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.pane-toolbar .actions {
+  display: flex;
+  gap: 4px;
+}
+.pane-toolbar button {
+  padding: 2px 6px;
+  font-size: 11px;
+}
+.pane-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.terminal-host {
+  flex: 1;
+  min-width: 0;
+  padding: 4px;
+}
+.sftp-panel {
+  width: 320px;
+  border-left: 1px solid var(--border);
+  background: var(--bg-1);
+  display: flex;
+  flex-direction: column;
+}
+.sftp-path {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sftp-list {
+  flex: 1;
+  overflow-y: auto;
+}
+.sftp-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+.sftp-row:hover {
+  background: var(--bg-2);
+}
+.sftp-row .size {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.modal-card {
+  width: 460px;
+  max-height: 85vh;
+  overflow-y: auto;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.modal-card h2 {
+  margin: 0;
+  font-size: 15px;
+}
+.form-row {
+  display: flex;
+  gap: 10px;
+}
+.form-row > label {
+  flex: 1;
+}
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-direction: row;
+  color: var(--text);
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 6px;
+}
+.pf-rule {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 6px;
+}
+.pf-rule input,
+.pf-rule select {
+  padding: 4px 6px;
+}

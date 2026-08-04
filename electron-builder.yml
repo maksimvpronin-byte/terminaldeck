@@ -1,0 +1,31 @@
+appId: com.terminaldeck.app
+productName: TerminalDeck
+directories:
+  buildResources: resources
+  output: dist
+files:
+  - out/**/*
+  - package.json
+asarUnpack:
+  - '**/node_modules/ssh2/**'
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+    - target: zip
+      arch: [x64, arm64]
+  category: public.app-category.developer-tools
+win:
+  target:
+    - target: nsis
+      arch: [x64, arm64]
+    - target: portable
+      arch: [x64, arm64]
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Development

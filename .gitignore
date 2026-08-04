@@ -1,0 +1,10 @@
+node_modules/
+out/
+dist/
+build/
+*.log
+*.tsbuildinfo
+.DS_Store
+.vscode/
+.idea/
+.claude/settings.local.json

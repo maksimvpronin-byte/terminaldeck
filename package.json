@@ -1,0 +1,43 @@
+{
+  "name": "terminaldeck",
+  "version": "0.1.0",
+  "description": "Cross-platform SSH/SFTP terminal manager (MobaXterm/Royal TSX alternative)",
+  "main": "./out/main/index.js",
+  "author": "TerminalDeck",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "start": "electron-vite preview",
+    "build:mac": "electron-vite build && electron-builder --mac",
+    "build:mac:dir": "electron-vite build && electron-builder --mac dir",
+    "build:win": "electron-vite build && electron-builder --win",
+    "build:linux": "electron-vite build && electron-builder --linux"
+  },
+  "dependencies": {
+    "ssh2": "^1.16.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "xterm": "^5.3.0",
+    "xterm-addon-fit": "^0.8.0",
+    "xterm-addon-search": "^0.13.0",
+    "zustand": "^4.5.5",
+    "nanoid": "^5.0.7"
+  },
+  "devDependencies": {
+    "@electron-toolkit/tsconfig": "^1.0.1",
+    "@electron-toolkit/preload": "^3.0.1",
+    "@electron-toolkit/utils": "^3.0.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@types/ssh2": "^1.15.0",
+    "@types/node": "^20.14.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "electron": "^33.0.0",
+    "electron-builder": "^24.13.3",
+    "electron-vite": "^2.3.0",
+    "typescript": "^5.5.4"
+  }
+}
