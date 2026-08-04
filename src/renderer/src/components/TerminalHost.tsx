@@ -4,6 +4,8 @@ import { FitAddon } from 'xterm-addon-fit'
 import { SearchAddon } from 'xterm-addon-search'
 import 'xterm/css/xterm.css'
 import type { PaneTarget } from '../state/store'
+import { useStore } from '../state/store'
+import { themeOf } from '../state/settings'
 
 interface Props {
   target: PaneTarget
@@ -43,6 +45,8 @@ export default function TerminalHost({
   onConnectedRef.current = onConnected
   const resolveWriteTargetsRef = useRef(resolveWriteTargets)
   resolveWriteTargetsRef.current = resolveWriteTargets
+
+  const settings = useStore((s) => s.settings)
 
   const [closed, setClosed] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -106,13 +110,15 @@ export default function TerminalHost({
   useEffect(() => {
     if (!hostRef.current) return
     const generation = ++generationRef.current
+    const s = useStore.getState().settings
     const term = new Terminal({
       convertEol: true,
-      fontFamily: 'Menlo, Consolas, monospace',
-      fontSize: 13,
-      theme: { background: '#17181c', foreground: '#e4e6eb' },
-      cursorBlink: true,
-      scrollback: 10000
+      fontFamily: s.fontFamily,
+      fontSize: s.fontSize,
+      theme: themeOf(s),
+      cursorBlink: s.cursorBlink,
+      cursorStyle: s.cursorStyle,
+      scrollback: s.scrollback
     })
     const fit = new FitAddon()
     const search = new SearchAddon()
@@ -164,6 +170,20 @@ export default function TerminalHost({
   useEffect(() => {
     if (active) termRef.current?.focus()
   }, [active])
+
+  // Apply appearance changes to terminals that are already open.
+  useEffect(() => {
+    const term = termRef.current
+    if (!term) return
+    term.options.fontFamily = settings.fontFamily
+    term.options.fontSize = settings.fontSize
+    term.options.theme = themeOf(settings)
+    term.options.cursorBlink = settings.cursorBlink
+    term.options.cursorStyle = settings.cursorStyle
+    term.options.scrollback = settings.scrollback
+    fitRef.current?.fit()
+    if (connIdRef.current) window.td.ssh.resize(connIdRef.current, term.cols, term.rows)
+  }, [settings])
 
   function handleClick(): void {
     onFocus()

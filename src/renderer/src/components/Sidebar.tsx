@@ -3,15 +3,14 @@ import { nanoid } from 'nanoid'
 import type { DragEvent as ReactDragEvent } from 'react'
 import type { SessionProfile } from '../../../shared/types'
 import { useStore } from '../state/store'
+import { DRAG_MIME, type DragItem } from '../state/dnd'
 import SessionDialog from './SessionDialog'
 import QuickConnectDialog from './QuickConnectDialog'
 import ImportSshConfigDialog from './ImportSshConfigDialog'
+import SettingsDialog from './SettingsDialog'
 
-const DRAG_MIME = 'application/x-terminaldeck-item'
 const ROOT_TARGET = '__root__'
 const COLLAPSED_KEY = 'terminaldeck.collapsedGroups'
-
-type DragItem = { kind: 'session' | 'group'; id: string }
 
 function loadCollapsed(): Set<string> {
   try {
@@ -36,6 +35,7 @@ export default function Sidebar(): JSX.Element {
   const [editingSession, setEditingSession] = useState<SessionProfile | undefined | 'new'>(undefined)
   const [showQuickConnect, setShowQuickConnect] = useState(false)
   const [showImport, setShowImport] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
   const [query, setQuery] = useState('')
   // undefined = dialog closed; null = creating a top-level group
   const [newGroupParent, setNewGroupParent] = useState<string | null | undefined>(undefined)
@@ -83,7 +83,8 @@ export default function Sidebar(): JSX.Element {
   function startDrag(e: ReactDragEvent, item: DragItem): void {
     e.stopPropagation()
     e.dataTransfer.setData(DRAG_MIME, JSON.stringify(item))
-    e.dataTransfer.effectAllowed = 'move'
+    // Panes accept the same payload as a 'copy' (open here), the tree as a 'move'.
+    e.dataTransfer.effectAllowed = 'copyMove'
   }
 
   function allowDrop(e: ReactDragEvent, targetId: string | null): void {
@@ -102,7 +103,7 @@ export default function Sidebar(): JSX.Element {
     if (!raw) return
     const item = JSON.parse(raw) as DragItem
     if (item.kind === 'session') await moveSession(item.id, targetGroupId)
-    else await moveGroup(item.id, targetGroupId)
+    else if (item.kind === 'group') await moveGroup(item.id, targetGroupId)
   }
 
   function renderSession(s: SessionProfile, paddingLeft: number): JSX.Element {
@@ -202,6 +203,9 @@ export default function Sidebar(): JSX.Element {
         <button style={{ flex: 1 }} onClick={() => setShowQuickConnect(true)}>
           Quick connect…
         </button>
+        <button title="Terminal settings" onClick={() => setShowSettings(true)}>
+          ⚙
+        </button>
         <button title="Lock vault (⌘L)" onClick={() => lockVault()}>
           🔒
         </button>
@@ -249,6 +253,7 @@ export default function Sidebar(): JSX.Element {
       )}
       {showQuickConnect && <QuickConnectDialog onClose={() => setShowQuickConnect(false)} />}
       {showImport && <ImportSshConfigDialog onClose={() => setShowImport(false)} />}
+      {showSettings && <SettingsDialog onClose={() => setShowSettings(false)} />}
 
       {newGroupParent !== undefined && (
         <div className="modal-backdrop" onClick={() => setNewGroupParent(undefined)}>

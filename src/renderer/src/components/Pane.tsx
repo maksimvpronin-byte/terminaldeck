@@ -1,5 +1,8 @@
-import type { PaneNode } from '../state/store'
-import { useStore, collectBroadcastTargets } from '../state/store'
+import { useRef, useState } from 'react'
+import type { DragEvent as ReactDragEvent } from 'react'
+import type { PaneNode, PaneTarget } from '../state/store'
+import { useStore, collectBroadcastTargets, collectLeaves } from '../state/store'
+import { DRAG_MIME, edgeFromPoint, edgeToSplit, type DragItem, type DropEdge } from '../state/dnd'
 import TerminalHost from './TerminalHost'
 import SftpPanel from './SftpPanel'
 import TunnelsPanel from './TunnelsPanel'
@@ -22,10 +25,62 @@ export default function Pane({
   const broadcast = useStore((s) => s.broadcast)
   const togglePaneBroadcast = useStore((s) => s.togglePaneBroadcast)
 
+  const splitPaneWith = useStore((s) => s.splitPaneWith)
+  const closeTab = useStore((s) => s.closeTab)
+  const rootRef = useRef<HTMLDivElement | null>(null)
+  const [dropEdge, setDropEdge] = useState<DropEdge | null>(null)
+
   const isActive = isActiveTab && activePaneId === node.id
 
+  function onDragOver(e: ReactDragEvent): void {
+    if (!e.dataTransfer.types.includes(DRAG_MIME) || !rootRef.current) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+    setDropEdge(edgeFromPoint(rootRef.current.getBoundingClientRect(), e.clientX, e.clientY))
+  }
+
+  function onDrop(e: ReactDragEvent): void {
+    e.preventDefault()
+    e.stopPropagation()
+    const edge = dropEdge
+    setDropEdge(null)
+    const raw = e.dataTransfer.getData(DRAG_MIME)
+    if (!raw || !edge) return
+    const item = JSON.parse(raw) as DragItem
+
+    let title: string
+    let target: PaneTarget
+    if (item.kind === 'session') {
+      const session = useStore.getState().sessions.find((s) => s.id === item.id)
+      if (!session) return
+      title = session.name
+      target = { kind: 'session', sessionId: session.id }
+    } else if (item.kind === 'tab') {
+      const sourceTab = useStore.getState().tabs.find((t) => t.id === item.id)
+      if (!sourceTab || sourceTab.id === tabId) return
+      const leaf = collectLeaves(sourceTab.root)[0]
+      if (!leaf) return
+      title = leaf.title
+      target = leaf.target
+    } else {
+      return // groups have no terminal to open
+    }
+
+    const { dir, position } = edgeToSplit(edge)
+    splitPaneWith(tabId, node.id, dir, position, title, target)
+    // A dragged tab moves here, so retire the original.
+    if (item.kind === 'tab') closeTab(item.id)
+  }
+
   return (
-    <div className={`pane ${isActive ? 'active' : ''}`}>
+    <div
+      className={`pane ${isActive ? 'active' : ''}`}
+      ref={rootRef}
+      onDragOver={onDragOver}
+      onDragLeave={() => setDropEdge(null)}
+      onDrop={onDrop}
+    >
+      {dropEdge && <div className={`pane-drop-hint ${dropEdge}`} />}
       <div className={`pane-toolbar ${broadcast && node.broadcastEnabled ? 'broadcasting' : ''}`}>
         <span>{node.title}</span>
         <div className="actions">

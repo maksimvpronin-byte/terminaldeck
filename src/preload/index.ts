@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { IPC } from '../shared/ipc-channels'
 import type {
   SessionProfile,
@@ -94,6 +94,10 @@ const api = {
     stop: (connectionId: string, ruleId: string): Promise<void> =>
       ipcRenderer.invoke(IPC.pfStop, connectionId, ruleId),
     status: (connectionId: string): Promise<string[]> => ipcRenderer.invoke(IPC.pfStatus, connectionId)
+  },
+  files: {
+    /** Electron 32+ dropped File.path; this is the supported replacement. */
+    pathFor: (file: File): string => webUtils.getPathForFile(file)
   },
   importer: {
     sshConfigHosts: (): Promise<SshConfigHost[]> => ipcRenderer.invoke(IPC.sshConfigRead)

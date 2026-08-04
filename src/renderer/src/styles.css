@@ -348,6 +348,39 @@ label {
   display: flex;
   flex-direction: column;
   border: 1px solid transparent;
+  position: relative;
+}
+/* Shows which half a dragged host/tab will occupy once dropped. */
+.pane-drop-hint {
+  position: absolute;
+  z-index: 20;
+  pointer-events: none;
+  background: rgba(91, 157, 255, 0.25);
+  border: 1px solid var(--accent);
+}
+.pane-drop-hint.left {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 50%;
+}
+.pane-drop-hint.right {
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 50%;
+}
+.pane-drop-hint.top {
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 50%;
+}
+.pane-drop-hint.bottom {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 50%;
 }
 .pane.active {
   border-color: var(--accent-dim);
@@ -420,14 +453,31 @@ label {
   display: flex;
   flex-direction: column;
 }
+.sftp-panel.drop-target {
+  outline: 2px dashed var(--accent);
+  outline-offset: -4px;
+  background: var(--accent-dim);
+}
 .sftp-path {
-  padding: 6px 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 8px;
   border-bottom: 1px solid var(--border);
   font-size: 11px;
   color: var(--text-dim);
+}
+.sftp-path-text {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.sftp-path button {
+  padding: 1px 7px;
+  font-size: 12px;
+  line-height: 1.2;
 }
 .sftp-list {
   flex: 1;
@@ -445,6 +495,68 @@ label {
 .sftp-row .size {
   color: var(--text-dim);
   font-size: 11px;
+}
+.sftp-row.selected {
+  background: var(--accent-dim);
+}
+.sftp-row .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rename-input {
+  width: 100%;
+  padding: 1px 4px;
+  font-size: 12px;
+}
+
+/* --- context menu --- */
+.context-menu {
+  position: fixed;
+  z-index: 200;
+  min-width: 160px;
+  padding: 4px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+}
+.context-menu button {
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  text-align: left;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+.context-menu button:hover {
+  background: var(--bg-3);
+  border: none;
+}
+.context-menu button.danger,
+button.danger {
+  color: var(--danger);
+}
+button.danger:hover {
+  border-color: var(--danger);
+}
+.context-sep {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--border);
+}
+.delete-list {
+  max-height: 160px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 6px 8px;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .sftp-progress {
@@ -590,6 +702,15 @@ label {
   gap: 8px;
   margin-top: 6px;
 }
+.theme-preview {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px;
+  line-height: 1.5;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
 .pf-rule {
   display: flex;
   gap: 6px;

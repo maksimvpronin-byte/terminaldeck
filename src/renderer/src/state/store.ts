@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { nanoid } from 'nanoid'
+import { loadSettings, saveSettings, type TerminalSettings } from './settings'
 import type {
   SessionGroup,
   SessionProfile,
@@ -63,6 +64,9 @@ interface AppState {
   vaultLocked: boolean
   /** When on, typing in any terminal is mirrored to every open pane, in every tab. */
   broadcast: boolean
+  settings: TerminalSettings
+
+  updateSettings: (patch: Partial<TerminalSettings>) => void
 
   lockVault: () => Promise<void>
   setVaultUnlocked: () => void
@@ -80,6 +84,14 @@ interface AppState {
   setActivePane: (tabId: string, paneId: string) => void
   setPaneConnection: (tabId: string, paneId: string, connectionId: string) => void
   splitPane: (tabId: string, paneId: string, dir: 'row' | 'col') => void
+  splitPaneWith: (
+    tabId: string,
+    paneId: string,
+    dir: 'row' | 'col',
+    position: 'before' | 'after',
+    title: string,
+    target: PaneTarget
+  ) => void
   closePane: (tabId: string, paneId: string) => void
   toggleSftp: (tabId: string, paneId: string) => void
   toggleTunnels: (tabId: string, paneId: string) => void
@@ -120,6 +132,14 @@ export const useStore = create<AppState>((set, get) => ({
   activeTabId: null,
   vaultLocked: false,
   broadcast: false,
+  settings: loadSettings(),
+
+  updateSettings: (patch) =>
+    set((s) => {
+      const settings = { ...s.settings, ...patch }
+      saveSettings(settings)
+      return { settings }
+    }),
 
   lockVault: async () => {
     await window.td.vault.lock()
@@ -223,19 +243,21 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   splitPane: (tabId, paneId, dir) => {
+    const source = findPane(get().tabs.find((t) => t.id === tabId)?.root ?? null, paneId)
+    if (!source || source.type !== 'leaf') return
+    get().splitPaneWith(tabId, paneId, dir, 'after', source.title, source.target)
+  },
+
+  splitPaneWith: (tabId, paneId, dir, position, title, target) => {
     set((s) => ({
       tabs: s.tabs.map((t) => {
         if (t.id !== tabId) return t
         const source = findPane(t.root, paneId)
         if (!source || source.type !== 'leaf') return t
-        const newLeaf = makeLeaf(source.title, source.target)
-        const splitNode: PaneNode = {
-          type: 'split',
-          id: nanoid(),
-          dir,
-          children: [source, newLeaf],
-          sizes: [50, 50]
-        }
+        const newLeaf = makeLeaf(title, target)
+        const children: [PaneNode, PaneNode] =
+          position === 'before' ? [newLeaf, source] : [source, newLeaf]
+        const splitNode: PaneNode = { type: 'split', id: nanoid(), dir, children, sizes: [50, 50] }
         return { ...t, root: replacePane(t.root, paneId, splitNode), activePaneId: newLeaf.id }
       })
     }))
@@ -329,7 +351,8 @@ function setSizes(node: PaneNode, id: string, sizes: [number, number]): PaneNode
   return node
 }
 
-function findPane(node: PaneNode, id: string): PaneNode | undefined {
+function findPane(node: PaneNode | null, id: string): PaneNode | undefined {
+  if (!node) return undefined
   if (node.id === id) return node
   if (node.type === 'split') {
     return findPane(node.children[0], id) ?? findPane(node.children[1], id)

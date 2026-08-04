@@ -1,4 +1,5 @@
 import { useStore, collectLeaves } from '../state/store'
+import { DRAG_MIME } from '../state/dnd'
 import SplitContainer from './SplitContainer'
 
 export default function Workspace(): JSX.Element {
@@ -20,6 +21,12 @@ export default function Workspace(): JSX.Element {
           <div
             key={t.id}
             className={`tab ${t.id === activeTabId ? 'active' : ''}`}
+            draggable
+            title="Drag onto a pane to view side by side"
+            onDragStart={(e) => {
+              e.dataTransfer.setData(DRAG_MIME, JSON.stringify({ kind: 'tab', id: t.id }))
+              e.dataTransfer.effectAllowed = 'copyMove'
+            }}
             onClick={() => setActiveTab(t.id)}
           >
             <span>{t.title}</span>
