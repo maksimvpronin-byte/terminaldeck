@@ -109,6 +109,13 @@ label {
   font-size: 12px;
 }
 
+.lock-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--bg-0);
+}
+
 /* --- layout --- */
 .app-shell {
   display: flex;
@@ -281,13 +288,46 @@ label {
   min-height: 0;
   display: flex;
 }
+.terminal-wrap {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
 .terminal-host {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   padding: 4px;
+}
+.terminal-search {
+  display: flex;
+  gap: 4px;
+  padding: 4px 6px;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--border);
+}
+.terminal-search input {
+  flex: 1;
+  padding: 3px 6px;
+}
+.terminal-search button {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+.terminal-reconnect {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(23, 24, 28, 0.72);
 }
 .sftp-panel {
   width: 320px;
+  flex-shrink: 0;
   border-left: 1px solid var(--border);
   background: var(--bg-1);
   display: flex;
@@ -318,6 +358,78 @@ label {
 .sftp-row .size {
   color: var(--text-dim);
   font-size: 11px;
+}
+
+/* --- tunnels panel --- */
+.side-panel {
+  width: 320px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  background: var(--bg-1);
+  display: flex;
+  flex-direction: column;
+}
+.side-panel-title {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+}
+.side-panel-list {
+  flex: 1;
+  overflow-y: auto;
+}
+.side-panel-empty {
+  padding: 10px 8px;
+  color: var(--text-dim);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.tunnel-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--bg-2);
+}
+.tunnel-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+.tunnel-row button {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+.tunnel-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.tunnel-dot.on {
+  background: var(--success);
+}
+.tunnel-dot.off {
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+}
+.tunnel-draft {
+  padding: 8px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tunnel-draft input,
+.tunnel-draft select {
+  width: 100%;
+  padding: 4px 6px;
 }
 
 .modal-backdrop {

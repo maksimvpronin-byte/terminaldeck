@@ -2,6 +2,7 @@ import type { PaneNode } from '../state/store'
 import { useStore } from '../state/store'
 import TerminalHost from './TerminalHost'
 import SftpPanel from './SftpPanel'
+import TunnelsPanel from './TunnelsPanel'
 
 export default function Pane({
   tabId,
@@ -16,6 +17,7 @@ export default function Pane({
   const setPaneConnection = useStore((s) => s.setPaneConnection)
   const splitPane = useStore((s) => s.splitPane)
   const toggleSftp = useStore((s) => s.toggleSftp)
+  const toggleTunnels = useStore((s) => s.toggleTunnels)
 
   const isActive = isActiveTab && activePaneId === node.id
 
@@ -33,6 +35,9 @@ export default function Pane({
           <button title="Toggle SFTP browser" onClick={() => toggleSftp(tabId, node.id)}>
             SFTP
           </button>
+          <button title="Toggle port forwarding" onClick={() => toggleTunnels(tabId, node.id)}>
+            Tunnels
+          </button>
         </div>
       </div>
       <div className="pane-body">
@@ -44,6 +49,12 @@ export default function Pane({
           onConnected={(connectionId) => setPaneConnection(tabId, node.id, connectionId)}
         />
         {node.sftpOpen && <SftpPanel connectionId={node.connectionId} />}
+        {node.tunnelsOpen && (
+          <TunnelsPanel
+            connectionId={node.connectionId}
+            sessionId={node.target.kind === 'session' ? node.target.sessionId : undefined}
+          />
+        )}
       </div>
     </div>
   )

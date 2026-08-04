@@ -12,7 +12,15 @@ export type PaneTarget =
   | { kind: 'quick'; params: QuickConnectParams }
 
 export type PaneNode =
-  | { type: 'leaf'; id: string; title: string; target: PaneTarget; connectionId?: string; sftpOpen: boolean }
+  | {
+      type: 'leaf'
+      id: string
+      title: string
+      target: PaneTarget
+      connectionId?: string
+      sftpOpen: boolean
+      tunnelsOpen: boolean
+    }
   | { type: 'split'; id: string; dir: 'row' | 'col'; children: [PaneNode, PaneNode]; sizes: [number, number] }
 
 export interface WorkspaceTab {
@@ -27,7 +35,10 @@ interface AppState {
   sessions: SessionProfile[]
   tabs: WorkspaceTab[]
   activeTabId: string | null
+  vaultLocked: boolean
 
+  lockVault: () => Promise<void>
+  setVaultUnlocked: () => void
   loadStore: () => Promise<void>
   upsertSession: (session: SessionProfile, secret?: string) => Promise<void>
   removeSession: (id: string) => Promise<void>
@@ -41,11 +52,20 @@ interface AppState {
   setPaneConnection: (tabId: string, paneId: string, connectionId: string) => void
   splitPane: (tabId: string, paneId: string, dir: 'row' | 'col') => void
   toggleSftp: (tabId: string, paneId: string) => void
+  toggleTunnels: (tabId: string, paneId: string) => void
   resizeSplit: (tabId: string, splitId: string, sizes: [number, number]) => void
 }
 
 function makeLeaf(title: string, target: PaneTarget): PaneNode {
-  return { type: 'leaf', id: nanoid(), connectionId: undefined, title, target, sftpOpen: false }
+  return {
+    type: 'leaf',
+    id: nanoid(),
+    connectionId: undefined,
+    title,
+    target,
+    sftpOpen: false,
+    tunnelsOpen: false
+  }
 }
 
 type LeafNode = Extract<PaneNode, { type: 'leaf' }>
@@ -64,6 +84,14 @@ export const useStore = create<AppState>((set) => ({
   sessions: [],
   tabs: [],
   activeTabId: null,
+  vaultLocked: false,
+
+  lockVault: async () => {
+    await window.td.vault.lock()
+    set({ vaultLocked: true })
+  },
+
+  setVaultUnlocked: () => set({ vaultLocked: false }),
 
   loadStore: async () => {
     const data: SessionStoreData = await window.td.store.load()
@@ -158,6 +186,19 @@ export const useStore = create<AppState>((set) => ({
       tabs: s.tabs.map((t) =>
         t.id === tabId
           ? { ...t, root: mapPane(t.root, paneId, (leaf) => ({ ...leaf, sftpOpen: !leaf.sftpOpen })) }
+          : t
+      )
+    }))
+  },
+
+  toggleTunnels: (tabId, paneId) => {
+    set((s) => ({
+      tabs: s.tabs.map((t) =>
+        t.id === tabId
+          ? {
+              ...t,
+              root: mapPane(t.root, paneId, (leaf) => ({ ...leaf, tunnelsOpen: !leaf.tunnelsOpen }))
+            }
           : t
       )
     }))

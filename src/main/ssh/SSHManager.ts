@@ -9,6 +9,7 @@ import type { SessionProfile, QuickConnectParams } from '../../shared/types'
 import { IPC } from '../../shared/ipc-channels'
 import { sessionStore } from '../store/SessionStore'
 import { vault } from '../vault/Vault'
+import { makeHostVerifier } from './hostVerifier'
 
 interface LiveConnection {
   id: string
@@ -40,7 +41,10 @@ function resolveAuth(profile: SessionProfile): Pick<
 }
 
 /** Connects to `profile`, hopping through its jump-host chain if configured. Resolves with the final connected Client and the list of every client opened along the way (for cleanup). */
-async function connectChain(profile: SessionProfile): Promise<{ target: Client; chain: Client[] }> {
+async function connectChain(
+  win: BrowserWindow,
+  profile: SessionProfile
+): Promise<{ target: Client; chain: Client[] }> {
   const hops: SessionProfile[] = [profile]
   let cursor = profile
   while (cursor.jumpHostId) {
@@ -65,7 +69,9 @@ async function connectChain(profile: SessionProfile): Promise<{ target: Client; 
         host: hop.host,
         port: hop.port,
         username: hop.username,
-        readyTimeout: 20000,
+        // Generous: the handshake pauses here while the user reads a host-key prompt.
+        readyTimeout: 120000,
+        hostVerifier: makeHostVerifier(win, hop.host, hop.port),
         ...auth,
         ...(sock ? { sock } : {})
       })
@@ -102,7 +108,7 @@ class SSHManager {
   ): Promise<string> {
     const connectionId = randomUUID()
     try {
-      const { target, chain } = await connectChain(profile)
+      const { target, chain } = await connectChain(win, profile)
       await this.openShell(win, connectionId, target, chain, cols, rows, profile)
       return connectionId
     } catch (err) {
@@ -137,7 +143,9 @@ class SSHManager {
           host: params.host,
           port: params.port,
           username: params.username,
-          readyTimeout: 20000,
+          // Generous: the handshake pauses here while the user reads a host-key prompt.
+          readyTimeout: 120000,
+          hostVerifier: makeHostVerifier(win, params.host, params.port),
           ...auth
         })
       })

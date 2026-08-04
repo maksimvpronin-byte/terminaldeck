@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
+import { SearchAddon } from 'xterm-addon-search'
 import 'xterm/css/xterm.css'
 import type { PaneTarget } from '../state/store'
 
@@ -10,6 +11,10 @@ interface Props {
   active: boolean
   onConnected: (connectionId: string) => void
   onFocus: () => void
+}
+
+function writeBase64(term: Terminal, b64: string): void {
+  term.write(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)))
 }
 
 export default function TerminalHost({
@@ -22,7 +27,63 @@ export default function TerminalHost({
   const hostRef = useRef<HTMLDivElement | null>(null)
   const termRef = useRef<Terminal | null>(null)
   const fitRef = useRef<FitAddon | null>(null)
+  const searchRef = useRef<SearchAddon | null>(null)
   const connIdRef = useRef<string | undefined>(connectionId)
+  const unsubscribeRef = useRef<Array<() => void>>([])
+
+  // Kept in refs so `connect` can stay referentially stable across renders.
+  const targetRef = useRef(target)
+  targetRef.current = target
+  const onConnectedRef = useRef(onConnected)
+  onConnectedRef.current = onConnected
+
+  const [closed, setClosed] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [needle, setNeedle] = useState('')
+
+  const detachListeners = useCallback(() => {
+    for (const off of unsubscribeRef.current) off()
+    unsubscribeRef.current = []
+  }, [])
+
+  const attachListeners = useCallback((cid: string) => {
+    const term = termRef.current
+    if (!term) return
+    unsubscribeRef.current.push(
+      window.td.ssh.onData(cid, (b64) => writeBase64(term, b64)),
+      window.td.ssh.onStatus(cid, (status) => {
+        if (status === 'closed') {
+          term.writeln('\r\n\x1b[31m[connection closed]\x1b[0m')
+          setClosed(true)
+        }
+      }),
+      window.td.ssh.onError(cid, (message) => {
+        term.writeln(`\r\n\x1b[31m[error] ${message}\x1b[0m`)
+      })
+    )
+  }, [])
+
+  const connect = useCallback(async () => {
+    const term = termRef.current
+    if (!term) return
+    detachListeners()
+    setClosed(false)
+    term.writeln('Connecting...\r\n')
+    try {
+      const { cols, rows } = term
+      const tgt = targetRef.current
+      const result =
+        tgt.kind === 'session'
+          ? await window.td.ssh.connect(tgt.sessionId, cols, rows)
+          : await window.td.ssh.quickConnect(tgt.params, cols, rows)
+      connIdRef.current = result.connectionId
+      onConnectedRef.current(result.connectionId)
+      attachListeners(result.connectionId)
+    } catch (err) {
+      term.writeln(`\r\n\x1b[31m[failed to connect] ${(err as Error).message}\x1b[0m`)
+      setClosed(true)
+    }
+  }, [attachListeners, detachListeners])
 
   useEffect(() => {
     if (!hostRef.current) return
@@ -31,58 +92,34 @@ export default function TerminalHost({
       fontFamily: 'Menlo, Consolas, monospace',
       fontSize: 13,
       theme: { background: '#17181c', foreground: '#e4e6eb' },
-      cursorBlink: true
+      cursorBlink: true,
+      scrollback: 10000
     })
     const fit = new FitAddon()
+    const search = new SearchAddon()
     term.loadAddon(fit)
+    term.loadAddon(search)
     term.open(hostRef.current)
     if (hostRef.current.clientWidth > 0 && hostRef.current.clientHeight > 0) fit.fit()
     termRef.current = term
     fitRef.current = fit
+    searchRef.current = search
     if (active) term.focus()
 
-    let disposed = false
-    let offData: (() => void) | undefined
-    let offStatus: (() => void) | undefined
-    let offError: (() => void) | undefined
+    term.attachCustomKeyEventHandler((e) => {
+      if (e.type === 'keydown' && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
+        setSearchOpen(true)
+        return false
+      }
+      return true
+    })
 
     term.onData((data) => {
       if (connIdRef.current) window.td.ssh.write(connIdRef.current, data)
     })
 
-    async function connect(): Promise<void> {
-      term.writeln(`Connecting...\r\n`)
-      try {
-        const { cols, rows } = term
-        const result =
-          target.kind === 'session'
-            ? await window.td.ssh.connect(target.sessionId, cols, rows)
-            : await window.td.ssh.quickConnect(target.params, cols, rows)
-        if (disposed) return
-        connIdRef.current = result.connectionId
-        onConnected(result.connectionId)
-
-        offData = window.td.ssh.onData(result.connectionId, (b64) => {
-          term.write(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)))
-        })
-        offStatus = window.td.ssh.onStatus(result.connectionId, (status) => {
-          if (status === 'closed') term.writeln('\r\n\x1b[31m[connection closed]\x1b[0m')
-        })
-        offError = window.td.ssh.onError(result.connectionId, (message) => {
-          term.writeln(`\r\n\x1b[31m[error] ${message}\x1b[0m`)
-        })
-      } catch (err) {
-        term.writeln(`\r\n\x1b[31m[failed to connect] ${(err as Error).message}\x1b[0m`)
-      }
-    }
-
-    if (connIdRef.current) {
-      offData = window.td.ssh.onData(connIdRef.current, (b64) => {
-        term.write(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)))
-      })
-    } else {
-      connect()
-    }
+    if (connIdRef.current) attachListeners(connIdRef.current)
+    else connect()
 
     const resizeObserver = new ResizeObserver((entries) => {
       const box = entries[0]?.contentRect
@@ -94,10 +131,7 @@ export default function TerminalHost({
     resizeObserver.observe(hostRef.current)
 
     return () => {
-      disposed = true
-      offData?.()
-      offStatus?.()
-      offError?.()
+      detachListeners()
       resizeObserver.disconnect()
       term.dispose()
       if (connIdRef.current) window.td.ssh.disconnect(connIdRef.current)
@@ -114,5 +148,51 @@ export default function TerminalHost({
     termRef.current?.focus()
   }
 
-  return <div className="terminal-host" ref={hostRef} onClick={handleClick} />
+  function closeSearch(): void {
+    setSearchOpen(false)
+    searchRef.current?.clearDecorations()
+    termRef.current?.focus()
+  }
+
+  return (
+    <div className="terminal-wrap">
+      {searchOpen && (
+        <div className="terminal-search">
+          <input
+            autoFocus
+            value={needle}
+            placeholder="Find…"
+            onChange={(e) => {
+              setNeedle(e.target.value)
+              searchRef.current?.findNext(e.target.value, { incremental: true })
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') closeSearch()
+              if (e.key === 'Enter') {
+                if (e.shiftKey) searchRef.current?.findPrevious(needle)
+                else searchRef.current?.findNext(needle)
+              }
+            }}
+          />
+          <button title="Previous (⇧⏎)" onClick={() => searchRef.current?.findPrevious(needle)}>
+            ↑
+          </button>
+          <button title="Next (⏎)" onClick={() => searchRef.current?.findNext(needle)}>
+            ↓
+          </button>
+          <button title="Close (Esc)" onClick={closeSearch}>
+            ✕
+          </button>
+        </div>
+      )}
+      <div className="terminal-host" ref={hostRef} onClick={handleClick} />
+      {closed && (
+        <div className="terminal-reconnect">
+          <button className="primary" onClick={() => connect()}>
+            Reconnect
+          </button>
+        </div>
+      )}
+    </div>
+  )
 }

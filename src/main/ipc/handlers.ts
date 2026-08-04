@@ -19,6 +19,12 @@ function focusedWin(): BrowserWindow {
   return win
 }
 
+function describeRule(rule: PortForwardRule): string {
+  const src = `${rule.srcHost}:${rule.srcPort}`
+  if (rule.type === 'dynamic') return `SOCKS ${src}`
+  return `${rule.type} ${src} -> ${rule.dstHost}:${rule.dstPort}`
+}
+
 export function registerIpcHandlers(): void {
   // --- Vault ---
   ipcMain.handle(IPC.vaultStatus, () => vault.status())
@@ -64,7 +70,22 @@ export function registerIpcHandlers(): void {
     async (_e, sessionId: string, cols: number, rows: number) => {
       const profile = sessionStore.getAll().sessions.find((s) => s.id === sessionId)
       if (!profile) throw new Error('Unknown session')
-      const connectionId = await sshManager.connectProfile(focusedWin(), profile, cols, rows)
+      const win = focusedWin()
+      const connectionId = await sshManager.connectProfile(win, profile, cols, rows)
+      // Bring the profile's tunnels up automatically; a failure here (busy port,
+      // server refusing a remote bind) must not take the shell down with it.
+      for (const rule of profile.portForwards) {
+        try {
+          await portForwardManager.start(connectionId, rule)
+        } catch (err) {
+          if (!win.isDestroyed()) {
+            win.webContents.send(
+              `${IPC.sshError}:${connectionId}`,
+              `tunnel ${describeRule(rule)} failed: ${(err as Error).message}`
+            )
+          }
+        }
+      }
       return { connectionId }
     }
   )

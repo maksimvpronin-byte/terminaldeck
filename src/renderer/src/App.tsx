@@ -94,6 +94,8 @@ function UnlockScreen({ onUnlocked }: { onUnlocked: () => void }): JSX.Element {
 export default function App(): JSX.Element {
   const [status, setStatus] = useState<VaultStatus | null>(null)
   const loadStore = useStore((s) => s.loadStore)
+  const vaultLocked = useStore((s) => s.vaultLocked)
+  const setVaultUnlocked = useStore((s) => s.setVaultUnlocked)
 
   const refreshStatus = async (): Promise<void> => setStatus(await window.td.vault.status())
 
@@ -110,5 +112,16 @@ export default function App(): JSX.Element {
   if (!status.exists) return <CreateVaultScreen onCreated={refreshStatus} />
   if (!status.unlocked) return <UnlockScreen onUnlocked={refreshStatus} />
 
-  return <MainLayout />
+  // A re-lock covers the workspace with an opaque overlay rather than unmounting it:
+  // unmounting would tear down every terminal and disconnect the live SSH sessions.
+  return (
+    <>
+      <MainLayout />
+      {vaultLocked && (
+        <div className="lock-overlay">
+          <UnlockScreen onUnlocked={setVaultUnlocked} />
+        </div>
+      )}
+    </>
+  )
 }

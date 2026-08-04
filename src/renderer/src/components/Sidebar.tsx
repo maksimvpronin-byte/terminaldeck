@@ -12,9 +12,11 @@ export default function Sidebar(): JSX.Element {
   const removeGroup = useStore((s) => s.removeGroup)
   const removeSession = useStore((s) => s.removeSession)
   const openTab = useStore((s) => s.openTab)
+  const lockVault = useStore((s) => s.lockVault)
 
   const [editingSession, setEditingSession] = useState<SessionProfile | undefined | 'new'>(undefined)
   const [showQuickConnect, setShowQuickConnect] = useState(false)
+  const [query, setQuery] = useState('')
 
   function connect(session: SessionProfile): void {
     openTab(session.name, { kind: 'session', sessionId: session.id })
@@ -26,7 +28,18 @@ export default function Sidebar(): JSX.Element {
     await upsertGroup({ id: nanoid(), name, parentId })
   }
 
-  const rootSessions = sessions.filter((s) => s.groupId === null)
+  const needle = query.trim().toLowerCase()
+  const visible = needle
+    ? sessions.filter((s) =>
+        [s.name, s.host, s.username, ...s.tags].some((f) => f.toLowerCase().includes(needle))
+      )
+    : sessions
+
+  const rootSessions = visible.filter((s) => s.groupId === null)
+  // While filtering, hide groups that no longer contain a match.
+  const visibleGroups = needle
+    ? groups.filter((g) => visible.some((s) => s.groupId === g.id))
+    : groups
 
   return (
     <div className="sidebar">
@@ -41,9 +54,20 @@ export default function Sidebar(): JSX.Element {
         <button style={{ flex: 1 }} onClick={() => setShowQuickConnect(true)}>
           Quick connect…
         </button>
+        <button title="Lock vault (⌘L)" onClick={() => lockVault()}>
+          🔒
+        </button>
+      </div>
+      <div className="sidebar-header" style={{ borderTop: 'none' }}>
+        <input
+          style={{ flex: 1 }}
+          placeholder="Filter hosts…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
       </div>
       <div className="sidebar-tree">
-        {groups.map((g) => (
+        {visibleGroups.map((g) => (
           <div className="tree-group" key={g.id}>
             <div className="tree-item">
               <span className="tree-group-title name">📁 {g.name}</span>
@@ -51,7 +75,7 @@ export default function Sidebar(): JSX.Element {
                 <button onClick={() => removeGroup(g.id)}>✕</button>
               </div>
             </div>
-            {sessions
+            {visible
               .filter((s) => s.groupId === g.id)
               .map((s) => (
                 <div className="tree-item" key={s.id} style={{ paddingLeft: 18 }} onDoubleClick={() => connect(s)}>
@@ -87,6 +111,11 @@ export default function Sidebar(): JSX.Element {
         {groups.length === 0 && sessions.length === 0 && (
           <div style={{ padding: 12, color: 'var(--text-dim)', fontSize: 12 }}>
             No saved sessions yet. Click "+ Session" to add one.
+          </div>
+        )}
+        {needle !== '' && visible.length === 0 && (
+          <div style={{ padding: 12, color: 'var(--text-dim)', fontSize: 12 }}>
+            Nothing matches “{query}”.
           </div>
         )}
       </div>
