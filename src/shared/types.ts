@@ -71,6 +71,13 @@ export interface TerminalResizePayload {
   rows: number
 }
 
+export type UpdateState =
+  | { status: 'idle' }
+  | { status: 'available'; version: string }
+  | { status: 'downloading'; percent: number }
+  | { status: 'ready'; version: string }
+  | { status: 'error'; message: string }
+
 export interface SshConfigHost {
   alias: string
   hostname: string

@@ -41,6 +41,13 @@ export const IPC = {
   // Import
   sshConfigRead: 'import:sshConfig',
 
+  // Auto-update
+  updateGetState: 'update:getState',
+  updateDownload: 'update:download',
+  updateInstall: 'update:install',
+  /** main -> renderer */
+  updateState: 'update:state',
+
   // Dialogs
   dialogPickPrivateKey: 'dialog:pickPrivateKey',
   dialogPickSavePath: 'dialog:pickSavePath',

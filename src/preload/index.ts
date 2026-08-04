@@ -8,7 +8,8 @@ import type {
   VaultStatus,
   SessionStoreData,
   SftpEntry,
-  SshConfigHost
+  SshConfigHost,
+  UpdateState
 } from '../shared/types'
 
 const api = {
@@ -94,6 +95,16 @@ const api = {
     stop: (connectionId: string, ruleId: string): Promise<void> =>
       ipcRenderer.invoke(IPC.pfStop, connectionId, ruleId),
     status: (connectionId: string): Promise<string[]> => ipcRenderer.invoke(IPC.pfStatus, connectionId)
+  },
+  updates: {
+    getState: (): Promise<UpdateState> => ipcRenderer.invoke(IPC.updateGetState),
+    download: (): Promise<void> => ipcRenderer.invoke(IPC.updateDownload),
+    install: (): Promise<void> => ipcRenderer.invoke(IPC.updateInstall),
+    onState: (cb: (state: UpdateState) => void): (() => void) => {
+      const listener = (_e: unknown, state: UpdateState): void => cb(state)
+      ipcRenderer.on(IPC.updateState, listener)
+      return () => ipcRenderer.removeListener(IPC.updateState, listener)
+    }
   },
   files: {
     /** Electron 32+ dropped File.path; this is the supported replacement. */

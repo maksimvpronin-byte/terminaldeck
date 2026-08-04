@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { VaultStatus } from '../../shared/types'
 import { useStore } from './state/store'
+import { applyUiPalette } from './state/settings'
 import MainLayout from './components/MainLayout'
 
 function CreateVaultScreen({ onCreated }: { onCreated: () => void }): JSX.Element {
@@ -97,11 +98,18 @@ export default function App(): JSX.Element {
   const vaultLocked = useStore((s) => s.vaultLocked)
   const setVaultUnlocked = useStore((s) => s.setVaultUnlocked)
 
+  const settings = useStore((s) => s.settings)
+
   const refreshStatus = async (): Promise<void> => setStatus(await window.td.vault.status())
 
   useEffect(() => {
     refreshStatus()
   }, [])
+
+  // Keep the app chrome in step with the chosen terminal theme.
+  useEffect(() => {
+    applyUiPalette(settings)
+  }, [settings])
 
   useEffect(() => {
     if (status?.unlocked) loadStore()

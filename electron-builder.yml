@@ -1,5 +1,9 @@
 appId: com.terminaldeck.app
 productName: TerminalDeck
+publish:
+  provider: github
+  owner: maksimvpronin-byte
+  repo: terminaldeck
 directories:
   buildResources: resources
   output: dist
@@ -15,6 +19,13 @@ mac:
     - target: zip
       arch: [x64, arm64]
   category: public.app-category.developer-tools
+  # Required for a hardened-runtime app that loads native modules (ssh2's crypto).
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: resources/entitlements.mac.plist
+  entitlementsInherit: resources/entitlements.mac.plist
+  # Set to true once APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID exist.
+  notarize: false
 win:
   target:
     - target: nsis

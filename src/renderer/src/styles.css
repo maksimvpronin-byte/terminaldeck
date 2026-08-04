@@ -117,9 +117,29 @@ label {
 }
 
 /* --- layout --- */
+.app-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
 .app-shell {
   display: flex;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
+}
+.update-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 10px;
+  font-size: 12px;
+  background: var(--accent-dim);
+  border-bottom: 1px solid var(--accent);
+}
+.update-banner button {
+  padding: 2px 10px;
+  font-size: 11px;
 }
 .sidebar {
   width: 260px;
