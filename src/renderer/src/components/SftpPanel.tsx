@@ -13,10 +13,25 @@ function formatSize(bytes: number): string {
   return `${val.toFixed(1)} ${units[i]}`
 }
 
+interface Transfer {
+  path: string
+  transferred: number
+  total: number
+}
+
 export default function SftpPanel({ connectionId }: { connectionId?: string }): JSX.Element {
   const [path, setPath] = useState('.')
   const [entries, setEntries] = useState<SftpEntry[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [transfer, setTransfer] = useState<Transfer | null>(null)
+
+  useEffect(() => {
+    if (!connectionId) return
+    const off = window.td.sftp.onProgress(connectionId, (p) => {
+      setTransfer(p.transferred >= p.total ? null : p)
+    })
+    return off
+  }, [connectionId])
 
   async function load(p: string): Promise<void> {
     if (!connectionId) return
@@ -73,6 +88,22 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
         ))}
       </div>
       {error && <div className="error-text" style={{ padding: 6 }}>{error}</div>}
+      {transfer && (
+        <div className="sftp-progress">
+          <div className="sftp-progress-label">
+            {transfer.path.split('/').pop()} — {formatSize(transfer.transferred)} /{' '}
+            {formatSize(transfer.total)}
+          </div>
+          <div className="sftp-progress-track">
+            <div
+              className="sftp-progress-bar"
+              style={{
+                width: `${transfer.total > 0 ? (transfer.transferred / transfer.total) * 100 : 0}%`
+              }}
+            />
+          </div>
+        </div>
+      )}
       <div style={{ padding: 6, borderTop: '1px solid var(--border)' }}>
         <button onClick={upload} style={{ width: '100%' }}>
           Upload file…

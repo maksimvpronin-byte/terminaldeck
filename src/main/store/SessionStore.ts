@@ -60,10 +60,15 @@ class SessionStore {
   }
 
   deleteGroup(id: string): void {
-    this.data.groups = this.data.groups.filter((g) => g.id !== id)
-    // orphaned sessions move to root instead of being deleted
+    const removed = this.data.groups.find((g) => g.id === id)
+    const newParent = removed?.parentId ?? null
+    this.data.groups = this.data.groups
+      .filter((g) => g.id !== id)
+      // subgroups are adopted by the removed group's parent rather than orphaned
+      .map((g) => (g.parentId === id ? { ...g, parentId: newParent } : g))
+    // sessions of the removed group move up too, instead of being deleted
     this.data.sessions = this.data.sessions.map((s) =>
-      s.groupId === id ? { ...s, groupId: null } : s
+      s.groupId === id ? { ...s, groupId: newParent } : s
     )
     this.persist()
   }

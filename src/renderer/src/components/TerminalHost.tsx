@@ -11,6 +11,8 @@ interface Props {
   active: boolean
   onConnected: (connectionId: string) => void
   onFocus: () => void
+  /** Returns every connection that should receive this pane's keystrokes. */
+  resolveWriteTargets: (ownConnectionId: string) => string[]
 }
 
 function writeBase64(term: Terminal, b64: string): void {
@@ -22,7 +24,8 @@ export default function TerminalHost({
   connectionId,
   active,
   onConnected,
-  onFocus
+  onFocus,
+  resolveWriteTargets
 }: Props): JSX.Element {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const termRef = useRef<Terminal | null>(null)
@@ -30,12 +33,16 @@ export default function TerminalHost({
   const searchRef = useRef<SearchAddon | null>(null)
   const connIdRef = useRef<string | undefined>(connectionId)
   const unsubscribeRef = useRef<Array<() => void>>([])
+  /** Bumped on every mount/unmount so stale in-flight connects can be discarded. */
+  const generationRef = useRef(0)
 
   // Kept in refs so `connect` can stay referentially stable across renders.
   const targetRef = useRef(target)
   targetRef.current = target
   const onConnectedRef = useRef(onConnected)
   onConnectedRef.current = onConnected
+  const resolveWriteTargetsRef = useRef(resolveWriteTargets)
+  resolveWriteTargetsRef.current = resolveWriteTargets
 
   const [closed, setClosed] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -63,30 +70,42 @@ export default function TerminalHost({
     )
   }, [])
 
-  const connect = useCallback(async () => {
-    const term = termRef.current
-    if (!term) return
-    detachListeners()
-    setClosed(false)
-    term.writeln('Connecting...\r\n')
-    try {
-      const { cols, rows } = term
-      const tgt = targetRef.current
-      const result =
-        tgt.kind === 'session'
-          ? await window.td.ssh.connect(tgt.sessionId, cols, rows)
-          : await window.td.ssh.quickConnect(tgt.params, cols, rows)
-      connIdRef.current = result.connectionId
-      onConnectedRef.current(result.connectionId)
-      attachListeners(result.connectionId)
-    } catch (err) {
-      term.writeln(`\r\n\x1b[31m[failed to connect] ${(err as Error).message}\x1b[0m`)
-      setClosed(true)
-    }
-  }, [attachListeners, detachListeners])
+  const connect = useCallback(
+    async (generation: number) => {
+      const term = termRef.current
+      if (!term) return
+      detachListeners()
+      setClosed(false)
+      term.writeln('Connecting...\r\n')
+      try {
+        const { cols, rows } = term
+        const tgt = targetRef.current
+        const result =
+          tgt.kind === 'session'
+            ? await window.td.ssh.connect(tgt.sessionId, cols, rows)
+            : await window.td.ssh.quickConnect(tgt.params, cols, rows)
+        // The pane was torn down (or reconnected) while we were connecting — React
+        // remounts effects in StrictMode, so without this both attempts would end up
+        // feeding the same terminal from two separate SSH sessions.
+        if (generationRef.current !== generation) {
+          window.td.ssh.disconnect(result.connectionId)
+          return
+        }
+        connIdRef.current = result.connectionId
+        onConnectedRef.current(result.connectionId)
+        attachListeners(result.connectionId)
+      } catch (err) {
+        if (generationRef.current !== generation) return
+        term.writeln(`\r\n\x1b[31m[failed to connect] ${(err as Error).message}\x1b[0m`)
+        setClosed(true)
+      }
+    },
+    [attachListeners, detachListeners]
+  )
 
   useEffect(() => {
     if (!hostRef.current) return
+    const generation = ++generationRef.current
     const term = new Terminal({
       convertEol: true,
       fontFamily: 'Menlo, Consolas, monospace',
@@ -115,11 +134,13 @@ export default function TerminalHost({
     })
 
     term.onData((data) => {
-      if (connIdRef.current) window.td.ssh.write(connIdRef.current, data)
+      const own = connIdRef.current
+      if (!own) return
+      for (const cid of resolveWriteTargetsRef.current(own)) window.td.ssh.write(cid, data)
     })
 
     if (connIdRef.current) attachListeners(connIdRef.current)
-    else connect()
+    else connect(generation)
 
     const resizeObserver = new ResizeObserver((entries) => {
       const box = entries[0]?.contentRect
@@ -131,6 +152,7 @@ export default function TerminalHost({
     resizeObserver.observe(hostRef.current)
 
     return () => {
+      generationRef.current++
       detachListeners()
       resizeObserver.disconnect()
       term.dispose()
@@ -188,7 +210,7 @@ export default function TerminalHost({
       <div className="terminal-host" ref={hostRef} onClick={handleClick} />
       {closed && (
         <div className="terminal-reconnect">
-          <button className="primary" onClick={() => connect()}>
+          <button className="primary" onClick={() => connect(generationRef.current)}>
             Reconnect
           </button>
         </div>

@@ -6,6 +6,7 @@ import { sessionStore } from '../store/SessionStore'
 import { sshManager } from '../ssh/SSHManager'
 import { sftpManager } from '../ssh/SFTPManager'
 import { portForwardManager } from '../ssh/PortForwardManager'
+import { readSshConfigHosts } from '../ssh/sshConfig'
 import type {
   SessionProfile,
   SessionGroup,
@@ -17,6 +18,17 @@ function focusedWin(): BrowserWindow {
   const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
   if (!win) throw new Error('No window available')
   return win
+}
+
+function reportTransfer(
+  connectionId: string,
+  path: string,
+  transferred: number,
+  total: number
+): void {
+  const win = BrowserWindow.getAllWindows()[0]
+  if (!win || win.isDestroyed()) return
+  win.webContents.send(`${IPC.sftpProgress}:${connectionId}`, { path, transferred, total })
 }
 
 function describeRule(rule: PortForwardRule): string {
@@ -128,12 +140,16 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     IPC.sftpDownload,
     (_e, connectionId: string, remotePath: string, localPath: string) =>
-      sftpManager.download(connectionId, remotePath, localPath)
+      sftpManager.download(connectionId, remotePath, localPath, (transferred, total) =>
+        reportTransfer(connectionId, remotePath, transferred, total)
+      )
   )
   ipcMain.handle(
     IPC.sftpUpload,
     (_e, connectionId: string, localPath: string, remotePath: string) =>
-      sftpManager.upload(connectionId, localPath, remotePath)
+      sftpManager.upload(connectionId, localPath, remotePath, (transferred, total) =>
+        reportTransfer(connectionId, remotePath, transferred, total)
+      )
   )
 
   // --- Port forwarding ---
@@ -146,6 +162,9 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.pfStatus, (_e, connectionId: string) =>
     portForwardManager.listActive(connectionId)
   )
+
+  // --- Import ---
+  ipcMain.handle(IPC.sshConfigRead, () => readSshConfigHosts())
 
   // --- Dialogs ---
   ipcMain.handle(IPC.dialogPickPrivateKey, async () => {

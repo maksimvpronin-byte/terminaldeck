@@ -7,7 +7,8 @@ import type {
   PortForwardRule,
   VaultStatus,
   SessionStoreData,
-  SftpEntry
+  SftpEntry,
+  SshConfigHost
 } from '../shared/types'
 
 const api = {
@@ -73,7 +74,19 @@ const api = {
     download: (connectionId: string, remotePath: string, localPath: string): Promise<void> =>
       ipcRenderer.invoke(IPC.sftpDownload, connectionId, remotePath, localPath),
     upload: (connectionId: string, localPath: string, remotePath: string): Promise<void> =>
-      ipcRenderer.invoke(IPC.sftpUpload, connectionId, localPath, remotePath)
+      ipcRenderer.invoke(IPC.sftpUpload, connectionId, localPath, remotePath),
+    onProgress: (
+      connectionId: string,
+      cb: (p: { path: string; transferred: number; total: number }) => void
+    ): (() => void) => {
+      const channel = `${IPC.sftpProgress}:${connectionId}`
+      const listener = (
+        _e: unknown,
+        payload: { path: string; transferred: number; total: number }
+      ): void => cb(payload)
+      ipcRenderer.on(channel, listener)
+      return () => ipcRenderer.removeListener(channel, listener)
+    }
   },
   portForward: {
     start: (connectionId: string, rule: PortForwardRule): Promise<void> =>
@@ -81,6 +94,9 @@ const api = {
     stop: (connectionId: string, ruleId: string): Promise<void> =>
       ipcRenderer.invoke(IPC.pfStop, connectionId, ruleId),
     status: (connectionId: string): Promise<string[]> => ipcRenderer.invoke(IPC.pfStatus, connectionId)
+  },
+  importer: {
+    sshConfigHosts: (): Promise<SshConfigHost[]> => ipcRenderer.invoke(IPC.sshConfigRead)
   },
   dialogs: {
     pickPrivateKey: (): Promise<string | undefined> => ipcRenderer.invoke(IPC.dialogPickPrivateKey),

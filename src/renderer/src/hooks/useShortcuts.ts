@@ -41,10 +41,12 @@ export function useShortcuts(): void {
           break
         }
         case 'w': {
-          if (!activeTabId) return
+          if (!activeTab) return
           e.preventDefault()
           e.stopPropagation()
-          state.closeTab(activeTabId)
+          // Close just the focused pane while the tab is split; otherwise the tab.
+          if (activeTab.root.type === 'split') state.closePane(activeTab.id, activeTab.activePaneId)
+          else state.closeTab(activeTab.id)
           break
         }
         case 'd': {

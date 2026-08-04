@@ -20,6 +20,8 @@ export type PaneNode =
       connectionId?: string
       sftpOpen: boolean
       tunnelsOpen: boolean
+      /** Whether this terminal takes part in broadcast input. */
+      broadcastEnabled: boolean
     }
   | { type: 'split'; id: string; dir: 'row' | 'col'; children: [PaneNode, PaneNode]; sizes: [number, number] }
 
@@ -30,12 +32,37 @@ export interface WorkspaceTab {
   activePaneId: string
 }
 
+/** Connection ids of every connected pane in a tab. */
+export function collectConnectionIds(node: PaneNode): string[] {
+  if (node.type === 'leaf') return node.connectionId ? [node.connectionId] : []
+  return [...collectConnectionIds(node.children[0]), ...collectConnectionIds(node.children[1])]
+}
+
+/** Connection ids of panes opted in to broadcast. */
+export function collectBroadcastTargets(node: PaneNode): string[] {
+  if (node.type === 'leaf') {
+    return node.connectionId && node.broadcastEnabled ? [node.connectionId] : []
+  }
+  return [
+    ...collectBroadcastTargets(node.children[0]),
+    ...collectBroadcastTargets(node.children[1])
+  ]
+}
+
+/** Every leaf in a tab, regardless of connection state. */
+export function collectLeaves(node: PaneNode): Array<Extract<PaneNode, { type: 'leaf' }>> {
+  if (node.type === 'leaf') return [node]
+  return [...collectLeaves(node.children[0]), ...collectLeaves(node.children[1])]
+}
+
 interface AppState {
   groups: SessionGroup[]
   sessions: SessionProfile[]
   tabs: WorkspaceTab[]
   activeTabId: string | null
   vaultLocked: boolean
+  /** When on, typing in any terminal is mirrored to every open pane, in every tab. */
+  broadcast: boolean
 
   lockVault: () => Promise<void>
   setVaultUnlocked: () => void
@@ -44,6 +71,8 @@ interface AppState {
   removeSession: (id: string) => Promise<void>
   upsertGroup: (group: SessionGroup) => Promise<void>
   removeGroup: (id: string) => Promise<void>
+  moveSession: (sessionId: string, groupId: string | null) => Promise<void>
+  moveGroup: (groupId: string, parentId: string | null) => Promise<void>
 
   openTab: (title: string, target: PaneTarget) => string
   closeTab: (tabId: string) => void
@@ -51,8 +80,12 @@ interface AppState {
   setActivePane: (tabId: string, paneId: string) => void
   setPaneConnection: (tabId: string, paneId: string, connectionId: string) => void
   splitPane: (tabId: string, paneId: string, dir: 'row' | 'col') => void
+  closePane: (tabId: string, paneId: string) => void
   toggleSftp: (tabId: string, paneId: string) => void
   toggleTunnels: (tabId: string, paneId: string) => void
+  toggleBroadcast: () => void
+  togglePaneBroadcast: (tabId: string, paneId: string) => void
+  setAllPanesBroadcast: (enabled: boolean) => void
   resizeSplit: (tabId: string, splitId: string, sizes: [number, number]) => void
 }
 
@@ -64,7 +97,8 @@ function makeLeaf(title: string, target: PaneTarget): PaneNode {
     title,
     target,
     sftpOpen: false,
-    tunnelsOpen: false
+    tunnelsOpen: false,
+    broadcastEnabled: true
   }
 }
 
@@ -79,12 +113,13 @@ function mapPane(node: PaneNode, id: string, fn: (leaf: LeafNode) => LeafNode): 
   }
 }
 
-export const useStore = create<AppState>((set) => ({
+export const useStore = create<AppState>((set, get) => ({
   groups: [],
   sessions: [],
   tabs: [],
   activeTabId: null,
   vaultLocked: false,
+  broadcast: false,
 
   lockVault: async () => {
     await window.td.vault.lock()
@@ -123,10 +158,35 @@ export const useStore = create<AppState>((set) => ({
 
   removeGroup: async (id) => {
     await window.td.store.deleteGroup(id)
-    set((s) => ({
-      groups: s.groups.filter((x) => x.id !== id),
-      sessions: s.sessions.map((x) => (x.groupId === id ? { ...x, groupId: null } : x))
-    }))
+    set((s) => {
+      // Mirror SessionStore.deleteGroup: children are adopted, not orphaned.
+      const newParent = s.groups.find((g) => g.id === id)?.parentId ?? null
+      return {
+        groups: s.groups
+          .filter((x) => x.id !== id)
+          .map((g) => (g.parentId === id ? { ...g, parentId: newParent } : g)),
+        sessions: s.sessions.map((x) => (x.groupId === id ? { ...x, groupId: newParent } : x))
+      }
+    })
+  },
+
+  moveSession: async (sessionId, groupId) => {
+    const session = get().sessions.find((s) => s.id === sessionId)
+    if (!session || session.groupId === groupId) return
+    await get().upsertSession({ ...session, groupId, updatedAt: Date.now() })
+  },
+
+  moveGroup: async (groupId, parentId) => {
+    const { groups } = get()
+    const group = groups.find((g) => g.id === groupId)
+    if (!group || group.parentId === parentId || groupId === parentId) return
+    // Refuse to nest a group inside its own subtree — that would detach the branch.
+    let cursor = parentId
+    while (cursor) {
+      if (cursor === groupId) return
+      cursor = groups.find((g) => g.id === cursor)?.parentId ?? null
+    }
+    await get().upsertGroup({ ...group, parentId })
   },
 
   openTab: (title, target) => {
@@ -181,6 +241,30 @@ export const useStore = create<AppState>((set) => ({
     }))
   },
 
+  closePane: (tabId, paneId) => {
+    set((s) => {
+      const tab = s.tabs.find((t) => t.id === tabId)
+      if (!tab) return {}
+      const root = removePane(tab.root, paneId)
+      if (!root) {
+        // That was the tab's last pane — drop the tab along with it.
+        const tabs = s.tabs.filter((t) => t.id !== tabId)
+        return {
+          tabs,
+          activeTabId:
+            s.activeTabId === tabId ? (tabs[tabs.length - 1]?.id ?? null) : s.activeTabId
+        }
+      }
+      const leaves = collectLeaves(root)
+      const activePaneId = leaves.some((l) => l.id === tab.activePaneId)
+        ? tab.activePaneId
+        : leaves[0].id
+      return {
+        tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, root, activePaneId } : t))
+      }
+    })
+  },
+
   toggleSftp: (tabId, paneId) => {
     set((s) => ({
       tabs: s.tabs.map((t) =>
@@ -204,6 +288,32 @@ export const useStore = create<AppState>((set) => ({
     }))
   },
 
+  toggleBroadcast: () => set((s) => ({ broadcast: !s.broadcast })),
+
+  togglePaneBroadcast: (tabId, paneId) => {
+    set((s) => ({
+      tabs: s.tabs.map((t) =>
+        t.id === tabId
+          ? {
+              ...t,
+              root: mapPane(t.root, paneId, (leaf) => ({
+                ...leaf,
+                broadcastEnabled: !leaf.broadcastEnabled
+              }))
+            }
+          : t
+      )
+    }))
+  },
+
+  setAllPanesBroadcast: (enabled) => {
+    const apply = (node: PaneNode): PaneNode =>
+      node.type === 'leaf'
+        ? { ...node, broadcastEnabled: enabled }
+        : { ...node, children: [apply(node.children[0]), apply(node.children[1])] }
+    set((s) => ({ tabs: s.tabs.map((t) => ({ ...t, root: apply(t.root) })) }))
+  },
+
   resizeSplit: (tabId, splitId, sizes) => {
     set((s) => ({
       tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, root: setSizes(t.root, splitId, sizes) } : t))
@@ -225,6 +335,16 @@ function findPane(node: PaneNode, id: string): PaneNode | undefined {
     return findPane(node.children[0], id) ?? findPane(node.children[1], id)
   }
   return undefined
+}
+
+/** Drops a leaf from the tree; the surviving sibling takes the split's place. */
+function removePane(node: PaneNode, paneId: string): PaneNode | null {
+  if (node.type === 'leaf') return node.id === paneId ? null : node
+  const a = removePane(node.children[0], paneId)
+  const b = removePane(node.children[1], paneId)
+  if (a === null) return b
+  if (b === null) return a
+  return { ...node, children: [a, b] }
 }
 
 function replacePane(node: PaneNode, id: string, replacement: PaneNode): PaneNode {

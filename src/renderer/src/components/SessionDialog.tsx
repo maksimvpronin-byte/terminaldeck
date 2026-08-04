@@ -31,7 +31,19 @@ function blank(defaultGroupId: string | null): SessionProfile {
 
 export default function SessionDialog({ initial, defaultGroupId = null, onClose }: Props): JSX.Element {
   const sessions = useStore((s) => s.sessions)
+  const groups = useStore((s) => s.groups)
   const upsertSession = useStore((s) => s.upsertSession)
+
+  /** "parent / child" so nested groups are distinguishable in a flat <select>. */
+  function groupPath(id: string): string {
+    const parts: string[] = []
+    let cursor = groups.find((g) => g.id === id)
+    while (cursor) {
+      parts.unshift(cursor.name)
+      cursor = cursor.parentId ? groups.find((g) => g.id === cursor!.parentId) : undefined
+    }
+    return parts.join(' / ')
+  }
 
   const [profile, setProfile] = useState<SessionProfile>(initial ?? blank(defaultGroupId))
   const [secret, setSecret] = useState('')
@@ -172,6 +184,18 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
             {otherSessions.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label>
+          Group
+          <select value={profile.groupId ?? ''} onChange={(e) => set('groupId', e.target.value || null)}>
+            <option value="">(no group)</option>
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {groupPath(g.id)}
               </option>
             ))}
           </select>

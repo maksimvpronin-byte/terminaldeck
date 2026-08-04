@@ -1,5 +1,5 @@
 import type { PaneNode } from '../state/store'
-import { useStore } from '../state/store'
+import { useStore, collectBroadcastTargets } from '../state/store'
 import TerminalHost from './TerminalHost'
 import SftpPanel from './SftpPanel'
 import TunnelsPanel from './TunnelsPanel'
@@ -16,16 +16,29 @@ export default function Pane({
   const setActivePane = useStore((s) => s.setActivePane)
   const setPaneConnection = useStore((s) => s.setPaneConnection)
   const splitPane = useStore((s) => s.splitPane)
+  const closePane = useStore((s) => s.closePane)
   const toggleSftp = useStore((s) => s.toggleSftp)
   const toggleTunnels = useStore((s) => s.toggleTunnels)
+  const broadcast = useStore((s) => s.broadcast)
+  const togglePaneBroadcast = useStore((s) => s.togglePaneBroadcast)
 
   const isActive = isActiveTab && activePaneId === node.id
 
   return (
     <div className={`pane ${isActive ? 'active' : ''}`}>
-      <div className="pane-toolbar">
+      <div className={`pane-toolbar ${broadcast && node.broadcastEnabled ? 'broadcasting' : ''}`}>
         <span>{node.title}</span>
         <div className="actions">
+          {broadcast && (
+            <label className="broadcast-check" title="Include this terminal in broadcast">
+              <input
+                type="checkbox"
+                checked={node.broadcastEnabled}
+                onChange={() => togglePaneBroadcast(tabId, node.id)}
+              />
+              ⇉
+            </label>
+          )}
           <button title="Split right" onClick={() => splitPane(tabId, node.id, 'row')}>
             ⬓
           </button>
@@ -38,6 +51,9 @@ export default function Pane({
           <button title="Toggle port forwarding" onClick={() => toggleTunnels(tabId, node.id)}>
             Tunnels
           </button>
+          <button title="Close pane (⌘W)" onClick={() => closePane(tabId, node.id)}>
+            ✕
+          </button>
         </div>
       </div>
       <div className="pane-body">
@@ -47,6 +63,13 @@ export default function Pane({
           active={isActive}
           onFocus={() => setActivePane(tabId, node.id)}
           onConnected={(connectionId) => setPaneConnection(tabId, node.id, connectionId)}
+          resolveWriteTargets={(own) => {
+            const state = useStore.getState()
+            // A terminal excluded from broadcast keeps its own input to itself.
+            if (!state.broadcast || !node.broadcastEnabled) return [own]
+            const all = state.tabs.flatMap((t) => collectBroadcastTargets(t.root))
+            return all.length > 0 ? all : [own]
+          }}
         />
         {node.sftpOpen && <SftpPanel connectionId={node.connectionId} />}
         {node.tunnelsOpen && (

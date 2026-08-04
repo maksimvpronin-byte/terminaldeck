@@ -59,17 +59,37 @@ class SFTPManager {
     })
   }
 
-  async download(connectionId: string, remotePath: string, localPath: string): Promise<void> {
+  async download(
+    connectionId: string,
+    remotePath: string,
+    localPath: string,
+    onProgress?: (transferred: number, total: number) => void
+  ): Promise<void> {
     const sftp = await this.getSftp(connectionId)
     await new Promise<void>((resolve, reject) => {
-      sftp.fastGet(remotePath, localPath, (err) => (err ? reject(err) : resolve()))
+      sftp.fastGet(
+        remotePath,
+        localPath,
+        { step: (transferred, _chunk, total) => onProgress?.(transferred, total) },
+        (err) => (err ? reject(err) : resolve())
+      )
     })
   }
 
-  async upload(connectionId: string, localPath: string, remotePath: string): Promise<void> {
+  async upload(
+    connectionId: string,
+    localPath: string,
+    remotePath: string,
+    onProgress?: (transferred: number, total: number) => void
+  ): Promise<void> {
     const sftp = await this.getSftp(connectionId)
     await new Promise<void>((resolve, reject) => {
-      sftp.fastPut(localPath, remotePath, (err) => (err ? reject(err) : resolve()))
+      sftp.fastPut(
+        localPath,
+        remotePath,
+        { step: (transferred, _chunk, total) => onProgress?.(transferred, total) },
+        (err) => (err ? reject(err) : resolve())
+      )
     })
   }
 

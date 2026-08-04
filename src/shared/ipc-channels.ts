@@ -30,11 +30,16 @@ export const IPC = {
   sftpMkdir: 'sftp:mkdir',
   sftpDelete: 'sftp:delete',
   sftpRename: 'sftp:rename',
+  /** main -> renderer, suffixed with connectionId */
+  sftpProgress: 'sftp:progress',
 
   // Port forwarding
   pfStart: 'pf:start',
   pfStop: 'pf:stop',
   pfStatus: 'pf:status',
+
+  // Import
+  sshConfigRead: 'import:sshConfig',
 
   // Dialogs
   dialogPickPrivateKey: 'dialog:pickPrivateKey',

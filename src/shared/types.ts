@@ -71,6 +71,15 @@ export interface TerminalResizePayload {
   rows: number
 }
 
+export interface SshConfigHost {
+  alias: string
+  hostname: string
+  user?: string
+  port: number
+  identityFile?: string
+  proxyJump?: string
+}
+
 export interface SftpEntry {
   name: string
   path: string
