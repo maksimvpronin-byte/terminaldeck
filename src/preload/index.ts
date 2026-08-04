@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, webUtils } from 'electron'
+import { contextBridge, ipcRenderer, webUtils, clipboard } from 'electron'
 import { IPC } from '../shared/ipc-channels'
 import type {
   SessionProfile,
@@ -121,6 +121,15 @@ const api = {
       ipcRenderer.on(IPC.updateState, listener)
       return () => ipcRenderer.removeListener(IPC.updateState, listener)
     }
+  },
+  clipboard: {
+    // Electron's own clipboard rather than navigator.clipboard: the packaged app
+    // is served from file://, which is not a secure context, so the web API fails.
+    read: (): string => clipboard.readText(),
+    write: (text: string): void => clipboard.writeText(text)
+  },
+  logs: {
+    reveal: (): Promise<string> => ipcRenderer.invoke(IPC.logsReveal)
   },
   files: {
     /** Electron 32+ dropped File.path; this is the supported replacement. */

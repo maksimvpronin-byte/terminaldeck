@@ -8,6 +8,7 @@ import SessionDialog from './SessionDialog'
 import QuickConnectDialog from './QuickConnectDialog'
 import ImportSshConfigDialog from './ImportSshConfigDialog'
 import SettingsDialog from './SettingsDialog'
+import ContextMenu, { type MenuItem } from './ContextMenu'
 import ModalBackdrop from './ModalBackdrop'
 
 const ROOT_TARGET = '__root__'
@@ -32,6 +33,7 @@ export default function Sidebar({
   const upsertGroup = useStore((s) => s.upsertGroup)
   const removeGroup = useStore((s) => s.removeGroup)
   const removeSession = useStore((s) => s.removeSession)
+  const upsertSession = useStore((s) => s.upsertSession)
   const openTab = useStore((s) => s.openTab)
   const lockVault = useStore((s) => s.lockVault)
   const moveSession = useStore((s) => s.moveSession)
@@ -46,6 +48,7 @@ export default function Sidebar({
   const [newGroupParent, setNewGroupParent] = useState<string | null | undefined>(undefined)
   const [groupName, setGroupName] = useState('')
   const [dropTarget, setDropTarget] = useState<string | null>(null)
+  const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null)
   const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsed)
 
   function toggleCollapsed(groupId: string): void {
@@ -111,10 +114,71 @@ export default function Sidebar({
     else if (item.kind === 'group') await moveGroup(item.id, targetGroupId)
   }
 
+  function sessionMenu(s: SessionProfile): MenuItem[] {
+    const state = useStore.getState()
+    const activeTab = state.tabs.find((t) => t.id === state.activeTabId)
+    return [
+      { label: 'Connect', onSelect: () => connect(s) },
+      {
+        label: 'Connect in split',
+        disabled: !activeTab,
+        onSelect: () => {
+          if (!activeTab) return
+          state.splitPaneWith(
+            activeTab.id,
+            activeTab.activePaneId,
+            'row',
+            'after',
+            s.name,
+            { kind: 'session', sessionId: s.id }
+          )
+        }
+      },
+      {
+        label: 'Duplicate',
+        separated: true,
+        onSelect: () => {
+          const now = Date.now()
+          // The clone gets its own id; the secret stays with the original, so the
+          // copy has to be given credentials of its own.
+          upsertSession({
+            ...s,
+            id: nanoid(),
+            name: `${s.name} copy`,
+            secretRef: undefined,
+            createdAt: now,
+            updatedAt: now
+          })
+        }
+      },
+      { label: 'Edit…', onSelect: () => setEditingSession(s) },
+      {
+        label: `Copy ${s.username ? `${s.username}@` : ''}${s.host}`,
+        onSelect: () => {
+          window.td.clipboard.write(`${s.username ? `${s.username}@` : ''}${s.host}`)
+        }
+      },
+      { label: 'Delete', danger: true, separated: true, onSelect: () => removeSession(s.id) }
+    ]
+  }
+
+  function groupMenu(groupId: string): MenuItem[] {
+    return [
+      { label: 'New session here', onSelect: () => setEditingSession('new') },
+      { label: 'New subgroup…', onSelect: () => setNewGroupParent(groupId) },
+      { label: 'Delete group', danger: true, separated: true, onSelect: () => removeGroup(groupId) }
+    ]
+  }
+
   function renderSession(s: SessionProfile, paddingLeft: number): JSX.Element {
     return (
       <div
         className="tree-item"
+        onContextMenu={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          setMenu({ x: e.clientX, y: e.clientY, items: sessionMenu(s) })
+        }}
         key={s.id}
         style={{ paddingLeft }}
         draggable
@@ -154,6 +218,11 @@ export default function Sidebar({
               onDragLeave={() => setDropTarget(null)}
               onDrop={(e) => handleDrop(e, g.id)}
               onClick={() => toggleCollapsed(g.id)}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                setMenu({ x: e.clientX, y: e.clientY, items: groupMenu(g.id) })
+              }}
             >
               <span className="tree-group-title name">
                 <span className="chevron">{isCollapsed ? '▸' : '▾'}</span> 📁 {g.name}
@@ -262,6 +331,10 @@ export default function Sidebar({
       {showQuickConnect && <QuickConnectDialog onClose={() => setShowQuickConnect(false)} />}
       {showImport && <ImportSshConfigDialog onClose={() => setShowImport(false)} />}
       {showSettings && <SettingsDialog onClose={() => setShowSettings(false)} />}
+
+      {menu && (
+        <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />
+      )}
 
       {newGroupParent !== undefined && (
         <ModalBackdrop onClose={() => setNewGroupParent(undefined)}>

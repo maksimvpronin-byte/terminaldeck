@@ -126,6 +126,28 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
             Blinking cursor
           </label>
         </div>
+
+        <label className="checkbox-row" style={{ flexDirection: 'row' }}>
+          <input
+            type="checkbox"
+            checked={settings.copyOnSelect}
+            onChange={(e) => updateSettings({ copyOnSelect: e.target.checked })}
+          />
+          Copy to clipboard as soon as text is selected
+        </label>
+
+        <label>
+          Right-click in a terminal
+          <select
+            value={settings.rightClick}
+            onChange={(e) =>
+              updateSettings({ rightClick: e.target.value as typeof settings.rightClick })
+            }
+          >
+            <option value="paste">Paste clipboard</option>
+            <option value="menu">Open context menu</option>
+          </select>
+        </label>
           </>
         )}
 

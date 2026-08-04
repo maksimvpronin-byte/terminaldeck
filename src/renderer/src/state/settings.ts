@@ -7,6 +7,10 @@ export interface TerminalSettings {
   cursorBlink: boolean
   cursorStyle: 'block' | 'underline' | 'bar'
   themeName: string
+  /** Selecting text in a terminal puts it on the clipboard right away. */
+  copyOnSelect: boolean
+  /** Right-click either pastes immediately or opens the terminal menu. */
+  rightClick: 'paste' | 'menu'
 }
 
 /** Chrome colours, mapped onto the CSS custom properties in styles.css. */
@@ -146,7 +150,9 @@ export const DEFAULT_SETTINGS: TerminalSettings = {
   scrollback: 10000,
   cursorBlink: true,
   cursorStyle: 'block',
-  themeName: 'TerminalDeck Dark'
+  themeName: 'TerminalDeck Dark',
+  copyOnSelect: true,
+  rightClick: 'paste'
 }
 
 export const FONT_CHOICES = [

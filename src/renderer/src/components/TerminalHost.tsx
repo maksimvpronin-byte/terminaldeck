@@ -6,6 +6,7 @@ import 'xterm/css/xterm.css'
 import type { PaneTarget } from '../state/store'
 import { useStore } from '../state/store'
 import { themeOf } from '../state/settings'
+import ContextMenu, { type MenuItem } from './ContextMenu'
 
 interface Props {
   target: PaneTarget
@@ -51,6 +52,7 @@ export default function TerminalHost({
   const [closed, setClosed] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [needle, setNeedle] = useState('')
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
 
   const detachListeners = useCallback(() => {
     for (const off of unsubscribeRef.current) off()
@@ -132,8 +134,22 @@ export default function TerminalHost({
     if (active) term.focus()
 
     term.attachCustomKeyEventHandler((e) => {
-      if (e.type === 'keydown' && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
+      if (e.type !== 'keydown') return true
+      const mod = e.metaKey || e.ctrlKey
+      if (!mod) return true
+      const key = e.key.toLowerCase()
+
+      if (key === 'f') {
         setSearchOpen(true)
+        return false
+      }
+      // Plain Ctrl+C stays SIGINT; Cmd+C and Ctrl+Shift+C copy the selection.
+      if (key === 'c' && (e.metaKey || e.shiftKey) && term.hasSelection()) {
+        copySelection()
+        return false
+      }
+      if (key === 'v' && (e.metaKey || e.shiftKey)) {
+        paste()
         return false
       }
       return true
@@ -190,6 +206,30 @@ export default function TerminalHost({
     termRef.current?.focus()
   }
 
+  function paste(): void {
+    const text = window.td.clipboard.read()
+    const own = connIdRef.current
+    if (!text || !own) return
+    for (const cid of resolveWriteTargetsRef.current(own)) window.td.ssh.write(cid, text)
+  }
+
+  function copySelection(): void {
+    const selection = termRef.current?.getSelection()
+    if (selection) window.td.clipboard.write(selection)
+  }
+
+  function terminalMenu(): MenuItem[] {
+    const term = termRef.current
+    const selection = term?.getSelection() ?? ''
+    return [
+      { label: 'Copy', disabled: selection === '', onSelect: copySelection },
+      { label: 'Paste', onSelect: paste },
+      { label: 'Select all', separated: true, onSelect: () => term?.selectAll() },
+      { label: 'Find…', onSelect: () => setSearchOpen(true) },
+      { label: 'Clear', separated: true, onSelect: () => term?.clear() }
+    ]
+  }
+
   function closeSearch(): void {
     setSearchOpen(false)
     searchRef.current?.clearDecorations()
@@ -227,7 +267,26 @@ export default function TerminalHost({
           </button>
         </div>
       )}
-      <div className="terminal-host" ref={hostRef} onClick={handleClick} />
+      <div
+        className="terminal-host"
+        ref={hostRef}
+        onClick={handleClick}
+        onMouseUp={() => {
+          if (settings.copyOnSelect) copySelection()
+        }}
+        onContextMenu={(e) => {
+          e.preventDefault()
+          if (settings.rightClick === 'paste') {
+            paste()
+            termRef.current?.focus()
+          } else {
+            setMenu({ x: e.clientX, y: e.clientY })
+          }
+        }}
+      />
+      {menu && (
+        <ContextMenu x={menu.x} y={menu.y} items={terminalMenu()} onClose={() => setMenu(null)} />
+      )}
       {closed && (
         <div className="terminal-reconnect">
           <button className="primary" onClick={() => connect(generationRef.current)}>

@@ -1,5 +1,7 @@
-import { ipcMain, BrowserWindow, dialog } from 'electron'
+import { ipcMain, BrowserWindow, dialog, shell, app } from 'electron'
 import { randomUUID } from 'crypto'
+import { join } from 'path'
+import { existsSync, mkdirSync } from 'fs'
 import { IPC } from '../../shared/ipc-channels'
 import { vault, WrongPasswordError } from '../vault/Vault'
 import { sessionStore } from '../store/SessionStore'
@@ -188,6 +190,15 @@ export function registerIpcHandlers(): void {
 
   // --- Import ---
   ipcMain.handle(IPC.sshConfigRead, () => readSshConfigHosts())
+
+  // --- Session logs ---
+  ipcMain.handle(IPC.logsReveal, async () => {
+    const dir = join(app.getPath('userData'), 'logs')
+    // The directory only appears once a session with logging enabled has run.
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+    await shell.openPath(dir)
+    return dir
+  })
 
   // --- Dialogs ---
   ipcMain.handle(IPC.dialogPickPrivateKey, async () => {

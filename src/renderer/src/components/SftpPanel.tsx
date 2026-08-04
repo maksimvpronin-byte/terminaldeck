@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from 'react'
 import type { SftpEntry } from '../../../shared/types'
 import ModalBackdrop from './ModalBackdrop'
+import ContextMenu, { type MenuItem } from './ContextMenu'
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -48,21 +49,6 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
     })
     return off
   }, [connectionId])
-
-  // Any click outside the menu, or Escape, dismisses it.
-  useEffect(() => {
-    if (!menu) return
-    const close = (): void => setMenu(null)
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') setMenu(null)
-    }
-    window.addEventListener('click', close)
-    window.addEventListener('keydown', onKey)
-    return () => {
-      window.removeEventListener('click', close)
-      window.removeEventListener('keydown', onKey)
-    }
-  }, [menu])
 
   async function fetchList(p: string, silent: boolean): Promise<SftpEntry[] | null> {
     if (!connectionId) return null
@@ -245,6 +231,40 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
     load(path)
   }
 
+  function sftpMenuItems(targets: SftpEntry[]): MenuItem[] {
+    const items: MenuItem[] = []
+    const only = targets.length === 1 ? targets[0] : undefined
+
+    if (only && !only.isDirectory) {
+      items.push({ label: 'Download', onSelect: () => download(only) })
+    }
+    if (only?.isDirectory) {
+      items.push({ label: 'Open', onSelect: () => load(only.path) })
+    }
+    if (only) {
+      items.push({
+        label: 'Rename…',
+        onSelect: () => setRenaming({ entry: only, value: only.name })
+      })
+    }
+    if (targets.length > 0) {
+      items.push({
+        label: `Delete${targets.length > 1 ? ` ${targets.length} items` : ''}`,
+        danger: true,
+        onSelect: () => setPendingDelete(targets)
+      })
+    }
+
+    items.push({
+      label: 'New folder…',
+      separated: targets.length > 0,
+      onSelect: () => setNewFolder('')
+    })
+    items.push({ label: 'Upload file…', onSelect: upload })
+    items.push({ label: 'Refresh', onSelect: () => refresh() })
+    return items
+  }
+
   const parentPath = path.split('/').slice(0, -1).join('/') || '/'
 
   return (
@@ -364,78 +384,12 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
       </div>
 
       {menu && (
-        <div
-          className="context-menu"
-          style={{ left: menu.x, top: menu.y }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {menu.entries.length === 1 && !menu.entries[0].isDirectory && (
-            <button
-              onClick={() => {
-                setMenu(null)
-                download(menu.entries[0])
-              }}
-            >
-              Download
-            </button>
-          )}
-          {menu.entries.length === 1 && menu.entries[0].isDirectory && (
-            <button
-              onClick={() => {
-                setMenu(null)
-                load(menu.entries[0].path)
-              }}
-            >
-              Open
-            </button>
-          )}
-          {menu.entries.length === 1 && (
-            <button
-              onClick={() => {
-                setRenaming({ entry: menu.entries[0], value: menu.entries[0].name })
-                setMenu(null)
-              }}
-            >
-              Rename…
-            </button>
-          )}
-          {menu.entries.length > 0 && (
-            <button
-              className="danger"
-              onClick={() => {
-                setPendingDelete(menu.entries)
-                setMenu(null)
-              }}
-            >
-              Delete{menu.entries.length > 1 ? ` ${menu.entries.length} items` : ''}
-            </button>
-          )}
-          {menu.entries.length > 0 && <div className="context-sep" />}
-          <button
-            onClick={() => {
-              setNewFolder('')
-              setMenu(null)
-            }}
-          >
-            New folder…
-          </button>
-          <button
-            onClick={() => {
-              setMenu(null)
-              upload()
-            }}
-          >
-            Upload file…
-          </button>
-          <button
-            onClick={() => {
-              setMenu(null)
-              load(path)
-            }}
-          >
-            Refresh
-          </button>
-        </div>
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          items={sftpMenuItems(menu.entries)}
+          onClose={() => setMenu(null)}
+        />
       )}
 
       {pendingDelete && (

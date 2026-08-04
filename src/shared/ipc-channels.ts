@@ -58,6 +58,9 @@ export const IPC = {
   /** main -> renderer */
   updateState: 'update:state',
 
+  // Session logs
+  logsReveal: 'logs:reveal',
+
   // Dialogs
   dialogPickPrivateKey: 'dialog:pickPrivateKey',
   dialogPickSavePath: 'dialog:pickSavePath',

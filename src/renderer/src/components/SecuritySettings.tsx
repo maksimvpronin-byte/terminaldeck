@@ -77,6 +77,15 @@ export default function SecuritySettings(): JSX.Element {
         </button>
       </div>
 
+      <h3 className="settings-heading">Session logs</h3>
+      <p className="settings-note">
+        Sessions with “Log session output to file” enabled write here. The transcript contains
+        everything the terminal showed, so treat it as sensitive.
+      </p>
+      <div>
+        <button onClick={() => window.td.logs.reveal()}>Open logs folder</button>
+      </div>
+
       <h3 className="settings-heading">Trusted host keys</h3>
       <p className="settings-note">
         Removing an entry makes TerminalDeck ask again on the next connection. Do that when a
