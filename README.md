@@ -48,8 +48,8 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
 
 - SFTP browser: multi-select, context menu, rename, delete, mkdir, whole-directory transfers,
   Finder drag-and-drop upload, transfer progress, and auto-refresh
-- **Edit remote files locally** — opens in the editor of your choice (Settings → Files) and
-  uploads on every save
+- **Edit remote files locally** — “Edit locally” in the file context menu opens it in the editor
+  of your choice (Settings → Files) and uploads on every save
 - Jump host / ProxyJump chaining, for saved sessions and inventory hosts alike
 - Port forwarding — local, remote, and dynamic (SOCKS5) — auto-started per session with a
   runtime control panel
