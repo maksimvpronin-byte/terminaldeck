@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
-import type { SessionGroup, SessionProfile } from '../../../shared/types'
+import type { SessionProfile } from '../../../shared/types'
 import { resolveAuth } from '../../../shared/authResolution'
+import { applyOverride } from '../../../shared/overrides'
+import { groupPath } from '../../../shared/groups'
 import { useStore } from '../state/store'
 import type { PaneTarget } from '../state/store'
 import ModalBackdrop from './ModalBackdrop'
@@ -14,20 +16,6 @@ interface Entry {
   address: string
   color?: string
   target: PaneTarget
-}
-
-function pathOf(groupId: string | null, groups: SessionGroup[]): string {
-  const parts: string[] = []
-  const seen = new Set<string>()
-  let cursor = groupId
-  while (cursor && !seen.has(cursor)) {
-    seen.add(cursor)
-    const group = groups.find((g) => g.id === cursor)
-    if (!group) break
-    parts.unshift(group.name)
-    cursor = group.parentId
-  }
-  return parts.join(' / ')
 }
 
 export default function HostPalette({ onClose }: { onClose: () => void }): JSX.Element {
@@ -51,7 +39,7 @@ export default function HostPalette({ onClose }: { onClose: () => void }): JSX.E
       out.push({
         id: s.id,
         title: s.name,
-        path: pathOf(s.groupId, groups),
+        path: groupPath(s.groupId, groups),
         address: auth.username ? `${auth.username}@${s.host}` : s.host,
         color: s.color,
         target: { kind: 'session', sessionId: s.id }
@@ -61,22 +49,15 @@ export default function HostPalette({ onClose }: { onClose: () => void }): JSX.E
     const invGroups = trees.flatMap((t) => t.groups)
     for (const tree of trees) {
       for (const raw of tree.sessions) {
-        const o = overrides.find((x) => x.nodeId === raw.id)
-        const host: SessionProfile = o
-          ? {
-              ...raw,
-              ...Object.fromEntries(
-                Object.entries(o).filter(
-                  ([k, v]) => k !== 'nodeId' && v !== undefined && v !== null && v !== ''
-                )
-              )
-            }
-          : raw
+        const host: SessionProfile = applyOverride(
+          raw,
+          overrides.find((x) => x.nodeId === raw.id)
+        )
         const auth = resolveAuth(host, host.groupId, invGroups)
         out.push({
           id: host.id,
           title: host.name,
-          path: pathOf(host.groupId, invGroups),
+          path: groupPath(host.groupId, invGroups),
           address: auth.username ? `${auth.username}@${host.host}` : host.host,
           color: host.color,
           target: { kind: 'session', sessionId: host.id }

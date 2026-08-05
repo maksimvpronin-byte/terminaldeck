@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { nanoid } from 'nanoid'
 import type { AuthMethod, PortForwardRule, SessionProfile } from '../../../shared/types'
 import { resolveAuth, inheritedFrom } from '../../../shared/authResolution'
+import { groupPath } from '../../../shared/groups'
 import { useStore } from '../state/store'
 import { SESSION_COLOURS } from '../state/colours'
 import ModalBackdrop from './ModalBackdrop'
@@ -32,17 +33,6 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
   const sessions = useStore((s) => s.sessions)
   const groups = useStore((s) => s.groups)
   const upsertSession = useStore((s) => s.upsertSession)
-
-  /** "parent / child" so nested groups are distinguishable in a flat <select>. */
-  function groupPath(id: string): string {
-    const parts: string[] = []
-    let cursor = groups.find((g) => g.id === id)
-    while (cursor) {
-      parts.unshift(cursor.name)
-      cursor = cursor.parentId ? groups.find((g) => g.id === cursor!.parentId) : undefined
-    }
-    return parts.join(' / ')
-  }
 
   const [profile, setProfile] = useState<SessionProfile>(initial ?? blank(defaultGroupId))
   const [secret, setSecret] = useState('')
@@ -236,7 +226,7 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
             <option value="">(no group)</option>
             {groups.map((g) => (
               <option key={g.id} value={g.id}>
-                {groupPath(g.id)}
+                {groupPath(g.id, groups)}
               </option>
             ))}
           </select>

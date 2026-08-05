@@ -10,6 +10,7 @@ import type {
 } from '../../shared/types'
 import { parseAnsibleInventory, type AnsibleVars } from './ansible'
 import { syncRepo, headRevision } from './GitRepo'
+import { applyOverride, withoutBlanks } from '../../shared/overrides'
 
 function configPath(): string {
   return join(app.getPath('userData'), 'inventories.json')
@@ -143,9 +144,10 @@ class InventoryStore {
     for (const tree of this.trees.values()) {
       const found = tree.sessions.find((s) => s.id === sessionId)
       if (!found) continue
-      const override = this.data.overrides.find((o) => o.nodeId === sessionId)
-      const { nodeId: _ignored, ...patch } = override ?? { nodeId: '' }
-      return override ? { ...found, ...stripEmpty(patch) } : found
+      return applyOverride(
+        found,
+        this.data.overrides.find((o) => o.nodeId === sessionId)
+      )
     }
     return undefined
   }
@@ -157,12 +159,7 @@ class InventoryStore {
   allGroups(): import('../../shared/types').SessionGroup[] {
     return [...this.trees.values()]
       .flatMap((t) => t.groups)
-      .map((g) => {
-        const override = this.data.overrides.find((o) => o.nodeId === g.id)
-        if (!override) return g
-        const { nodeId: _ignored, ...patch } = override
-        return { ...g, ...stripEmpty(patch) }
-      })
+      .map((g) => applyOverride(g, this.data.overrides.find((o) => o.nodeId === g.id)))
   }
 
   async sync(sourceId: string): Promise<InventoryTree> {
@@ -179,7 +176,7 @@ class InventoryStore {
       const { id: _id, name, repoUrl: _url, branch: _br, paths: _p, ...sourceAuth } = source
       const tree: InventoryTree = {
         sourceId,
-        groups: [{ ...stripEmpty(sourceAuth), id: rootId, name, parentId: null }],
+        groups: [{ ...withoutBlanks(sourceAuth), id: rootId, name, parentId: null }],
         sessions: []
       }
       for (const file of files) {
@@ -221,15 +218,6 @@ class InventoryStore {
       await this.sync(source.id).catch(() => undefined)
     }
   }
-}
-
-/** Drops blank fields so an override only shadows what it actually sets. */
-function stripEmpty<T extends object>(value: T): Partial<T> {
-  const out: Record<string, unknown> = {}
-  for (const [k, v] of Object.entries(value)) {
-    if (v !== undefined && v !== null && v !== '') out[k] = v
-  }
-  return out as Partial<T>
 }
 
 export const inventoryStore = new InventoryStore()

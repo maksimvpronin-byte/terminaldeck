@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { MouseEvent as ReactMouseEvent } from 'react'
 import type { InventorySource, SessionGroup, SessionProfile } from '../../../shared/types'
 import { resolveAuth } from '../../../shared/authResolution'
+import { applyOverride } from '../../../shared/overrides'
 import { useStore, collectConnectedSessionIds } from '../state/store'
 import InventorySourceDialog from './InventorySourceDialog'
 import InventoryOverrideDialog from './InventoryOverrideDialog'
@@ -70,13 +71,7 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
 
   /** Local settings layered over a derived node, blank fields ignored. */
   function withOverride<T extends { id: string }>(node: T): T {
-    const o = overrides.find((x) => x.nodeId === node.id)
-    if (!o) return node
-    const { nodeId: _drop, ...patch } = o
-    const clean = Object.fromEntries(
-      Object.entries(patch).filter(([, v]) => v !== undefined && v !== null && v !== '')
-    )
-    return { ...node, ...clean }
+    return applyOverride(node, overrides.find((x) => x.nodeId === node.id))
   }
 
   // Groups carry overrides too, so a whole Ansible group can be pointed at a

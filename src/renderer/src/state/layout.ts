@@ -1,5 +1,7 @@
 import { collectLeaves, removePane, type PaneNode } from './paneTree'
-import type { WorkspaceTab } from './store'
+// Straight from the slice types, not from the store: the store imports this
+// module, and pointing back at it would close a cycle.
+import type { WorkspaceTab } from './slices/types'
 
 const KEY = 'terminaldeck.layout'
 

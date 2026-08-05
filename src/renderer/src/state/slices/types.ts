@@ -1,0 +1,125 @@
+import type { TerminalSettings } from '../settings'
+import type { PaneNode, PaneTarget } from '../paneTree'
+import type {
+  InventoryOverride,
+  InventorySource,
+  InventoryTree,
+  SessionGroup,
+  SessionProfile,
+  Snippet
+} from '../../../../shared/types'
+
+export interface WorkspaceTab {
+  id: string
+  title: string
+  root: PaneNode
+  activePaneId: string
+  /** Output arrived while the tab was in the background. */
+  hasActivity?: boolean
+}
+
+export interface OpenRequest {
+  title: string
+  target: PaneTarget
+  color?: string
+}
+
+export interface VaultSlice {
+  vaultLocked: boolean
+  lockVault: () => Promise<void>
+  setVaultUnlocked: () => void
+}
+
+export interface SettingsSlice {
+  settings: TerminalSettings
+  updateSettings: (patch: Partial<TerminalSettings>) => void
+}
+
+export interface SessionsSlice {
+  groups: SessionGroup[]
+  sessions: SessionProfile[]
+  loadStore: () => Promise<void>
+  upsertSession: (session: SessionProfile, secret?: string) => Promise<void>
+  removeSession: (id: string) => Promise<void>
+  upsertGroup: (group: SessionGroup, secret?: string) => Promise<void>
+  removeGroup: (id: string) => Promise<void>
+  moveSession: (sessionId: string, groupId: string | null) => Promise<void>
+  moveGroup: (groupId: string, parentId: string | null) => Promise<void>
+}
+
+export interface InventorySlice {
+  inventorySources: InventorySource[]
+  inventoryOverrides: InventoryOverride[]
+  inventoryTrees: InventoryTree[]
+  inventorySyncing: string[]
+  gitAvailable: boolean
+  loadInventory: () => Promise<void>
+  syncInventory: (sourceId?: string) => Promise<void>
+  saveInventorySource: (source: InventorySource) => Promise<void>
+  removeInventorySource: (id: string) => Promise<void>
+  saveInventoryOverride: (override: InventoryOverride, secret?: string) => Promise<void>
+  clearInventoryOverride: (nodeId: string) => Promise<void>
+}
+
+export interface SnippetsSlice {
+  snippets: Snippet[]
+  loadSnippets: () => Promise<void>
+  upsertSnippet: (snippet: Snippet) => Promise<void>
+  removeSnippet: (id: string) => Promise<void>
+}
+
+export interface WorkspaceSlice {
+  tabs: WorkspaceTab[]
+  activeTabId: string | null
+  /** When on, typing in any terminal is mirrored to every open pane, in every tab. */
+  broadcast: boolean
+
+  /** Hosts ticked in the tree, across both the saved and inventory tabs. */
+  selectedHostIds: string[]
+  lastSelectedHostId: string | null
+  toggleHostSelection: (id: string) => void
+  /** Shift-click: everything between the previous click and this one. */
+  selectHostRange: (orderedIds: string[], toId: string) => void
+  clearHostSelection: () => void
+  openSelectedHosts: (mode: 'tabs' | 'grid') => void
+
+  openTab: (title: string, target: PaneTarget, color?: string) => string
+  /** Opens several hosts at once, each in its own tab or all tiled in one. */
+  openMany: (items: OpenRequest[], mode: 'tabs' | 'grid') => void
+  closeTab: (tabId: string) => void
+  setActiveTab: (tabId: string) => void
+  /** Flags a background tab that produced output, so the tab bar can show it. */
+  markActivity: (tabId: string) => void
+
+  setActivePane: (tabId: string, paneId: string) => void
+  setPaneConnection: (tabId: string, paneId: string, connectionId: string) => void
+  splitPane: (tabId: string, paneId: string, dir: 'row' | 'col') => void
+  splitPaneWith: (
+    tabId: string,
+    paneId: string,
+    dir: 'row' | 'col',
+    position: 'before' | 'after',
+    title: string,
+    target: PaneTarget,
+    color?: string
+  ) => void
+  closePane: (tabId: string, paneId: string) => void
+  /** Pulls a pane out of its split and gives it a tab of its own. */
+  detachPane: (tabId: string, paneId: string) => void
+  toggleSftp: (tabId: string, paneId: string) => void
+  toggleTunnels: (tabId: string, paneId: string) => void
+  toggleBroadcast: () => void
+  togglePaneBroadcast: (tabId: string, paneId: string) => void
+  setAllPanesBroadcast: (enabled: boolean) => void
+  resizeSplit: (tabId: string, splitId: string, sizes: [number, number]) => void
+
+  /** Sends text to the focused terminal, or to all broadcast targets when broadcast is on. */
+  sendToTerminals: (text: string, execute: boolean) => number
+}
+
+export type AppState = VaultSlice &
+  SettingsSlice &
+  SessionsSlice &
+  InventorySlice &
+  SnippetsSlice &
+  WorkspaceSlice
