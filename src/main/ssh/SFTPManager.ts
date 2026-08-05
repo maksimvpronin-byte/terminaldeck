@@ -1,6 +1,10 @@
 import type { SFTPWrapper } from 'ssh2'
+import { readdir, mkdir, stat } from 'fs/promises'
+import { join, basename } from 'path'
 import { sshManager } from './SSHManager'
 import type { SftpEntry } from '../../shared/types'
+
+type ProgressFn = (transferred: number, total: number, path: string) => void
 
 class SFTPManager {
   private sessions = new Map<string, SFTPWrapper>()
@@ -43,8 +47,18 @@ class SFTPManager {
     })
   }
 
+  /**
+   * Removes a path, emptying directories first — rmdir refuses non-empty ones.
+   * Symlinks are unlinked rather than followed, so a link pointing outside the
+   * tree can't take its target with it.
+   */
   async delete(connectionId: string, remotePath: string, isDirectory: boolean): Promise<void> {
     const sftp = await this.getSftp(connectionId)
+    if (isDirectory) {
+      for (const entry of await this.list(connectionId, remotePath)) {
+        await this.delete(connectionId, entry.path, entry.isDirectory && !entry.isSymlink)
+      }
+    }
     await new Promise<void>((resolve, reject) => {
       const cb = (err: Error | undefined | null): void => (err ? reject(err) : resolve())
       if (isDirectory) sftp.rmdir(remotePath, cb)
@@ -91,6 +105,71 @@ class SFTPManager {
         (err) => (err ? reject(err) : resolve())
       )
     })
+  }
+
+  /** Mirrors a remote directory into `localDir`, creating it if needed. */
+  async downloadDirectory(
+    connectionId: string,
+    remotePath: string,
+    localDir: string,
+    onProgress?: ProgressFn
+  ): Promise<void> {
+    await mkdir(localDir, { recursive: true })
+    for (const entry of await this.list(connectionId, remotePath)) {
+      const target = join(localDir, entry.name)
+      // Symlinked directories are skipped: following them can loop forever and
+      // pull in files from outside the tree.
+      if (entry.isDirectory && !entry.isSymlink) {
+        await this.downloadDirectory(connectionId, entry.path, target, onProgress)
+      } else if (!entry.isDirectory) {
+        await this.download(connectionId, entry.path, target, (t, total) =>
+          onProgress?.(t, total, entry.path)
+        )
+      }
+    }
+  }
+
+  /** Mirrors a local directory into `remoteParent/<dirname>`. */
+  async uploadDirectory(
+    connectionId: string,
+    localPath: string,
+    remoteParent: string,
+    onProgress?: ProgressFn
+  ): Promise<void> {
+    const remoteDir = `${remoteParent.replace(/\/$/, '')}/${basename(localPath)}`
+    try {
+      await this.mkdir(connectionId, remoteDir)
+    } catch {
+      // Already there — carry on and merge into it.
+    }
+    for (const entry of await readdir(localPath, { withFileTypes: true })) {
+      const child = join(localPath, entry.name)
+      if (entry.isDirectory()) {
+        await this.uploadDirectory(connectionId, child, remoteDir, onProgress)
+      } else if (entry.isFile()) {
+        await this.upload(connectionId, child, `${remoteDir}/${entry.name}`, (t, total) =>
+          onProgress?.(t, total, child)
+        )
+      }
+    }
+  }
+
+  /** Uploads a path of either kind, so callers don't have to stat it themselves. */
+  async uploadPath(
+    connectionId: string,
+    localPath: string,
+    remoteParent: string,
+    onProgress?: ProgressFn
+  ): Promise<void> {
+    const info = await stat(localPath)
+    if (info.isDirectory()) {
+      await this.uploadDirectory(connectionId, localPath, remoteParent, onProgress)
+    } else {
+      const remote = `${remoteParent.replace(/\/$/, '')}/${basename(localPath)}`
+      await this.upload(connectionId, localPath, remote, (t, total) =>
+        onProgress?.(t, total, localPath)
+      )
+    }
   }
 
   releaseConnection(connectionId: string): void {

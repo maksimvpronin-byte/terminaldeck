@@ -137,27 +137,48 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
   }
 
   async function download(entry: SftpEntry): Promise<void> {
-    const localPath = await window.td.dialogs.pickSavePath(entry.name)
-    if (!localPath || !connectionId) return
+    if (!connectionId) return
+    // A folder needs a destination directory; a file needs a destination filename.
+    const localPath = entry.isDirectory
+      ? await window.td.dialogs.pickDirectory()
+      : await window.td.dialogs.pickSavePath(entry.name)
+    if (!localPath) return
+    setError(null)
     try {
-      await window.td.sftp.download(connectionId, entry.path, localPath)
+      if (entry.isDirectory) {
+        await window.td.sftp.downloadDirectory(
+          connectionId,
+          entry.path,
+          `${localPath}/${entry.name}`
+        )
+      } else {
+        await window.td.sftp.download(connectionId, entry.path, localPath)
+      }
     } catch (err) {
       setError((err as Error).message)
     }
     setTransfer(null)
   }
 
-  async function uploadPath(localPath: string): Promise<void> {
-    if (!connectionId) return
-    const name = localPath.split(/[/\\]/).pop() ?? 'file'
-    await window.td.sftp.upload(connectionId, localPath, `${path.replace(/\/$/, '')}/${name}`)
-  }
-
   async function upload(): Promise<void> {
     const localPath = await window.td.dialogs.pickOpenPath()
-    if (!localPath) return
+    if (!localPath || !connectionId) return
+    setError(null)
     try {
-      await uploadPath(localPath)
+      await window.td.sftp.uploadPath(connectionId, localPath, path)
+    } catch (err) {
+      setError((err as Error).message)
+    }
+    setTransfer(null)
+    load(path)
+  }
+
+  async function uploadFolder(): Promise<void> {
+    const localPath = await window.td.dialogs.pickDirectory()
+    if (!localPath || !connectionId) return
+    setError(null)
+    try {
+      await window.td.sftp.uploadPath(connectionId, localPath, path)
     } catch (err) {
       setError((err as Error).message)
     }
@@ -173,7 +194,10 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
     setError(null)
     try {
       // Sequential: fastPut on one SFTP channel doesn't like concurrent writers.
-      for (const p of paths.filter(Boolean)) await uploadPath(p)
+      // uploadPath handles folders too, so a dropped directory comes across whole.
+      for (const p of paths.filter(Boolean)) {
+        await window.td.sftp.uploadPath(connectionId, p, path)
+      }
     } catch (err) {
       setError((err as Error).message)
     }
@@ -235,11 +259,12 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
     const items: MenuItem[] = []
     const only = targets.length === 1 ? targets[0] : undefined
 
-    if (only && !only.isDirectory) {
-      items.push({ label: 'Download', onSelect: () => download(only) })
-    }
     if (only?.isDirectory) {
       items.push({ label: 'Open', onSelect: () => load(only.path) })
+      items.push({ label: 'Download folder…', onSelect: () => download(only) })
+    }
+    if (only && !only.isDirectory) {
+      items.push({ label: 'Download', onSelect: () => download(only) })
     }
     if (only) {
       items.push({
@@ -261,6 +286,7 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
       onSelect: () => setNewFolder('')
     })
     items.push({ label: 'Upload file…', onSelect: upload })
+    items.push({ label: 'Upload folder…', onSelect: uploadFolder })
     items.push({ label: 'Refresh', onSelect: () => refresh() })
     return items
   }

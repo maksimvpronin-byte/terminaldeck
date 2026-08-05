@@ -11,12 +11,16 @@ import { sftpManager } from '../ssh/SFTPManager'
 import { portForwardManager } from '../ssh/PortForwardManager'
 import { readSshConfigHosts } from '../ssh/sshConfig'
 import { knownHosts } from '../ssh/KnownHosts'
+import { inventoryStore } from '../inventory/InventoryStore'
+import { isGitAvailable } from '../inventory/GitRepo'
 import type {
   SessionProfile,
   SessionGroup,
   QuickConnectParams,
   PortForwardRule,
-  Snippet
+  Snippet,
+  InventorySource,
+  InventoryOverride
 } from '../../shared/types'
 
 function focusedWin(): BrowserWindow {
@@ -93,8 +97,34 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.storeDeleteSession, (_e, id: string) => {
     sessionStore.deleteSession(id)
   })
-  ipcMain.handle(IPC.storeSaveGroup, (_e, group: SessionGroup) => sessionStore.saveGroup(group))
+  ipcMain.handle(IPC.storeSaveGroup, (_e, group: SessionGroup, secret?: string) => {
+    if (secret !== undefined) {
+      group.secretRef = group.secretRef ?? randomUUID()
+      vault.setSecret(group.secretRef, secret)
+    }
+    return sessionStore.saveGroup(group)
+  })
   ipcMain.handle(IPC.storeDeleteGroup, (_e, id: string) => sessionStore.deleteGroup(id))
+
+  // --- Inventory ---
+  ipcMain.handle(IPC.inventoryGitAvailable, () => isGitAvailable())
+  ipcMain.handle(IPC.inventoryList, () => ({
+    sources: inventoryStore.sources(),
+    overrides: inventoryStore.overrides(),
+    trees: inventoryStore.allTrees()
+  }))
+  ipcMain.handle(IPC.inventorySaveSource, (_e, source: InventorySource) =>
+    inventoryStore.saveSource(source)
+  )
+  ipcMain.handle(IPC.inventoryRemoveSource, (_e, id: string) => inventoryStore.removeSource(id))
+  ipcMain.handle(IPC.inventorySync, (_e, id: string) => inventoryStore.sync(id))
+  ipcMain.handle(IPC.inventorySyncAll, () => inventoryStore.syncAll())
+  ipcMain.handle(IPC.inventorySaveOverride, (_e, override: InventoryOverride) =>
+    inventoryStore.saveOverride(override)
+  )
+  ipcMain.handle(IPC.inventoryClearOverride, (_e, hostId: string) =>
+    inventoryStore.clearOverride(hostId)
+  )
 
   // --- Snippets ---
   ipcMain.handle(IPC.snippetsList, () => snippetStore.list())
@@ -105,7 +135,10 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     IPC.sshConnect,
     async (_e, sessionId: string, cols: number, rows: number) => {
-      const profile = sessionStore.getAll().sessions.find((s) => s.id === sessionId)
+      // Inventory hosts live in their own store and aren't saved as sessions.
+      const profile =
+        sessionStore.getAll().sessions.find((s) => s.id === sessionId) ??
+        inventoryStore.findSession(sessionId)
       if (!profile) throw new Error('Unknown session')
       const win = focusedWin()
       const connectionId = await sshManager.connectProfile(win, profile, cols, rows)
@@ -176,6 +209,20 @@ export function registerIpcHandlers(): void {
         reportTransfer(connectionId, remotePath, transferred, total)
       )
   )
+  ipcMain.handle(
+    IPC.sftpDownloadDir,
+    (_e, connectionId: string, remotePath: string, localDir: string) =>
+      sftpManager.downloadDirectory(connectionId, remotePath, localDir, (t, total, path) =>
+        reportTransfer(connectionId, path, t, total)
+      )
+  )
+  ipcMain.handle(
+    IPC.sftpUploadPath,
+    (_e, connectionId: string, localPath: string, remoteParent: string) =>
+      sftpManager.uploadPath(connectionId, localPath, remoteParent, (t, total, path) =>
+        reportTransfer(connectionId, path, t, total)
+      )
+  )
 
   // --- Port forwarding ---
   ipcMain.handle(IPC.pfStart, (_e, connectionId: string, rule: PortForwardRule) =>
@@ -214,6 +261,13 @@ export function registerIpcHandlers(): void {
   })
   ipcMain.handle(IPC.dialogPickOpenPath, async () => {
     const res = await dialog.showOpenDialog(focusedWin(), { properties: ['openFile'] })
+    return res.canceled ? undefined : res.filePaths[0]
+  })
+  ipcMain.handle(IPC.dialogPickDirectory, async () => {
+    const res = await dialog.showOpenDialog(focusedWin(), {
+      properties: ['openDirectory', 'createDirectory'],
+      title: 'Choose a destination folder'
+    })
     return res.canceled ? undefined : res.filePaths[0]
   })
 }

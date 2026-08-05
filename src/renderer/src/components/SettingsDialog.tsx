@@ -51,13 +51,23 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
         <div className="form-row">
           <label>
             Font size
-            <input
-              type="number"
-              min={8}
-              max={32}
-              value={settings.fontSize}
-              onChange={(e) => updateSettings({ fontSize: Number(e.target.value) })}
-            />
+            <div className="stepper">
+              <button
+                title="Smaller (⌘−)"
+                disabled={settings.fontSize <= 8}
+                onClick={() => updateSettings({ fontSize: settings.fontSize - 1 })}
+              >
+                −
+              </button>
+              <span className="stepper-value">{settings.fontSize}</span>
+              <button
+                title="Larger (⌘+)"
+                disabled={settings.fontSize >= 32}
+                onClick={() => updateSettings({ fontSize: settings.fontSize + 1 })}
+              >
+                +
+              </button>
+            </div>
           </label>
           <label>
             Scrollback (lines)

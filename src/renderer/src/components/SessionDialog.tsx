@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { nanoid } from 'nanoid'
 import type { AuthMethod, PortForwardRule, SessionProfile } from '../../../shared/types'
+import { resolveAuth, inheritedFrom } from '../../../shared/authResolution'
 import { useStore } from '../state/store'
 import { SESSION_COLOURS } from '../state/colours'
 import ModalBackdrop from './ModalBackdrop'
@@ -13,17 +14,13 @@ interface Props {
 
 function blank(defaultGroupId: string | null): SessionProfile {
   const now = Date.now()
+  // Auth fields stay unset so a new session inherits from its group by default.
   return {
     id: nanoid(),
     name: '',
     host: '',
-    port: 22,
-    username: '',
-    authMethod: 'password',
     groupId: defaultGroupId,
     tags: [],
-    jumpHostId: null,
-    agentForward: false,
     logToFile: false,
     portForwards: [],
     createdAt: now,
@@ -56,6 +53,13 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
     setProfile((p) => ({ ...p, [key]: value }))
   }
 
+  // What this session ends up with once inheritance is applied.
+  const effective = resolveAuth(profile, profile.groupId, groups)
+  const inheritNote = (key: Parameters<typeof inheritedFrom>[3]): string => {
+    const source = inheritedFrom(profile, profile.groupId, groups, key)
+    return source ? `inherited from ${source.name}` : ''
+  }
+
   async function pickKey(): Promise<void> {
     const path = await window.td.dialogs.pickPrivateKey()
     if (path) set('privateKeyPath', path)
@@ -78,8 +82,12 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
   }
 
   async function submit(): Promise<void> {
-    if (!profile.name.trim() || !profile.host.trim() || !profile.username.trim()) {
-      setError('Name, host and username are required')
+    if (!profile.name.trim() || !profile.host.trim()) {
+      setError('Name and host are required')
+      return
+    }
+    if (!effective.username.trim()) {
+      setError('Username is not set here and none is inherited from a group')
       return
     }
     const tags = tagsInput
@@ -87,7 +95,7 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
       .map((t) => t.trim())
       .filter(Boolean)
     const toSave: SessionProfile = { ...profile, tags, updatedAt: Date.now() }
-    const secretToStore = profile.authMethod === 'agent' ? undefined : secret || undefined
+    const secretToStore = effective.authMethod === 'agent' ? undefined : secret || undefined
     await upsertSession(toSave, secretToStore)
     onClose()
   }
@@ -113,39 +121,66 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
             Port
             <input
               type="number"
-              value={profile.port}
-              onChange={(e) => set('port', Number(e.target.value))}
+              value={profile.port ?? ''}
+              placeholder={String(effective.port)}
+              onChange={(e) => set('port', e.target.value ? Number(e.target.value) : undefined)}
             />
           </label>
         </div>
 
+        {profile.groupId && (
+          <label className="checkbox-row" style={{ flexDirection: 'row' }}>
+            <input
+              type="checkbox"
+              checked={profile.inheritAuth !== false}
+              onChange={(e) => set('inheritAuth', e.target.checked ? undefined : false)}
+            />
+            Inherit connection settings from the group
+          </label>
+        )}
+
         <label>
           Username
-          <input value={profile.username} onChange={(e) => set('username', e.target.value)} />
+          <input
+            value={profile.username ?? ''}
+            placeholder={inheritNote('username') || 'required'}
+            onChange={(e) => set('username', e.target.value)}
+          />
         </label>
 
         <label>
           Auth method
-          <select value={profile.authMethod} onChange={(e) => set('authMethod', e.target.value as AuthMethod)}>
+          <select
+            value={profile.authMethod ?? ''}
+            onChange={(e) => set('authMethod', (e.target.value || undefined) as AuthMethod)}
+          >
+            <option value="">Inherit ({effective.authMethod})</option>
             <option value="password">Password</option>
             <option value="privateKey">Private key</option>
             <option value="agent">SSH agent</option>
           </select>
         </label>
 
-        {profile.authMethod === 'password' && (
+        {effective.authMethod === 'password' && (
           <label>
-            Password (leave blank to keep existing)
+            Password{' '}
+            {inheritNote('secretRef')
+              ? `(blank keeps the one ${inheritNote('secretRef')})`
+              : '(leave blank to keep existing)'}
             <input type="password" value={secret} onChange={(e) => setSecret(e.target.value)} />
           </label>
         )}
 
-        {profile.authMethod === 'privateKey' && (
+        {effective.authMethod === 'privateKey' && (
           <>
             <div className="form-row">
               <label style={{ flex: 1 }}>
                 Private key file
-                <input readOnly value={profile.privateKeyPath ?? ''} placeholder="No file selected" />
+                <input
+                  readOnly
+                  value={profile.privateKeyPath ?? ''}
+                  placeholder={inheritNote('privateKeyPath') || 'No file selected'}
+                />
               </label>
               <button style={{ alignSelf: 'flex-end' }} onClick={pickKey}>
                 Browse…
@@ -161,7 +196,7 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
         <label className="checkbox-row" style={{ flexDirection: 'row' }}>
           <input
             type="checkbox"
-            checked={profile.agentForward}
+            checked={effective.agentForward}
             onChange={(e) => set('agentForward', e.target.checked)}
           />
           Forward SSH agent to remote host
@@ -182,7 +217,11 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
             value={profile.jumpHostId ?? ''}
             onChange={(e) => set('jumpHostId', e.target.value || null)}
           >
-            <option value="">None</option>
+            <option value="">
+              {inheritNote('jumpHostId')
+                ? `Inherited (${sessions.find((s) => s.id === effective.jumpHostId)?.name ?? 'none'})`
+                : 'None'}
+            </option>
             {otherSessions.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}

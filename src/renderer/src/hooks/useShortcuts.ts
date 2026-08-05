@@ -1,15 +1,25 @@
 import { useEffect, useRef } from 'react'
 import { useStore, type PaneNode } from '../state/store'
+import { DEFAULT_SETTINGS } from '../state/settings'
 
 const IDLE_LOCK_MS = 15 * 60 * 1000
+
+function clampFontSize(size: number): number {
+  return Math.min(32, Math.max(8, size))
+}
 
 /**
  * Window-level shortcuts. Registered in the capture phase so they win over
  * xterm.js, which otherwise swallows the keystroke into the remote shell.
  */
-export function useShortcuts(actions: { openSnippets: () => void }): void {
+export function useShortcuts(actions: {
+  openSnippets: () => void
+  openHelp: () => void
+}): void {
   const openSnippetsRef = useRef(actions.openSnippets)
   openSnippetsRef.current = actions.openSnippets
+  const openHelpRef = useRef(actions.openHelp)
+  openHelpRef.current = actions.openHelp
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent): void {
@@ -71,6 +81,15 @@ export function useShortcuts(actions: { openSnippets: () => void }): void {
           openSnippetsRef.current()
           break
         }
+        // Zoom keys never reach here: main claims them before Chromium's own
+        // page zoom can, and drives the font size through the uiZoom event.
+        case '/':
+        case '?': {
+          e.preventDefault()
+          e.stopPropagation()
+          openHelpRef.current()
+          break
+        }
         default:
           break
       }
@@ -78,6 +97,21 @@ export function useShortcuts(actions: { openSnippets: () => void }): void {
 
     window.addEventListener('keydown', onKeyDown, true)
     return () => window.removeEventListener('keydown', onKeyDown, true)
+  }, [])
+}
+
+/** Applies the terminal font zoom that the main process intercepted for us. */
+export function useZoom(): void {
+  useEffect(() => {
+    return window.td.ui.onZoom((direction) => {
+      const { settings, updateSettings } = useStore.getState()
+      if (direction === 'reset') updateSettings({ fontSize: DEFAULT_SETTINGS.fontSize })
+      else {
+        updateSettings({
+          fontSize: clampFontSize(settings.fontSize + (direction === 'in' ? 1 : -1))
+        })
+      }
+    })
   }, [])
 }
 

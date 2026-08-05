@@ -154,12 +154,84 @@ label {
   flex-shrink: 0;
   -webkit-app-region: drag;
 }
+.sidebar-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  -webkit-app-region: no-drag;
+}
+.sidebar-tabs button {
+  flex: 1;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 8px 0;
+  color: var(--text-dim);
+  border-bottom: 2px solid transparent;
+}
+.sidebar-tabs button.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+  background: transparent;
+}
+.sidebar-tabs button:hover {
+  background: var(--bg-2);
+  border-color: transparent;
+  border-bottom: 2px solid var(--border);
+}
+.sidebar-tabs button.active:hover {
+  border-bottom-color: var(--accent);
+}
+.inventory-meta {
+  font-size: 10px;
+  color: var(--text-dim);
+  padding-bottom: 4px;
+}
+.inventory-error {
+  font-size: 10px;
+  color: var(--danger);
+  padding-bottom: 4px;
+  padding-right: 8px;
+  line-height: 1.4;
+}
+.inventory-warning {
+  margin: 8px;
+  padding: 8px;
+  border: 1px solid var(--danger);
+  border-radius: 5px;
+  font-size: 11px;
+  line-height: 1.5;
+  background: rgba(229, 83, 75, 0.12);
+}
+
 .sidebar-header {
-  padding: 10px;
+  padding: 8px;
   border-bottom: 1px solid var(--border);
   display: flex;
+  align-items: stretch;
   gap: 6px;
   -webkit-app-region: no-drag;
+}
+/* One height for every control in the sidebar so rows line up. */
+.sidebar-header > button,
+.sidebar-header > input,
+.sidebar-footer > button {
+  height: 28px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.sidebar-header > .icon-button,
+.sidebar-footer > .icon-button {
+  width: 30px;
+  padding: 0;
+  flex-shrink: 0;
+}
+.sidebar-footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
 }
 .sidebar-tree {
   flex: 1;
@@ -253,6 +325,11 @@ label {
   min-height: 0;
   min-width: 0;
   flex-direction: column;
+}
+.no-inherit {
+  margin-left: 6px;
+  color: var(--text-dim);
+  font-size: 11px;
 }
 .session-dot {
   display: inline-block;
@@ -947,6 +1024,67 @@ textarea:focus {
   grid-row: 1 / span 2;
   padding: 2px 8px;
   font-size: 11px;
+}
+
+.stepper {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+}
+.stepper button {
+  width: 32px;
+  font-size: 15px;
+  line-height: 1;
+  padding: 0;
+}
+.stepper-value {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg-1);
+  font-size: 12px;
+}
+
+/* --- help --- */
+.help-card {
+  width: 620px;
+  max-width: 92vw;
+}
+.help-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 4px;
+}
+.help-row {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 12px;
+}
+.help-keys {
+  text-align: right;
+}
+.help-what {
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--bg-2);
+  color: var(--text);
+  font-family: Menlo, Consolas, monospace;
+  font-size: 11px;
+  white-space: nowrap;
 }
 
 .theme-preview {

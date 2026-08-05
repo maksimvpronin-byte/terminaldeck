@@ -19,7 +19,10 @@ import type {
   SessionGroup,
   SessionProfile,
   SessionStoreData,
-  Snippet
+  Snippet,
+  InventorySource,
+  InventoryOverride,
+  InventoryTree
 } from '../../../shared/types'
 
 export type { PaneNode, PaneTarget }
@@ -49,10 +52,22 @@ interface AppState {
   loadStore: () => Promise<void>
   upsertSession: (session: SessionProfile, secret?: string) => Promise<void>
   removeSession: (id: string) => Promise<void>
-  upsertGroup: (group: SessionGroup) => Promise<void>
+  upsertGroup: (group: SessionGroup, secret?: string) => Promise<void>
   removeGroup: (id: string) => Promise<void>
   moveSession: (sessionId: string, groupId: string | null) => Promise<void>
   moveGroup: (groupId: string, parentId: string | null) => Promise<void>
+
+  inventorySources: InventorySource[]
+  inventoryOverrides: InventoryOverride[]
+  inventoryTrees: InventoryTree[]
+  inventorySyncing: string[]
+  gitAvailable: boolean
+  loadInventory: () => Promise<void>
+  syncInventory: (sourceId?: string) => Promise<void>
+  saveInventorySource: (source: InventorySource) => Promise<void>
+  removeInventorySource: (id: string) => Promise<void>
+  saveInventoryOverride: (override: InventoryOverride) => Promise<void>
+  clearInventoryOverride: (hostId: string) => Promise<void>
 
   snippets: Snippet[]
   loadSnippets: () => Promise<void>
@@ -77,6 +92,8 @@ interface AppState {
     color?: string
   ) => void
   closePane: (tabId: string, paneId: string) => void
+  /** Pulls a pane out of its split and gives it a tab of its own. */
+  detachPane: (tabId: string, paneId: string) => void
   toggleSftp: (tabId: string, paneId: string) => void
   toggleTunnels: (tabId: string, paneId: string) => void
   toggleBroadcast: () => void
@@ -129,8 +146,8 @@ export const useStore = create<AppState>((set, get) => ({
     set((s) => ({ sessions: s.sessions.filter((x) => x.id !== id) }))
   },
 
-  upsertGroup: async (group) => {
-    const saved = await window.td.store.saveGroup(group)
+  upsertGroup: async (group, secret) => {
+    const saved = await window.td.store.saveGroup(group, secret)
     set((s) => ({
       groups: s.groups.some((x) => x.id === saved.id)
         ? s.groups.map((x) => (x.id === saved.id ? saved : x))
@@ -169,6 +186,59 @@ export const useStore = create<AppState>((set, get) => ({
       cursor = groups.find((g) => g.id === cursor)?.parentId ?? null
     }
     await get().upsertGroup({ ...group, parentId })
+  },
+
+  inventorySources: [],
+  inventoryOverrides: [],
+  inventoryTrees: [],
+  inventorySyncing: [],
+  gitAvailable: true,
+
+  loadInventory: async () => {
+    const [data, gitAvailable] = await Promise.all([
+      window.td.inventory.list(),
+      window.td.inventory.gitAvailable()
+    ])
+    set({
+      inventorySources: data.sources,
+      inventoryOverrides: data.overrides,
+      inventoryTrees: data.trees,
+      gitAvailable
+    })
+  },
+
+  syncInventory: async (sourceId) => {
+    const ids = sourceId ? [sourceId] : get().inventorySources.map((s) => s.id)
+    set((s) => ({ inventorySyncing: [...s.inventorySyncing, ...ids] }))
+    try {
+      if (sourceId) await window.td.inventory.sync(sourceId)
+      else await window.td.inventory.syncAll()
+    } catch {
+      // The error is recorded on the source itself and shown in the tree.
+    }
+    set((s) => ({ inventorySyncing: s.inventorySyncing.filter((id) => !ids.includes(id)) }))
+    await get().loadInventory()
+  },
+
+  saveInventorySource: async (source) => {
+    await window.td.inventory.saveSource(source)
+    await get().loadInventory()
+    await get().syncInventory(source.id)
+  },
+
+  removeInventorySource: async (id) => {
+    await window.td.inventory.removeSource(id)
+    await get().loadInventory()
+  },
+
+  saveInventoryOverride: async (override) => {
+    await window.td.inventory.saveOverride(override)
+    await get().loadInventory()
+  },
+
+  clearInventoryOverride: async (hostId) => {
+    await window.td.inventory.clearOverride(hostId)
+    await get().loadInventory()
   },
 
   snippets: [],
@@ -279,6 +349,41 @@ export const useStore = create<AppState>((set, get) => ({
       return {
         tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, root, activePaneId } : t))
       }
+    })
+  },
+
+  detachPane: (tabId, paneId) => {
+    set((s) => {
+      const tab = s.tabs.find((t) => t.id === tabId)
+      if (!tab) return {}
+      const leaf = collectLeaves(tab.root).find((l) => l.id === paneId)
+      // Nothing to detach from when the pane already owns the whole tab.
+      if (!leaf || tab.root.type === 'leaf') return {}
+      const remaining = removePane(tab.root, paneId)
+      if (!remaining) return {}
+
+      // The pane moves to a different tree, so React remounts it and the old
+      // connection is torn down; the new one starts fresh.
+      const moved = makeLeaf(leaf.title, leaf.target, leaf.color)
+      const newTab: WorkspaceTab = {
+        id: nanoid(),
+        title: leaf.title,
+        root: moved,
+        activePaneId: moved.id
+      }
+      const leaves = collectLeaves(remaining)
+      const updated = s.tabs.map((t) =>
+        t.id === tabId
+          ? {
+              ...t,
+              root: remaining,
+              activePaneId: leaves.some((l) => l.id === t.activePaneId)
+                ? t.activePaneId
+                : leaves[0].id
+            }
+          : t
+      )
+      return { tabs: [...updated, newTab], activeTabId: newTab.id }
     })
   },
 

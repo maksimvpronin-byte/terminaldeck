@@ -6,7 +6,7 @@ import { DRAG_MIME, edgeFromPoint, edgeToSplit, type DragItem, type DropEdge } f
 import TerminalHost from './TerminalHost'
 import SftpPanel from './SftpPanel'
 import TunnelsPanel from './TunnelsPanel'
-import { SplitRightIcon, SplitDownIcon, CloseIcon } from './icons'
+import { SplitRightIcon, SplitDownIcon, CloseIcon, DetachIcon } from './icons'
 
 export default function Pane({
   tabId,
@@ -21,6 +21,8 @@ export default function Pane({
   const setPaneConnection = useStore((s) => s.setPaneConnection)
   const splitPane = useStore((s) => s.splitPane)
   const closePane = useStore((s) => s.closePane)
+  const detachPane = useStore((s) => s.detachPane)
+  const isSplit = useStore((s) => s.tabs.find((t) => t.id === tabId)?.root.type === 'split')
   const toggleSftp = useStore((s) => s.toggleSftp)
   const toggleTunnels = useStore((s) => s.toggleTunnels)
   const broadcast = useStore((s) => s.broadcast)
@@ -118,6 +120,15 @@ export default function Pane({
           <button title="Toggle port forwarding" onClick={() => toggleTunnels(tabId, node.id)}>
             Tunnels
           </button>
+          {isSplit && (
+            <button
+              className="icon-button"
+              title="Move this pane to its own tab"
+              onClick={() => detachPane(tabId, node.id)}
+            >
+              <DetachIcon />
+            </button>
+          )}
           <button
             className="icon-button"
             title="Close pane (⌘W)"

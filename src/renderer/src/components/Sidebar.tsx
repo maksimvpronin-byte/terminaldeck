@@ -1,15 +1,17 @@
 import { useState } from 'react'
 import { nanoid } from 'nanoid'
 import type { DragEvent as ReactDragEvent } from 'react'
-import type { SessionProfile } from '../../../shared/types'
+import type { SessionGroup, SessionProfile } from '../../../shared/types'
+import { resolveAuth } from '../../../shared/authResolution'
 import { useStore } from '../state/store'
 import { DRAG_MIME, type DragItem } from '../state/dnd'
 import SessionDialog from './SessionDialog'
 import QuickConnectDialog from './QuickConnectDialog'
 import ImportSshConfigDialog from './ImportSshConfigDialog'
+import GroupDialog from './GroupDialog'
+import InventoryTree from './InventoryTree'
 import SettingsDialog from './SettingsDialog'
 import ContextMenu, { type MenuItem } from './ContextMenu'
-import ModalBackdrop from './ModalBackdrop'
 
 const ROOT_TARGET = '__root__'
 const COLLAPSED_KEY = 'terminaldeck.collapsedGroups'
@@ -24,13 +26,14 @@ function loadCollapsed(): Set<string> {
 }
 
 export default function Sidebar({
-  onOpenSnippets
+  onOpenSnippets,
+  onOpenHelp
 }: {
   onOpenSnippets: () => void
+  onOpenHelp: () => void
 }): JSX.Element {
   const groups = useStore((s) => s.groups)
   const sessions = useStore((s) => s.sessions)
-  const upsertGroup = useStore((s) => s.upsertGroup)
   const removeGroup = useStore((s) => s.removeGroup)
   const removeSession = useStore((s) => s.removeSession)
   const upsertSession = useStore((s) => s.upsertSession)
@@ -44,12 +47,13 @@ export default function Sidebar({
   const [showImport, setShowImport] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [query, setQuery] = useState('')
-  // undefined = dialog closed; null = creating a top-level group
-  const [newGroupParent, setNewGroupParent] = useState<string | null | undefined>(undefined)
-  const [groupName, setGroupName] = useState('')
+  const [groupDialog, setGroupDialog] = useState<
+    { group?: SessionGroup; parentId: string | null } | null
+  >(null)
   const [dropTarget, setDropTarget] = useState<string | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null)
   const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsed)
+  const [tab, setTab] = useState<'sessions' | 'inventory'>('sessions')
 
   function toggleCollapsed(groupId: string): void {
     setCollapsed((prev) => {
@@ -65,18 +69,16 @@ export default function Sidebar({
     openTab(session.name, { kind: 'session', sessionId: session.id }, session.color)
   }
 
-  async function submitGroup(): Promise<void> {
-    const name = groupName.trim()
-    if (!name || newGroupParent === undefined) return
-    await upsertGroup({ id: nanoid(), name, parentId: newGroupParent })
-    setNewGroupParent(undefined)
-    setGroupName('')
+  /** user@host as it will actually be used, inheritance included. */
+  function addressOf(s: SessionProfile): string {
+    const { username } = resolveAuth(s, s.groupId, groups)
+    return username ? `${username}@${s.host}` : s.host
   }
 
   const needle = query.trim().toLowerCase()
   const visible = needle
     ? sessions.filter((s) =>
-        [s.name, s.host, s.username, ...s.tags].some((f) => f.toLowerCase().includes(needle))
+        [s.name, s.host, addressOf(s), ...s.tags].some((f) => f.toLowerCase().includes(needle))
       )
     : sessions
 
@@ -154,19 +156,23 @@ export default function Sidebar({
       },
       { label: 'Edit…', onSelect: () => setEditingSession(s) },
       {
-        label: `Copy ${s.username ? `${s.username}@` : ''}${s.host}`,
-        onSelect: () => {
-          window.td.clipboard.write(`${s.username ? `${s.username}@` : ''}${s.host}`)
-        }
+        label: `Copy ${addressOf(s)}`,
+        onSelect: () => window.td.clipboard.write(addressOf(s))
       },
       { label: 'Delete', danger: true, separated: true, onSelect: () => removeSession(s.id) }
     ]
   }
 
   function groupMenu(groupId: string): MenuItem[] {
+    const group = groups.find((g) => g.id === groupId)
     return [
+      {
+        label: 'Edit group…',
+        disabled: !group,
+        onSelect: () => group && setGroupDialog({ group, parentId: group.parentId })
+      },
       { label: 'New session here', onSelect: () => setEditingSession('new') },
-      { label: 'New subgroup…', onSelect: () => setNewGroupParent(groupId) },
+      { label: 'New subgroup…', onSelect: () => setGroupDialog({ parentId: groupId }) },
       { label: 'Delete group', danger: true, separated: true, onSelect: () => removeGroup(groupId) }
     ]
   }
@@ -193,6 +199,11 @@ export default function Sidebar({
             aria-hidden="true"
           />
           {s.name}
+          {s.groupId && s.inheritAuth === false && (
+            <span className="no-inherit" title="Does not inherit settings from its group">
+              ⊘
+            </span>
+          )}
         </span>
         <div className="actions">
           <button onClick={() => setEditingSession(s)}>Edit</button>
@@ -239,7 +250,7 @@ export default function Sidebar({
                   title="New subgroup"
                   onClick={(e) => {
                     e.stopPropagation()
-                    setNewGroupParent(g.id)
+                    setGroupDialog({ parentId: g.id })
                   }}
                 >
                   +
@@ -270,11 +281,34 @@ export default function Sidebar({
   return (
     <div className="sidebar">
       <div className="titlebar-spacer" />
+
+      <div className="sidebar-tabs">
+        <button className={tab === 'sessions' ? 'active' : ''} onClick={() => setTab('sessions')}>
+          Sessions
+        </button>
+        <button className={tab === 'inventory' ? 'active' : ''} onClick={() => setTab('inventory')}>
+          Inventory
+        </button>
+      </div>
+
+      <div className="sidebar-header" style={{ borderTop: 'none' }}>
+        <input
+          style={{ flex: 1 }}
+          placeholder={tab === 'sessions' ? 'Filter hosts…' : 'Filter inventory…'}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </div>
+
+      {tab === 'inventory' && <InventoryTree query={query} />}
+
+      {tab === 'sessions' && (
+        <>
       <div className="sidebar-header">
         <button className="primary" style={{ flex: 1 }} onClick={() => setEditingSession('new')}>
           + Session
         </button>
-        <button onClick={() => setNewGroupParent(null)}>+ Group</button>
+        <button onClick={() => setGroupDialog({ parentId: null })}>+ Group</button>
         <button title="Import from ~/.ssh/config" onClick={() => setShowImport(true)}>
           ⇩
         </button>
@@ -283,23 +317,6 @@ export default function Sidebar({
         <button style={{ flex: 1 }} onClick={() => setShowQuickConnect(true)}>
           Quick connect…
         </button>
-        <button title="Snippets (⌘K)" onClick={onOpenSnippets}>
-          ⌘
-        </button>
-        <button title="Settings" onClick={() => setShowSettings(true)}>
-          ⚙
-        </button>
-        <button title="Lock vault (⌘L)" onClick={() => lockVault()}>
-          🔒
-        </button>
-      </div>
-      <div className="sidebar-header" style={{ borderTop: 'none' }}>
-        <input
-          style={{ flex: 1 }}
-          placeholder="Filter hosts…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
       </div>
       <div
         className={`sidebar-tree ${dropTarget === ROOT_TARGET ? 'drop-target' : ''}`}
@@ -327,6 +344,24 @@ export default function Sidebar({
           </div>
         )}
       </div>
+        </>
+      )}
+
+      <div className="sidebar-footer">
+        <button title="Snippets (⌘K)" onClick={onOpenSnippets}>
+          Snippets
+        </button>
+        <span style={{ flex: 1 }} />
+        <button className="icon-button" title="Shortcuts and features (⌘/)" onClick={onOpenHelp}>
+          ?
+        </button>
+        <button className="icon-button" title="Settings" onClick={() => setShowSettings(true)}>
+          ⚙
+        </button>
+        <button className="icon-button" title="Lock vault (⌘L)" onClick={() => lockVault()}>
+          🔒
+        </button>
+      </div>
 
       {editingSession !== undefined && (
         <SessionDialog
@@ -342,34 +377,12 @@ export default function Sidebar({
         <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />
       )}
 
-      {newGroupParent !== undefined && (
-        <ModalBackdrop onClose={() => setNewGroupParent(undefined)}>
-          <div
-            className="modal-card"
-            style={{ width: 340 }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2>{newGroupParent === null ? 'New group' : 'New subgroup'}</h2>
-            <label>
-              Name
-              <input
-                autoFocus
-                value={groupName}
-                onChange={(e) => setGroupName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') submitGroup()
-                  if (e.key === 'Escape') setNewGroupParent(undefined)
-                }}
-              />
-            </label>
-            <div className="modal-actions">
-              <button onClick={() => setNewGroupParent(undefined)}>Cancel</button>
-              <button className="primary" onClick={submitGroup} disabled={!groupName.trim()}>
-                Create
-              </button>
-            </div>
-          </div>
-        </ModalBackdrop>
+      {groupDialog && (
+        <GroupDialog
+          initial={groupDialog.group}
+          parentId={groupDialog.parentId}
+          onClose={() => setGroupDialog(null)}
+        />
       )}
     </div>
   )

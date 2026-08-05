@@ -11,7 +11,10 @@ import type {
   SshConfigHost,
   UpdateState,
   Snippet,
-  AuthPromptRequest
+  AuthPromptRequest,
+  InventorySource,
+  InventoryOverride,
+  InventoryTree
 } from '../shared/types'
 
 const api = {
@@ -37,9 +40,27 @@ const api = {
     saveSession: (session: SessionProfile, secret?: string): Promise<SessionProfile> =>
       ipcRenderer.invoke(IPC.storeSaveSession, session, secret),
     deleteSession: (id: string): Promise<void> => ipcRenderer.invoke(IPC.storeDeleteSession, id),
-    saveGroup: (group: SessionGroup): Promise<SessionGroup> =>
-      ipcRenderer.invoke(IPC.storeSaveGroup, group),
+    saveGroup: (group: SessionGroup, secret?: string): Promise<SessionGroup> =>
+      ipcRenderer.invoke(IPC.storeSaveGroup, group, secret),
     deleteGroup: (id: string): Promise<void> => ipcRenderer.invoke(IPC.storeDeleteGroup, id)
+  },
+  inventory: {
+    gitAvailable: (): Promise<boolean> => ipcRenderer.invoke(IPC.inventoryGitAvailable),
+    list: (): Promise<{
+      sources: InventorySource[]
+      overrides: InventoryOverride[]
+      trees: InventoryTree[]
+    }> => ipcRenderer.invoke(IPC.inventoryList),
+    saveSource: (source: InventorySource): Promise<InventorySource> =>
+      ipcRenderer.invoke(IPC.inventorySaveSource, source),
+    removeSource: (id: string): Promise<void> =>
+      ipcRenderer.invoke(IPC.inventoryRemoveSource, id),
+    sync: (id: string): Promise<InventoryTree> => ipcRenderer.invoke(IPC.inventorySync, id),
+    syncAll: (): Promise<void> => ipcRenderer.invoke(IPC.inventorySyncAll),
+    saveOverride: (override: InventoryOverride): Promise<void> =>
+      ipcRenderer.invoke(IPC.inventorySaveOverride, override),
+    clearOverride: (hostId: string): Promise<void> =>
+      ipcRenderer.invoke(IPC.inventoryClearOverride, hostId)
   },
   snippets: {
     list: (): Promise<Snippet[]> => ipcRenderer.invoke(IPC.snippetsList),
@@ -93,6 +114,14 @@ const api = {
       ipcRenderer.invoke(IPC.sftpDownload, connectionId, remotePath, localPath),
     upload: (connectionId: string, localPath: string, remotePath: string): Promise<void> =>
       ipcRenderer.invoke(IPC.sftpUpload, connectionId, localPath, remotePath),
+    downloadDirectory: (
+      connectionId: string,
+      remotePath: string,
+      localDir: string
+    ): Promise<void> =>
+      ipcRenderer.invoke(IPC.sftpDownloadDir, connectionId, remotePath, localDir),
+    uploadPath: (connectionId: string, localPath: string, remoteParent: string): Promise<void> =>
+      ipcRenderer.invoke(IPC.sftpUploadPath, connectionId, localPath, remoteParent),
     onProgress: (
       connectionId: string,
       cb: (p: { path: string; transferred: number; total: number }) => void
@@ -133,6 +162,13 @@ const api = {
       ipcRenderer.send(`${IPC.authPromptReply}:${requestId}`, answers)
     }
   },
+  ui: {
+    onZoom: (cb: (direction: 'in' | 'out' | 'reset') => void): (() => void) => {
+      const listener = (_e: unknown, direction: 'in' | 'out' | 'reset'): void => cb(direction)
+      ipcRenderer.on(IPC.uiZoom, listener)
+      return () => ipcRenderer.removeListener(IPC.uiZoom, listener)
+    }
+  },
   clipboard: {
     // Electron's own clipboard rather than navigator.clipboard: the packaged app
     // is served from file://, which is not a secure context, so the web API fails.
@@ -153,7 +189,8 @@ const api = {
     pickPrivateKey: (): Promise<string | undefined> => ipcRenderer.invoke(IPC.dialogPickPrivateKey),
     pickSavePath: (defaultName: string): Promise<string | undefined> =>
       ipcRenderer.invoke(IPC.dialogPickSavePath, defaultName),
-    pickOpenPath: (): Promise<string | undefined> => ipcRenderer.invoke(IPC.dialogPickOpenPath)
+    pickOpenPath: (): Promise<string | undefined> => ipcRenderer.invoke(IPC.dialogPickOpenPath),
+    pickDirectory: (): Promise<string | undefined> => ipcRenderer.invoke(IPC.dialogPickDirectory)
   }
 }
 

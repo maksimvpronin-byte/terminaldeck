@@ -1,6 +1,29 @@
 export type AuthMethod = 'password' | 'privateKey' | 'agent'
 
-export interface SessionGroup {
+/**
+ * Connection settings that a session can leave unset and inherit from the group
+ * it lives in, and that a group can in turn inherit from its own parent. An
+ * absent field means "inherit"; a present one overrides everything above it.
+ */
+export interface AuthDefaults {
+  /**
+   * Whether to fall back to the parent group for anything left unset. Defaults
+   * to true; set false to stand alone inside a group that defines credentials.
+   */
+  inheritAuth?: boolean
+  port?: number
+  username?: string
+  authMethod?: AuthMethod
+  /** Path to private key file, used when the effective authMethod is 'privateKey' */
+  privateKeyPath?: string
+  /** Reference id into the vault for password / key passphrase. */
+  secretRef?: string
+  agentForward?: boolean
+  /** id of a SessionProfile to use as a jump host (ProxyJump) */
+  jumpHostId?: string | null
+}
+
+export interface SessionGroup extends AuthDefaults {
   id: string
   name: string
   parentId: string | null
@@ -17,27 +40,62 @@ export interface PortForwardRule {
   dstPort?: number
 }
 
-export interface SessionProfile {
+export interface SessionProfile extends AuthDefaults {
   id: string
   name: string
   host: string
-  port: number
-  username: string
-  authMethod: AuthMethod
-  /** Path to private key file, used when authMethod === 'privateKey' */
-  privateKeyPath?: string
-  /** Reference id into the vault for password / key passphrase. Absent = no secret stored. */
-  secretRef?: string
   groupId: string | null
   tags: string[]
-  /** id of another SessionProfile to use as a jump host (ProxyJump) */
-  jumpHostId?: string | null
-  agentForward: boolean
   logToFile: boolean
   portForwards: PortForwardRule[]
   color?: string
   createdAt: number
   updatedAt: number
+}
+
+/** An AuthDefaults chain collapsed into concrete values ready to connect with. */
+export interface ResolvedAuth {
+  port: number
+  username: string
+  authMethod: AuthMethod
+  privateKeyPath?: string
+  secretRef?: string
+  agentForward: boolean
+  jumpHostId: string | null
+}
+
+/** A git repository that machine inventories are read out of. */
+export interface InventorySource extends AuthDefaults {
+  id: string
+  name: string
+  repoUrl: string
+  branch?: string
+  /** Paths inside the repo to read; a directory pulls in its *.yml files. */
+  paths: string[]
+  color?: string
+  lastSyncedAt?: number
+  lastRevision?: string
+  lastError?: string
+}
+
+/** Local changes layered over a host that came from a repository. */
+export interface InventoryOverride extends AuthDefaults {
+  /** The derived host id, stable across syncs. */
+  hostId: string
+  color?: string
+}
+
+export interface InventoryData {
+  version: 1
+  sources: InventorySource[]
+  overrides: InventoryOverride[]
+}
+
+/** What a sync produced: the same shapes the manual tree uses. */
+export interface InventoryTree {
+  sourceId: string
+  groups: SessionGroup[]
+  sessions: SessionProfile[]
 }
 
 export interface SessionStoreData {

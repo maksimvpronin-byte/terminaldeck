@@ -17,6 +17,16 @@ export const IPC = {
   storeSaveGroup: 'store:saveGroup',
   storeDeleteGroup: 'store:deleteGroup',
 
+  // Inventory sources backed by git
+  inventoryList: 'inventory:list',
+  inventorySaveSource: 'inventory:saveSource',
+  inventoryRemoveSource: 'inventory:removeSource',
+  inventorySync: 'inventory:sync',
+  inventorySyncAll: 'inventory:syncAll',
+  inventorySaveOverride: 'inventory:saveOverride',
+  inventoryClearOverride: 'inventory:clearOverride',
+  inventoryGitAvailable: 'inventory:gitAvailable',
+
   // Snippets
   snippetsList: 'snippets:list',
   snippetsSave: 'snippets:save',
@@ -40,6 +50,8 @@ export const IPC = {
   sftpMkdir: 'sftp:mkdir',
   sftpDelete: 'sftp:delete',
   sftpRename: 'sftp:rename',
+  sftpDownloadDir: 'sftp:downloadDir',
+  sftpUploadPath: 'sftp:uploadPath',
   /** main -> renderer, suffixed with connectionId */
   sftpProgress: 'sftp:progress',
 
@@ -64,11 +76,15 @@ export const IPC = {
   /** renderer -> main, suffixed with the request id */
   authPromptReply: 'auth:promptReply',
 
+  /** main -> renderer: terminal font zoom, intercepted before Chromium's page zoom */
+  uiZoom: 'ui:zoom',
+
   // Session logs
   logsReveal: 'logs:reveal',
 
   // Dialogs
   dialogPickPrivateKey: 'dialog:pickPrivateKey',
   dialogPickSavePath: 'dialog:pickSavePath',
-  dialogPickOpenPath: 'dialog:pickOpenPath'
+  dialogPickOpenPath: 'dialog:pickOpenPath',
+  dialogPickDirectory: 'dialog:pickDirectory'
 } as const

@@ -5,9 +5,11 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import type { Readable } from 'stream'
 import { app, BrowserWindow } from 'electron'
-import type { SessionProfile, QuickConnectParams } from '../../shared/types'
+import type { SessionProfile, QuickConnectParams, ResolvedAuth } from '../../shared/types'
+import { resolveAuth as resolveAuthChain } from '../../shared/authResolution'
 import { IPC } from '../../shared/ipc-channels'
 import { sessionStore } from '../store/SessionStore'
+import { inventoryStore } from '../inventory/InventoryStore'
 import { vault } from '../vault/Vault'
 import { makeHostVerifier } from './hostVerifier'
 import { requestAuth } from './authPrompt'
@@ -24,19 +26,27 @@ function agentSockForPlatform(): string | undefined {
   return process.env.SSH_AUTH_SOCK
 }
 
-async function resolveAuth(
+/** Collapses a profile's own settings with everything inherited from its groups. */
+function effectiveAuth(profile: SessionProfile): ResolvedAuth {
+  // Inventory hosts hang off groups derived from a repository, not the saved ones.
+  const groups = [...sessionStore.getAll().groups, ...inventoryStore.allGroups()]
+  return resolveAuthChain(profile, profile.groupId, groups)
+}
+
+async function buildAuthConfig(
   win: BrowserWindow,
-  profile: SessionProfile
+  profile: SessionProfile,
+  auth: ResolvedAuth
 ): Promise<
   Pick<ConnectConfig, 'password' | 'privateKey' | 'passphrase' | 'agent' | 'agentForward'>
 > {
-  if (profile.authMethod === 'password') {
-    let password = profile.secretRef ? vault.getSecret(profile.secretRef) : undefined
+  if (auth.authMethod === 'password') {
+    let password = auth.secretRef ? vault.getSecret(auth.secretRef) : undefined
     if (!password) {
       // Nothing stored: ask, rather than failing authentication silently. This
       // is also the path for people who deliberately don't save passwords.
       const answers = await requestAuth(win, {
-        host: `${profile.username}@${profile.host}`,
+        host: `${auth.username}@${profile.host}`,
         title: 'Password required',
         fields: [{ prompt: 'Password', echo: false }]
       })
@@ -45,14 +55,14 @@ async function resolveAuth(
     }
     return { password }
   }
-  if (profile.authMethod === 'privateKey') {
-    if (!profile.privateKeyPath) throw new Error('No private key path configured')
-    const privateKey = readFileSync(profile.privateKeyPath)
-    const passphrase = profile.secretRef ? vault.getSecret(profile.secretRef) : undefined
+  if (auth.authMethod === 'privateKey') {
+    if (!auth.privateKeyPath) throw new Error('No private key path configured')
+    const privateKey = readFileSync(auth.privateKeyPath)
+    const passphrase = auth.secretRef ? vault.getSecret(auth.secretRef) : undefined
     return { privateKey, passphrase }
   }
   // agent
-  return { agent: agentSockForPlatform(), agentForward: profile.agentForward }
+  return { agent: agentSockForPlatform(), agentForward: auth.agentForward }
 }
 
 /**
@@ -68,7 +78,9 @@ function wireKeyboardInteractive(win: BrowserWindow, client: Client, host: strin
         host,
         title: name || 'Additional authentication',
         instructions,
-        fields: prompts.map((p) => ({ prompt: p.prompt, echo: p.echo }))
+        // ssh2 leaves echo optional; a prompt that doesn't say otherwise is a
+        // secret, so it must be masked rather than shown.
+        fields: prompts.map((p) => ({ prompt: p.prompt, echo: p.echo === true }))
       }).then((answers) => finish(answers ?? []))
     }
   )
@@ -89,34 +101,38 @@ async function connectChain(
   win: BrowserWindow,
   profile: SessionProfile
 ): Promise<{ target: Client; chain: Client[] }> {
-  const hops: SessionProfile[] = [profile]
-  let cursor = profile
-  while (cursor.jumpHostId) {
-    const next = sessionStore.getAll().sessions.find((s) => s.id === cursor.jumpHostId)
-    if (!next) break
-    hops.unshift(next)
-    cursor = next
+  // Each hop carries its own inherited settings, resolved once up front.
+  const hops: Array<{ profile: SessionProfile; auth: ResolvedAuth }> = []
+  let cursor: SessionProfile | undefined = profile
+  const seen = new Set<string>()
+  while (cursor && !seen.has(cursor.id)) {
+    seen.add(cursor.id)
+    const auth = effectiveAuth(cursor)
+    hops.unshift({ profile: cursor, auth })
+    cursor = auth.jumpHostId
+      ? sessionStore.getAll().sessions.find((s) => s.id === auth.jumpHostId)
+      : undefined
   }
 
   const chain: Client[] = []
   let sock: Readable | undefined
 
   for (let i = 0; i < hops.length; i++) {
-    const hop = hops[i]
+    const { profile: hop, auth } = hops[i]
     const client = new Client()
     chain.push(client)
-    const auth = await resolveAuth(win, hop)
-    wireKeyboardInteractive(win, client, `${hop.username}@${hop.host}`)
+    const authConfig = await buildAuthConfig(win, hop, auth)
+    wireKeyboardInteractive(win, client, `${auth.username}@${hop.host}`)
     await new Promise<void>((resolve, reject) => {
       client.on('ready', () => resolve())
       client.on('error', (err) => reject(err))
       client.connect({
         ...COMMON_CONNECT,
         host: hop.host,
-        port: hop.port,
-        username: hop.username,
-        hostVerifier: makeHostVerifier(win, hop.host, hop.port),
-        ...auth,
+        port: auth.port,
+        username: auth.username,
+        hostVerifier: makeHostVerifier(win, hop.host, auth.port),
+        ...authConfig,
         ...(sock ? { sock } : {})
       })
     })
@@ -125,7 +141,7 @@ async function connectChain(
     if (!isLast) {
       const nextHop = hops[i + 1]
       sock = await new Promise<Readable>((resolve, reject) => {
-        client.forwardOut('127.0.0.1', 0, nextHop.host, nextHop.port, (err, stream) => {
+        client.forwardOut('127.0.0.1', 0, nextHop.profile.host, nextHop.auth.port, (err, stream) => {
           if (err) reject(err)
           else resolve(stream as unknown as Readable)
         })
