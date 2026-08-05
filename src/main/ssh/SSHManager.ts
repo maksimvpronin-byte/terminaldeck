@@ -21,9 +21,17 @@ interface LiveConnection {
   logStream?: WriteStream
 }
 
+const OPENSSH_PIPE = '\\\\.\\pipe\\openssh-ssh-agent'
+
+/**
+ * Locates an SSH agent. An explicit SSH_AUTH_SOCK always wins. On Windows the
+ * built-in OpenSSH agent listens on a named pipe and is now the common case, so
+ * it is preferred over Pageant, which is only used if that pipe is absent.
+ */
 function agentSockForPlatform(): string | undefined {
-  if (process.platform === 'win32') return 'pageant'
-  return process.env.SSH_AUTH_SOCK
+  if (process.env.SSH_AUTH_SOCK) return process.env.SSH_AUTH_SOCK
+  if (process.platform !== 'win32') return undefined
+  return existsSync(OPENSSH_PIPE) ? OPENSSH_PIPE : 'pageant'
 }
 
 /** Collapses a profile's own settings with everything inherited from its groups. */

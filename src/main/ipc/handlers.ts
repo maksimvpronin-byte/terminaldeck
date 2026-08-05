@@ -8,6 +8,7 @@ import { sessionStore } from '../store/SessionStore'
 import { snippetStore } from '../store/SnippetStore'
 import { sshManager } from '../ssh/SSHManager'
 import { sftpManager } from '../ssh/SFTPManager'
+import { remoteEdit } from '../ssh/RemoteEdit'
 import { portForwardManager } from '../ssh/PortForwardManager'
 import { readSshConfigHosts } from '../ssh/sshConfig'
 import { knownHosts } from '../ssh/KnownHosts'
@@ -174,6 +175,7 @@ export function registerIpcHandlers(): void {
     }
   )
   ipcMain.handle(IPC.sshDisconnect, (_e, connectionId: string) => {
+    remoteEdit.stopAllFor(connectionId)
     sftpManager.releaseConnection(connectionId)
     portForwardManager.stopAllForConnection(connectionId)
     sshManager.disconnect(connectionId)
@@ -229,6 +231,15 @@ export function registerIpcHandlers(): void {
       sftpManager.uploadPath(connectionId, localPath, remoteParent, (t, total, path) =>
         reportTransfer(connectionId, path, t, total)
       )
+  )
+
+  ipcMain.handle(
+    IPC.sftpEdit,
+    (_e, connectionId: string, remotePath: string, editorCommand?: string) =>
+      remoteEdit.open(focusedWin(), connectionId, remotePath, editorCommand)
+  )
+  ipcMain.handle(IPC.sftpStopEdit, (_e, connectionId: string, remotePath: string) =>
+    remoteEdit.stop(connectionId, remotePath)
   )
 
   // --- Port forwarding ---

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { nanoid } from 'nanoid'
-import type { DragEvent as ReactDragEvent } from 'react'
+import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from 'react'
 import type { SessionGroup, SessionProfile } from '../../../shared/types'
 import { resolveAuth } from '../../../shared/authResolution'
 import { useStore } from '../state/store'
@@ -12,6 +12,7 @@ import GroupDialog from './GroupDialog'
 import InventoryTree from './InventoryTree'
 import SettingsDialog from './SettingsDialog'
 import ContextMenu, { type MenuItem } from './ContextMenu'
+import { keyHint } from '../state/keys'
 
 const ROOT_TARGET = '__root__'
 const COLLAPSED_KEY = 'terminaldeck.collapsedGroups'
@@ -41,6 +42,11 @@ export default function Sidebar({
   const lockVault = useStore((s) => s.lockVault)
   const moveSession = useStore((s) => s.moveSession)
   const moveGroup = useStore((s) => s.moveGroup)
+  const selectedHostIds = useStore((s) => s.selectedHostIds)
+  const toggleHostSelection = useStore((s) => s.toggleHostSelection)
+  const selectHostRange = useStore((s) => s.selectHostRange)
+  const clearHostSelection = useStore((s) => s.clearHostSelection)
+  const openSelectedHosts = useStore((s) => s.openSelectedHosts)
 
   const [editingSession, setEditingSession] = useState<SessionProfile | undefined | 'new'>(undefined)
   const [showQuickConnect, setShowQuickConnect] = useState(false)
@@ -51,6 +57,7 @@ export default function Sidebar({
     { group?: SessionGroup; parentId: string | null } | null
   >(null)
   const [dropTarget, setDropTarget] = useState<string | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
   const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null)
   const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsed)
   const [tab, setTab] = useState<'sessions' | 'inventory'>('sessions')
@@ -84,17 +91,59 @@ export default function Sidebar({
 
   const rootSessions = visible.filter((s) => s.groupId === null)
 
+  /** Ids in the order they appear on screen, so Shift-click can take a range. */
+  function flattenOrder(parentId: string | null): string[] {
+    const out: string[] = []
+    for (const g of groups
+      .filter((x) => x.parentId === parentId)
+      .filter((g) => !needle || groupHasMatch(g.id))) {
+      if (needle === '' && collapsed.has(g.id)) continue
+      out.push(...visible.filter((s) => s.groupId === g.id).map((s) => s.id))
+      out.push(...flattenOrder(g.id))
+    }
+    return out
+  }
+
+  function onSessionClick(e: ReactMouseEvent, s: SessionProfile): void {
+    if (e.metaKey || e.ctrlKey) {
+      toggleHostSelection(s.id)
+      return
+    }
+    if (e.shiftKey) {
+      selectHostRange([...flattenOrder(null), ...rootSessions.map((x) => x.id)], s.id)
+      return
+    }
+    clearHostSelection()
+    connect(s)
+  }
+
   /** A group survives filtering if it, or any descendant, still holds a match. */
   function groupHasMatch(groupId: string): boolean {
     if (visible.some((s) => s.groupId === groupId)) return true
     return groups.filter((g) => g.parentId === groupId).some((g) => groupHasMatch(g.id))
   }
 
-  function startDrag(e: ReactDragEvent, item: DragItem): void {
+  function startDrag(e: ReactDragEvent, item: DragItem, label: string): void {
     e.stopPropagation()
     e.dataTransfer.setData(DRAG_MIME, JSON.stringify(item))
     // Panes accept the same payload as a 'copy' (open here), the tree as a 'move'.
     e.dataTransfer.effectAllowed = 'copyMove'
+    setIsDragging(true)
+
+    // The default drag image is the row plus whatever it contains, which reads
+    // as though the branch is moving. A plain chip says exactly what is moving.
+    const ghost = document.createElement('div')
+    ghost.className = 'drag-ghost'
+    ghost.textContent = label
+    document.body.appendChild(ghost)
+    e.dataTransfer.setDragImage(ghost, 12, 14)
+    // Removed once the browser has taken its snapshot.
+    setTimeout(() => ghost.remove(), 0)
+  }
+
+  function endDrag(): void {
+    setIsDragging(false)
+    setDropTarget(null)
   }
 
   function allowDrop(e: ReactDragEvent, targetId: string | null): void {
@@ -180,7 +229,7 @@ export default function Sidebar({
   function renderSession(s: SessionProfile, paddingLeft: number): JSX.Element {
     return (
       <div
-        className="tree-item"
+        className={`tree-item ${selectedHostIds.includes(s.id) ? 'selected' : ''}`}
         onContextMenu={(e) => {
           e.preventDefault()
           e.stopPropagation()
@@ -189,10 +238,11 @@ export default function Sidebar({
         key={s.id}
         style={{ paddingLeft }}
         draggable
-        onDragStart={(e) => startDrag(e, { kind: 'session', id: s.id })}
-        onDoubleClick={() => connect(s)}
+        onDragStart={(e) => startDrag(e, { kind: 'session', id: s.id }, s.name)}
+        onDragEnd={endDrag}
+        onClick={(e) => onSessionClick(e, s)}
       >
-        <span className="name" onClick={() => connect(s)}>
+        <span className="name">
           <span
             className="session-dot"
             style={s.color ? { background: s.color } : undefined}
@@ -230,7 +280,8 @@ export default function Sidebar({
               className={`tree-item ${dropTarget === g.id ? 'drop-target' : ''}`}
               style={{ paddingLeft: 8 + depth * 12 }}
               draggable
-              onDragStart={(e) => startDrag(e, { kind: 'group', id: g.id })}
+              onDragStart={(e) => startDrag(e, { kind: 'group', id: g.id }, g.name)}
+              onDragEnd={endDrag}
               onDragOver={(e) => allowDrop(e, g.id)}
               onDragLeave={() => setDropTarget(null)}
               onDrop={(e) => handleDrop(e, g.id)}
@@ -318,12 +369,7 @@ export default function Sidebar({
           Quick connect…
         </button>
       </div>
-      <div
-        className={`sidebar-tree ${dropTarget === ROOT_TARGET ? 'drop-target' : ''}`}
-        onDragOver={(e) => allowDrop(e, null)}
-        onDragLeave={() => setDropTarget(null)}
-        onDrop={(e) => handleDrop(e, null)}
-      >
+      <div className="sidebar-tree">
         {renderGroups(null, 0)}
 
         {rootSessions.length > 0 && (
@@ -343,22 +389,51 @@ export default function Sidebar({
             Nothing matches “{query}”.
           </div>
         )}
+
+        {/* An explicit strip, rather than outlining the whole tree, which made
+            it look as though the entire structure were being moved. */}
+        {isDragging && (
+          <div
+            className={`root-drop-zone ${dropTarget === ROOT_TARGET ? 'over' : ''}`}
+            onDragOver={(e) => allowDrop(e, null)}
+            onDragLeave={() => setDropTarget(null)}
+            onDrop={(e) => handleDrop(e, null)}
+          >
+            Move to top level
+          </div>
+        )}
       </div>
         </>
       )}
 
+      {selectedHostIds.length > 0 && (
+        <div className="selection-bar">
+          <span>{selectedHostIds.length} selected</span>
+          <span style={{ flex: 1 }} />
+          <button title="Each in its own tab" onClick={() => openSelectedHosts('tabs')}>
+            Open
+          </button>
+          <button title="All tiled in one tab" onClick={() => openSelectedHosts('grid')}>
+            Tile
+          </button>
+          <button className="icon-button" title="Clear" onClick={clearHostSelection}>
+            ✕
+          </button>
+        </div>
+      )}
+
       <div className="sidebar-footer">
-        <button title="Snippets (⌘K)" onClick={onOpenSnippets}>
+        <button title={keyHint('Snippets (⌘K)')} onClick={onOpenSnippets}>
           Snippets
         </button>
         <span style={{ flex: 1 }} />
-        <button className="icon-button" title="Shortcuts and features (⌘/)" onClick={onOpenHelp}>
+        <button className="icon-button" title={keyHint('Shortcuts and features (⌘/)')} onClick={onOpenHelp}>
           ?
         </button>
         <button className="icon-button" title="Settings" onClick={() => setShowSettings(true)}>
           ⚙
         </button>
-        <button className="icon-button" title="Lock vault (⌘L)" onClick={() => lockVault()}>
+        <button className="icon-button" title={keyHint('Lock vault (⌘L)')} onClick={() => lockVault()}>
           🔒
         </button>
       </div>

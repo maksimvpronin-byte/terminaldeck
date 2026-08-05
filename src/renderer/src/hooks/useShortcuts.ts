@@ -15,11 +15,14 @@ function clampFontSize(size: number): number {
 export function useShortcuts(actions: {
   openSnippets: () => void
   openHelp: () => void
+  openHosts: () => void
 }): void {
   const openSnippetsRef = useRef(actions.openSnippets)
   openSnippetsRef.current = actions.openSnippets
   const openHelpRef = useRef(actions.openHelp)
   openHelpRef.current = actions.openHelp
+  const openHostsRef = useRef(actions.openHosts)
+  openHostsRef.current = actions.openHosts
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent): void {
@@ -79,6 +82,12 @@ export function useShortcuts(actions: {
           e.preventDefault()
           e.stopPropagation()
           openSnippetsRef.current()
+          break
+        }
+        case 'p': {
+          e.preventDefault()
+          e.stopPropagation()
+          openHostsRef.current()
           break
         }
         // Zoom keys never reach here: main claims them before Chromium's own

@@ -11,6 +11,11 @@ export interface TerminalSettings {
   copyOnSelect: boolean
   /** Right-click either pastes immediately or opens the terminal menu. */
   rightClick: 'paste' | 'menu'
+  /**
+   * Command used to open a remote file for editing. Empty hands the file to the
+   * OS default. `{file}` is replaced by the path, or it is appended if absent.
+   */
+  externalEditor: string
 }
 
 /** Chrome colours, mapped onto the CSS custom properties in styles.css. */
@@ -152,7 +157,8 @@ export const DEFAULT_SETTINGS: TerminalSettings = {
   cursorStyle: 'block',
   themeName: 'TerminalDeck Dark',
   copyOnSelect: true,
-  rightClick: 'paste'
+  rightClick: 'paste',
+  externalEditor: ''
 }
 
 export const FONT_CHOICES = [

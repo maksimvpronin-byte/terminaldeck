@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { MouseEvent as ReactMouseEvent } from 'react'
 import type { InventorySource, SessionGroup, SessionProfile } from '../../../shared/types'
 import { resolveAuth } from '../../../shared/authResolution'
 import { useStore } from '../state/store'
@@ -39,6 +40,10 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
   const clearInventoryOverride = useStore((s) => s.clearInventoryOverride)
   const openTab = useStore((s) => s.openTab)
   const splitPaneWith = useStore((s) => s.splitPaneWith)
+  const selectedHostIds = useStore((s) => s.selectedHostIds)
+  const toggleHostSelection = useStore((s) => s.toggleHostSelection)
+  const selectHostRange = useStore((s) => s.selectHostRange)
+  const clearHostSelection = useStore((s) => s.clearHostSelection)
 
   const [editing, setEditing] = useState<InventorySource | 'new' | undefined>(undefined)
   const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsed)
@@ -200,21 +205,45 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
       })
   }
 
+  /** Ids in on-screen order, so Shift-click can take a range. */
+  function flattenOrder(parentId: string): string[] {
+    const out: string[] = [...hostsOf(parentId).map((h) => h.id)]
+    for (const g of allGroups.filter((g) => g.parentId === parentId)) {
+      if (needle === '' && collapsed.has(g.id)) continue
+      out.push(...flattenOrder(g.id))
+    }
+    return out
+  }
+
+  function onHostClick(e: ReactMouseEvent, host: SessionProfile, colour?: string): void {
+    if (e.metaKey || e.ctrlKey) {
+      toggleHostSelection(host.id)
+      return
+    }
+    if (e.shiftKey) {
+      const order = sources.flatMap((s) => flattenOrder(`inv:${s.id}:root`))
+      selectHostRange(order, host.id)
+      return
+    }
+    clearHostSelection()
+    connect(host, colour)
+  }
+
   function renderHost(host: SessionProfile, paddingLeft: number, colour?: string): JSX.Element {
     const dotColour = host.color ?? colour
     return (
       <div
-        className="tree-item"
+        className={`tree-item ${selectedHostIds.includes(host.id) ? 'selected' : ''}`}
         key={host.id}
         style={{ paddingLeft }}
-        onDoubleClick={() => connect(host, dotColour)}
+        onClick={(e) => onHostClick(e, host, dotColour)}
         onContextMenu={(e) => {
           e.preventDefault()
           e.stopPropagation()
           setMenu({ x: e.clientX, y: e.clientY, items: hostMenu(host, dotColour) })
         }}
       >
-        <span className="name" onClick={() => connect(host, dotColour)}>
+        <span className="name">
           <span
             className="session-dot"
             style={dotColour ? { background: dotColour } : undefined}

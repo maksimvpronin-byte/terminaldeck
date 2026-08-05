@@ -33,6 +33,9 @@ export default function Workspace(): JSX.Element {
               const colour = collectLeaves(t.root).find((l) => l.color)?.color
               return colour ? <span className="tab-colour" style={{ background: colour }} /> : null
             })()}
+            {t.hasActivity && t.id !== activeTabId && (
+              <span className="activity-dot" title="New output since you last looked" />
+            )}
             <span>{t.title}</span>
             {broadcast && collectLeaves(t.root).some((l) => l.broadcastEnabled) && (
               <span className="tab-badge">⇉</span>

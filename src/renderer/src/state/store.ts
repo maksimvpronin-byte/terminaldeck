@@ -33,6 +33,8 @@ export interface WorkspaceTab {
   title: string
   root: PaneNode
   activePaneId: string
+  /** Output arrived while the tab was in the background. */
+  hasActivity?: boolean
 }
 
 interface AppState {
@@ -77,8 +79,24 @@ interface AppState {
   sendToTerminals: (text: string, execute: boolean) => number
 
   openTab: (title: string, target: PaneTarget, color?: string) => string
+  /** Opens several hosts at once, each in its own tab or all tiled in one. */
+  openMany: (
+    items: Array<{ title: string; target: PaneTarget; color?: string }>,
+    mode: 'tabs' | 'grid'
+  ) => void
+
+  /** Hosts ticked in the tree, across both the saved and inventory tabs. */
+  selectedHostIds: string[]
+  lastSelectedHostId: string | null
+  toggleHostSelection: (id: string) => void
+  /** Shift-click: everything between the previous click and this one. */
+  selectHostRange: (orderedIds: string[], toId: string) => void
+  clearHostSelection: () => void
+  openSelectedHosts: (mode: 'tabs' | 'grid') => void
   closeTab: (tabId: string) => void
   setActiveTab: (tabId: string) => void
+  /** Flags a background tab that produced output, so the tab bar can show it. */
+  markActivity: (tabId: string) => void
   setActivePane: (tabId: string, paneId: string) => void
   setPaneConnection: (tabId: string, paneId: string, connectionId: string) => void
   splitPane: (tabId: string, paneId: string, dir: 'row' | 'col') => void
@@ -285,6 +303,91 @@ export const useStore = create<AppState>((set, get) => ({
     return leaf.id
   },
 
+  openMany: (items, mode) => {
+    if (items.length === 0) return
+    if (mode === 'tabs') {
+      for (const item of items) get().openTab(item.title, item.target, item.color)
+      return
+    }
+
+    const [first, ...rest] = items
+    get().openTab(first.title, first.target, first.color)
+    const tabId = get().tabs[get().tabs.length - 1].id
+    rest.forEach((item, index) => {
+      const tab = get().tabs.find((t) => t.id === tabId)
+      if (!tab) return
+      // Alternate the direction so the panes stay roughly square rather than
+      // ending up as a row of slivers.
+      get().splitPaneWith(
+        tabId,
+        tab.activePaneId,
+        index % 2 === 0 ? 'row' : 'col',
+        'after',
+        item.title,
+        item.target,
+        item.color
+      )
+    })
+  },
+
+  selectedHostIds: [],
+  lastSelectedHostId: null,
+
+  toggleHostSelection: (id) =>
+    set((s) => ({
+      selectedHostIds: s.selectedHostIds.includes(id)
+        ? s.selectedHostIds.filter((x) => x !== id)
+        : [...s.selectedHostIds, id],
+      lastSelectedHostId: id
+    })),
+
+  selectHostRange: (orderedIds, toId) =>
+    set((s) => {
+      const to = orderedIds.indexOf(toId)
+      if (to < 0) return {}
+      const anchor = s.lastSelectedHostId ? orderedIds.indexOf(s.lastSelectedHostId) : -1
+      const from = anchor >= 0 ? anchor : to
+      const [lo, hi] = from < to ? [from, to] : [to, from]
+      return {
+        selectedHostIds: [...new Set([...s.selectedHostIds, ...orderedIds.slice(lo, hi + 1)])],
+        lastSelectedHostId: toId
+      }
+    }),
+
+  clearHostSelection: () => set({ selectedHostIds: [], lastSelectedHostId: null }),
+
+  openSelectedHosts: (mode) => {
+    const s = get()
+    const items: Array<{ title: string; target: PaneTarget; color?: string }> = []
+
+    for (const id of s.selectedHostIds) {
+      const manual = s.sessions.find((x) => x.id === id)
+      if (manual) {
+        items.push({
+          title: manual.name,
+          target: { kind: 'session', sessionId: id },
+          color: manual.color
+        })
+        continue
+      }
+      // Otherwise it came from an inventory; its colour may be overridden locally.
+      for (const tree of s.inventoryTrees) {
+        const host = tree.sessions.find((x) => x.id === id)
+        if (!host) continue
+        const override = s.inventoryOverrides.find((o) => o.nodeId === id)
+        items.push({
+          title: host.name,
+          target: { kind: 'session', sessionId: id },
+          color: override?.color ?? host.color
+        })
+        break
+      }
+    }
+
+    get().openMany(items, mode)
+    get().clearHostSelection()
+  },
+
   closeTab: (tabId) => {
     set((s) => {
       const tabs = s.tabs.filter((t) => t.id !== tabId)
@@ -293,7 +396,21 @@ export const useStore = create<AppState>((set, get) => ({
     })
   },
 
-  setActiveTab: (tabId) => set({ activeTabId: tabId }),
+  setActiveTab: (tabId) =>
+    set((s) => ({
+      activeTabId: tabId,
+      // Looking at a tab clears its unread marker.
+      tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, hasActivity: false } : t))
+    })),
+
+  markActivity: (tabId) => {
+    set((s) => {
+      if (s.activeTabId === tabId) return {}
+      const tab = s.tabs.find((t) => t.id === tabId)
+      if (!tab || tab.hasActivity) return {}
+      return { tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, hasActivity: true } : t)) }
+    })
+  },
 
   setActivePane: (tabId, paneId) => {
     set((s) => ({

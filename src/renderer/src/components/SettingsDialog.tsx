@@ -3,12 +3,18 @@ import { useStore } from '../state/store'
 import { FONT_CHOICES, THEMES, DEFAULT_SETTINGS, themeOf } from '../state/settings'
 import SecuritySettings from './SecuritySettings'
 import ModalBackdrop from './ModalBackdrop'
+import { keyHint } from '../state/keys'
 
 export default function SettingsDialog({ onClose }: { onClose: () => void }): JSX.Element {
   const settings = useStore((s) => s.settings)
   const updateSettings = useStore((s) => s.updateSettings)
   const preview = themeOf(settings)
-  const [tab, setTab] = useState<'terminal' | 'security'>('terminal')
+  const [tab, setTab] = useState<'terminal' | 'files' | 'security'>('terminal')
+
+  async function pickEditor(): Promise<void> {
+    const path = await window.td.dialogs.pickOpenPath()
+    if (path) updateSettings({ externalEditor: path })
+  }
 
   return (
     <ModalBackdrop onClose={onClose}>
@@ -22,6 +28,9 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
           >
             Terminal
           </button>
+          <button className={tab === 'files' ? 'active' : ''} onClick={() => setTab('files')}>
+            Files
+          </button>
           <button
             className={tab === 'security' ? 'active' : ''}
             onClick={() => setTab('security')}
@@ -29,6 +38,34 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
             Security
           </button>
         </div>
+
+        {tab === 'files' && (
+          <>
+            <h3 className="settings-heading">External editor</h3>
+            <p className="settings-note">
+              Used by “Edit locally” in the SFTP panel. Leave empty to hand the file to whatever
+              the system opens it with — on Windows that is often Notepad, or nothing at all.
+            </p>
+            <div className="form-row">
+              <label style={{ flex: 1 }}>
+                Command
+                <input
+                  value={settings.externalEditor}
+                  placeholder="e.g. code -w {file}"
+                  onChange={(e) => updateSettings({ externalEditor: e.target.value })}
+                />
+              </label>
+              <button style={{ alignSelf: 'flex-end' }} onClick={pickEditor}>
+                Browse…
+              </button>
+            </div>
+            <p className="settings-note">
+              <code>{'{file}'}</code> is replaced by the path; without it the path is appended.
+              Give the full path to the program — a windowed app does not inherit the PATH from
+              your shell, so a bare <code>code</code> or <code>subl</code> may not be found.
+            </p>
+          </>
+        )}
 
         {tab === 'security' && <SecuritySettings />}
 
@@ -53,7 +90,7 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
             Font size
             <div className="stepper">
               <button
-                title="Smaller (⌘−)"
+                title={keyHint('Smaller (⌘−)')}
                 disabled={settings.fontSize <= 8}
                 onClick={() => updateSettings({ fontSize: settings.fontSize - 1 })}
               >
@@ -61,7 +98,7 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
               </button>
               <span className="stepper-value">{settings.fontSize}</span>
               <button
-                title="Larger (⌘+)"
+                title={keyHint('Larger (⌘+)')}
                 disabled={settings.fontSize >= 32}
                 onClick={() => updateSettings({ fontSize: settings.fontSize + 1 })}
               >

@@ -52,6 +52,10 @@ export const IPC = {
   sftpRename: 'sftp:rename',
   sftpDownloadDir: 'sftp:downloadDir',
   sftpUploadPath: 'sftp:uploadPath',
+  sftpEdit: 'sftp:edit',
+  sftpStopEdit: 'sftp:stopEdit',
+  /** main -> renderer, suffixed with connectionId */
+  sftpEdited: 'sftp:edited',
   /** main -> renderer, suffixed with connectionId */
   sftpProgress: 'sftp:progress',
 

@@ -7,6 +7,7 @@ import TerminalHost from './TerminalHost'
 import SftpPanel from './SftpPanel'
 import TunnelsPanel from './TunnelsPanel'
 import { SplitRightIcon, SplitDownIcon, CloseIcon, DetachIcon } from './icons'
+import { keyHint } from '../state/keys'
 
 export default function Pane({
   tabId,
@@ -18,6 +19,7 @@ export default function Pane({
   const activePaneId = useStore((s) => s.tabs.find((t) => t.id === tabId)?.activePaneId)
   const isActiveTab = useStore((s) => s.activeTabId === tabId)
   const setActivePane = useStore((s) => s.setActivePane)
+  const markActivity = useStore((s) => s.markActivity)
   const setPaneConnection = useStore((s) => s.setPaneConnection)
   const splitPane = useStore((s) => s.splitPane)
   const closePane = useStore((s) => s.closePane)
@@ -102,14 +104,14 @@ export default function Pane({
           )}
           <button
             className="icon-button"
-            title="Split right (⌘D)"
+            title={keyHint('Split right (⌘D)')}
             onClick={() => splitPane(tabId, node.id, 'row')}
           >
             <SplitRightIcon />
           </button>
           <button
             className="icon-button"
-            title="Split down (⌘⇧D)"
+            title={keyHint('Split down (⌘⇧D)')}
             onClick={() => splitPane(tabId, node.id, 'col')}
           >
             <SplitDownIcon />
@@ -131,7 +133,7 @@ export default function Pane({
           )}
           <button
             className="icon-button"
-            title="Close pane (⌘W)"
+            title={keyHint('Close pane (⌘W)')}
             onClick={() => closePane(tabId, node.id)}
           >
             <CloseIcon />
@@ -145,6 +147,7 @@ export default function Pane({
           active={isActive}
           restored={node.restored}
           onFocus={() => setActivePane(tabId, node.id)}
+          onOutput={() => markActivity(tabId)}
           onConnected={(connectionId) => setPaneConnection(tabId, node.id, connectionId)}
           resolveWriteTargets={(own) => {
             const state = useStore.getState()

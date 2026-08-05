@@ -122,6 +122,22 @@ const api = {
       ipcRenderer.invoke(IPC.sftpDownloadDir, connectionId, remotePath, localDir),
     uploadPath: (connectionId: string, localPath: string, remoteParent: string): Promise<void> =>
       ipcRenderer.invoke(IPC.sftpUploadPath, connectionId, localPath, remoteParent),
+    edit: (connectionId: string, remotePath: string, editorCommand?: string): Promise<string> =>
+      ipcRenderer.invoke(IPC.sftpEdit, connectionId, remotePath, editorCommand),
+    stopEdit: (connectionId: string, remotePath: string): Promise<void> =>
+      ipcRenderer.invoke(IPC.sftpStopEdit, connectionId, remotePath),
+    onEdited: (
+      connectionId: string,
+      cb: (p: { remotePath: string; savedAt?: number; error?: string }) => void
+    ): (() => void) => {
+      const channel = `${IPC.sftpEdited}:${connectionId}`
+      const listener = (
+        _e: unknown,
+        payload: { remotePath: string; savedAt?: number; error?: string }
+      ): void => cb(payload)
+      ipcRenderer.on(channel, listener)
+      return () => ipcRenderer.removeListener(channel, listener)
+    },
     onProgress: (
       connectionId: string,
       cb: (p: { path: string; transferred: number; total: number }) => void

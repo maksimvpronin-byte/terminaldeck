@@ -3,6 +3,7 @@ import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from 
 import type { SftpEntry } from '../../../shared/types'
 import ModalBackdrop from './ModalBackdrop'
 import ContextMenu, { type MenuItem } from './ContextMenu'
+import { useStore } from '../state/store'
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -30,11 +31,15 @@ interface MenuState {
 }
 
 export default function SftpPanel({ connectionId }: { connectionId?: string }): JSX.Element {
+  const externalEditor = useStore((s) => s.settings.externalEditor)
   const [path, setPath] = useState('.')
   const [entries, setEntries] = useState<SftpEntry[]>([])
   const [error, setError] = useState<string | null>(null)
   const [transfer, setTransfer] = useState<Transfer | null>(null)
   const [dragging, setDragging] = useState(false)
+  /** Remote paths currently open in a local editor. */
+  const [editing, setEditing] = useState<Set<string>>(new Set())
+  const [saved, setSaved] = useState<string | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [menu, setMenu] = useState<MenuState | null>(null)
   const [renaming, setRenaming] = useState<{ entry: SftpEntry; value: string } | null>(null)
@@ -48,6 +53,20 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
       setTransfer(p.transferred >= p.total ? null : p)
     })
     return off
+  }, [connectionId])
+
+  useEffect(() => {
+    if (!connectionId) return
+    return window.td.sftp.onEdited(connectionId, (p) => {
+      if (p.error) {
+        setError(`${p.remotePath.split('/').pop()}: ${p.error}`)
+        return
+      }
+      const name = p.remotePath.split('/').pop() ?? p.remotePath
+      setSaved(name)
+      // The banner is an acknowledgement, not a state; let it fade.
+      setTimeout(() => setSaved((cur) => (cur === name ? null : cur)), 2500)
+    })
   }, [connectionId])
 
   async function fetchList(p: string, silent: boolean): Promise<SftpEntry[] | null> {
@@ -160,6 +179,18 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
     setTransfer(null)
   }
 
+  /** Opens the file in the local editor; saves are pushed back automatically. */
+  async function edit(entry: SftpEntry): Promise<void> {
+    if (!connectionId) return
+    setError(null)
+    try {
+      await window.td.sftp.edit(connectionId, entry.path, externalEditor)
+      setEditing((prev) => new Set(prev).add(entry.path))
+    } catch (err) {
+      setError((err as Error).message)
+    }
+  }
+
   async function upload(): Promise<void> {
     const localPath = await window.td.dialogs.pickOpenPath()
     if (!localPath || !connectionId) return
@@ -264,6 +295,7 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
       items.push({ label: 'Download folder…', onSelect: () => download(only) })
     }
     if (only && !only.isDirectory) {
+      items.push({ label: 'Edit locally', onSelect: () => edit(only) })
       items.push({ label: 'Download', onSelect: () => download(only) })
     }
     if (only) {
@@ -355,6 +387,11 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
               <>
                 <span className="name">
                   {e.isDirectory ? '📁' : '📄'} {e.name}
+                  {editing.has(e.path) && (
+                    <span className="no-inherit" title="Open in a local editor; saves upload">
+                      ✎
+                    </span>
+                  )}
                 </span>
                 {!e.isDirectory && <span className="size">{formatSize(e.size)}</span>}
               </>
@@ -385,6 +422,8 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
           {error}
         </div>
       )}
+
+      {saved && <div className="sftp-saved">Uploaded {saved}</div>}
 
       {transfer && (
         <div className="sftp-progress">

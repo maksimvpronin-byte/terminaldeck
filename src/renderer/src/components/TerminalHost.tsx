@@ -16,6 +16,8 @@ interface Props {
   restored?: boolean
   onConnected: (connectionId: string) => void
   onFocus: () => void
+  /** Called when output arrives, so a background tab can be flagged. */
+  onOutput?: () => void
   /** Returns every connection that should receive this pane's keystrokes. */
   resolveWriteTargets: (ownConnectionId: string) => string[]
 }
@@ -31,6 +33,7 @@ export default function TerminalHost({
   restored,
   onConnected,
   onFocus,
+  onOutput,
   resolveWriteTargets
 }: Props): JSX.Element {
   const hostRef = useRef<HTMLDivElement | null>(null)
@@ -49,6 +52,8 @@ export default function TerminalHost({
   onConnectedRef.current = onConnected
   const resolveWriteTargetsRef = useRef(resolveWriteTargets)
   resolveWriteTargetsRef.current = resolveWriteTargets
+  const onOutputRef = useRef(onOutput)
+  onOutputRef.current = onOutput
 
   const settings = useStore((s) => s.settings)
 
@@ -66,7 +71,10 @@ export default function TerminalHost({
     const term = termRef.current
     if (!term) return
     unsubscribeRef.current.push(
-      window.td.ssh.onData(cid, (b64) => writeBase64(term, b64)),
+      window.td.ssh.onData(cid, (b64) => {
+        writeBase64(term, b64)
+        onOutputRef.current?.()
+      }),
       window.td.ssh.onStatus(cid, (status) => {
         if (status === 'closed') {
           term.writeln('\r\n\x1b[31m[connection closed]\x1b[0m')

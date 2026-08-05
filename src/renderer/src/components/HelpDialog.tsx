@@ -1,23 +1,5 @@
 import ModalBackdrop from './ModalBackdrop'
-
-const IS_MAC = navigator.platform.toLowerCase().includes('mac')
-
-/**
- * Shortcuts are written in mac notation and rewritten for other platforms, so
- * a Windows or Linux user isn't left translating ⌘ and ⇧ in their head.
- */
-function forPlatform(keys: string): string {
-  if (IS_MAC) return keys
-  return (
-    keys
-      .replace(/⌘⇧/g, 'Ctrl+Shift+')
-      .replace(/⌘/g, 'Ctrl+')
-      .replace(/⇧/g, 'Shift+')
-      .replace(/⏎/g, 'Enter')
-      // "Ctrl+ / Shift+ click" reads badly; drop a + with nothing after it.
-      .replace(/\+(\s|\/|$)/g, '$1')
-  )
-}
+import { keyHint } from '../state/keys'
 
 interface Row {
   keys?: string
@@ -33,6 +15,9 @@ const SECTIONS: Section[] = [
   {
     title: 'Tabs and panes',
     rows: [
+      { keys: '⌘P', what: 'Go to a host by name, across saved sessions and inventories' },
+      { keys: 'Tab', what: 'In that list, mark several hosts to open at once' },
+      { keys: '⇧⏎', what: 'Opens the marked hosts tiled in one tab instead of separate tabs' },
       { keys: '⌘T', what: 'New tab with the same host as the focused pane' },
       { keys: '⌘W', what: 'Close the focused pane, or the tab when it is the last one' },
       { keys: '⌘1 … ⌘9', what: 'Jump to that tab' },
@@ -41,7 +26,8 @@ const SECTIONS: Section[] = [
       { what: 'Drag a host or a whole tab onto a pane to place them side by side' },
       { what: 'The edge you drop nearest decides which half the new pane takes' },
       { what: 'Use ⇱ in a pane toolbar to move it back out into its own tab' },
-      { what: 'Drag the divider between panes to resize them' }
+      { what: 'Drag the divider between panes to resize them' },
+      { what: 'A dot on a background tab means new output arrived there' }
     ]
   },
   {
@@ -58,7 +44,11 @@ const SECTIONS: Section[] = [
   {
     title: 'Sessions',
     rows: [
-      { what: 'Double-click a host to connect; right-click for connect, split, duplicate, delete' },
+      { what: 'Click a host to connect; right-click for connect, split, duplicate, delete' },
+      { keys: '⌘ click', what: 'Tick a host instead of connecting, to open several at once' },
+      { keys: '⇧ click', what: 'Tick everything between the last click and this one' },
+      { what: 'A bar appears with Open, for separate tabs, and Tile, for one tab' },
+      { what: 'The selection spans both tabs, so saved and inventory hosts mix freely' },
       { what: 'Drag hosts and groups between groups, or onto empty space for the top level' },
       { what: 'A group holds a shared login, key and port — hosts inside inherit them' },
       { what: 'A blank field means inherit; untick "Inherit" on a host to stand alone' },
@@ -81,6 +71,8 @@ const SECTIONS: Section[] = [
       { keys: '⌘ / ⇧ click', what: 'Toggle one file, or extend the selection to a range' },
       { what: 'Double-click opens a folder or downloads a file' },
       { what: 'Right-click to download, rename, delete, or make a folder' },
+      { what: '"Edit locally" opens a file in your editor and uploads it on every save' },
+      { what: 'Pick that editor in Settings → Files; otherwise the system default is used' },
       { what: 'Drag files or folders in from Finder to upload them' },
       { what: 'The listing re-reads itself every few seconds, so changes made in the shell show up' }
     ]
@@ -113,7 +105,7 @@ export default function HelpDialog({ onClose }: { onClose: () => void }): JSX.El
               {section.rows.map((row, i) => (
                 <div className="help-row" key={`${section.title}-${i}`}>
                   <span className="help-keys">
-                    {row.keys ? <kbd>{forPlatform(row.keys)}</kbd> : null}
+                    {row.keys ? <kbd>{keyHint(row.keys)}</kbd> : null}
                   </span>
                   <span className="help-what">{row.what}</span>
                 </div>
