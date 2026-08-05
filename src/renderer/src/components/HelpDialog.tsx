@@ -53,7 +53,9 @@ const SECTIONS: Section[] = [
       { what: 'A group holds a shared login, key and port — hosts inside inherit them' },
       { what: 'A blank field means inherit; untick "Inherit" on a host to stand alone' },
       { what: 'Colour a host or group to tell production apart at a glance' },
-      { keys: '⌘L', what: 'Lock the vault; it also locks itself after 15 minutes idle' }
+      { what: 'A green dot marks a host that already has a terminal open' },
+      { keys: '⌘L', what: 'Lock the vault; it also locks itself after 15 minutes idle' },
+      { what: 'Settings → Backup moves everything to another machine, credentials optional' }
     ]
   },
   {

@@ -6,6 +6,7 @@ import { IPC } from '../../shared/ipc-channels'
 import { vault, WrongPasswordError } from '../vault/Vault'
 import { sessionStore } from '../store/SessionStore'
 import { snippetStore } from '../store/SnippetStore'
+import { exportToFile, importFromFile } from '../store/Backup'
 import { sshManager } from '../ssh/SSHManager'
 import { sftpManager } from '../ssh/SFTPManager'
 import { remoteEdit } from '../ssh/RemoteEdit'
@@ -132,6 +133,14 @@ export function registerIpcHandlers(): void {
   )
   ipcMain.handle(IPC.inventoryClearOverride, (_e, nodeId: string) =>
     inventoryStore.clearOverride(nodeId)
+  )
+
+  // --- Backup ---
+  ipcMain.handle(IPC.backupExport, (_e, includeSecrets: boolean, password?: string) =>
+    exportToFile(focusedWin(), includeSecrets, password)
+  )
+  ipcMain.handle(IPC.backupImport, (_e, password?: string) =>
+    importFromFile(focusedWin(), password)
   )
 
   // --- Snippets ---

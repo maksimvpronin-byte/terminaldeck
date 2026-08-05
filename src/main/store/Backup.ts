@@ -1,0 +1,154 @@
+import { dialog, type BrowserWindow } from 'electron'
+import { readFileSync, writeFileSync } from 'fs'
+import { deriveKey, newSalt, encrypt, decrypt, type EncryptedPayload } from '../vault/crypto'
+import { vault } from '../vault/Vault'
+import { sessionStore } from './SessionStore'
+import { snippetStore } from './SnippetStore'
+import { inventoryStore } from '../inventory/InventoryStore'
+import type {
+  ImportSummary,
+  InventoryOverride,
+  InventorySource,
+  SessionGroup,
+  SessionProfile,
+  Snippet
+} from '../../shared/types'
+
+interface BackupFile {
+  format: 'terminaldeck-backup'
+  version: 1
+  exportedAt: number
+  groups: SessionGroup[]
+  sessions: SessionProfile[]
+  snippets: Snippet[]
+  inventorySources: InventorySource[]
+  inventoryOverrides: InventoryOverride[]
+  /** Present only when secrets were included; encrypted under its own password. */
+  secrets?: { salt: string; payload: EncryptedPayload }
+}
+
+/**
+ * Writes everything but the terminal look-and-feel to one file. Credentials are
+ * optional and, when included, are re-encrypted under a password given here —
+ * they are never written in the clear, and the master password is not reused so
+ * the file can be shared with a different machine without handing over the vault.
+ */
+export async function exportToFile(
+  win: BrowserWindow,
+  includeSecrets: boolean,
+  password?: string
+): Promise<string | undefined> {
+  if (includeSecrets && !password) throw new Error('A password is required to export credentials')
+
+  const store = sessionStore.getAll()
+  const backup: BackupFile = {
+    format: 'terminaldeck-backup',
+    version: 1,
+    exportedAt: Date.now(),
+    groups: store.groups,
+    sessions: store.sessions,
+    snippets: snippetStore.list(),
+    inventorySources: inventoryStore.sources(),
+    inventoryOverrides: inventoryStore.overrides()
+  }
+
+  if (includeSecrets && password) {
+    // Only secrets something in this export actually points at. The vault can
+    // hold orphans from deleted sessions, and there is no reason to carry those
+    // out of the machine.
+    const wanted = new Set(
+      [
+        ...backup.groups,
+        ...backup.sessions,
+        ...backup.inventorySources,
+        ...backup.inventoryOverrides
+      ]
+        .map((item) => item.secretRef)
+        .filter((ref): ref is string => Boolean(ref))
+    )
+    const all = vault.allSecrets()
+    const referenced = Object.fromEntries(
+      Object.entries(all).filter(([ref]) => wanted.has(ref))
+    )
+
+    const salt = newSalt()
+    const key = deriveKey(password, salt)
+    backup.secrets = { salt, payload: encrypt(key, JSON.stringify(referenced)) }
+  }
+
+  const res = await dialog.showSaveDialog(win, {
+    title: 'Export TerminalDeck data',
+    defaultPath: `terminaldeck-${new Date().toISOString().slice(0, 10)}.json`,
+    filters: [{ name: 'JSON', extensions: ['json'] }]
+  })
+  if (res.canceled || !res.filePath) return undefined
+
+  writeFileSync(res.filePath, JSON.stringify(backup, null, 2), 'utf8')
+  return res.filePath
+}
+
+/** Merges a backup in by id: existing entries are replaced, nothing is deleted. */
+export async function importFromFile(
+  win: BrowserWindow,
+  password?: string
+): Promise<ImportSummary | undefined> {
+  const res = await dialog.showOpenDialog(win, {
+    title: 'Import TerminalDeck data',
+    properties: ['openFile'],
+    filters: [{ name: 'JSON', extensions: ['json'] }]
+  })
+  if (res.canceled || res.filePaths.length === 0) return undefined
+
+  const parsed = JSON.parse(readFileSync(res.filePaths[0], 'utf8')) as Partial<BackupFile>
+  if (parsed.format !== 'terminaldeck-backup') {
+    throw new Error('That file is not a TerminalDeck export')
+  }
+
+  const summary: ImportSummary = {
+    groups: 0,
+    sessions: 0,
+    snippets: 0,
+    inventorySources: 0,
+    inventoryOverrides: 0,
+    secrets: 0
+  }
+
+  // Secrets first: a session is useless if its credential lands later and fails.
+  if (parsed.secrets) {
+    if (!password) throw new Error('This export contains credentials and needs its password')
+    let secrets: Record<string, string>
+    try {
+      const key = deriveKey(password, parsed.secrets.salt)
+      secrets = JSON.parse(decrypt(key, parsed.secrets.payload)) as Record<string, string>
+    } catch {
+      throw new Error('Wrong password for the credentials in this export')
+    }
+    for (const [ref, value] of Object.entries(secrets)) {
+      vault.setSecret(ref, value)
+      summary.secrets++
+    }
+  }
+
+  for (const group of parsed.groups ?? []) {
+    sessionStore.saveGroup(group)
+    summary.groups++
+  }
+  for (const session of parsed.sessions ?? []) {
+    sessionStore.saveSession(session)
+    summary.sessions++
+  }
+  for (const snippet of parsed.snippets ?? []) {
+    snippetStore.save(snippet)
+    summary.snippets++
+  }
+  for (const source of parsed.inventorySources ?? []) {
+    inventoryStore.saveSource(source)
+    summary.inventorySources++
+  }
+  for (const override of parsed.inventoryOverrides ?? []) {
+    inventoryStore.saveOverride(override)
+    summary.inventoryOverrides++
+  }
+
+  return summary
+}

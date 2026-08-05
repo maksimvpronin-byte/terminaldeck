@@ -27,6 +27,10 @@ export const IPC = {
   inventoryClearOverride: 'inventory:clearOverride',
   inventoryGitAvailable: 'inventory:gitAvailable',
 
+  // Backup
+  backupExport: 'backup:export',
+  backupImport: 'backup:import',
+
   // Snippets
   snippetsList: 'snippets:list',
   snippetsSave: 'snippets:save',

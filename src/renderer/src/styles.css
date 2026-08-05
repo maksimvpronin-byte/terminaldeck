@@ -372,6 +372,15 @@ label {
   min-width: 0;
   flex-direction: column;
 }
+.live-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  vertical-align: middle;
+}
 .no-inherit {
   margin-left: 6px;
   color: var(--text-dim);

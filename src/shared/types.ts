@@ -144,6 +144,16 @@ export interface AuthPromptRequest {
   fields: AuthPromptField[]
 }
 
+/** What an import actually brought in, reported back to the user. */
+export interface ImportSummary {
+  groups: number
+  sessions: number
+  snippets: number
+  inventorySources: number
+  inventoryOverrides: number
+  secrets: number
+}
+
 export interface Snippet {
   id: string
   name: string

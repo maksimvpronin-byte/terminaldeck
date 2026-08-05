@@ -26,7 +26,12 @@ import type {
 } from '../../../shared/types'
 
 export type { PaneNode, PaneTarget }
-export { collectConnectionIds, collectBroadcastTargets, collectLeaves } from './paneTree'
+export {
+  collectConnectionIds,
+  collectBroadcastTargets,
+  collectLeaves,
+  collectConnectedSessionIds
+} from './paneTree'
 
 export interface WorkspaceTab {
   id: string

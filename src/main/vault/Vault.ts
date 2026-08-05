@@ -123,6 +123,17 @@ class Vault {
     return decrypt(key, payload)
   }
 
+  /**
+   * Every stored secret in the clear. Only for export, which re-encrypts them
+   * under a password of the user's choosing before anything reaches disk.
+   */
+  allSecrets(): Record<string, string> {
+    const { key, file } = this.requireUnlocked()
+    const out: Record<string, string> = {}
+    for (const [ref, payload] of Object.entries(file.secrets)) out[ref] = decrypt(key, payload)
+    return out
+  }
+
   deleteSecret(ref: string): void {
     const { file } = this.requireUnlocked()
     delete file.secrets[ref]

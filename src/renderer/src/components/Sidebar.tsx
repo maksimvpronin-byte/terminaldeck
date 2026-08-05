@@ -3,7 +3,7 @@ import { nanoid } from 'nanoid'
 import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from 'react'
 import type { SessionGroup, SessionProfile } from '../../../shared/types'
 import { resolveAuth } from '../../../shared/authResolution'
-import { useStore } from '../state/store'
+import { useStore, collectConnectedSessionIds } from '../state/store'
 import { DRAG_MIME, type DragItem } from '../state/dnd'
 import SessionDialog from './SessionDialog'
 import QuickConnectDialog from './QuickConnectDialog'
@@ -47,6 +47,10 @@ export default function Sidebar({
   const selectHostRange = useStore((s) => s.selectHostRange)
   const clearHostSelection = useStore((s) => s.clearHostSelection)
   const openSelectedHosts = useStore((s) => s.openSelectedHosts)
+  const tabs = useStore((s) => s.tabs)
+
+  // Which hosts already have a terminal open, so the tree says so.
+  const connected = new Set(tabs.flatMap((t) => collectConnectedSessionIds(t.root)))
 
   const [editingSession, setEditingSession] = useState<SessionProfile | undefined | 'new'>(undefined)
   const [showQuickConnect, setShowQuickConnect] = useState(false)
@@ -249,6 +253,7 @@ export default function Sidebar({
             aria-hidden="true"
           />
           {s.name}
+          {connected.has(s.id) && <span className="live-dot" title="Connected" />}
           {s.groupId && s.inheritAuth === false && (
             <span className="no-inherit" title="Does not inherit settings from its group">
               ⊘

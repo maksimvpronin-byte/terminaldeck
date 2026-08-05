@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useStore } from '../state/store'
 import { FONT_CHOICES, THEMES, DEFAULT_SETTINGS, themeOf } from '../state/settings'
 import SecuritySettings from './SecuritySettings'
+import BackupSettings from './BackupSettings'
 import ModalBackdrop from './ModalBackdrop'
 import { keyHint } from '../state/keys'
 
@@ -9,7 +10,7 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
   const settings = useStore((s) => s.settings)
   const updateSettings = useStore((s) => s.updateSettings)
   const preview = themeOf(settings)
-  const [tab, setTab] = useState<'terminal' | 'files' | 'security'>('terminal')
+  const [tab, setTab] = useState<'terminal' | 'files' | 'security' | 'backup'>('terminal')
 
   async function pickEditor(): Promise<void> {
     const path = await window.td.dialogs.pickOpenPath()
@@ -36,6 +37,9 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
             onClick={() => setTab('security')}
           >
             Security
+          </button>
+          <button className={tab === 'backup' ? 'active' : ''} onClick={() => setTab('backup')}>
+            Backup
           </button>
         </div>
 
@@ -68,6 +72,7 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
         )}
 
         {tab === 'security' && <SecuritySettings />}
+        {tab === 'backup' && <BackupSettings />}
 
         {tab === 'terminal' && (
           <>

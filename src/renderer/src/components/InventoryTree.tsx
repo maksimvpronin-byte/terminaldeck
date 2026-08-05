@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { MouseEvent as ReactMouseEvent } from 'react'
 import type { InventorySource, SessionGroup, SessionProfile } from '../../../shared/types'
 import { resolveAuth } from '../../../shared/authResolution'
-import { useStore } from '../state/store'
+import { useStore, collectConnectedSessionIds } from '../state/store'
 import InventorySourceDialog from './InventorySourceDialog'
 import InventoryOverrideDialog from './InventoryOverrideDialog'
 import ContextMenu, { type MenuItem } from './ContextMenu'
@@ -44,6 +44,8 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
   const toggleHostSelection = useStore((s) => s.toggleHostSelection)
   const selectHostRange = useStore((s) => s.selectHostRange)
   const clearHostSelection = useStore((s) => s.clearHostSelection)
+  const tabs = useStore((s) => s.tabs)
+  const connected = new Set(tabs.flatMap((t) => collectConnectedSessionIds(t.root)))
 
   const [editing, setEditing] = useState<InventorySource | 'new' | undefined>(undefined)
   const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsed)
@@ -250,6 +252,7 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
             aria-hidden="true"
           />
           {host.name}
+          {connected.has(host.id) && <span className="live-dot" title="Connected" />}
           {overrides.some((o) => o.nodeId === host.id) && (
             <span className="no-inherit" title="Has a local override">
               ✎

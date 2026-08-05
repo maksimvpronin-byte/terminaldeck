@@ -14,7 +14,8 @@ import type {
   AuthPromptRequest,
   InventorySource,
   InventoryOverride,
-  InventoryTree
+  InventoryTree,
+  ImportSummary
 } from '../shared/types'
 
 const api = {
@@ -61,6 +62,12 @@ const api = {
       ipcRenderer.invoke(IPC.inventorySaveOverride, override, secret),
     clearOverride: (nodeId: string): Promise<void> =>
       ipcRenderer.invoke(IPC.inventoryClearOverride, nodeId)
+  },
+  backup: {
+    exportToFile: (includeSecrets: boolean, password?: string): Promise<string | undefined> =>
+      ipcRenderer.invoke(IPC.backupExport, includeSecrets, password),
+    importFromFile: (password?: string): Promise<ImportSummary | undefined> =>
+      ipcRenderer.invoke(IPC.backupImport, password)
   },
   snippets: {
     list: (): Promise<Snippet[]> => ipcRenderer.invoke(IPC.snippetsList),

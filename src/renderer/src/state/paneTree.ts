@@ -136,6 +136,17 @@ export function collectLeaves(node: PaneNode): LeafNode[] {
   return [...collectLeaves(node.children[0]), ...collectLeaves(node.children[1])]
 }
 
+/** Session ids that currently have a live terminal somewhere. */
+export function collectConnectedSessionIds(node: PaneNode): string[] {
+  if (node.type === 'leaf') {
+    return node.connectionId && node.target.kind === 'session' ? [node.target.sessionId] : []
+  }
+  return [
+    ...collectConnectedSessionIds(node.children[0]),
+    ...collectConnectedSessionIds(node.children[1])
+  ]
+}
+
 export function setAllBroadcast(node: PaneNode, enabled: boolean): PaneNode {
   return node.type === 'leaf'
     ? { ...node, broadcastEnabled: enabled }

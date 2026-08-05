@@ -38,7 +38,10 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
 - **Host palette** (`⌘P`) searching saved sessions and inventories together; tick several hosts
   in the tree with `⌘`/`⇧` click and open them as tabs or tiled in one
 - Search (`⌘F`), zoom (`⌘+` / `⌘−` / `⌘0`), copy-on-select, right-click paste
-- Colour-coded sessions, restored tab layout on launch, activity marks on background tabs
+- Colour-coded sessions, restored tab layout on launch, activity marks on background tabs,
+  and a green dot on hosts that already have a terminal open
+- **Export and import** everything to one file to move machines or keep a backup; credentials
+  are optional and re-encrypted under a password of their own
 - Optional per-session logging to a local file
 
 ### Files and networking
