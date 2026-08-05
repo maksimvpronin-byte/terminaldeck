@@ -119,11 +119,18 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.inventoryRemoveSource, (_e, id: string) => inventoryStore.removeSource(id))
   ipcMain.handle(IPC.inventorySync, (_e, id: string) => inventoryStore.sync(id))
   ipcMain.handle(IPC.inventorySyncAll, () => inventoryStore.syncAll())
-  ipcMain.handle(IPC.inventorySaveOverride, (_e, override: InventoryOverride) =>
-    inventoryStore.saveOverride(override)
+  ipcMain.handle(
+    IPC.inventorySaveOverride,
+    (_e, override: InventoryOverride, secret?: string) => {
+      if (secret !== undefined) {
+        override.secretRef = override.secretRef ?? randomUUID()
+        vault.setSecret(override.secretRef, secret)
+      }
+      return inventoryStore.saveOverride(override)
+    }
   )
-  ipcMain.handle(IPC.inventoryClearOverride, (_e, hostId: string) =>
-    inventoryStore.clearOverride(hostId)
+  ipcMain.handle(IPC.inventoryClearOverride, (_e, nodeId: string) =>
+    inventoryStore.clearOverride(nodeId)
   )
 
   // --- Snippets ---

@@ -3,6 +3,7 @@ import type { InventorySource, SessionGroup, SessionProfile } from '../../../sha
 import { resolveAuth } from '../../../shared/authResolution'
 import { useStore } from '../state/store'
 import InventorySourceDialog from './InventorySourceDialog'
+import InventoryOverrideDialog from './InventoryOverrideDialog'
 import ContextMenu, { type MenuItem } from './ContextMenu'
 import { RefreshIcon } from './icons'
 
@@ -42,6 +43,7 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
   const [editing, setEditing] = useState<InventorySource | 'new' | undefined>(undefined)
   const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsed)
   const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null)
+  const [overriding, setOverriding] = useState<SessionProfile | SessionGroup | null>(null)
 
   useEffect(() => {
     loadInventory()
@@ -57,19 +59,22 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
     })
   }
 
-  const allGroups: SessionGroup[] = trees.flatMap((t) => t.groups)
   const needle = query.trim().toLowerCase()
 
-  /** The host with its local override applied, as it will actually connect. */
-  function withOverride(host: SessionProfile): SessionProfile {
-    const o = overrides.find((x) => x.hostId === host.id)
-    if (!o) return host
-    const { hostId: _drop, ...patch } = o
+  /** Local settings layered over a derived node, blank fields ignored. */
+  function withOverride<T extends { id: string }>(node: T): T {
+    const o = overrides.find((x) => x.nodeId === node.id)
+    if (!o) return node
+    const { nodeId: _drop, ...patch } = o
     const clean = Object.fromEntries(
       Object.entries(patch).filter(([, v]) => v !== undefined && v !== null && v !== '')
     )
-    return { ...host, ...clean }
+    return { ...node, ...clean }
   }
+
+  // Groups carry overrides too, so a whole Ansible group can be pointed at a
+  // different bastion or user without touching the repository.
+  const allGroups: SessionGroup[] = trees.flatMap((t) => t.groups).map(withOverride)
 
   function hostsOf(groupId: string): SessionProfile[] {
     return trees
@@ -92,7 +97,7 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
     const state = useStore.getState()
     const activeTab = state.tabs.find((t) => t.id === state.activeTabId)
     const auth = resolveAuth(host, host.groupId, allGroups)
-    const overridden = overrides.some((o) => o.hostId === host.id)
+    const overridden = overrides.some((o) => o.nodeId === host.id)
     return [
       { label: 'Connect', onSelect: () => connect(host, colour) },
       {
@@ -117,9 +122,29 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
           window.td.clipboard.write(`${auth.username ? `${auth.username}@` : ''}${host.host}`)
       },
       {
+        label: overridden ? 'Local settings…' : 'Override locally…',
+        separated: true,
+        onSelect: () => setOverriding(host)
+      },
+      {
         label: 'Clear local override',
         disabled: !overridden,
         onSelect: () => clearInventoryOverride(host.id)
+      }
+    ]
+  }
+
+  function groupMenu(group: SessionGroup): MenuItem[] {
+    const overridden = overrides.some((o) => o.nodeId === group.id)
+    return [
+      {
+        label: overridden ? 'Local settings…' : 'Override locally…',
+        onSelect: () => setOverriding(group)
+      },
+      {
+        label: 'Clear local settings',
+        disabled: !overridden,
+        onSelect: () => clearInventoryOverride(group.id)
       }
     ]
   }
@@ -149,9 +174,19 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
               className="tree-item"
               style={{ paddingLeft: 8 + depth * 12 }}
               onClick={() => toggleCollapsed(g.id)}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                setMenu({ x: e.clientX, y: e.clientY, items: groupMenu(g) })
+              }}
             >
               <span className="tree-group-title name">
                 <span className="chevron">{isCollapsed ? '▸' : '▾'}</span> 📁 {g.name}
+                {overrides.some((o) => o.nodeId === g.id) && (
+                  <span className="no-inherit" title="Has local settings">
+                    ✎
+                  </span>
+                )}
               </span>
             </div>
             {!isCollapsed && (
@@ -186,7 +221,7 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
             aria-hidden="true"
           />
           {host.name}
-          {overrides.some((o) => o.hostId === host.id) && (
+          {overrides.some((o) => o.nodeId === host.id) && (
             <span className="no-inherit" title="Has a local override">
               ✎
             </span>
@@ -290,6 +325,13 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
         <InventorySourceDialog
           initial={editing === 'new' ? undefined : editing}
           onClose={() => setEditing(undefined)}
+        />
+      )}
+      {overriding && (
+        <InventoryOverrideDialog
+          node={overriding}
+          groups={allGroups}
+          onClose={() => setOverriding(null)}
         />
       )}
       {menu && (

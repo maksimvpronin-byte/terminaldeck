@@ -117,20 +117,20 @@ class InventoryStore {
   removeSource(id: string): void {
     this.data.sources = this.data.sources.filter((s) => s.id !== id)
     // Overrides for hosts that can no longer appear are dead weight.
-    this.data.overrides = this.data.overrides.filter((o) => !o.hostId.startsWith(`inv:${id}:`))
+    this.data.overrides = this.data.overrides.filter((o) => !o.nodeId.startsWith(`inv:${id}:`))
     this.trees.delete(id)
     this.persist()
   }
 
   saveOverride(override: InventoryOverride): void {
-    const idx = this.data.overrides.findIndex((o) => o.hostId === override.hostId)
+    const idx = this.data.overrides.findIndex((o) => o.nodeId === override.nodeId)
     if (idx >= 0) this.data.overrides[idx] = override
     else this.data.overrides.push(override)
     this.persist()
   }
 
-  clearOverride(hostId: string): void {
-    this.data.overrides = this.data.overrides.filter((o) => o.hostId !== hostId)
+  clearOverride(nodeId: string): void {
+    this.data.overrides = this.data.overrides.filter((o) => o.nodeId !== nodeId)
     this.persist()
   }
 
@@ -143,20 +143,26 @@ class InventoryStore {
     for (const tree of this.trees.values()) {
       const found = tree.sessions.find((s) => s.id === sessionId)
       if (!found) continue
-      const override = this.data.overrides.find((o) => o.hostId === sessionId)
-      const { hostId: _ignored, ...patch } = override ?? { hostId: '' }
+      const override = this.data.overrides.find((o) => o.nodeId === sessionId)
+      const { nodeId: _ignored, ...patch } = override ?? { nodeId: '' }
       return override ? { ...found, ...stripEmpty(patch) } : found
     }
     return undefined
   }
 
-  groupsOf(sourceId: string): import('../../shared/types').SessionGroup[] {
-    return this.trees.get(sourceId)?.groups ?? []
-  }
-
-  /** All groups across every synced source, for auth resolution. */
+  /**
+   * All groups across every synced source, with local overrides applied — a
+   * group override has to be visible to auth resolution, not just to the tree.
+   */
   allGroups(): import('../../shared/types').SessionGroup[] {
-    return [...this.trees.values()].flatMap((t) => t.groups)
+    return [...this.trees.values()]
+      .flatMap((t) => t.groups)
+      .map((g) => {
+        const override = this.data.overrides.find((o) => o.nodeId === g.id)
+        if (!override) return g
+        const { nodeId: _ignored, ...patch } = override
+        return { ...g, ...stripEmpty(patch) }
+      })
   }
 
   async sync(sourceId: string): Promise<InventoryTree> {

@@ -13,6 +13,7 @@ export default function InventorySourceDialog({
   onClose: () => void
 }): JSX.Element {
   const saveInventorySource = useStore((s) => s.saveInventorySource)
+  const sessions = useStore((s) => s.sessions)
 
   const [source, setSource] = useState<InventorySource>(
     initial ?? { id: nanoid(), name: '', repoUrl: '', paths: [] }
@@ -141,6 +142,35 @@ export default function InventorySourceDialog({
             </button>
           </div>
         )}
+
+        <label>
+          Jump host (ProxyJump)
+          <select
+            value={source.jumpHostId ?? ''}
+            onChange={(e) => set('jumpHostId', e.target.value || undefined)}
+          >
+            <option value="">None</option>
+            {/* Saved sessions only: an inventory host is rebuilt on every sync. */}
+            {sessions.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="settings-note">
+          Set this when the repository describes machines behind a bastion — every host from it
+          will be reached through that session.
+        </p>
+
+        <label className="checkbox-row" style={{ flexDirection: 'row' }}>
+          <input
+            type="checkbox"
+            checked={source.agentForward ?? false}
+            onChange={(e) => set('agentForward', e.target.checked)}
+          />
+          Forward SSH agent to remote hosts
+        </label>
 
         <label>
           Colour

@@ -57,10 +57,10 @@ const api = {
       ipcRenderer.invoke(IPC.inventoryRemoveSource, id),
     sync: (id: string): Promise<InventoryTree> => ipcRenderer.invoke(IPC.inventorySync, id),
     syncAll: (): Promise<void> => ipcRenderer.invoke(IPC.inventorySyncAll),
-    saveOverride: (override: InventoryOverride): Promise<void> =>
-      ipcRenderer.invoke(IPC.inventorySaveOverride, override),
-    clearOverride: (hostId: string): Promise<void> =>
-      ipcRenderer.invoke(IPC.inventoryClearOverride, hostId)
+    saveOverride: (override: InventoryOverride, secret?: string): Promise<void> =>
+      ipcRenderer.invoke(IPC.inventorySaveOverride, override, secret),
+    clearOverride: (nodeId: string): Promise<void> =>
+      ipcRenderer.invoke(IPC.inventoryClearOverride, nodeId)
   },
   snippets: {
     list: (): Promise<Snippet[]> => ipcRenderer.invoke(IPC.snippetsList),

@@ -80,8 +80,8 @@ export interface InventorySource extends AuthDefaults {
 
 /** Local changes layered over a host that came from a repository. */
 export interface InventoryOverride extends AuthDefaults {
-  /** The derived host id, stable across syncs. */
-  hostId: string
+  /** Derived id of the host or group it applies to, stable across syncs. */
+  nodeId: string
   color?: string
 }
 

@@ -66,8 +66,8 @@ interface AppState {
   syncInventory: (sourceId?: string) => Promise<void>
   saveInventorySource: (source: InventorySource) => Promise<void>
   removeInventorySource: (id: string) => Promise<void>
-  saveInventoryOverride: (override: InventoryOverride) => Promise<void>
-  clearInventoryOverride: (hostId: string) => Promise<void>
+  saveInventoryOverride: (override: InventoryOverride, secret?: string) => Promise<void>
+  clearInventoryOverride: (nodeId: string) => Promise<void>
 
   snippets: Snippet[]
   loadSnippets: () => Promise<void>
@@ -231,13 +231,13 @@ export const useStore = create<AppState>((set, get) => ({
     await get().loadInventory()
   },
 
-  saveInventoryOverride: async (override) => {
-    await window.td.inventory.saveOverride(override)
+  saveInventoryOverride: async (override, secret) => {
+    await window.td.inventory.saveOverride(override, secret)
     await get().loadInventory()
   },
 
-  clearInventoryOverride: async (hostId) => {
-    await window.td.inventory.clearOverride(hostId)
+  clearInventoryOverride: async (nodeId) => {
+    await window.td.inventory.clearOverride(nodeId)
     await get().loadInventory()
   },
 
