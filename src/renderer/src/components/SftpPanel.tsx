@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from 'react'
-import type { SftpEntry } from '../../../shared/types'
+import type { SftpEntry, TransferDecisions, TransferPlan } from '../../../shared/types'
+import { parentOf, segmentsOf } from '../../../shared/remotePath'
 import ModalBackdrop from './ModalBackdrop'
 import ContextMenu, { type MenuItem } from './ContextMenu'
+import TransferConflictDialog from './TransferConflictDialog'
+import DiffDialog from './DiffDialog'
 import { useStore } from '../state/store'
 
 function formatSize(bytes: number): string {
@@ -33,6 +36,8 @@ interface MenuState {
 export default function SftpPanel({ connectionId }: { connectionId?: string }): JSX.Element {
   const externalEditor = useStore((s) => s.settings.externalEditor)
   const [path, setPath] = useState('.')
+  /** What is in the path box, which may differ from `path` while being edited. */
+  const [draftPath, setDraftPath] = useState('.')
   const [entries, setEntries] = useState<SftpEntry[]>([])
   const [error, setError] = useState<string | null>(null)
   const [transfer, setTransfer] = useState<Transfer | null>(null)
@@ -45,7 +50,20 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
   const [renaming, setRenaming] = useState<{ entry: SftpEntry; value: string } | null>(null)
   const [pendingDelete, setPendingDelete] = useState<SftpEntry[] | null>(null)
   const [newFolder, setNewFolder] = useState<string | null>(null)
+  /** A planned transfer waiting on an answer about what it would overwrite. */
+  const [pendingTransfer, setPendingTransfer] = useState<TransferPlan | null>(null)
+  /** A file being compared, remote against local. */
+  const [comparing, setComparing] = useState<{ remote: string; local: string } | null>(null)
+  /**
+   * Whether this connection is tracking the shell's directory. The host setting
+   * only decides how it starts; from here on it is a property of the live
+   * connection, switched right where the directory is being looked at.
+   */
+  const [following, setFollowing] = useState(false)
   const lastClickedRef = useRef<string | null>(null)
+  /** Read inside the cwd listener, which is registered once per connection. */
+  const pathRef = useRef(path)
+  pathRef.current = path
 
   useEffect(() => {
     if (!connectionId) return
@@ -53,6 +71,19 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
       setTransfer(p.transferred >= p.total ? null : p)
     })
     return off
+  }, [connectionId])
+
+  // The shell's own directory, reported only for profiles that asked to follow.
+  useEffect(() => {
+    if (!connectionId) return
+    // Main only reports a directory while following is on, so anything arriving
+    // here is wanted. A no-op when the panel is already there, which is the
+    // common case: the shell says where it is on every prompt, not only on cd.
+    return window.td.ssh.onCwd(connectionId, (cwd) => {
+      if (pathRef.current === cwd) return
+      load(cwd)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectionId])
 
   useEffect(() => {
@@ -89,8 +120,35 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
   /** Navigate to a directory. */
   async function load(p: string): Promise<void> {
     setPath(p)
+    setDraftPath(p)
     setSelected(new Set())
     await fetchList(p, false)
+  }
+
+  /**
+   * Go wherever the user typed. The path is resolved by the server rather than
+   * by us, so `~`, `..` and symlinks behave as they would in the remote shell.
+   * A path pointing at a file opens its directory and selects it, which is what
+   * pasting a path out of a log is usually for.
+   */
+  async function navigateTo(typed: string): Promise<void> {
+    if (!connectionId) return
+    const wanted = typed.trim()
+    if (!wanted) return
+    try {
+      const resolved = await window.td.sftp.realpath(connectionId, wanted)
+      const info = await window.td.sftp.stat(connectionId, resolved)
+      if (info && !info.isDirectory) {
+        await load(parentOf(resolved))
+        setSelected(new Set([resolved]))
+        return
+      }
+      await load(resolved)
+    } catch (err) {
+      // The typed text is deliberately left alone: a typo should be fixable,
+      // not snapped back to the old path for retyping.
+      setError((err as Error).message)
+    }
   }
 
   /** Re-read the current directory, keeping the selection that still exists. */
@@ -103,8 +161,25 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
     })
   }
 
+  // The host's setting decided how this connection started; ask what it is now.
   useEffect(() => {
-    if (connectionId) load('.')
+    if (!connectionId) return
+    window.td.ssh.getFollowCwd(connectionId).then(setFollowing).catch(() => undefined)
+  }, [connectionId])
+
+  async function toggleFollow(): Promise<void> {
+    if (!connectionId) return
+    setFollowing(await window.td.ssh.setFollowCwd(connectionId, !following))
+  }
+
+  useEffect(() => {
+    if (!connectionId) return
+    // SFTP opens on '.', which is usually the home directory but need not be.
+    // Resolving it once means the panel can say where it actually is.
+    window.td.sftp
+      .realpath(connectionId, '.')
+      .then((resolved) => load(resolved))
+      .catch(() => load('.'))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectionId])
 
@@ -155,6 +230,47 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
     setMenu({ x: e.clientX, y: e.clientY, entries: targets })
   }
 
+  /**
+   * Plans a transfer, asks about anything it would trample, then runs it.
+   * Every batch asks afresh — no answer is remembered between transfers, so a
+   * decision made once in a hurry never governs a later copy.
+   */
+  async function runTransfer(plan: TransferPlan): Promise<void> {
+    if (plan.items.length === 0) return
+    if (plan.conflicts.length === 0 && plan.collisions.length === 0) {
+      await execute(plan, {})
+      return
+    }
+    setPendingTransfer(plan)
+  }
+
+  async function execute(plan: TransferPlan, decisions: TransferDecisions): Promise<void> {
+    if (!connectionId) return
+    setPendingTransfer(null)
+    setError(null)
+    try {
+      await window.td.sftp.runPlan(connectionId, plan, decisions)
+    } catch (err) {
+      setError((err as Error).message)
+    }
+    setTransfer(null)
+    if (plan.direction === 'upload') load(path)
+  }
+
+  async function planAndUpload(localPaths: string[]): Promise<void> {
+    if (!connectionId) return
+    setError(null)
+    try {
+      // Sequential on purpose: fastPut on one SFTP channel dislikes concurrent
+      // writers, and one dialog per dropped item is clearer than one merged.
+      for (const localPath of localPaths.filter(Boolean)) {
+        await runTransfer(await window.td.sftp.planUpload(connectionId, localPath, path))
+      }
+    } catch (err) {
+      setError((err as Error).message)
+    }
+  }
+
   async function download(entry: SftpEntry): Promise<void> {
     if (!connectionId) return
     // A folder needs a destination directory; a file needs a destination filename.
@@ -164,19 +280,16 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
     if (!localPath) return
     setError(null)
     try {
-      if (entry.isDirectory) {
-        await window.td.sftp.downloadDirectory(
-          connectionId,
-          entry.path,
-          `${localPath}/${entry.name}`
-        )
-      } else {
-        await window.td.sftp.download(connectionId, entry.path, localPath)
-      }
+      // A folder mirrors into a directory; a single file goes to the exact name
+      // the save dialog returned, and is checked against that name.
+      await runTransfer(
+        entry.isDirectory
+          ? await window.td.sftp.planDownload(connectionId, entry.path, `${localPath}/${entry.name}`)
+          : await window.td.sftp.planDownload(connectionId, entry.path, localPath, true)
+      )
     } catch (err) {
       setError((err as Error).message)
     }
-    setTransfer(null)
   }
 
   /** Opens the file in the local editor; saves are pushed back automatically. */
@@ -193,28 +306,12 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
 
   async function upload(): Promise<void> {
     const localPath = await window.td.dialogs.pickOpenPath()
-    if (!localPath || !connectionId) return
-    setError(null)
-    try {
-      await window.td.sftp.uploadPath(connectionId, localPath, path)
-    } catch (err) {
-      setError((err as Error).message)
-    }
-    setTransfer(null)
-    load(path)
+    if (localPath) await planAndUpload([localPath])
   }
 
   async function uploadFolder(): Promise<void> {
     const localPath = await window.td.dialogs.pickDirectory()
-    if (!localPath || !connectionId) return
-    setError(null)
-    try {
-      await window.td.sftp.uploadPath(connectionId, localPath, path)
-    } catch (err) {
-      setError((err as Error).message)
-    }
-    setTransfer(null)
-    load(path)
+    if (localPath) await planAndUpload([localPath])
   }
 
   async function onDrop(e: ReactDragEvent): Promise<void> {
@@ -222,18 +319,7 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
     setDragging(false)
     if (!connectionId) return
     const paths = Array.from(e.dataTransfer.files).map((f) => window.td.files.pathFor(f))
-    setError(null)
-    try {
-      // Sequential: fastPut on one SFTP channel doesn't like concurrent writers.
-      // uploadPath handles folders too, so a dropped directory comes across whole.
-      for (const p of paths.filter(Boolean)) {
-        await window.td.sftp.uploadPath(connectionId, p, path)
-      }
-    } catch (err) {
-      setError((err as Error).message)
-    }
-    setTransfer(null)
-    load(path)
+    await planAndUpload(paths)
   }
 
   async function doDelete(targets: SftpEntry[]): Promise<void> {
@@ -304,6 +390,15 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
         onSelect: () => setRenaming({ entry: only, value: only.name })
       })
     }
+    if (only && !only.isDirectory) {
+      items.push({
+        label: 'Compare with a local file…',
+        onSelect: async () => {
+          const local = await window.td.dialogs.pickOpenPath()
+          if (local) setComparing({ remote: only.path, local })
+        }
+      })
+    }
     if (targets.length > 0) {
       items.push({
         label: `Delete${targets.length > 1 ? ` ${targets.length} items` : ''}`,
@@ -323,8 +418,6 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
     return items
   }
 
-  const parentPath = path.split('/').slice(0, -1).join('/') || '/'
-
   return (
     <div
       className={`sftp-panel ${dragging ? 'drop-target' : ''}`}
@@ -341,23 +434,63 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
       }}
       onClick={() => setSelected(new Set())}
     >
-      <div className="sftp-path">
-        <span className="sftp-path-text" title={path}>
-          {path}
-        </span>
+      <div className="sftp-path" onClick={(e) => e.stopPropagation()}>
         <button
-          title="Refresh"
-          onClick={(e) => {
-            e.stopPropagation()
-            refresh()
-          }}
+          title="Up one level"
+          disabled={path === '/' || path === '.'}
+          onClick={() => load(parentOf(path))}
         >
+          ↑
+        </button>
+        <input
+          className="sftp-path-input"
+          value={draftPath}
+          spellCheck={false}
+          title={path}
+          onChange={(e) => setDraftPath(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') navigateTo(draftPath)
+            if (e.key === 'Escape') {
+              setDraftPath(path)
+              e.currentTarget.blur()
+            }
+          }}
+        />
+        <button
+          className={following ? 'active' : ''}
+          disabled={!connectionId}
+          title={
+            following
+              ? 'Following the terminal’s directory — click to stop'
+              : 'Follow the terminal’s directory (sends a setup line to the shell)'
+          }
+          onClick={toggleFollow}
+        >
+          ⇉
+        </button>
+        <button title="Refresh" onClick={() => refresh()}>
           ⟳
         </button>
       </div>
+
+      <div className="sftp-crumbs" onClick={(e) => e.stopPropagation()}>
+        {segmentsOf(path).map((crumb, i, all) => (
+          <span key={crumb.path}>
+            <button
+              className="crumb"
+              disabled={i === all.length - 1}
+              title={crumb.path}
+              onClick={() => load(crumb.path)}
+            >
+              {crumb.name}
+            </button>
+            {i < all.length - 1 && crumb.name !== '/' && <span className="crumb-sep">/</span>}
+          </span>
+        ))}
+      </div>
       <div className="sftp-list">
         {path !== '.' && path !== '/' && (
-          <div className="sftp-row" onDoubleClick={() => load(parentPath)}>
+          <div className="sftp-row" onDoubleClick={() => load(parentOf(path))}>
             <span className="name">..</span>
           </div>
         )}
@@ -421,6 +554,24 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
         <div className="error-text" style={{ padding: 6 }}>
           {error}
         </div>
+      )}
+
+      {pendingTransfer && (
+        <TransferConflictDialog
+          plan={pendingTransfer}
+          onCompare={(remote, local) => setComparing({ remote, local })}
+          onCancel={() => setPendingTransfer(null)}
+          onConfirm={(decisions) => execute(pendingTransfer, decisions)}
+        />
+      )}
+
+      {comparing && connectionId && (
+        <DiffDialog
+          connectionId={connectionId}
+          remotePath={comparing.remote}
+          localPath={comparing.local}
+          onClose={() => setComparing(null)}
+        />
       )}
 
       {saved && <div className="sftp-saved">Uploaded {saved}</div>}

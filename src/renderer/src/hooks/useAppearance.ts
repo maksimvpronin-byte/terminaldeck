@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { resolveAppearance } from '../../../shared/appearance'
 import type { ResolvedAppearance } from '../../../shared/types'
 import type { PaneTarget } from '../state/paneTree'
-import { findHost, governingCollection } from '../state/hosts'
+import { findHost } from '../state/hosts'
 import { useStore } from '../state/store'
 
 /**
@@ -13,7 +13,15 @@ import { useStore } from '../state/store'
  * refits the terminal — a fresh object on every render would resize the pane
  * continuously.
  */
-export function useAppearance(target: PaneTarget): ResolvedAppearance {
+export function useAppearance(
+  target: PaneTarget,
+  /**
+   * The collection this pane was opened from, if any. A host can be in several,
+   * so nothing but the way in can answer which one lends its look — opened from
+   * the tree, no collection applies and the host's groups decide.
+   */
+  viaCollectionId?: string
+): ResolvedAppearance {
   const settings = useStore((s) => s.settings)
   const sessions = useStore((s) => s.sessions)
   const groups = useStore((s) => s.groups)
@@ -29,8 +37,10 @@ export function useAppearance(target: PaneTarget): ResolvedAppearance {
     if (!found) return settings
     // The collection sits between the host and its groups: it recolours a whole
     // set without overruling a host that was marked on purpose.
-    const collection = governingCollection(state, target.sessionId)
+    const collection = viaCollectionId
+      ? state.collections.find((c) => c.id === viaCollectionId)
+      : undefined
     return resolveAppearance(found.host, found.host.groupId, found.groups, settings, collection)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target, settings, sessions, groups, trees, overrides, collections])
+  }, [target, viaCollectionId, settings, sessions, groups, trees, overrides, collections])
 }

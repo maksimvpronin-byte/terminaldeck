@@ -180,6 +180,28 @@ export default function GroupDialog({ initial, parentId = null, onClose }: Props
           </>
         )}
 
+        <label>
+          On connect
+          <textarea
+            rows={2}
+            value={group.onConnectCommand ?? ''}
+            placeholder={from('onConnectCommand') || 'e.g. sudo -i'}
+            onChange={(e) => set('onConnectCommand', e.target.value)}
+          />
+        </label>
+        <p className="settings-note">
+          Run in the shell of every host in this group, one command per line.
+        </p>
+
+        <label className="checkbox-row">
+          <input
+            type="checkbox"
+            checked={effective.followTerminalCwd}
+            onChange={(e) => set('followTerminalCwd', e.target.checked)}
+          />
+          SFTP panel follows the terminal&apos;s directory
+        </label>
+
         <details className="settings-section">
           <summary>Appearance</summary>
           <p className="settings-note">

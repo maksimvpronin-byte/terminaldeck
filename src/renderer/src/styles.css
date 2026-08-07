@@ -735,17 +735,55 @@ label {
   font-size: 11px;
   color: var(--text-dim);
 }
-.sftp-path-text {
+.sftp-path-input {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  padding: 2px 6px;
+  font-family: Menlo, Consolas, monospace;
+  font-size: 11px;
+}
+/* Scrolls sideways in its own strip: a deep path must not widen the panel. */
+.sftp-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
   white-space: nowrap;
+  font-size: 11px;
+}
+.sftp-crumbs .crumb {
+  padding: 1px 4px;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 11px;
+  cursor: pointer;
+}
+.sftp-crumbs .crumb:hover:not(:disabled) {
+  text-decoration: underline;
+}
+/* The last crumb is where you already are, so it reads as a label. */
+.sftp-crumbs .crumb:disabled {
+  color: var(--text);
+  cursor: default;
+  opacity: 1;
+}
+.sftp-crumbs .crumb-sep {
+  color: var(--text-dim);
 }
 .sftp-path button {
   padding: 1px 7px;
   font-size: 12px;
   line-height: 1.2;
+}
+/* Lit while the panel is tracking the shell, so the state is visible at a
+   glance rather than only in the tooltip. */
+.sftp-path button.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--text);
 }
 .sftp-list {
   flex: 1;
@@ -1309,4 +1347,121 @@ kbd {
 .pf-rule input,
 .pf-rule select {
   padding: 4px 6px;
+}
+
+/* Transfer conflicts. Wider than a normal dialog: paths are the content, and
+   truncating them is exactly what makes an overwrite decision unanswerable. */
+.conflict-card {
+  width: 640px;
+}
+.conflict-bulk {
+  display: flex;
+  gap: 6px;
+}
+.conflict-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 280px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px;
+  background: var(--bg-2);
+}
+.conflict-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 6px;
+}
+.conflict-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+.conflict-path {
+  font-family: Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.conflict-detail {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+.conflict-choice {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.conflict-choice button {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+.conflict-choice button.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--text);
+}
+.conflict-choice button.active.danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+/* A diff is read across, not down: the card is wide and the body scrolls. */
+.diff-card {
+  width: 760px;
+}
+.diff-view {
+  max-height: 420px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-0);
+  font-family: Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.diff-line {
+  display: flex;
+  white-space: pre;
+}
+.diff-line.added {
+  background: rgba(63, 185, 80, 0.14);
+}
+.diff-line.removed {
+  background: rgba(229, 83, 75, 0.14);
+}
+.diff-no {
+  flex: 0 0 44px;
+  padding-right: 6px;
+  text-align: right;
+  color: var(--text-dim);
+  user-select: none;
+}
+.diff-sign {
+  flex: 0 0 14px;
+  text-align: center;
+  color: var(--text-dim);
+  user-select: none;
+}
+.diff-line.added .diff-sign {
+  color: var(--success);
+}
+.diff-line.removed .diff-sign {
+  color: var(--danger);
+}
+.diff-text {
+  flex: 1;
+  padding-right: 8px;
+}
+.diff-gap {
+  padding: 2px 8px 2px 58px;
+  color: var(--text-dim);
+  background: var(--bg-1);
+  font-size: 10px;
 }

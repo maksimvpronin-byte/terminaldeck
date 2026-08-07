@@ -21,6 +21,23 @@ export interface AuthDefaults {
   agentForward?: boolean
   /** id of a SessionProfile to use as a jump host (ProxyJump) */
   jumpHostId?: string | null
+  /**
+   * Typed into the shell once it is ready, as if the user had. Several lines run
+   * in order. Blank inherits, so "everything here starts with sudo -i" is stated
+   * once on the group.
+   *
+   * Read from local configuration only. An inventory repository must never be
+   * able to set this: it is arbitrary code on every connection, and honouring it
+   * from a repo would hand command execution to anyone who can commit there.
+   */
+  onConnectCommand?: string
+  /**
+   * Keep the SFTP panel on the directory the shell is in, by watching for the
+   * OSC 7 sequence the shell prints on each prompt. Off unless asked for: it
+   * sends a setup line to the shell on connect, and lets the remote host move
+   * the file browser.
+   */
+  followTerminalCwd?: boolean
 }
 
 export type CursorStyle = 'block' | 'underline' | 'bar'
@@ -98,6 +115,8 @@ export interface ResolvedAuth {
   secretRef?: string
   agentForward: boolean
   jumpHostId: string | null
+  onConnectCommand?: string
+  followTerminalCwd: boolean
 }
 
 /** A git repository that machine inventories are read out of. */
@@ -214,9 +233,9 @@ export interface HostCollection extends AppearanceDefaults {
   id: string
   name: string
   /**
-   * Worn by every host in the set, so a whole environment reads as one thing.
-   * A host's own colour still wins; a host in several collections takes the
-   * first one that lists it, and the list order is the user's to arrange.
+   * Worn by every host seen through this set, or opened from it. A host's own
+   * colour still wins. A host in several sets is not forced to pick one: it
+   * simply looks like whichever set you are looking at it through.
    */
   color?: string
   /** Session or inventory host ids, in the order the user arranged them. */
@@ -248,6 +267,55 @@ export interface SshConfigHost {
   port: number
   identityFile?: string
   proxyJump?: string
+}
+
+/** One file a transfer intends to write, in either direction. */
+export interface TransferItem {
+  sourcePath: string
+  destPath: string
+  sourceSize: number
+  sourceMtime: number
+}
+
+/**
+ * Why a destination is occupied. Only `file` can be overwritten — the rest are
+ * refused outright, because replacing a directory with a file, or writing
+ * through a symlink, is never what someone dragging a folder meant to do.
+ */
+export type ConflictReason = 'file' | 'directory' | 'symlink' | 'unreadable'
+
+export interface TransferConflict extends TransferItem {
+  destSize: number
+  destMtime: number
+  reason: ConflictReason
+}
+
+export interface TransferPlan {
+  direction: 'upload' | 'download'
+  items: TransferItem[]
+  conflicts: TransferConflict[]
+  /** Two sources landing on one destination; the batch is refused, not merged. */
+  collisions: Array<{ destPath: string; sourcePaths: string[] }>
+  totalBytes: number
+}
+
+/** Destination path to what to do with it. Anything absent is written. */
+export type TransferDecisions = Record<string, 'overwrite' | 'skip'>
+
+/** Both sides of a file comparison, or the reason there is nothing to show. */
+export interface FileComparison {
+  remotePath: string
+  localPath: string
+  remote: string | null
+  local: string | null
+  remoteSize: number
+  localSize: number
+  /**
+   * `binary` — a NUL byte was found, so this is not text.
+   * `too-large` — beyond the diff cap; reading it in would hang the window.
+   * `missing` — one side is not there any more.
+   */
+  blocked?: 'binary' | 'too-large' | 'missing'
 }
 
 export interface SftpEntry {

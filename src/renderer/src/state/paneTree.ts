@@ -20,6 +20,12 @@ export type PaneNode =
       tunnelsOpen: boolean
       /** Whether this terminal takes part in broadcast input. */
       broadcastEnabled: boolean
+      /**
+       * The collection this pane was opened from, when it was. A host may sit in
+       * several, so which one lends its look cannot be answered by the host
+       * alone — it is answered by where you opened it.
+       */
+      viaCollectionId?: string
     }
   | {
       type: 'split'
@@ -31,7 +37,12 @@ export type PaneNode =
 
 export type LeafNode = Extract<PaneNode, { type: 'leaf' }>
 
-export function makeLeaf(title: string, target: PaneTarget, color?: string): LeafNode {
+export function makeLeaf(
+  title: string,
+  target: PaneTarget,
+  color?: string,
+  viaCollectionId?: string
+): LeafNode {
   return {
     type: 'leaf',
     id: nanoid(),
@@ -39,6 +50,7 @@ export function makeLeaf(title: string, target: PaneTarget, color?: string): Lea
     title,
     target,
     color,
+    viaCollectionId,
     sftpOpen: false,
     tunnelsOpen: false,
     broadcastEnabled: true

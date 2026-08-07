@@ -9,7 +9,6 @@ import {
   activeTab as currentTab,
   allRoots
 } from '../state/store'
-import { colorOf } from '../state/hosts'
 import { DRAG_MIME, type DragItem } from '../state/dnd'
 import SessionDialog from './SessionDialog'
 import QuickConnectDialog from './QuickConnectDialog'
@@ -92,12 +91,7 @@ export default function Sidebar({
   }
 
   function connect(session: SessionProfile): void {
-    openTab(session.name, { kind: 'session', sessionId: session.id }, hostColour(session))
-  }
-
-  /** Its own colour, or the one lent by the collection that governs it. */
-  function hostColour(session: SessionProfile): string | undefined {
-    return colorOf({ collections }, session)
+    openTab(session.name, { kind: 'session', sessionId: session.id }, session.color)
   }
 
   /** user@host as it will actually be used, inheritance included. */
@@ -302,7 +296,7 @@ export default function Sidebar({
         <span className="name">
           <span
             className="session-dot"
-            style={hostColour(s) ? { background: hostColour(s) } : undefined}
+            style={s.color ? { background: s.color } : undefined}
             aria-hidden="true"
           />
           {s.name}

@@ -184,11 +184,35 @@ export default function InventorySourceDialog({
         <label className="checkbox-row" style={{ flexDirection: 'row' }}>
           <input
             type="checkbox"
+            checked={source.followTerminalCwd ?? false}
+            onChange={(e) => set('followTerminalCwd', e.target.checked)}
+          />
+          SFTP panel follows the terminal&apos;s directory
+        </label>
+
+        <label className="checkbox-row" style={{ flexDirection: 'row' }}>
+          <input
+            type="checkbox"
             checked={source.agentForward ?? false}
             onChange={(e) => set('agentForward', e.target.checked)}
           />
           Forward SSH agent to remote hosts
         </label>
+
+        <label>
+          On connect
+          <textarea
+            rows={2}
+            value={source.onConnectCommand ?? ''}
+            placeholder="e.g. sudo -i"
+            onChange={(e) => set('onConnectCommand', e.target.value)}
+          />
+        </label>
+        <p className="settings-note">
+          Run on every host from this repository, one command per line. Set here and nowhere
+          else — it is never read from the inventory itself, because that would let anyone who
+          can commit to the repository run commands on your machines.
+        </p>
 
         <label>
           Colour

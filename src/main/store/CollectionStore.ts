@@ -59,11 +59,8 @@ class CollectionStore {
     return deduped
   }
 
-  /**
-   * Fixes the list order, which is what decides the look of a host that sits in
-   * several collections — the first one to name it wins, so the order has to be
-   * the user's to set rather than an accident of when things were created.
-   */
+  /** Fixes the list order, so it is the user's to arrange rather than an
+   * accident of when each set happened to be created. */
   reorder(ids: string[]): void {
     const byId = new Map(this.data.collections.map((c) => [c.id, c]))
     const next = ids.map((id) => byId.get(id)).filter((c): c is HostCollection => Boolean(c))

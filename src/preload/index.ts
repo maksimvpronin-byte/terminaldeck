@@ -16,7 +16,10 @@ import type {
   InventorySource,
   InventoryOverride,
   InventoryTree,
-  ImportSummary
+  ImportSummary,
+  TransferPlan,
+  TransferDecisions,
+  FileComparison
 } from '../shared/types'
 
 const api = {
@@ -114,11 +117,26 @@ const api = {
       const listener = (_e: unknown, message: string): void => cb(message)
       ipcRenderer.on(channel, listener)
       return () => ipcRenderer.removeListener(channel, listener)
+    },
+    setFollowCwd: (connectionId: string, enabled: boolean): Promise<boolean> =>
+      ipcRenderer.invoke(IPC.sshSetFollowCwd, connectionId, enabled),
+    getFollowCwd: (connectionId: string): Promise<boolean> =>
+      ipcRenderer.invoke(IPC.sshGetFollowCwd, connectionId),
+    /** Fires only while this connection is tracking the shell's directory. */
+    onCwd: (connectionId: string, cb: (path: string) => void): (() => void) => {
+      const channel = `${IPC.sshCwd}:${connectionId}`
+      const listener = (_e: unknown, path: string): void => cb(path)
+      ipcRenderer.on(channel, listener)
+      return () => ipcRenderer.removeListener(channel, listener)
     }
   },
   sftp: {
     list: (connectionId: string, path: string): Promise<SftpEntry[]> =>
       ipcRenderer.invoke(IPC.sftpList, connectionId, path),
+    realpath: (connectionId: string, path: string): Promise<string> =>
+      ipcRenderer.invoke(IPC.sftpRealpath, connectionId, path),
+    stat: (connectionId: string, path: string): Promise<SftpEntry | null> =>
+      ipcRenderer.invoke(IPC.sftpStat, connectionId, path),
     mkdir: (connectionId: string, path: string): Promise<void> =>
       ipcRenderer.invoke(IPC.sftpMkdir, connectionId, path),
     delete: (connectionId: string, path: string, isDirectory: boolean): Promise<void> =>
@@ -137,6 +155,31 @@ const api = {
       ipcRenderer.invoke(IPC.sftpDownloadDir, connectionId, remotePath, localDir),
     uploadPath: (connectionId: string, localPath: string, remoteParent: string): Promise<void> =>
       ipcRenderer.invoke(IPC.sftpUploadPath, connectionId, localPath, remoteParent),
+    planUpload: (
+      connectionId: string,
+      localPath: string,
+      remoteParent: string
+    ): Promise<TransferPlan> =>
+      ipcRenderer.invoke(IPC.sftpPlanUpload, connectionId, localPath, remoteParent),
+    planDownload: (
+      connectionId: string,
+      remotePath: string,
+      localTarget: string,
+      exactFile?: boolean
+    ): Promise<TransferPlan> =>
+      ipcRenderer.invoke(IPC.sftpPlanDownload, connectionId, remotePath, localTarget, exactFile),
+    runPlan: (
+      connectionId: string,
+      plan: TransferPlan,
+      decisions: TransferDecisions
+    ): Promise<{ written: number; skipped: number }> =>
+      ipcRenderer.invoke(IPC.sftpRunPlan, connectionId, plan, decisions),
+    compare: (
+      connectionId: string,
+      remotePath: string,
+      localPath: string
+    ): Promise<FileComparison> =>
+      ipcRenderer.invoke(IPC.sftpCompare, connectionId, remotePath, localPath),
     edit: (connectionId: string, remotePath: string, editorCommand?: string): Promise<string> =>
       ipcRenderer.invoke(IPC.sftpEdit, connectionId, remotePath, editorCommand),
     stopEdit: (connectionId: string, remotePath: string): Promise<void> =>

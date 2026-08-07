@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { HostCollection } from '../../../shared/types'
 import { useStore, collectConnectedSessionIds, allRoots } from '../state/store'
-import { findHost } from '../state/hosts'
+import { colorOf, findHost } from '../state/hosts'
 import ContextMenu, { type MenuItem } from './ContextMenu'
 import CollectionDialog from './CollectionDialog'
 
@@ -72,7 +72,8 @@ export default function CollectionsPanel({ query }: { query: string }): JSX.Elem
         id,
         name: found.host.name,
         address: found.host.host,
-        color: found.host.color,
+        // Seen through this collection, so it wears this collection's colour.
+        color: colorOf(found.host, collection),
         missing: false
       }
     })
@@ -96,14 +97,14 @@ export default function CollectionsPanel({ query }: { query: string }): JSX.Elem
             .map((f) => ({
               title: f.host.name,
               target: { kind: 'session' as const, sessionId: f.host.id },
-              color: f.host.color
+              color: colorOf(f.host, collection),
+              viaCollectionId: collection.id
             }))
           openMany(items, 'grid')
         }
       },
       { label: 'Edit…', separated: true, onSelect: () => setEditing(collection) },
       {
-        // Order decides the look of a host that sits in more than one.
         label: 'Move up',
         disabled: collections.indexOf(collection) === 0,
         onSelect: () => moveCollection(collection.id, -1)
@@ -203,7 +204,15 @@ export default function CollectionsPanel({ query }: { query: string }): JSX.Elem
                     className="tree-item"
                     style={{ paddingLeft: 28 }}
                     onClick={() => {
-                      if (!m.missing) openTab(m.name, { kind: 'session', sessionId: m.id }, m.color)
+                      if (!m.missing) {
+                        // Opened from here, so this set lends its look.
+                        openTab(
+                          m.name,
+                          { kind: 'session', sessionId: m.id },
+                          m.color,
+                          collection.id
+                        )
+                      }
                     }}
                     onContextMenu={(e) => {
                       e.preventDefault()

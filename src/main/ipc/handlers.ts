@@ -24,7 +24,9 @@ import type {
   Snippet,
   HostCollection,
   InventorySource,
-  InventoryOverride
+  InventoryOverride,
+  TransferPlan,
+  TransferDecisions
 } from '../../shared/types'
 
 function focusedWin(): BrowserWindow {
@@ -192,6 +194,12 @@ export function registerIpcHandlers(): void {
       return { connectionId }
     }
   )
+  ipcMain.handle(IPC.sshSetFollowCwd, (_e, connectionId: string, enabled: boolean) =>
+    sshManager.setFollowCwd(connectionId, enabled)
+  )
+  ipcMain.handle(IPC.sshGetFollowCwd, (_e, connectionId: string) =>
+    sshManager.isFollowingCwd(connectionId)
+  )
   ipcMain.handle(IPC.sshDisconnect, (_e, connectionId: string) => {
     remoteEdit.stopAllFor(connectionId)
     sftpManager.releaseConnection(connectionId)
@@ -208,6 +216,34 @@ export function registerIpcHandlers(): void {
   // --- SFTP ---
   ipcMain.handle(IPC.sftpList, (_e, connectionId: string, path: string) =>
     sftpManager.list(connectionId, path)
+  )
+  ipcMain.handle(
+    IPC.sftpPlanUpload,
+    (_e, connectionId: string, localPath: string, remoteParent: string) =>
+      sftpManager.planUpload(connectionId, localPath, remoteParent)
+  )
+  ipcMain.handle(
+    IPC.sftpPlanDownload,
+    (_e, connectionId: string, remotePath: string, localTarget: string, exactFile?: boolean) =>
+      sftpManager.planDownload(connectionId, remotePath, localTarget, exactFile)
+  )
+  ipcMain.handle(
+    IPC.sftpRunPlan,
+    (_e, connectionId: string, plan: TransferPlan, decisions: TransferDecisions) =>
+      sftpManager.runPlan(connectionId, plan, decisions, (transferred, total, path) =>
+        reportTransfer(connectionId, path, transferred, total)
+      )
+  )
+  ipcMain.handle(
+    IPC.sftpCompare,
+    (_e, connectionId: string, remotePath: string, localPath: string) =>
+      sftpManager.compareWithLocal(connectionId, remotePath, localPath)
+  )
+  ipcMain.handle(IPC.sftpRealpath, (_e, connectionId: string, path: string) =>
+    sftpManager.realpath(connectionId, path)
+  )
+  ipcMain.handle(IPC.sftpStat, (_e, connectionId: string, path: string) =>
+    sftpManager.statPath(connectionId, path)
   )
   ipcMain.handle(IPC.sftpMkdir, (_e, connectionId: string, path: string) =>
     sftpManager.mkdir(connectionId, path)

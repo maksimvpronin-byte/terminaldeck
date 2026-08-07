@@ -41,6 +41,8 @@ export interface OpenRequest {
   title: string
   target: PaneTarget
   color?: string
+  /** Set when opening from a collection, so its look travels with the pane. */
+  viaCollectionId?: string
 }
 
 /**
@@ -96,10 +98,7 @@ export interface CollectionsSlice {
   loadCollections: () => Promise<void>
   upsertCollection: (collection: HostCollection) => Promise<void>
   removeCollection: (id: string) => Promise<void>
-  /**
-   * Shifts a collection up or down the list. The order is the tie-break for a
-   * host that belongs to several, so it has to be the user's to set.
-   */
+  /** Shifts a collection up or down, so the list reads in the order you want. */
   moveCollection: (id: string, delta: -1 | 1) => Promise<void>
   /** Appends hosts, keeping the existing order and ignoring ones already in. */
   addToCollection: (id: string, hostIds: string[]) => Promise<void>
@@ -139,7 +138,12 @@ export interface WorkspaceSlice {
   moveTabToWorkspace: (tabId: string, workspaceId: string) => void
 
   /** Opens a tab in the current workspace, creating one if there is none. */
-  openTab: (title: string, target: PaneTarget, color?: string) => string
+  openTab: (
+    title: string,
+    target: PaneTarget,
+    color?: string,
+    viaCollectionId?: string
+  ) => string
   /** Opens several hosts at once — see OpenMode. */
   openMany: (items: OpenRequest[], mode: OpenMode, workspaceTitle?: string) => void
   closeTab: (tabId: string) => void

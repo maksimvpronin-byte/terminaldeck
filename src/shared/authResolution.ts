@@ -7,7 +7,8 @@ export const AUTH_FALLBACK: ResolvedAuth = {
   username: '',
   authMethod: 'password',
   agentForward: false,
-  jumpHostId: null
+  jumpHostId: null,
+  followTerminalCwd: false
 }
 
 const optedOut = (level: AuthDefaults): boolean => level.inheritAuth === false
@@ -49,7 +50,9 @@ export function resolveAuth(
     secretRef: pick(chain, 'secretRef'),
     // Booleans can be legitimately false, so they take the first explicit value.
     agentForward: firstDefined(chain, 'agentForward') ?? AUTH_FALLBACK.agentForward,
-    jumpHostId: pick(chain, 'jumpHostId') ?? AUTH_FALLBACK.jumpHostId
+    jumpHostId: pick(chain, 'jumpHostId') ?? AUTH_FALLBACK.jumpHostId,
+    onConnectCommand: pick(chain, 'onConnectCommand'),
+    followTerminalCwd: firstDefined(chain, 'followTerminalCwd') ?? AUTH_FALLBACK.followTerminalCwd
   }
 }
 

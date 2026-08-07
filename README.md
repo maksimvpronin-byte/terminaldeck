@@ -34,6 +34,10 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
   can be switched off per host or group
 - Host key verification against a local `known_hosts`, prompting on first contact and warning
   loudly when a stored key changes; stored keys can be reviewed and revoked
+- **On-connect commands**: lines typed into the shell as soon as it opens — `sudo -i`,
+  `cd /var/log`, `tmux attach` — inherited down the same chain, so a whole group can share an
+  opening move. Read from local configuration only and **never from an inventory repository**,
+  since that would hand command execution to anyone able to commit there
 - Password prompt when nothing is stored, and **keyboard-interactive** support for 2FA
 - Import hosts from `~/.ssh/config`, including `ProxyJump` links
 
@@ -48,11 +52,12 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
   reopened as a workspace whenever you want them back. Unlike a group, a host can be in any
   number of them, membership has no effect on credentials, and a workspace can be saved as one
   before you close it. Hosts that later vanish are flagged rather than quietly dropped
-- A collection also carries an **appearance profile** — colour and terminal theme — worn by every
-  host in it, so a whole environment reads as one thing at a glance. It sits between the host and
-  its groups: a host with settings of its own keeps them, a host without takes the set's instead
-  of its group's. A host in several collections follows the topmost, and the list order is
-  yours to arrange
+- A collection also carries an **appearance profile** — colour and terminal theme — so a whole
+  environment reads as one thing at a glance. It applies **by context**: a host wears the set's
+  look where you see it under that set, and where you opened it from that set. The same machine
+  in both *Prod* and *Databases* therefore looks like whichever one you came in through, and
+  opening it from the ordinary tree involves no set at all. A host with settings of its own keeps
+  them either way
 - Tabs and split panes; drag a host or a whole tab onto a pane to place them side by side, and
   move a pane back out into its own tab
 - **Broadcast** input to the terminals you tick, across every tab
@@ -76,6 +81,23 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
 
 - SFTP browser: multi-select, context menu, rename, delete, mkdir, whole-directory transfers,
   Finder drag-and-drop upload, transfer progress, and auto-refresh
+- An **editable path box** with breadcrumbs: type or paste a path and press `⏎`. `~` and `..`
+  are resolved by the server rather than guessed at, so they land where the shell would, and a
+  path pointing at a file opens its folder with the file selected
+- **Follow the terminal**, optionally: the `⇉` button in the path bar makes the panel track the
+  shell's `cd`, and switches it back off, on the live connection — no dialog, no reconnect. It
+  watches for the `OSC 7` sequence a shell prints on each prompt and types a one-line setup into
+  the shell so hosts that aren't configured for it report it too — the echo of that line is taken
+  back out of the stream, so it never reaches the screen. Off by default, since it lets the remote
+  host move the file browser. The host or group setting decides only how a new connection starts
+- **Overwrite confirmation, in both directions.** A transfer is planned before a byte moves, and
+  anything it would replace is listed with the size and date on each side. Every clash starts on
+  *Skip*, a folder standing where a file must go is refused rather than replaced, and no answer
+  is remembered — each transfer asks afresh
+- **Diff before you replace**: any clashing text file can be compared line by line without
+  leaving the dialog, and any remote file can be compared against a local one from its context
+  menu. Binary files and anything past 2 MB say so instead of being read across the wire, and a
+  CRLF-only difference is reported as such rather than as a rewritten file
 - **Edit remote files locally** — “Edit locally” in the file context menu opens it in the editor
   of your choice (Settings → Files) and uploads on every save
 - Jump host / ProxyJump chaining, for saved sessions and inventory hosts alike
@@ -128,8 +150,9 @@ npm test
 ```
 
 Tests cover the parts where a silent failure costs most: vault crypto, the `~/.ssh/config` and
-Ansible inventory parsers, the credential and appearance inheritance chains, the pane tree, and
-the workspace selectors together with the migration of layouts saved before workspaces existed.
+Ansible inventory parsers, the credential and appearance inheritance chains, the pane tree, the
+workspace selectors with the migration of layouts saved before workspaces existed, remote path
+handling, the transfer conflict planner, and the diff engine.
 
 ## Building installers
 

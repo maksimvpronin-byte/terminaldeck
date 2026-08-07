@@ -17,7 +17,9 @@ describe('resolveAuth', () => {
       privateKeyPath: undefined,
       secretRef: undefined,
       agentForward: false,
-      jumpHostId: null
+      jumpHostId: null,
+      onConnectCommand: undefined,
+      followTerminalCwd: false
     })
   })
 
@@ -82,7 +84,9 @@ describe('opting out of inheritance', () => {
       privateKeyPath: undefined,
       secretRef: undefined,
       agentForward: false,
-      jumpHostId: null
+      jumpHostId: null,
+      onConnectCommand: undefined,
+      followTerminalCwd: false
     })
   })
 
@@ -118,5 +122,68 @@ describe('inheritedFrom', () => {
 
   it('returns nothing when no ancestor defines it', () => {
     expect(inheritedFrom({}, 'prod', groups, 'privateKeyPath')).toBeUndefined()
+  })
+})
+
+describe('onConnectCommand', () => {
+  const withCommands: SessionGroup[] = [
+    { id: 'root', name: 'Infra', parentId: null, onConnectCommand: 'cd /srv' },
+    { id: 'prod', name: 'Prod', parentId: 'root', onConnectCommand: 'sudo -i' },
+    { id: 'plain', name: 'Plain', parentId: 'root' }
+  ]
+
+  it('is unset when nothing states one', () => {
+    expect(resolveAuth({}, null, withCommands).onConnectCommand).toBeUndefined()
+  })
+
+  it('takes the nearest group, so a subgroup can replace what the parent runs', () => {
+    expect(resolveAuth({}, 'prod', withCommands).onConnectCommand).toBe('sudo -i')
+  })
+
+  it('walks past a group that states none', () => {
+    expect(resolveAuth({}, 'plain', withCommands).onConnectCommand).toBe('cd /srv')
+  })
+
+  it("lets a host state its own", () => {
+    expect(resolveAuth({ onConnectCommand: 'tmux a' }, 'prod', withCommands).onConnectCommand).toBe(
+      'tmux a'
+    )
+  })
+
+  it('treats a blank field as unset, so clearing it inherits again', () => {
+    expect(resolveAuth({ onConnectCommand: '' }, 'prod', withCommands).onConnectCommand).toBe(
+      'sudo -i'
+    )
+  })
+
+  it('is dropped along with everything else when the host opts out', () => {
+    const own = { inheritAuth: false as const }
+    expect(resolveAuth(own, 'prod', withCommands).onConnectCommand).toBeUndefined()
+  })
+})
+
+describe('followTerminalCwd', () => {
+  const groupsWithFollow: SessionGroup[] = [
+    { id: 'root', name: 'Infra', parentId: null, followTerminalCwd: true },
+    { id: 'quiet', name: 'Quiet', parentId: 'root', followTerminalCwd: false },
+    { id: 'plain', name: 'Plain', parentId: 'root' }
+  ]
+
+  it('is off unless something asks for it', () => {
+    expect(resolveAuth({}, null, groupsWithFollow).followTerminalCwd).toBe(false)
+  })
+
+  it('is inherited from a group', () => {
+    expect(resolveAuth({}, 'plain', groupsWithFollow).followTerminalCwd).toBe(true)
+  })
+
+  it('lets a subgroup switch it back off, since false is a real answer', () => {
+    expect(resolveAuth({}, 'quiet', groupsWithFollow).followTerminalCwd).toBe(false)
+  })
+
+  it('lets a host switch it off inside a group that wants it', () => {
+    expect(
+      resolveAuth({ followTerminalCwd: false }, 'plain', groupsWithFollow).followTerminalCwd
+    ).toBe(false)
   })
 })

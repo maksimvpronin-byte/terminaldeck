@@ -186,11 +186,35 @@ export default function InventoryOverrideDialog({ node, groups, onClose }: Props
         <label className="checkbox-row" style={{ flexDirection: 'row' }}>
           <input
             type="checkbox"
+            checked={override.followTerminalCwd ?? fromRepo.followTerminalCwd}
+            onChange={(e) => set('followTerminalCwd', e.target.checked)}
+          />
+          SFTP panel follows the terminal&apos;s directory
+        </label>
+
+        <label className="checkbox-row" style={{ flexDirection: 'row' }}>
+          <input
+            type="checkbox"
             checked={override.agentForward ?? fromRepo.agentForward}
             onChange={(e) => set('agentForward', e.target.checked)}
           />
           Forward SSH agent to remote host
         </label>
+
+        <label>
+          On connect
+          <textarea
+            rows={2}
+            value={override.onConnectCommand ?? ''}
+            placeholder="e.g. sudo -i"
+            onChange={(e) => set('onConnectCommand', e.target.value)}
+          />
+        </label>
+        <p className="settings-note">
+          Set here and nowhere else: this is never read from the repository. It is arbitrary
+          code run on every connection, and honouring it from a repo would hand command
+          execution to anyone able to commit there.
+        </p>
 
         <label>
           Colour

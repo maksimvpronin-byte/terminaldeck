@@ -3,29 +3,17 @@ import type { HostCollection, SessionGroup, SessionProfile } from '../../../shar
 import type { AppState } from './slices/types'
 
 /**
- * The collection whose look a host wears: the first in the list that names it.
+ * The colour a host is drawn in, in a given context.
  *
- * A host can sit in any number of collections, so something has to break the
- * tie. Rather than invent a hidden rule, the tie-break is the visible order of
- * the list, which the user can rearrange.
- */
-export function governingCollection(
-  state: Pick<AppState, 'collections'>,
-  hostId: string
-): HostCollection | undefined {
-  return state.collections.find((c) => c.hostIds.includes(hostId))
-}
-
-/**
- * The colour a host should be drawn in, everywhere it appears. Its own colour
- * wins, so a deliberately marked machine stays marked; otherwise its collection
- * lends one, which is what makes a whole set read as one environment.
+ * A host may belong to any number of collections, so there is no such thing as
+ * "the" collection of a host — only the one you are looking at it through, or
+ * opened it from. Where there is no such context, the host answers for itself.
  */
 export function colorOf(
-  state: Pick<AppState, 'collections'>,
-  host: { id: string; color?: string }
+  host: { color?: string },
+  collection?: Pick<HostCollection, 'color'>
 ): string | undefined {
-  return host.color ?? governingCollection(state, host.id)?.color
+  return host.color ?? collection?.color
 }
 
 export interface FoundHost {

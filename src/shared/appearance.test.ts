@@ -169,3 +169,21 @@ describe('an interposed level, as a collection is', () => {
     )
   })
 })
+
+describe('two collections claiming the same host', () => {
+  // The case that prompted this: opening from the second set must not show the
+  // first set's look just because it happens to be listed higher.
+  const prod: AppearanceDefaults = { themeName: 'Nord' }
+  const databases: AppearanceDefaults = { themeName: 'Monokai' }
+
+  it('shows whichever set was opened, not whichever is first', () => {
+    expect(resolveAppearance({}, 'prod', groups, globals, prod).themeName).toBe('Nord')
+    expect(resolveAppearance({}, 'prod', groups, globals, databases).themeName).toBe('Monokai')
+  })
+
+  it("still lets the host's own setting win over either", () => {
+    const own = { themeName: 'Light' }
+    expect(resolveAppearance(own, 'prod', groups, globals, prod).themeName).toBe('Light')
+    expect(resolveAppearance(own, 'prod', groups, globals, databases).themeName).toBe('Light')
+  })
+})

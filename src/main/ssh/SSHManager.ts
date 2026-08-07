@@ -8,6 +8,8 @@ import { app, BrowserWindow } from 'electron'
 import type { SessionProfile, QuickConnectParams, ResolvedAuth } from '../../shared/types'
 import { resolveAuth as resolveAuthChain } from '../../shared/authResolution'
 import { IPC } from '../../shared/ipc-channels'
+import { OSC7_SHELL_SETUP, scanOsc7 } from '../../shared/osc7'
+import { EchoSuppressor } from './echoSuppressor'
 import { sessionStore } from '../store/SessionStore'
 import { inventoryStore } from '../inventory/InventoryStore'
 import { vault } from '../vault/Vault'
@@ -19,6 +21,14 @@ interface LiveConnection {
   clients: Client[] // chain of clients, last one is the target
   stream: ClientChannel
   logStream?: WriteStream
+  /**
+   * Whether this connection's directory is being tracked. Held per connection
+   * rather than read from the profile each time, so it can be switched from the
+   * SFTP panel without editing — and un-editing — the saved host.
+   */
+  followCwd: boolean
+  /** Swallows the echo of the setup line we typed in, so it never shows. */
+  echoSuppressor?: EchoSuppressor
 }
 
 const OPENSSH_PIPE = '\\\\.\\pipe\\openssh-ssh-agent'
@@ -250,11 +260,39 @@ class SSHManager {
           logStream = createWriteStream(join(dir, filename), { flags: 'a' })
         }
 
-        this.connections.set(connectionId, { id: connectionId, clients: chain, stream, logStream })
+        const auth = profile ? effectiveAuth(profile) : undefined
+        // The saved setting is only the starting point; the SFTP panel can turn
+        // it on and off afterwards. Scanning is skipped entirely while it is off.
+        const connection: LiveConnection = {
+          id: connectionId,
+          clients: chain,
+          stream,
+          logStream,
+          followCwd: auth?.followTerminalCwd === true
+        }
+        this.connections.set(connectionId, connection)
 
-        stream.on('data', (data: Buffer) => {
-          this.send(win, connectionId, IPC.sshData, data.toString('base64'))
-          logStream?.write(data)
+        let pending = ''
+        let lastCwd: string | undefined
+
+        stream.on('data', (raw: Buffer) => {
+          // The setup line is ours, not the user's, so its echo is taken back
+          // out before anyone sees it. Scanning still runs on the full stream:
+          // the sequence we are looking for rides in that same echo.
+          const suppressor = connection.echoSuppressor
+          const data = suppressor && !suppressor.done ? suppressor.push(raw) : raw
+
+          if (data.length > 0) {
+            this.send(win, connectionId, IPC.sshData, data.toString('base64'))
+            logStream?.write(data)
+          }
+          if (!connection.followCwd) return
+          const scan = scanOsc7(pending + raw.toString('utf8'))
+          pending = scan.rest
+          if (scan.path && scan.path !== lastCwd) {
+            lastCwd = scan.path
+            this.send(win, connectionId, IPC.sshCwd, scan.path)
+          }
         })
         stream.stderr.on('data', (data: Buffer) => {
           this.send(win, connectionId, IPC.sshData, data.toString('base64'))
@@ -268,9 +306,65 @@ class SSHManager {
         })
 
         this.send(win, connectionId, IPC.sshStatus, 'connected')
+
+        // Typed in rather than run on a separate exec channel, so the command
+        // and its output show up in the terminal, `cd` sticks, and `sudo -i`
+        // hands over the session the user is looking at. A reconnect repeats it.
+        // The shell only reports its directory if it has been told to. Sent as
+        // one line so the echo is a line rather than a screenful, and appended
+        // to any PROMPT_COMMAND already there rather than replacing it.
+        if (connection.followCwd) this.sendSetupQuietly(connection)
+
+        if (auth) {
+          const command = auth.onConnectCommand?.trim()
+          if (command) {
+            for (const line of command.split('\n')) stream.write(`${line}\n`)
+          }
+        }
+
         resolve()
       })
     })
+  }
+
+  /**
+   * Types the setup line in without showing it. If the shell never echoes it —
+   * echo disabled, or a shell that swallows it — the suppressor is released
+   * shortly after, so nothing of the user's is held back for long.
+   */
+  private sendSetupQuietly(conn: LiveConnection): void {
+    const line = `${OSC7_SHELL_SETUP}\n`
+    conn.echoSuppressor = new EchoSuppressor(Buffer.from(OSC7_SHELL_SETUP, 'utf8'))
+    conn.stream.write(line)
+    setTimeout(() => {
+      const held = conn.echoSuppressor?.done === false ? conn.echoSuppressor.flush() : undefined
+      if (held && held.length > 0) {
+        const win = BrowserWindow.getAllWindows()[0]
+        if (win && !win.isDestroyed()) {
+          win.webContents.send(`${IPC.sshData}:${conn.id}`, held.toString('base64'))
+        }
+      }
+    }, 2000)
+  }
+
+  /**
+   * Turns directory tracking on or off for a live connection.
+   *
+   * Enabling sends the setup line again, which is what makes this work on a
+   * host that was never configured for it. Disabling only stops listening: the
+   * shell keeps printing an escape sequence nobody reads, which is invisible
+   * and harmless, and undoing it would mean issuing more commands.
+   */
+  setFollowCwd(connectionId: string, enabled: boolean): boolean {
+    const conn = this.connections.get(connectionId)
+    if (!conn) return false
+    if (enabled && !conn.followCwd) this.sendSetupQuietly(conn)
+    conn.followCwd = enabled
+    return conn.followCwd
+  }
+
+  isFollowingCwd(connectionId: string): boolean {
+    return this.connections.get(connectionId)?.followCwd ?? false
   }
 
   write(connectionId: string, data: string): void {

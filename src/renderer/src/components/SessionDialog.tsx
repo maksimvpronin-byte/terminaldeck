@@ -218,6 +218,20 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
         <label className="checkbox-row" style={{ flexDirection: 'row' }}>
           <input
             type="checkbox"
+            checked={effective.followTerminalCwd}
+            onChange={(e) => set('followTerminalCwd', e.target.checked)}
+          />
+          SFTP panel follows the terminal&apos;s directory
+        </label>
+        <p className="settings-note">
+          Keeps the SFTP panel on the directory the shell is in. Types one setup line into the
+          shell on connect so it reports where it is; its echo is hidden. Off by default: it lets
+          the host move the file browser. The ⇉ button in the panel switches it at any time.
+        </p>
+
+        <label className="checkbox-row" style={{ flexDirection: 'row' }}>
+          <input
+            type="checkbox"
             checked={profile.logToFile}
             onChange={(e) => set('logToFile', e.target.checked)}
           />
@@ -242,6 +256,21 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
             ))}
           </select>
         </label>
+
+        <label>
+          On connect
+          <textarea
+            rows={2}
+            value={profile.onConnectCommand ?? ''}
+            placeholder={inheritNote('onConnectCommand') || 'e.g. sudo -i'}
+            onChange={(e) => set('onConnectCommand', e.target.value)}
+          />
+        </label>
+        <p className="settings-note">
+          Typed into the shell as soon as it is ready, so you see it run and{' '}
+          <code>cd</code> sticks. One command per line, run in order. It repeats on every
+          reconnect.
+        </p>
 
         <label>
           Group

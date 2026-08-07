@@ -1,10 +1,31 @@
 import type { SFTPWrapper } from 'ssh2'
-import { readdir, mkdir, stat } from 'fs/promises'
+import { readdir, mkdir, stat, lstat, readFile } from 'fs/promises'
 import { join, basename } from 'path'
 import { sshManager } from './SSHManager'
-import type { SftpEntry } from '../../shared/types'
+import { buildTransferPlan, shouldWrite, type DestInfo } from '../../shared/transferPlan'
+import type {
+  FileComparison,
+  SftpEntry,
+  TransferDecisions,
+  TransferItem,
+  TransferPlan
+} from '../../shared/types'
 
 type ProgressFn = (transferred: number, total: number, path: string) => void
+
+const NO_DECISIONS: TransferDecisions = {}
+
+/**
+ * Past this, a file is not diffed. Reading a 200 MB log into the renderer to
+ * compare it line by line would lock the window for an answer nobody wants in
+ * that form.
+ */
+const MAX_DIFF_BYTES = 2 * 1024 * 1024
+
+/** Text or not: the same test `grep` and `git` use — a NUL byte early on. */
+function looksBinary(buffer: Buffer): boolean {
+  return buffer.subarray(0, 8192).includes(0)
+}
 
 class SFTPManager {
   private sessions = new Map<string, SFTPWrapper>()
@@ -38,6 +59,44 @@ class SFTPManager {
       mtime: (e.attrs.mtime ?? 0) * 1000,
       permissions: (e.attrs.mode & 0o777).toString(8)
     }))
+  }
+
+  /**
+   * The server's own answer for a path: resolves `~`, `.`, `..` and symlinks.
+   * The panel opens on `.`, which is wherever SFTP started, and needs this to
+   * show where that actually is.
+   */
+  async realpath(connectionId: string, remotePath: string): Promise<string> {
+    const sftp = await this.getSftp(connectionId)
+    return new Promise((resolve, reject) => {
+      sftp.realpath(remotePath, (err, resolved) => (err ? reject(err) : resolve(resolved)))
+    })
+  }
+
+  /** A stat that answers "missing" rather than throwing, for existence checks. */
+  async statPath(connectionId: string, remotePath: string): Promise<SftpEntry | null> {
+    const sftp = await this.getSftp(connectionId)
+    return new Promise((resolve, reject) => {
+      sftp.lstat(remotePath, (err, stats) => {
+        if (err) {
+          // ssh2 reports a missing file as code 2; anything else is a real fault
+          // and must not be mistaken for "there is nothing there".
+          const code = (err as NodeJS.ErrnoException & { code?: number }).code
+          if (code === 2 || /no such file/i.test(err.message)) resolve(null)
+          else reject(err)
+          return
+        }
+        resolve({
+          name: remotePath.slice(remotePath.lastIndexOf('/') + 1),
+          path: remotePath,
+          isDirectory: stats.isDirectory(),
+          isSymlink: stats.isSymbolicLink(),
+          size: stats.size,
+          mtime: (stats.mtime ?? 0) * 1000,
+          permissions: (stats.mode & 0o777).toString(8)
+        })
+      })
+    })
   }
 
   async mkdir(connectionId: string, remotePath: string): Promise<void> {
@@ -170,6 +229,250 @@ class SFTPManager {
         onProgress?.(t, total, localPath)
       )
     }
+  }
+
+  // --- Planning: what a transfer would trample, worked out before it starts ---
+
+  /** Every file an upload of `localPath` into `remoteParent` would write. */
+  private async localTree(localPath: string, remoteParent: string): Promise<TransferItem[]> {
+    const info = await stat(localPath)
+    const dest = `${remoteParent.replace(/\/$/, '')}/${basename(localPath)}`
+    if (!info.isDirectory()) {
+      return [
+        {
+          sourcePath: localPath,
+          destPath: dest,
+          sourceSize: info.size,
+          sourceMtime: info.mtimeMs
+        }
+      ]
+    }
+    const out: TransferItem[] = []
+    for (const entry of await readdir(localPath, { withFileTypes: true })) {
+      const child = join(localPath, entry.name)
+      if (entry.isDirectory()) out.push(...(await this.localTree(child, dest)))
+      else if (entry.isFile()) {
+        const childInfo = await stat(child)
+        out.push({
+          sourcePath: child,
+          destPath: `${dest}/${entry.name}`,
+          sourceSize: childInfo.size,
+          sourceMtime: childInfo.mtimeMs
+        })
+      }
+    }
+    return out
+  }
+
+  /** Every file a download of `remotePath` into `localDir` would write. */
+  private async remoteTree(
+    connectionId: string,
+    remotePath: string,
+    localDir: string
+  ): Promise<TransferItem[]> {
+    const info = await this.statPath(connectionId, remotePath)
+    if (!info) return []
+    if (!info.isDirectory) {
+      return [
+        {
+          sourcePath: remotePath,
+          destPath: join(localDir, info.name),
+          sourceSize: info.size,
+          sourceMtime: info.mtime
+        }
+      ]
+    }
+    const out: TransferItem[] = []
+    for (const entry of await this.list(connectionId, remotePath)) {
+      const target = join(localDir, entry.name)
+      // Symlinked directories are skipped here for the same reason the transfer
+      // itself skips them: following one can loop or escape the tree.
+      if (entry.isDirectory && !entry.isSymlink) {
+        out.push(...(await this.remoteTree(connectionId, entry.path, target)))
+      } else if (!entry.isDirectory) {
+        out.push({
+          sourcePath: entry.path,
+          destPath: target,
+          sourceSize: entry.size,
+          sourceMtime: entry.mtime
+        })
+      }
+    }
+    return out
+  }
+
+  private async singleRemoteItem(
+    connectionId: string,
+    remotePath: string,
+    destPath: string
+  ): Promise<TransferItem[]> {
+    const info = await this.statPath(connectionId, remotePath)
+    if (!info) return []
+    return [
+      { sourcePath: remotePath, destPath, sourceSize: info.size, sourceMtime: info.mtime }
+    ]
+  }
+
+  async planUpload(
+    connectionId: string,
+    localPath: string,
+    remoteParent: string
+  ): Promise<TransferPlan> {
+    const items = await this.localTree(localPath, remoteParent)
+    const found = new Map<string, DestInfo | null>()
+    for (const item of items) {
+      if (found.has(item.destPath)) continue
+      try {
+        const info = await this.statPath(connectionId, item.destPath)
+        found.set(
+          item.destPath,
+          info
+            ? {
+                size: info.size,
+                mtime: info.mtime,
+                isDirectory: info.isDirectory,
+                isSymlink: info.isSymlink
+              }
+            : null
+        )
+      } catch {
+        // Could not be stated at all — treated as occupied, never as empty.
+        found.set(item.destPath, {
+          size: 0,
+          mtime: 0,
+          isDirectory: false,
+          isSymlink: false,
+          unreadable: true
+        })
+      }
+    }
+    return buildTransferPlan('upload', items, (p) => found.get(p) ?? null)
+  }
+
+  /**
+   * `localTarget` is a directory to mirror into, or — with `exactFile` — the
+   * precise filename the user chose in the save dialog. Saving one file under a
+   * new name must be checked against that name, not against the original.
+   */
+  async planDownload(
+    connectionId: string,
+    remotePath: string,
+    localTarget: string,
+    exactFile = false
+  ): Promise<TransferPlan> {
+    const items = exactFile
+      ? await this.singleRemoteItem(connectionId, remotePath, localTarget)
+      : await this.remoteTree(connectionId, remotePath, localTarget)
+    const found = new Map<string, DestInfo | null>()
+    for (const item of items) {
+      if (found.has(item.destPath)) continue
+      try {
+        const info = await lstat(item.destPath)
+        found.set(item.destPath, {
+          size: info.size,
+          mtime: info.mtimeMs,
+          isDirectory: info.isDirectory(),
+          isSymlink: info.isSymbolicLink()
+        })
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException).code
+        found.set(
+          item.destPath,
+          code === 'ENOENT'
+            ? null
+            : { size: 0, mtime: 0, isDirectory: false, isSymlink: false, unreadable: true }
+        )
+      }
+    }
+    return buildTransferPlan('download', items, (p) => found.get(p) ?? null)
+  }
+
+  /** Runs a planned transfer, honouring the answers collected for it. */
+  async runPlan(
+    connectionId: string,
+    plan: TransferPlan,
+    decisions: TransferDecisions = NO_DECISIONS,
+    onProgress?: ProgressFn
+  ): Promise<{ written: number; skipped: number }> {
+    let written = 0
+    let skipped = 0
+    for (const item of plan.items) {
+      if (!shouldWrite(item.destPath, decisions)) {
+        skipped++
+        continue
+      }
+      if (plan.direction === 'upload') {
+        const parent = item.destPath.slice(0, item.destPath.lastIndexOf('/'))
+        if (parent) await this.mkdir(connectionId, parent).catch(() => undefined)
+        await this.upload(connectionId, item.sourcePath, item.destPath, (t, total) =>
+          onProgress?.(t, total, item.sourcePath)
+        )
+      } else {
+        await mkdir(item.destPath.slice(0, item.destPath.lastIndexOf('/')) || '/', {
+          recursive: true
+        })
+        await this.download(connectionId, item.sourcePath, item.destPath, (t, total) =>
+          onProgress?.(t, total, item.sourcePath)
+        )
+      }
+      written++
+    }
+    return { written, skipped }
+  }
+
+  /** Reads a remote file into memory, refusing anything past the diff cap. */
+  private async readRemote(connectionId: string, remotePath: string): Promise<Buffer> {
+    const sftp = await this.getSftp(connectionId)
+    return new Promise((resolve, reject) => {
+      const chunks: Buffer[] = []
+      let size = 0
+      const stream = sftp.createReadStream(remotePath)
+      stream.on('data', (chunk: Buffer) => {
+        size += chunk.length
+        if (size > MAX_DIFF_BYTES) {
+          stream.destroy()
+          reject(new Error('File is larger than the comparison limit'))
+          return
+        }
+        chunks.push(chunk)
+      })
+      stream.on('error', reject)
+      stream.on('close', () => resolve(Buffer.concat(chunks)))
+    })
+  }
+
+  /**
+   * Both sides of a file, ready to diff — or a reason there is nothing to show.
+   * The guards are here rather than in the dialog so that an oversized or
+   * binary file is never read across the wire in the first place.
+   */
+  async compareWithLocal(
+    connectionId: string,
+    remotePath: string,
+    localPath: string
+  ): Promise<FileComparison> {
+    const remoteInfo = await this.statPath(connectionId, remotePath)
+    const localInfo = await stat(localPath).catch(() => null)
+    const base: FileComparison = {
+      remotePath,
+      localPath,
+      remote: null,
+      local: null,
+      remoteSize: remoteInfo?.size ?? 0,
+      localSize: localInfo?.size ?? 0
+    }
+    if (!remoteInfo || !localInfo) return { ...base, blocked: 'missing' }
+    if (remoteInfo.size > MAX_DIFF_BYTES || localInfo.size > MAX_DIFF_BYTES) {
+      return { ...base, blocked: 'too-large' }
+    }
+
+    const [remoteBuf, localBuf] = await Promise.all([
+      this.readRemote(connectionId, remotePath),
+      readFile(localPath)
+    ])
+    if (looksBinary(remoteBuf) || looksBinary(localBuf)) return { ...base, blocked: 'binary' }
+
+    return { ...base, remote: remoteBuf.toString('utf8'), local: localBuf.toString('utf8') }
   }
 
   releaseConnection(connectionId: string): void {

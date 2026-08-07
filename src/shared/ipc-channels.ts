@@ -52,9 +52,14 @@ export const IPC = {
   sshData: 'ssh:data',
   sshStatus: 'ssh:status',
   sshError: 'ssh:error',
+  sshCwd: 'ssh:cwd',
+  sshSetFollowCwd: 'ssh:setFollowCwd',
+  sshGetFollowCwd: 'ssh:getFollowCwd',
 
   // SFTP
   sftpList: 'sftp:list',
+  sftpRealpath: 'sftp:realpath',
+  sftpStat: 'sftp:stat',
   sftpDownload: 'sftp:download',
   sftpUpload: 'sftp:upload',
   sftpMkdir: 'sftp:mkdir',
@@ -62,6 +67,10 @@ export const IPC = {
   sftpRename: 'sftp:rename',
   sftpDownloadDir: 'sftp:downloadDir',
   sftpUploadPath: 'sftp:uploadPath',
+  sftpPlanUpload: 'sftp:planUpload',
+  sftpPlanDownload: 'sftp:planDownload',
+  sftpRunPlan: 'sftp:runPlan',
+  sftpCompare: 'sftp:compare',
   sftpEdit: 'sftp:edit',
   sftpStopEdit: 'sftp:stopEdit',
   /** main -> renderer, suffixed with connectionId */

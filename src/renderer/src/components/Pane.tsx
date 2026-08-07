@@ -144,6 +144,7 @@ export default function Pane({
       <div className="pane-body">
         <TerminalHost
           target={node.target}
+          viaCollectionId={node.viaCollectionId}
           connectionId={node.connectionId}
           active={isActive}
           restored={node.restored}

@@ -3,7 +3,6 @@ import type { MouseEvent as ReactMouseEvent } from 'react'
 import type { InventorySource, SessionGroup, SessionProfile } from '../../../shared/types'
 import { resolveAuth } from '../../../shared/authResolution'
 import { applyOverride } from '../../../shared/overrides'
-import { colorOf } from '../state/hosts'
 import {
   useStore,
   collectConnectedSessionIds,
@@ -53,7 +52,6 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
   const selectHostRange = useStore((s) => s.selectHostRange)
   const clearHostSelection = useStore((s) => s.clearHostSelection)
   const openMany = useStore((s) => s.openMany)
-  const collections = useStore((s) => s.collections)
   const workspaces = useStore((s) => s.workspaces)
   const connected = new Set(
     allRoots({ workspaces }).flatMap(collectConnectedSessionIds)
@@ -327,8 +325,7 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
   }
 
   function renderHost(host: SessionProfile, paddingLeft: number, colour?: string): JSX.Element {
-    // Own colour, then the collection that governs it, then the repository's.
-    const dotColour = colorOf({ collections }, host) ?? colour
+    const dotColour = host.color ?? colour
     return (
       <div
         className={`tree-item ${selectedHostIds.includes(host.id) ? 'selected' : ''}`}

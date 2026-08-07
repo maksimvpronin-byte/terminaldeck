@@ -64,7 +64,10 @@ export const createCollectionsSlice: StateCreator<AppState, [], [], CollectionsS
       items.push({
         title: found.host.name,
         target: { kind: 'session', sessionId: hostId },
-        color: colorOf(state, found.host)
+        // The set being opened lends its colour. A host in several looks like
+        // whichever one you came in through; one marked on purpose keeps its own.
+        color: colorOf(found.host, collection),
+        viaCollectionId: collection.id
       })
     }
     if (items.length > 0) state.openMany(items, 'workspace', collection.name)

@@ -13,14 +13,18 @@ import {
   type PaneTarget
 } from '../paneTree'
 import { activeTab, allTabs, mapTab, workspaceOfTab } from '../workspaces'
-import { colorOf } from '../hosts'
 import { loadLayout } from '../layout'
 import type { AppState, OpenRequest, Workspace, WorkspaceSlice, WorkspaceTab } from './types'
 
 const restored = loadLayout()
 
-function makeTab(title: string, target: PaneTarget, color?: string): WorkspaceTab {
-  const leaf = makeLeaf(title, target, color)
+function makeTab(
+  title: string,
+  target: PaneTarget,
+  color?: string,
+  viaCollectionId?: string
+): WorkspaceTab {
+  const leaf = makeLeaf(title, target, color, viaCollectionId)
   return { id: nanoid(), title, root: leaf, activePaneId: leaf.id }
 }
 
@@ -75,7 +79,7 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
         items.push({
           title: manual.name,
           target: { kind: 'session', sessionId: id },
-          color: colorOf(s, manual)
+          color: manual.color
         })
         continue
       }
@@ -87,7 +91,7 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
         items.push({
           title: host.name,
           target: { kind: 'session', sessionId: id },
-          color: colorOf(s, { id, color: override?.color ?? host.color })
+          color: override?.color ?? host.color
         })
         break
       }
@@ -164,10 +168,10 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
 
   // --- tabs ---
 
-  openTab: (title, target, color) => {
+  openTab: (title, target, color, viaCollectionId) => {
     // A tab always needs somewhere to live; the first one makes its workspace.
     if (!get().workspaces.some((w) => w.id === get().activeWorkspaceId)) get().openWorkspace()
-    const tab = makeTab(title, target, color)
+    const tab = makeTab(title, target, color, viaCollectionId)
     const workspaceId = get().activeWorkspaceId
     set((s) => ({
       workspaces: s.workspaces.map((w) =>
@@ -182,16 +186,20 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
     if (mode === 'workspace') {
       // The group's own colour rides along, so the whole strip entry is tinted.
       get().openWorkspace(workspaceTitle, items.find((i) => i.color)?.color)
-      for (const item of items) get().openTab(item.title, item.target, item.color)
+      for (const item of items) {
+        get().openTab(item.title, item.target, item.color, item.viaCollectionId)
+      }
       return
     }
     if (mode === 'tabs') {
-      for (const item of items) get().openTab(item.title, item.target, item.color)
+      for (const item of items) {
+        get().openTab(item.title, item.target, item.color, item.viaCollectionId)
+      }
       return
     }
 
     const [first, ...rest] = items
-    get().openTab(first.title, first.target, first.color)
+    get().openTab(first.title, first.target, first.color, first.viaCollectionId)
     const tabId = activeTab(get())?.id
     if (!tabId) return
     rest.forEach((item, index) => {

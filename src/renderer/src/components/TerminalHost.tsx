@@ -11,6 +11,8 @@ import ContextMenu, { type MenuItem } from './ContextMenu'
 
 interface Props {
   target: PaneTarget
+  /** The collection this pane was opened from, if any — it lends its look. */
+  viaCollectionId?: string
   connectionId?: string
   active: boolean
   /** Restored from a saved layout, so it starts idle rather than connecting. */
@@ -29,6 +31,7 @@ function writeBase64(term: Terminal, b64: string): void {
 
 export default function TerminalHost({
   target,
+  viaCollectionId,
   connectionId,
   active,
   restored,
@@ -58,7 +61,7 @@ export default function TerminalHost({
 
   // Behaviour stays application-wide; only the look is per host.
   const settings = useStore((s) => s.settings)
-  const appearance = useAppearance(target)
+  const appearance = useAppearance(target, viaCollectionId)
   const appearanceRef = useRef(appearance)
   appearanceRef.current = appearance
 
