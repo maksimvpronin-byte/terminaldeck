@@ -4,8 +4,9 @@ import type { SessionProfile } from '../../../shared/types'
 import { resolveAuth } from '../../../shared/authResolution'
 import { applyOverride } from '../../../shared/overrides'
 import { groupPath } from '../../../shared/groups'
+import { colorOf } from '../state/hosts'
 import { useStore } from '../state/store'
-import type { PaneTarget } from '../state/store'
+import type { OpenMode, PaneTarget } from '../state/store'
 import ModalBackdrop from './ModalBackdrop'
 
 interface Entry {
@@ -23,6 +24,7 @@ export default function HostPalette({ onClose }: { onClose: () => void }): JSX.E
   const groups = useStore((s) => s.groups)
   const trees = useStore((s) => s.inventoryTrees)
   const overrides = useStore((s) => s.inventoryOverrides)
+  const collections = useStore((s) => s.collections)
   const openTab = useStore((s) => s.openTab)
   const openMany = useStore((s) => s.openMany)
 
@@ -41,7 +43,7 @@ export default function HostPalette({ onClose }: { onClose: () => void }): JSX.E
         title: s.name,
         path: groupPath(s.groupId, groups),
         address: auth.username ? `${auth.username}@${s.host}` : s.host,
-        color: s.color,
+        color: colorOf({ collections }, s),
         target: { kind: 'session', sessionId: s.id }
       })
     }
@@ -59,13 +61,13 @@ export default function HostPalette({ onClose }: { onClose: () => void }): JSX.E
           title: host.name,
           path: groupPath(host.groupId, invGroups),
           address: auth.username ? `${auth.username}@${host.host}` : host.host,
-          color: host.color,
+          color: colorOf({ collections }, host),
           target: { kind: 'session', sessionId: host.id }
         })
       }
     }
     return out
-  }, [sessions, groups, trees, overrides])
+  }, [sessions, groups, trees, overrides, collections])
 
   const matches = useMemo(() => {
     const needle = query.trim().toLowerCase()
@@ -90,7 +92,7 @@ export default function HostPalette({ onClose }: { onClose: () => void }): JSX.E
     return one ? [one] : []
   }
 
-  function open(mode: 'tabs' | 'grid'): void {
+  function open(mode: OpenMode): void {
     const list = chosen()
     if (list.length === 0) return
     if (list.length === 1 && mode === 'tabs') {
@@ -129,7 +131,7 @@ export default function HostPalette({ onClose }: { onClose: () => void }): JSX.E
       if (matches[cursor]) toggle(matches[cursor].id)
     } else if (e.key === 'Enter') {
       e.preventDefault()
-      open(e.shiftKey ? 'grid' : 'tabs')
+      open(e.altKey ? 'workspace' : e.shiftKey ? 'grid' : 'tabs')
     } else if (e.key === 'Escape') {
       onClose()
     }
@@ -149,7 +151,7 @@ export default function HostPalette({ onClose }: { onClose: () => void }): JSX.E
 
         <div className="palette-target">
           {picked.size > 0
-            ? `${picked.size} selected — ⏎ opens them in tabs, ⇧⏎ tiles them in one`
+            ? `${picked.size} selected — ⏎ tabs, ⇧⏎ tiled in one, ⌥⏎ a new workspace`
             : 'Tab marks a host for opening several at once'}
         </div>
 
@@ -189,7 +191,7 @@ export default function HostPalette({ onClose }: { onClose: () => void }): JSX.E
         </div>
 
         <div className="palette-footer">
-          <span>⏎ open · ⇧⏎ tile in one tab · Tab mark · ↑↓ move · esc close</span>
+          <span>⏎ open · ⇧⏎ tile · ⌥⏎ new workspace · Tab mark · ↑↓ move · esc close</span>
           <span>{matches.length} hosts</span>
         </div>
       </div>

@@ -9,16 +9,33 @@ import {
   splitLeaf,
   setAllBroadcast,
   collectLeaves,
-  collectBroadcastTargets
+  collectBroadcastTargets,
+  type PaneTarget
 } from '../paneTree'
+import { activeTab, allTabs, mapTab, workspaceOfTab } from '../workspaces'
+import { colorOf } from '../hosts'
 import { loadLayout } from '../layout'
-import type { AppState, OpenRequest, WorkspaceSlice, WorkspaceTab } from './types'
+import type { AppState, OpenRequest, Workspace, WorkspaceSlice, WorkspaceTab } from './types'
 
 const restored = loadLayout()
 
+function makeTab(title: string, target: PaneTarget, color?: string): WorkspaceTab {
+  const leaf = makeLeaf(title, target, color)
+  return { id: nanoid(), title, root: leaf, activePaneId: leaf.id }
+}
+
+/** "Workspace 3" — the lowest number not already on the strip. */
+function nextTitle(workspaces: Workspace[]): string {
+  const taken = new Set(workspaces.map((w) => w.title))
+  for (let n = 1; ; n++) {
+    const candidate = `Workspace ${n}`
+    if (!taken.has(candidate)) return candidate
+  }
+}
+
 export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice> = (set, get) => ({
-  tabs: restored.tabs,
-  activeTabId: restored.activeTabId,
+  workspaces: restored.workspaces,
+  activeWorkspaceId: restored.activeWorkspaceId,
   broadcast: false,
   selectedHostIds: [],
   lastSelectedHostId: null,
@@ -58,7 +75,7 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
         items.push({
           title: manual.name,
           target: { kind: 'session', sessionId: id },
-          color: manual.color
+          color: colorOf(s, manual)
         })
         continue
       }
@@ -70,7 +87,7 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
         items.push({
           title: host.name,
           target: { kind: 'session', sessionId: id },
-          color: override?.color ?? host.color
+          color: colorOf(s, { id, color: override?.color ?? host.color })
         })
         break
       }
@@ -80,17 +97,94 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
     get().clearHostSelection()
   },
 
+  // --- workspaces (the top strip) ---
+
+  openWorkspace: (title, color) => {
+    const workspace: Workspace = {
+      id: nanoid(),
+      title: title?.trim() || nextTitle(get().workspaces),
+      color,
+      tabs: [],
+      activeTabId: null
+    }
+    set((s) => ({
+      workspaces: [...s.workspaces, workspace],
+      activeWorkspaceId: workspace.id
+    }))
+    return workspace.id
+  },
+
+  closeWorkspace: (workspaceId) => {
+    set((s) => {
+      const workspaces = s.workspaces.filter((w) => w.id !== workspaceId)
+      const activeWorkspaceId =
+        s.activeWorkspaceId === workspaceId
+          ? (workspaces[workspaces.length - 1]?.id ?? null)
+          : s.activeWorkspaceId
+      return { workspaces, activeWorkspaceId }
+    })
+  },
+
+  setActiveWorkspace: (workspaceId) => set({ activeWorkspaceId: workspaceId }),
+
+  renameWorkspace: (workspaceId, title) => {
+    const trimmed = title.trim()
+    if (!trimmed) return
+    set((s) => ({
+      workspaces: s.workspaces.map((w) => (w.id === workspaceId ? { ...w, title: trimmed } : w))
+    }))
+  },
+
+  moveTabToWorkspace: (tabId, workspaceId) => {
+    set((s) => {
+      const from = workspaceOfTab(s, tabId)
+      if (!from || from.id === workspaceId) return {}
+      const tab = from.tabs.find((t) => t.id === tabId)
+      if (!tab) return {}
+
+      // The tab object is carried across untouched, and every tab panel is
+      // rendered from one flat list keyed by tab id — so React never remounts
+      // it and the SSH session survives the move.
+      const workspaces = s.workspaces.map((w) => {
+        if (w.id === from.id) {
+          const tabs = w.tabs.filter((t) => t.id !== tabId)
+          return {
+            ...w,
+            tabs,
+            activeTabId:
+              w.activeTabId === tabId ? (tabs[tabs.length - 1]?.id ?? null) : w.activeTabId
+          }
+        }
+        if (w.id === workspaceId) return { ...w, tabs: [...w.tabs, tab], activeTabId: tabId }
+        return w
+      })
+      return { workspaces, activeWorkspaceId: workspaceId }
+    })
+  },
+
   // --- tabs ---
 
   openTab: (title, target, color) => {
-    const leaf = makeLeaf(title, target, color)
-    const tab: WorkspaceTab = { id: nanoid(), title, root: leaf, activePaneId: leaf.id }
-    set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }))
-    return leaf.id
+    // A tab always needs somewhere to live; the first one makes its workspace.
+    if (!get().workspaces.some((w) => w.id === get().activeWorkspaceId)) get().openWorkspace()
+    const tab = makeTab(title, target, color)
+    const workspaceId = get().activeWorkspaceId
+    set((s) => ({
+      workspaces: s.workspaces.map((w) =>
+        w.id === workspaceId ? { ...w, tabs: [...w.tabs, tab], activeTabId: tab.id } : w
+      )
+    }))
+    return tab.activePaneId
   },
 
-  openMany: (items, mode) => {
+  openMany: (items, mode, workspaceTitle) => {
     if (items.length === 0) return
+    if (mode === 'workspace') {
+      // The group's own colour rides along, so the whole strip entry is tinted.
+      get().openWorkspace(workspaceTitle, items.find((i) => i.color)?.color)
+      for (const item of items) get().openTab(item.title, item.target, item.color)
+      return
+    }
     if (mode === 'tabs') {
       for (const item of items) get().openTab(item.title, item.target, item.color)
       return
@@ -98,9 +192,10 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
 
     const [first, ...rest] = items
     get().openTab(first.title, first.target, first.color)
-    const tabId = get().tabs[get().tabs.length - 1].id
+    const tabId = activeTab(get())?.id
+    if (!tabId) return
     rest.forEach((item, index) => {
-      const tab = get().tabs.find((t) => t.id === tabId)
+      const tab = allTabs(get()).find((t) => t.id === tabId)
       if (!tab) return
       // Alternate the direction so the panes stay roughly square rather than
       // ending up as a row of slivers.
@@ -118,26 +213,66 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
 
   closeTab: (tabId) => {
     set((s) => {
-      const tabs = s.tabs.filter((t) => t.id !== tabId)
-      const activeTabId =
-        s.activeTabId === tabId ? (tabs[tabs.length - 1]?.id ?? null) : s.activeTabId
-      return { tabs, activeTabId }
+      const owner = workspaceOfTab(s, tabId)
+      if (!owner) return {}
+      const tabs = owner.tabs.filter((t) => t.id !== tabId)
+
+      // Closing the last tab retires the workspace with it, the way a browser
+      // window goes when its last tab does — unless it is the only workspace
+      // left, where an empty strip is less jarring than everything vanishing.
+      if (tabs.length === 0 && s.workspaces.length > 1) {
+        const workspaces = s.workspaces.filter((w) => w.id !== owner.id)
+        return {
+          workspaces,
+          activeWorkspaceId:
+            s.activeWorkspaceId === owner.id
+              ? (workspaces[workspaces.length - 1]?.id ?? null)
+              : s.activeWorkspaceId
+        }
+      }
+
+      return {
+        workspaces: s.workspaces.map((w) =>
+          w.id === owner.id
+            ? {
+                ...w,
+                tabs,
+                activeTabId:
+                  w.activeTabId === tabId ? (tabs[tabs.length - 1]?.id ?? null) : w.activeTabId
+              }
+            : w
+        )
+      }
     })
   },
 
-  setActiveTab: (tabId) =>
-    set((s) => ({
-      activeTabId: tabId,
-      // Looking at a tab clears its unread marker.
-      tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, hasActivity: false } : t))
-    })),
+  setActiveTab: (tabId) => {
+    set((s) => {
+      const owner = workspaceOfTab(s, tabId)
+      if (!owner) return {}
+      return {
+        // Looking at a tab brings its workspace forward too, so this one call
+        // works from the host palette, which does not know where a tab lives.
+        activeWorkspaceId: owner.id,
+        workspaces: s.workspaces.map((w) =>
+          w.id === owner.id
+            ? {
+                ...w,
+                activeTabId: tabId,
+                tabs: w.tabs.map((t) => (t.id === tabId ? { ...t, hasActivity: false } : t))
+              }
+            : w
+        )
+      }
+    })
+  },
 
   markActivity: (tabId) => {
     set((s) => {
-      if (s.activeTabId === tabId) return {}
-      const tab = s.tabs.find((t) => t.id === tabId)
+      if (activeTab(s)?.id === tabId) return {}
+      const tab = allTabs(s).find((t) => t.id === tabId)
       if (!tab || tab.hasActivity) return {}
-      return { tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, hasActivity: true } : t)) }
+      return { workspaces: mapTab(s.workspaces, tabId, (t) => ({ ...t, hasActivity: true })) }
     })
   },
 
@@ -145,30 +280,29 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
 
   setActivePane: (tabId, paneId) => {
     set((s) => ({
-      tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, activePaneId: paneId } : t))
+      workspaces: mapTab(s.workspaces, tabId, (t) => ({ ...t, activePaneId: paneId }))
     }))
   },
 
   setPaneConnection: (tabId, paneId, connectionId) => {
     set((s) => ({
-      tabs: s.tabs.map((t) =>
-        t.id === tabId
-          ? { ...t, root: mapPane(t.root, paneId, (leaf) => ({ ...leaf, connectionId })) }
-          : t
-      )
+      workspaces: mapTab(s.workspaces, tabId, (t) => ({
+        ...t,
+        root: mapPane(t.root, paneId, (leaf) => ({ ...leaf, connectionId }))
+      }))
     }))
   },
 
   splitPane: (tabId, paneId, dir) => {
-    const source = findPane(get().tabs.find((t) => t.id === tabId)?.root ?? null, paneId)
+    const tab = allTabs(get()).find((t) => t.id === tabId)
+    const source = findPane(tab?.root ?? null, paneId)
     if (!source || source.type !== 'leaf') return
     get().splitPaneWith(tabId, paneId, dir, 'after', source.title, source.target, source.color)
   },
 
   splitPaneWith: (tabId, paneId, dir, position, title, target, color) => {
     set((s) => ({
-      tabs: s.tabs.map((t) => {
-        if (t.id !== tabId) return t
+      workspaces: mapTab(s.workspaces, tabId, (t) => {
         const newLeaf = makeLeaf(title, target, color)
         const root = splitLeaf(t.root, paneId, dir, position, newLeaf)
         return root ? { ...t, root, activePaneId: newLeaf.id } : t
@@ -177,33 +311,28 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
   },
 
   closePane: (tabId, paneId) => {
-    set((s) => {
-      const tab = s.tabs.find((t) => t.id === tabId)
-      if (!tab) return {}
-      const root = removePane(tab.root, paneId)
-      if (!root) {
-        // That was the tab's last pane — drop the tab along with it.
-        const tabs = s.tabs.filter((t) => t.id !== tabId)
-        return {
-          tabs,
-          activeTabId:
-            s.activeTabId === tabId ? (tabs[tabs.length - 1]?.id ?? null) : s.activeTabId
-        }
-      }
-      const leaves = collectLeaves(root)
-      const activePaneId = leaves.some((l) => l.id === tab.activePaneId)
-        ? tab.activePaneId
-        : leaves[0].id
-      return {
-        tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, root, activePaneId } : t))
-      }
-    })
+    const tab = allTabs(get()).find((t) => t.id === tabId)
+    if (!tab) return
+    const root = removePane(tab.root, paneId)
+    // That was the tab's last pane, so the tab goes — and perhaps its workspace.
+    if (!root) {
+      get().closeTab(tabId)
+      return
+    }
+    const leaves = collectLeaves(root)
+    const activePaneId = leaves.some((l) => l.id === tab.activePaneId)
+      ? tab.activePaneId
+      : leaves[0].id
+    set((s) => ({
+      workspaces: mapTab(s.workspaces, tabId, (t) => ({ ...t, root, activePaneId }))
+    }))
   },
 
   detachPane: (tabId, paneId) => {
     set((s) => {
-      const tab = s.tabs.find((t) => t.id === tabId)
-      if (!tab) return {}
+      const owner = workspaceOfTab(s, tabId)
+      const tab = owner?.tabs.find((t) => t.id === tabId)
+      if (!owner || !tab) return {}
       const leaf = collectLeaves(tab.root).find((l) => l.id === paneId)
       // Nothing to detach from when the pane already owns the whole tab.
       if (!leaf || tab.root.type === 'leaf') return {}
@@ -212,63 +341,59 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
 
       // The pane moves to a different tree, so React remounts it and the old
       // connection is torn down; the new one starts fresh.
-      const moved = makeLeaf(leaf.title, leaf.target, leaf.color)
-      const newTab: WorkspaceTab = {
-        id: nanoid(),
-        title: leaf.title,
-        root: moved,
-        activePaneId: moved.id
-      }
+      const moved = makeTab(leaf.title, leaf.target, leaf.color)
       const leaves = collectLeaves(remaining)
-      const updated = s.tabs.map((t) =>
-        t.id === tabId
-          ? {
-              ...t,
-              root: remaining,
-              activePaneId: leaves.some((l) => l.id === t.activePaneId)
-                ? t.activePaneId
-                : leaves[0].id
-            }
-          : t
-      )
-      return { tabs: [...updated, newTab], activeTabId: newTab.id }
+      return {
+        workspaces: s.workspaces.map((w) =>
+          w.id === owner.id
+            ? {
+                ...w,
+                tabs: [
+                  ...w.tabs.map((t) =>
+                    t.id === tabId
+                      ? {
+                          ...t,
+                          root: remaining,
+                          activePaneId: leaves.some((l) => l.id === t.activePaneId)
+                            ? t.activePaneId
+                            : leaves[0].id
+                        }
+                      : t
+                  ),
+                  moved
+                ],
+                activeTabId: moved.id
+              }
+            : w
+        )
+      }
     })
   },
 
   toggleSftp: (tabId, paneId) => {
     set((s) => ({
-      tabs: s.tabs.map((t) =>
-        t.id === tabId
-          ? {
-              ...t,
-              root: mapPane(t.root, paneId, (leaf) => ({ ...leaf, sftpOpen: !leaf.sftpOpen }))
-            }
-          : t
-      )
+      workspaces: mapTab(s.workspaces, tabId, (t) => ({
+        ...t,
+        root: mapPane(t.root, paneId, (leaf) => ({ ...leaf, sftpOpen: !leaf.sftpOpen }))
+      }))
     }))
   },
 
   toggleTunnels: (tabId, paneId) => {
     set((s) => ({
-      tabs: s.tabs.map((t) =>
-        t.id === tabId
-          ? {
-              ...t,
-              root: mapPane(t.root, paneId, (leaf) => ({
-                ...leaf,
-                tunnelsOpen: !leaf.tunnelsOpen
-              }))
-            }
-          : t
-      )
+      workspaces: mapTab(s.workspaces, tabId, (t) => ({
+        ...t,
+        root: mapPane(t.root, paneId, (leaf) => ({ ...leaf, tunnelsOpen: !leaf.tunnelsOpen }))
+      }))
     }))
   },
 
   resizeSplit: (tabId, splitId, sizes) => {
     set((s) => ({
-      tabs: s.tabs.map((t) =>
-        t.id === tabId ? { ...t, root: setSizes(t.root, splitId, sizes) } : t
-      )
+      workspaces: mapTab(s.workspaces, tabId, (t) => ({
+        ...t,
+        root: setSizes(t.root, splitId, sizes)
+      }))
     }))
   },
 
@@ -278,31 +403,32 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
 
   togglePaneBroadcast: (tabId, paneId) => {
     set((s) => ({
-      tabs: s.tabs.map((t) =>
-        t.id === tabId
-          ? {
-              ...t,
-              root: mapPane(t.root, paneId, (leaf) => ({
-                ...leaf,
-                broadcastEnabled: !leaf.broadcastEnabled
-              }))
-            }
-          : t
-      )
+      workspaces: mapTab(s.workspaces, tabId, (t) => ({
+        ...t,
+        root: mapPane(t.root, paneId, (leaf) => ({
+          ...leaf,
+          broadcastEnabled: !leaf.broadcastEnabled
+        }))
+      }))
     }))
   },
 
   setAllPanesBroadcast: (enabled) => {
-    set((s) => ({ tabs: s.tabs.map((t) => ({ ...t, root: setAllBroadcast(t.root, enabled) })) }))
+    set((s) => ({
+      workspaces: s.workspaces.map((w) => ({
+        ...w,
+        tabs: w.tabs.map((t) => ({ ...t, root: setAllBroadcast(t.root, enabled) }))
+      }))
+    }))
   },
 
   sendToTerminals: (text, execute) => {
     const s = get()
-    const tab = s.tabs.find((t) => t.id === s.activeTabId)
+    const tab = activeTab(s)
     if (!tab) return 0
     const own = collectLeaves(tab.root).find((l) => l.id === tab.activePaneId)?.connectionId
     const targets = s.broadcast
-      ? s.tabs.flatMap((t) => collectBroadcastTargets(t.root))
+      ? allTabs(s).flatMap((t) => collectBroadcastTargets(t.root))
       : own
         ? [own]
         : []

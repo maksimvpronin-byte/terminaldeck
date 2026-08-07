@@ -1,11 +1,19 @@
+import { nanoid } from 'nanoid'
 import { collectLeaves, removePane, type PaneNode } from './paneTree'
 // Straight from the slice types, not from the store: the store imports this
 // module, and pointing back at it would close a cycle.
-import type { WorkspaceTab } from './slices/types'
+import type { Workspace, WorkspaceTab } from './slices/types'
 
 const KEY = 'terminaldeck.layout'
 
 interface StoredLayout {
+  version: 2
+  workspaces: Workspace[]
+  activeWorkspaceId: string | null
+}
+
+/** The single-level shape written before workspaces existed. */
+export interface StoredLayoutV1 {
   version: 1
   tabs: WorkspaceTab[]
   activeTabId: string | null
@@ -30,22 +38,41 @@ function sanitise(node: PaneNode): PaneNode | null {
   return strip(result)
 }
 
-export function saveLayout(tabs: WorkspaceTab[], activeTabId: string | null): void {
+function sanitiseTabs(tabs: WorkspaceTab[]): WorkspaceTab[] {
+  const saved: WorkspaceTab[] = []
+  for (const tab of tabs) {
+    const root = sanitise(tab.root)
+    if (!root) continue
+    const leaves = collectLeaves(root)
+    const activePaneId = leaves.some((l) => l.id === tab.activePaneId)
+      ? tab.activePaneId
+      : leaves[0].id
+    saved.push({ ...tab, root, activePaneId })
+  }
+  return saved
+}
+
+export function saveLayout(workspaces: Workspace[], activeWorkspaceId: string | null): void {
   try {
-    const saved: WorkspaceTab[] = []
-    for (const tab of tabs) {
-      const root = sanitise(tab.root)
-      if (!root) continue
-      const leaves = collectLeaves(root)
-      const activePaneId = leaves.some((l) => l.id === tab.activePaneId)
-        ? tab.activePaneId
-        : leaves[0].id
-      saved.push({ ...tab, root, activePaneId })
+    const saved: Workspace[] = []
+    for (const workspace of workspaces) {
+      const tabs = sanitiseTabs(workspace.tabs)
+      // A workspace whose tabs were all quick connects has nothing to restore.
+      if (tabs.length === 0) continue
+      saved.push({
+        ...workspace,
+        tabs,
+        activeTabId: tabs.some((t) => t.id === workspace.activeTabId)
+          ? workspace.activeTabId
+          : tabs[0].id
+      })
     }
     const payload: StoredLayout = {
-      version: 1,
-      tabs: saved,
-      activeTabId: saved.some((t) => t.id === activeTabId) ? activeTabId : (saved[0]?.id ?? null)
+      version: 2,
+      workspaces: saved,
+      activeWorkspaceId: saved.some((w) => w.id === activeWorkspaceId)
+        ? activeWorkspaceId
+        : (saved[0]?.id ?? null)
     }
     localStorage.setItem(KEY, JSON.stringify(payload))
   } catch {
@@ -53,14 +80,40 @@ export function saveLayout(tabs: WorkspaceTab[], activeTabId: string | null): vo
   }
 }
 
-export function loadLayout(): { tabs: WorkspaceTab[]; activeTabId: string | null } {
+function empty(): { workspaces: Workspace[]; activeWorkspaceId: string | null } {
+  return { workspaces: [], activeWorkspaceId: null }
+}
+
+/**
+ * Everything a v1 layout held becomes the tabs of a single workspace.
+ * Exported for its own test: losing this silently would empty someone's
+ * restored layout on the upgrade, with nothing to point at afterwards.
+ */
+export function migrateV1(parsed: StoredLayoutV1): {
+  workspaces: Workspace[]
+  activeWorkspaceId: string | null
+} {
+  if (!Array.isArray(parsed.tabs) || parsed.tabs.length === 0) return empty()
+  const workspace: Workspace = {
+    id: nanoid(),
+    title: 'Workspace 1',
+    tabs: parsed.tabs,
+    activeTabId: parsed.tabs.some((t) => t.id === parsed.activeTabId)
+      ? parsed.activeTabId
+      : parsed.tabs[0].id
+  }
+  return { workspaces: [workspace], activeWorkspaceId: workspace.id }
+}
+
+export function loadLayout(): { workspaces: Workspace[]; activeWorkspaceId: string | null } {
   try {
     const raw = localStorage.getItem(KEY)
-    if (!raw) return { tabs: [], activeTabId: null }
-    const parsed = JSON.parse(raw) as StoredLayout
-    if (parsed.version !== 1 || !Array.isArray(parsed.tabs)) return { tabs: [], activeTabId: null }
-    return { tabs: parsed.tabs, activeTabId: parsed.activeTabId }
+    if (!raw) return empty()
+    const parsed = JSON.parse(raw) as StoredLayout | StoredLayoutV1
+    if (parsed.version === 1) return migrateV1(parsed)
+    if (parsed.version !== 2 || !Array.isArray(parsed.workspaces)) return empty()
+    return { workspaces: parsed.workspaces, activeWorkspaceId: parsed.activeWorkspaceId }
   } catch {
-    return { tabs: [], activeTabId: null }
+    return empty()
   }
 }

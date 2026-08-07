@@ -3,13 +3,21 @@ import { nanoid } from 'nanoid'
 import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from 'react'
 import type { SessionGroup, SessionProfile } from '../../../shared/types'
 import { resolveAuth } from '../../../shared/authResolution'
-import { useStore, collectConnectedSessionIds } from '../state/store'
+import {
+  useStore,
+  collectConnectedSessionIds,
+  activeTab as currentTab,
+  allRoots
+} from '../state/store'
+import { colorOf } from '../state/hosts'
 import { DRAG_MIME, type DragItem } from '../state/dnd'
 import SessionDialog from './SessionDialog'
 import QuickConnectDialog from './QuickConnectDialog'
 import ImportSshConfigDialog from './ImportSshConfigDialog'
 import GroupDialog from './GroupDialog'
 import InventoryTree from './InventoryTree'
+import CollectionsPanel from './CollectionsPanel'
+import CollectionDialog from './CollectionDialog'
 import SettingsDialog from './SettingsDialog'
 import ContextMenu, { type MenuItem } from './ContextMenu'
 import { keyHint } from '../state/keys'
@@ -47,10 +55,15 @@ export default function Sidebar({
   const selectHostRange = useStore((s) => s.selectHostRange)
   const clearHostSelection = useStore((s) => s.clearHostSelection)
   const openSelectedHosts = useStore((s) => s.openSelectedHosts)
-  const tabs = useStore((s) => s.tabs)
+  const openMany = useStore((s) => s.openMany)
+  const collections = useStore((s) => s.collections)
+  const addToCollection = useStore((s) => s.addToCollection)
+  const workspaces = useStore((s) => s.workspaces)
 
-  // Which hosts already have a terminal open, so the tree says so.
-  const connected = new Set(tabs.flatMap((t) => collectConnectedSessionIds(t.root)))
+  // Which hosts already have a terminal open anywhere, so the tree says so.
+  const connected = new Set(
+    allRoots({ workspaces }).flatMap(collectConnectedSessionIds)
+  )
 
   const [editingSession, setEditingSession] = useState<SessionProfile | undefined | 'new'>(undefined)
   const [showQuickConnect, setShowQuickConnect] = useState(false)
@@ -65,6 +78,8 @@ export default function Sidebar({
   const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null)
   const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsed)
   const [tab, setTab] = useState<'sessions' | 'inventory'>('sessions')
+  /** Hosts waiting to be put into a brand new collection. */
+  const [collecting, setCollecting] = useState<string[] | null>(null)
 
   function toggleCollapsed(groupId: string): void {
     setCollapsed((prev) => {
@@ -77,7 +92,12 @@ export default function Sidebar({
   }
 
   function connect(session: SessionProfile): void {
-    openTab(session.name, { kind: 'session', sessionId: session.id }, session.color)
+    openTab(session.name, { kind: 'session', sessionId: session.id }, hostColour(session))
+  }
+
+  /** Its own colour, or the one lent by the collection that governs it. */
+  function hostColour(session: SessionProfile): string | undefined {
+    return colorOf({ collections }, session)
   }
 
   /** user@host as it will actually be used, inheritance included. */
@@ -171,7 +191,7 @@ export default function Sidebar({
 
   function sessionMenu(s: SessionProfile): MenuItem[] {
     const state = useStore.getState()
-    const activeTab = state.tabs.find((t) => t.id === state.activeTabId)
+    const activeTab = currentTab(state)
     return [
       { label: 'Connect', onSelect: () => connect(s) },
       {
@@ -216,11 +236,44 @@ export default function Sidebar({
     ]
   }
 
+  /** The group and everything nested under it. A fixpoint, so a cycle cannot hang it. */
+  function groupSubtree(groupId: string): Set<string> {
+    const ids = new Set([groupId])
+    let grew = true
+    while (grew) {
+      grew = false
+      for (const g of groups) {
+        if (g.parentId && ids.has(g.parentId) && !ids.has(g.id)) {
+          ids.add(g.id)
+          grew = true
+        }
+      }
+    }
+    return ids
+  }
+
   function groupMenu(groupId: string): MenuItem[] {
     const group = groups.find((g) => g.id === groupId)
+    const inGroup = groupSubtree(groupId)
+    const hosts = sessions.filter((s) => s.groupId && inGroup.has(s.groupId))
     return [
       {
+        label: `Open all in a new workspace (${hosts.length})`,
+        disabled: hosts.length === 0,
+        onSelect: () =>
+          openMany(
+            hosts.map((s) => ({
+              title: s.name,
+              target: { kind: 'session' as const, sessionId: s.id },
+              color: s.color
+            })),
+            'workspace',
+            group?.name
+          )
+      },
+      {
         label: 'Edit group…',
+        separated: true,
         disabled: !group,
         onSelect: () => group && setGroupDialog({ group, parentId: group.parentId })
       },
@@ -249,7 +302,7 @@ export default function Sidebar({
         <span className="name">
           <span
             className="session-dot"
-            style={s.color ? { background: s.color } : undefined}
+            style={hostColour(s) ? { background: hostColour(s) } : undefined}
             aria-hidden="true"
           />
           {s.name}
@@ -407,6 +460,10 @@ export default function Sidebar({
             Move to top level
           </div>
         )}
+
+        {/* Custom sets live in the same tree as the groups, below them: they are
+            another way of grouping the very same hosts, not a separate place. */}
+        <CollectionsPanel query={query} />
       </div>
         </>
       )}
@@ -415,11 +472,47 @@ export default function Sidebar({
         <div className="selection-bar">
           <span>{selectedHostIds.length} selected</span>
           <span style={{ flex: 1 }} />
-          <button title="Each in its own tab" onClick={() => openSelectedHosts('tabs')}>
+          <button
+            title="Each in its own tab, in the current workspace"
+            onClick={() => openSelectedHosts('tabs')}
+          >
             Open
           </button>
           <button title="All tiled in one tab" onClick={() => openSelectedHosts('grid')}>
             Tile
+          </button>
+          <button
+            title="A new workspace with a tab per host"
+            onClick={() => openSelectedHosts('workspace')}
+          >
+            Workspace
+          </button>
+          <button
+            title="Save these hosts as a collection you can reopen later"
+            onClick={(e) => {
+              e.stopPropagation()
+              const picked = [...selectedHostIds]
+              setMenu({
+                x: e.clientX,
+                y: e.clientY,
+                items: [
+                  ...collections.map((c) => ({
+                    label: `Add to “${c.name}”`,
+                    onSelect: async () => {
+                      await addToCollection(c.id, picked)
+                      clearHostSelection()
+                    }
+                  })),
+                  {
+                    label: 'New collection…',
+                    separated: collections.length > 0,
+                    onSelect: () => setCollecting(picked)
+                  }
+                ]
+              })
+            }}
+          >
+            Collect
           </button>
           <button className="icon-button" title="Clear" onClick={clearHostSelection}>
             ✕
@@ -452,6 +545,16 @@ export default function Sidebar({
       {showQuickConnect && <QuickConnectDialog onClose={() => setShowQuickConnect(false)} />}
       {showImport && <ImportSshConfigDialog onClose={() => setShowImport(false)} />}
       {showSettings && <SettingsDialog onClose={() => setShowSettings(false)} />}
+
+      {collecting && (
+        <CollectionDialog
+          hostIds={collecting}
+          onClose={() => {
+            setCollecting(null)
+            clearHostSelection()
+          }}
+        />
+      )}
 
       {menu && (
         <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />

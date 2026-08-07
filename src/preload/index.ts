@@ -11,6 +11,7 @@ import type {
   SshConfigHost,
   UpdateState,
   Snippet,
+  HostCollection,
   AuthPromptRequest,
   InventorySource,
   InventoryOverride,
@@ -73,6 +74,13 @@ const api = {
     list: (): Promise<Snippet[]> => ipcRenderer.invoke(IPC.snippetsList),
     save: (snippet: Snippet): Promise<Snippet> => ipcRenderer.invoke(IPC.snippetsSave, snippet),
     remove: (id: string): Promise<void> => ipcRenderer.invoke(IPC.snippetsDelete, id)
+  },
+  collections: {
+    list: (): Promise<HostCollection[]> => ipcRenderer.invoke(IPC.collectionsList),
+    save: (collection: HostCollection): Promise<HostCollection> =>
+      ipcRenderer.invoke(IPC.collectionsSave, collection),
+    remove: (id: string): Promise<void> => ipcRenderer.invoke(IPC.collectionsDelete, id),
+    reorder: (ids: string[]): Promise<void> => ipcRenderer.invoke(IPC.collectionsReorder, ids)
   },
   ssh: {
     connect: (sessionId: string, cols: number, rows: number): Promise<{ connectionId: string }> =>

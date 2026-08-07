@@ -5,11 +5,21 @@ import { createSettingsSlice } from './slices/settings'
 import { createSessionsSlice } from './slices/sessions'
 import { createInventorySlice } from './slices/inventory'
 import { createSnippetsSlice } from './slices/snippets'
+import { createCollectionsSlice } from './slices/collections'
 import { createWorkspaceSlice } from './slices/workspace'
 import type { AppState } from './slices/types'
 
 export type { PaneNode, PaneTarget } from './paneTree'
-export type { AppState, WorkspaceTab } from './slices/types'
+export type { AppState, Workspace, WorkspaceTab, OpenMode } from './slices/types'
+export {
+  activeTab,
+  activeWorkspace,
+  allRoots,
+  allTabs,
+  findTab,
+  workspaceHasActivity,
+  workspaceOfTab
+} from './workspaces'
 export {
   collectConnectionIds,
   collectBroadcastTargets,
@@ -28,16 +38,18 @@ export const useStore = create<AppState>()((...a) => ({
   ...createSessionsSlice(...a),
   ...createInventorySlice(...a),
   ...createSnippetsSlice(...a),
+  ...createCollectionsSlice(...a),
   ...createWorkspaceSlice(...a)
 }))
 
-// Persist the workspace shape whenever it changes, so a restart brings the tabs
-// and splits back. Connections themselves are not restored — see layout.ts.
-let lastTabs = useStore.getState().tabs
-let lastActive = useStore.getState().activeTabId
+// Persist the workspace shape whenever it changes, so a restart brings the
+// workspaces, tabs and splits back. Connections themselves are not restored —
+// see layout.ts.
+let lastWorkspaces = useStore.getState().workspaces
+let lastActive = useStore.getState().activeWorkspaceId
 useStore.subscribe((state) => {
-  if (state.tabs === lastTabs && state.activeTabId === lastActive) return
-  lastTabs = state.tabs
-  lastActive = state.activeTabId
-  saveLayout(state.tabs, state.activeTabId)
+  if (state.workspaces === lastWorkspaces && state.activeWorkspaceId === lastActive) return
+  lastWorkspaces = state.workspaces
+  lastActive = state.activeWorkspaceId
+  saveLayout(state.workspaces, state.activeWorkspaceId)
 })

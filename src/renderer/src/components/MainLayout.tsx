@@ -17,6 +17,9 @@ export default function MainLayout(): JSX.Element {
   // Loaded up front, not just when the Inventory tab is opened: the host
   // palette searches inventory hosts too.
   const loadInventory = useStore((s) => s.loadInventory)
+  // Needed from the Inventory tab too, where the collections section is not on
+  // screen but the selection bar still offers to add hosts to an existing one.
+  const loadCollections = useStore((s) => s.loadCollections)
 
   useShortcuts({
     openSnippets: () => setPaletteOpen(true),
@@ -29,7 +32,8 @@ export default function MainLayout(): JSX.Element {
   useEffect(() => {
     loadSnippets()
     loadInventory()
-  }, [loadSnippets, loadInventory])
+    loadCollections()
+  }, [loadSnippets, loadInventory, loadCollections])
 
   return (
     <div className="app-root">

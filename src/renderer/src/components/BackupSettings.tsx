@@ -6,6 +6,7 @@ export default function BackupSettings(): JSX.Element {
   const loadStore = useStore((s) => s.loadStore)
   const loadSnippets = useStore((s) => s.loadSnippets)
   const loadInventory = useStore((s) => s.loadInventory)
+  const loadCollections = useStore((s) => s.loadCollections)
 
   // Off by default: an export leaves the machine and the OS account that
   // protects the vault, so including credentials must be a deliberate choice.
@@ -46,11 +47,12 @@ export default function BackupSettings(): JSX.Element {
         importPassword || undefined
       )
       if (!summary) return
-      await Promise.all([loadStore(), loadSnippets(), loadInventory()])
+      await Promise.all([loadStore(), loadSnippets(), loadInventory(), loadCollections()])
       setImportPassword('')
       setDone(
         `Imported ${summary.sessions} sessions, ${summary.groups} groups, ` +
-          `${summary.snippets} snippets, ${summary.inventorySources} repositories` +
+          `${summary.snippets} snippets, ${summary.collections} collections, ` +
+          `${summary.inventorySources} repositories` +
           (summary.secrets > 0 ? `, ${summary.secrets} credentials` : '')
       )
     } catch (err) {

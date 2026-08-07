@@ -6,6 +6,7 @@ export const createInventorySlice: StateCreator<AppState, [], [], InventorySlice
   inventoryOverrides: [],
   inventoryTrees: [],
   inventorySyncing: [],
+  inventorySyncErrors: {},
   gitAvailable: true,
 
   loadInventory: async () => {
@@ -23,12 +24,25 @@ export const createInventorySlice: StateCreator<AppState, [], [], InventorySlice
 
   syncInventory: async (sourceId) => {
     const ids = sourceId ? [sourceId] : get().inventorySources.map((s) => s.id)
-    set((s) => ({ inventorySyncing: [...s.inventorySyncing, ...ids] }))
+    set((s) => ({
+      inventorySyncing: [...s.inventorySyncing, ...ids],
+      inventorySyncErrors: Object.fromEntries(
+        Object.entries(s.inventorySyncErrors).filter(([id]) => !ids.includes(id))
+      )
+    }))
     try {
       if (sourceId) await window.td.inventory.sync(sourceId)
       else await window.td.inventory.syncAll()
-    } catch {
-      // The error is recorded on the source itself and shown in the tree.
+    } catch (err) {
+      // Most failures are recorded on the source and shown in the tree, but the
+      // ones raised before that point would otherwise vanish without a trace.
+      const message = (err as Error).message || 'Sync failed'
+      set((s) => ({
+        inventorySyncErrors: {
+          ...s.inventorySyncErrors,
+          ...Object.fromEntries(ids.map((id) => [id, message]))
+        }
+      }))
     }
     set((s) => ({ inventorySyncing: s.inventorySyncing.filter((id) => !ids.includes(id)) }))
     await get().loadInventory()

@@ -23,7 +23,43 @@ export interface AuthDefaults {
   jumpHostId?: string | null
 }
 
-export interface SessionGroup extends AuthDefaults {
+export type CursorStyle = 'block' | 'underline' | 'bar'
+
+/**
+ * Terminal look-and-feel that a session can leave unset and inherit from its
+ * group, a group from its parent, and anything that reaches the top from the
+ * application-wide settings. An absent field means "inherit".
+ *
+ * Deliberately separate from AuthDefaults: the two are opted out of
+ * independently, so a host can keep the group's login while wearing its own
+ * colours — which is the point of marking production red.
+ */
+export interface AppearanceDefaults {
+  /**
+   * Whether to fall back to the parent group for anything left unset. Defaults
+   * to true; set false to stand alone inside a group that defines appearance.
+   */
+  inheritAppearance?: boolean
+  fontFamily?: string
+  fontSize?: number
+  /** Key into THEMES; affects this terminal only, never the app's own chrome. */
+  themeName?: string
+  cursorStyle?: CursorStyle
+  cursorBlink?: boolean
+  scrollback?: number
+}
+
+/** An AppearanceDefaults chain collapsed into concrete values for xterm. */
+export interface ResolvedAppearance {
+  fontFamily: string
+  fontSize: number
+  themeName: string
+  cursorStyle: CursorStyle
+  cursorBlink: boolean
+  scrollback: number
+}
+
+export interface SessionGroup extends AuthDefaults, AppearanceDefaults {
   id: string
   name: string
   parentId: string | null
@@ -40,7 +76,7 @@ export interface PortForwardRule {
   dstPort?: number
 }
 
-export interface SessionProfile extends AuthDefaults {
+export interface SessionProfile extends AuthDefaults, AppearanceDefaults {
   id: string
   name: string
   host: string
@@ -65,7 +101,7 @@ export interface ResolvedAuth {
 }
 
 /** A git repository that machine inventories are read out of. */
-export interface InventorySource extends AuthDefaults {
+export interface InventorySource extends AuthDefaults, AppearanceDefaults {
   id: string
   name: string
   repoUrl: string
@@ -76,10 +112,15 @@ export interface InventorySource extends AuthDefaults {
   lastSyncedAt?: number
   lastRevision?: string
   lastError?: string
+  /**
+   * Repo-relative paths the last sync actually parsed. Without this a sync that
+   * quietly read the wrong files — or none — looks exactly like one that worked.
+   */
+  lastFiles?: string[]
 }
 
 /** Local changes layered over a host that came from a repository. */
-export interface InventoryOverride extends AuthDefaults {
+export interface InventoryOverride extends AuthDefaults, AppearanceDefaults {
   /** Derived id of the host or group it applies to, stable across syncs. */
   nodeId: string
   color?: string
@@ -96,6 +137,12 @@ export interface InventoryTree {
   sourceId: string
   groups: SessionGroup[]
   sessions: SessionProfile[]
+  /**
+   * Host id to every group that names it. A host stays one entity with one
+   * `groupId` — the group its connection settings come from — but Ansible lets
+   * it belong to several, and the tree shows it under each.
+   */
+  memberships: Record<string, string[]>
 }
 
 export interface SessionStoreData {
@@ -149,9 +196,33 @@ export interface ImportSummary {
   groups: number
   sessions: number
   snippets: number
+  collections: number
   inventorySources: number
   inventoryOverrides: number
   secrets: number
+}
+
+/**
+ * A saved, hand-picked set of hosts. Independent of the session tree: a host
+ * lives in exactly one group but in any number of collections, and being in one
+ * has no effect on credentials — those still come from the host's own group.
+ *
+ * Members are referenced by id, so a collection can mix saved sessions with
+ * hosts that came from an inventory repository.
+ */
+export interface HostCollection extends AppearanceDefaults {
+  id: string
+  name: string
+  /**
+   * Worn by every host in the set, so a whole environment reads as one thing.
+   * A host's own colour still wins; a host in several collections takes the
+   * first one that lists it, and the list order is the user's to arrange.
+   */
+  color?: string
+  /** Session or inventory host ids, in the order the user arranged them. */
+  hostIds: string[]
+  createdAt: number
+  updatedAt: number
 }
 
 export interface Snippet {

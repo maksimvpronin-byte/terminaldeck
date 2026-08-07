@@ -13,14 +13,44 @@ interface Section {
 
 const SECTIONS: Section[] = [
   {
+    title: 'Collections',
+    rows: [
+      { what: 'Your own sets of hosts, under the groups in the Sessions tab' },
+      { what: 'A named set that outlives the workspace you opened them in' },
+      { what: 'Tick hosts in either tab, then press Collect to save them as a set' },
+      { what: 'Or right-click a workspace above and choose “Save as collection…”' },
+      { what: 'Close the workspace freely — Open brings the whole set back' },
+      { what: 'Saving under a name that already exists offers to add to it or replace it' },
+      { what: 'Independent of groups: one host can sit in as many collections as you like' },
+      { what: 'A collection carries a colour and a terminal theme, worn by every host in it' },
+      { what: 'A host with settings of its own keeps them; otherwise the set overrules its group' },
+      { what: 'In several collections? The topmost wins — reorder with Move up / Move down' },
+      { what: 'Being in a collection changes no credentials; those still come from the group' },
+      { what: 'A host deleted or gone from an inventory is listed as missing, not dropped' }
+    ]
+  },
+  {
+    title: 'Workspaces',
+    rows: [
+      { what: 'The top strip holds workspaces; each has its own row of tabs beneath it' },
+      { what: '“+” makes an empty one — double-click a workspace to rename it' },
+      { what: 'Right-click a group or a repository to open everything in a new workspace' },
+      { what: 'Drag a tab onto a workspace to move it there; its terminal stays connected' },
+      { keys: '⌘⇧1 … ⌘⇧9', what: 'Jump to that workspace' },
+      { what: 'Closing a workspace closes every terminal in it' },
+      { what: 'A dot on a workspace means new output arrived in one of its tabs' }
+    ]
+  },
+  {
     title: 'Tabs and panes',
     rows: [
       { keys: '⌘P', what: 'Go to a host by name, across saved sessions and inventories' },
       { keys: 'Tab', what: 'In that list, mark several hosts to open at once' },
       { keys: '⇧⏎', what: 'Opens the marked hosts tiled in one tab instead of separate tabs' },
+      { keys: '⌥⏎', what: 'Opens the marked hosts in a workspace of their own' },
       { keys: '⌘T', what: 'New tab with the same host as the focused pane' },
       { keys: '⌘W', what: 'Close the focused pane, or the tab when it is the last one' },
-      { keys: '⌘1 … ⌘9', what: 'Jump to that tab' },
+      { keys: '⌘1 … ⌘9', what: 'Jump to that tab within the current workspace' },
       { keys: '⌘D', what: 'Split the pane to the right' },
       { keys: '⌘⇧D', what: 'Split the pane downwards' },
       { what: 'Drag a host or a whole tab onto a pane to place them side by side' },
@@ -35,10 +65,23 @@ const SECTIONS: Section[] = [
     rows: [
       { keys: '⌘F', what: 'Search the scrollback; ⏎ and ⇧⏎ step through matches' },
       { keys: '⌘+ / ⌘− / ⌘0', what: 'Font size up, down, and back to default' },
+      { what: 'Zoom moves the global size, or the host’s own if it has one set' },
       { keys: '⌘C / ⌘V', what: 'Copy the selection, and paste' },
       { keys: 'Ctrl+C', what: 'Left alone as SIGINT, so a hung command can still be stopped' },
       { what: 'Selecting text copies it straight away; right-click pastes' },
       { what: 'Both of those are switchable in Settings if you prefer a menu' }
+    ]
+  },
+  {
+    title: 'Appearance',
+    rows: [
+      { what: 'Settings → Terminal holds the defaults every terminal starts from' },
+      { what: 'A group, a repository or one host can override them under Appearance' },
+      { what: 'Font, size, theme, cursor and scrollback each inherit or stand on their own' },
+      { what: 'Each control names what it would inherit, and from which group' },
+      { what: 'Untick "Inherit appearance" to ignore the groups and follow Settings instead' },
+      { what: 'Appearance and credentials are opted out of separately' },
+      { what: 'A host theme recolours its terminal only — the app keeps the Settings theme' }
     ]
   },
   {
@@ -85,7 +128,12 @@ const SECTIONS: Section[] = [
       { what: 'Add a repository holding an Ansible inventory to get its hosts here' },
       { what: 'Cloned read-only through your own git, so your keys and helpers are used' },
       { what: 'Ansible groups, group_vars and host_vars become groups and connection settings' },
+      { what: 'A host in several groups is shown under each, marked ×2 — it is one host' },
+      { what: 'Its settings come from one of them: the deepest, alphabetically last' },
       { what: 'Credentials set on the repository are inherited by every host in it' },
+      { what: 'A source follows one branch — empty means the default, usually main' },
+      { what: 'The line under a repository states the branch, revision and what was read' },
+      { what: 'Work on another branch will not appear until you name it or merge it' },
       { what: 'Local tweaks to a host survive the next sync' }
     ]
   }

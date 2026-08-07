@@ -1,10 +1,21 @@
 import { useState } from 'react'
 import { nanoid } from 'nanoid'
-import type { AuthMethod, PortForwardRule, SessionProfile } from '../../../shared/types'
+import type {
+  AppearanceDefaults,
+  AuthMethod,
+  PortForwardRule,
+  SessionProfile
+} from '../../../shared/types'
 import { resolveAuth, inheritedFrom } from '../../../shared/authResolution'
+import {
+  appearanceSource,
+  inheritedAppearance,
+  resolveAppearance
+} from '../../../shared/appearance'
 import { groupPath } from '../../../shared/groups'
 import { useStore } from '../state/store'
 import { SESSION_COLOURS } from '../state/colours'
+import AppearanceFields from './AppearanceFields'
 import ModalBackdrop from './ModalBackdrop'
 
 interface Props {
@@ -32,6 +43,7 @@ function blank(defaultGroupId: string | null): SessionProfile {
 export default function SessionDialog({ initial, defaultGroupId = null, onClose }: Props): JSX.Element {
   const sessions = useStore((s) => s.sessions)
   const groups = useStore((s) => s.groups)
+  const settings = useStore((s) => s.settings)
   const upsertSession = useStore((s) => s.upsertSession)
 
   const [profile, setProfile] = useState<SessionProfile>(initial ?? blank(defaultGroupId))
@@ -43,11 +55,22 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
     setProfile((p) => ({ ...p, [key]: value }))
   }
 
+  function setLook<K extends keyof AppearanceDefaults>(key: K, value: AppearanceDefaults[K]): void {
+    setProfile((p) => ({ ...p, [key]: value }))
+  }
+
   // What this session ends up with once inheritance is applied.
   const effective = resolveAuth(profile, profile.groupId, groups)
   const inheritNote = (key: Parameters<typeof inheritedFrom>[3]): string => {
     const source = inheritedFrom(profile, profile.groupId, groups, key)
     return source ? `inherited from ${source.name}` : ''
+  }
+
+  const appearance = resolveAppearance(profile, profile.groupId, groups, settings)
+  const inheritedLook = inheritedAppearance(profile, profile.groupId, groups, settings)
+  const appearanceFrom = (key: keyof AppearanceDefaults): string => {
+    const source = appearanceSource(profile, profile.groupId, groups, key)
+    return source ? `the group ${source.name}` : 'Settings'
   }
 
   async function pickKey(): Promise<void> {
@@ -258,6 +281,24 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
           Tags (comma separated)
           <input value={tagsInput} onChange={(e) => setTagsInput(e.target.value)} />
         </label>
+
+        <details className="settings-section">
+          <summary>Appearance</summary>
+          <p className="settings-note">
+            Applies to this host's terminals only. Anything left on “inherit” follows the group,
+            and then Settings — so marking one production box red changes nothing else.
+          </p>
+          <AppearanceFields
+            value={profile}
+            set={setLook}
+            effective={appearance}
+            inherited={inheritedLook}
+            inheritedFrom={appearanceFrom}
+            inheritToggle={
+              profile.groupId ? { label: 'Inherit appearance from the group' } : undefined
+            }
+          />
+        </details>
 
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { nanoid } from 'nanoid'
 import type { Snippet } from '../../../shared/types'
-import { useStore } from '../state/store'
+import { useStore, allRoots } from '../state/store'
 import { collectBroadcastTargets } from '../state/paneTree'
 import ModalBackdrop from './ModalBackdrop'
 
@@ -17,7 +17,7 @@ export default function SnippetPalette({ onClose }: { onClose: () => void }): JS
   const removeSnippet = useStore((s) => s.removeSnippet)
   const sendToTerminals = useStore((s) => s.sendToTerminals)
   const broadcast = useStore((s) => s.broadcast)
-  const tabs = useStore((s) => s.tabs)
+  const workspaces = useStore((s) => s.workspaces)
 
   const [query, setQuery] = useState('')
   const [cursor, setCursor] = useState(0)
@@ -25,7 +25,7 @@ export default function SnippetPalette({ onClose }: { onClose: () => void }): JS
   const [tagsInput, setTagsInput] = useState('')
 
   const targetCount = broadcast
-    ? tabs.flatMap((t) => collectBroadcastTargets(t.root)).length
+    ? allRoots({ workspaces }).flatMap(collectBroadcastTargets).length
     : 1
 
   const matches = useMemo(() => {

@@ -1,8 +1,14 @@
 import { useState } from 'react'
 import { nanoid } from 'nanoid'
-import type { AuthMethod, SessionGroup } from '../../../shared/types'
+import type { AppearanceDefaults, AuthMethod, SessionGroup } from '../../../shared/types'
 import { resolveAuth, inheritedFrom } from '../../../shared/authResolution'
+import {
+  appearanceSource,
+  inheritedAppearance,
+  resolveAppearance
+} from '../../../shared/appearance'
 import { useStore } from '../state/store'
+import AppearanceFields from './AppearanceFields'
 import ModalBackdrop from './ModalBackdrop'
 
 interface Props {
@@ -14,6 +20,7 @@ interface Props {
 
 export default function GroupDialog({ initial, parentId = null, onClose }: Props): JSX.Element {
   const groups = useStore((s) => s.groups)
+  const settings = useStore((s) => s.settings)
   const upsertGroup = useStore((s) => s.upsertGroup)
 
   const [group, setGroup] = useState<SessionGroup>(
@@ -26,11 +33,22 @@ export default function GroupDialog({ initial, parentId = null, onClose }: Props
     setGroup((g) => ({ ...g, [key]: value }))
   }
 
+  function setLook<K extends keyof AppearanceDefaults>(key: K, value: AppearanceDefaults[K]): void {
+    setGroup((g) => ({ ...g, [key]: value }))
+  }
+
   // What this group would use if it defines nothing itself.
   const effective = resolveAuth(group, group.parentId, groups)
   const from = (key: Parameters<typeof inheritedFrom>[3]): string => {
     const source = inheritedFrom(group, group.parentId, groups, key)
     return source ? `inherited from ${source.name}` : ''
+  }
+
+  const appearance = resolveAppearance(group, group.parentId, groups, settings)
+  const inheritedLook = inheritedAppearance(group, group.parentId, groups, settings)
+  const appearanceFrom = (key: keyof AppearanceDefaults): string => {
+    const source = appearanceSource(group, group.parentId, groups, key)
+    return source ? `the group ${source.name}` : 'Settings'
   }
 
   async function pickKey(): Promise<void> {
@@ -161,6 +179,24 @@ export default function GroupDialog({ initial, parentId = null, onClose }: Props
             </label>
           </>
         )}
+
+        <details className="settings-section">
+          <summary>Appearance</summary>
+          <p className="settings-note">
+            Everything in this group inherits what you set here, so a whole environment can be
+            given its own colours in one place.
+          </p>
+          <AppearanceFields
+            value={group}
+            set={setLook}
+            effective={appearance}
+            inherited={inheritedLook}
+            inheritedFrom={appearanceFrom}
+            inheritToggle={
+              group.parentId ? { label: 'Inherit appearance from the parent group' } : undefined
+            }
+          />
+        </details>
 
         {error && <span className="error-text">{error}</span>}
 

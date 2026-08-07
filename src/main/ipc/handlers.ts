@@ -6,6 +6,7 @@ import { IPC } from '../../shared/ipc-channels'
 import { vault, WrongPasswordError } from '../vault/Vault'
 import { sessionStore } from '../store/SessionStore'
 import { snippetStore } from '../store/SnippetStore'
+import { collectionStore } from '../store/CollectionStore'
 import { exportToFile, importFromFile } from '../store/Backup'
 import { sshManager } from '../ssh/SSHManager'
 import { sftpManager } from '../ssh/SFTPManager'
@@ -21,6 +22,7 @@ import type {
   QuickConnectParams,
   PortForwardRule,
   Snippet,
+  HostCollection,
   InventorySource,
   InventoryOverride
 } from '../../shared/types'
@@ -147,6 +149,13 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.snippetsList, () => snippetStore.list())
   ipcMain.handle(IPC.snippetsSave, (_e, snippet: Snippet) => snippetStore.save(snippet))
   ipcMain.handle(IPC.snippetsDelete, (_e, id: string) => snippetStore.remove(id))
+
+  ipcMain.handle(IPC.collectionsList, () => collectionStore.list())
+  ipcMain.handle(IPC.collectionsSave, (_e, collection: HostCollection) =>
+    collectionStore.save(collection)
+  )
+  ipcMain.handle(IPC.collectionsDelete, (_e, id: string) => collectionStore.remove(id))
+  ipcMain.handle(IPC.collectionsReorder, (_e, ids: string[]) => collectionStore.reorder(ids))
 
   // --- SSH ---
   ipcMain.handle(

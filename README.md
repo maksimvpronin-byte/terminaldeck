@@ -13,6 +13,16 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
   and proxies apply as they do in a terminal; nothing is ever pushed
 - Ansible groups, `children`, inline `vars`, `group_vars/` and `host_vars/` become groups and
   connection settings
+- A host named by **several groups appears under each of them**, marked with the count, and stays
+  a single host throughout — one set of local overrides, one entry in a collection, one terminal.
+  Its connection settings are inherited from one group: the deepest, and alphabetically last
+  within a level, which is the group Ansible itself would let win. Full Ansible variable
+  precedence across every group is *not* implemented — where that matters, set the host's own
+  local override
+- A source follows **one branch** — the default one unless you name another — and the line under
+  it states that branch, the revision, the host and group counts, and the files it read, so a
+  sync that quietly followed the wrong branch or missed a file is visible rather than puzzling
+- YAML inventories only: `.yml` and `.yaml`, with a directory read one level deep
 - Local per-host and per-group tweaks are stored separately and re-applied after every sync
 
 ### Credentials
@@ -31,15 +41,33 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
 
 - SSH via xterm.js with password / private-key / SSH-agent auth, and keepalive so idle
   sessions don't die silently behind NAT
+- **Workspaces**: a top strip of named containers, each with its own row of tabs — open a whole
+  host group or a whole inventory repository into one, with a tab per host. Tabs drag between
+  workspaces without dropping their connection
+- **Collections**: hand-picked sets of hosts, listed under the groups in the session tree and
+  reopened as a workspace whenever you want them back. Unlike a group, a host can be in any
+  number of them, membership has no effect on credentials, and a workspace can be saved as one
+  before you close it. Hosts that later vanish are flagged rather than quietly dropped
+- A collection also carries an **appearance profile** — colour and terminal theme — worn by every
+  host in it, so a whole environment reads as one thing at a glance. It sits between the host and
+  its groups: a host with settings of its own keeps them, a host without takes the set's instead
+  of its group's. A host in several collections follows the topmost, and the list order is
+  yours to arrange
 - Tabs and split panes; drag a host or a whole tab onto a pane to place them side by side, and
   move a pane back out into its own tab
 - **Broadcast** input to the terminals you tick, across every tab
 - **Snippet library** (`⌘K`): saved commands, run or merely pasted, stating where they will land
 - **Host palette** (`⌘P`) searching saved sessions and inventories together; tick several hosts
   in the tree with `⌘`/`⇧` click and open them as tabs or tiled in one
-- Search (`⌘F`), zoom (`⌘+` / `⌘−` / `⌘0`), copy-on-select, right-click paste
-- Colour-coded sessions, restored tab layout on launch, activity marks on background tabs,
-  and a green dot on hosts that already have a terminal open
+- **Appearance profiles**: font, size, colour theme, cursor and scrollback are set globally in
+  Settings, and a group, an inventory repository or a single host can override them — each
+  control says what it would inherit and from where, and inheritance can be switched off per
+  host or group, independently of the credential inheritance. A host's theme recolours its own
+  terminal, not the app
+- Search (`⌘F`), zoom (`⌘+` / `⌘−` / `⌘0`, moving the host's own size when it has one),
+  copy-on-select, right-click paste
+- Colour-coded sessions, restored workspace and tab layout on launch, activity marks on
+  background tabs and workspaces, and a green dot on hosts that already have a terminal open
 - **Export and import** everything to one file to move machines or keep a backup; credentials
   are optional and re-encrypted under a password of their own
 - Optional per-session logging to a local file
@@ -100,7 +128,8 @@ npm test
 ```
 
 Tests cover the parts where a silent failure costs most: vault crypto, the `~/.ssh/config` and
-Ansible inventory parsers, the credential inheritance chain, and the pane tree.
+Ansible inventory parsers, the credential and appearance inheritance chains, the pane tree, and
+the workspace selectors together with the migration of layouts saved before workspaces existed.
 
 ## Building installers
 
@@ -180,7 +209,7 @@ src/
     ipc/        Handlers exposed to the renderer
   preload/      contextBridge API exposed to the renderer as window.td
   renderer/     React UI (sidebar, tabs, split panes, terminal, SFTP browser, dialogs)
-  shared/       Types, IPC channel names and the credential inheritance rules
+  shared/       Types, IPC channel names, and the credential and appearance inheritance rules
 ```
 
 Where things are kept, all under the OS user-data directory:
@@ -190,6 +219,7 @@ Where things are kept, all under the OS user-data directory:
 | `vault.json` | Encrypted passwords and passphrases |
 | `sessions.json` | Saved hosts and groups (no secrets) |
 | `snippets.json` | Command library |
+| `collections.json` | Saved sets of hosts (references only, no secrets) |
 | `inventories.json` | Inventory sources and local overrides |
 | `known_hosts.json` | Trusted host fingerprints |
 | `inventory-repos/` | Read-only git mirrors |

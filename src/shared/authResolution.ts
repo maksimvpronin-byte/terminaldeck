@@ -1,3 +1,5 @@
+import { inheritanceChain } from './inheritance'
+import { isSet } from './overrides'
 import type { AuthDefaults, ResolvedAuth, SessionGroup } from './types'
 
 export const AUTH_FALLBACK: ResolvedAuth = {
@@ -8,36 +10,18 @@ export const AUTH_FALLBACK: ResolvedAuth = {
   jumpHostId: null
 }
 
+const optedOut = (level: AuthDefaults): boolean => level.inheritAuth === false
+
 /**
  * The chain a value is looked up along: the item itself, then its group, then
  * that group's parent, and so on. Nearest definition wins.
  */
-export function inheritanceChain(
+export function authChain(
   own: AuthDefaults,
   groupId: string | null,
   groups: SessionGroup[]
 ): AuthDefaults[] {
-  const chain: AuthDefaults[] = [own]
-  // Opted out: the item stands on its own settings alone.
-  if (own.inheritAuth === false) return chain
-
-  const seen = new Set<string>()
-  let cursor = groupId
-  while (cursor && !seen.has(cursor)) {
-    seen.add(cursor)
-    const group = groups.find((g) => g.id === cursor)
-    if (!group) break
-    chain.push(group)
-    // A group that opted out still contributes its own values, but the walk
-    // stops there rather than reaching its parent.
-    if (group.inheritAuth === false) break
-    cursor = group.parentId
-  }
-  return chain
-}
-
-function isSet(value: unknown): boolean {
-  return value !== undefined && value !== null && value !== ''
+  return inheritanceChain(own, groupId, groups, optedOut)
 }
 
 function pick<K extends keyof AuthDefaults>(
@@ -56,7 +40,7 @@ export function resolveAuth(
   groupId: string | null,
   groups: SessionGroup[]
 ): ResolvedAuth {
-  const chain = inheritanceChain(own, groupId, groups)
+  const chain = authChain(own, groupId, groups)
   return {
     port: pick(chain, 'port') ?? AUTH_FALLBACK.port,
     username: pick(chain, 'username') ?? AUTH_FALLBACK.username,
@@ -91,7 +75,7 @@ export function inheritedFrom(
 ): SessionGroup | undefined {
   if (isSet(own[key])) return undefined
   // Skip the item itself; everything after it in the chain is an ancestor group.
-  for (const level of inheritanceChain(own, groupId, groups).slice(1)) {
+  for (const level of authChain(own, groupId, groups).slice(1)) {
     if (isSet(level[key])) return level as SessionGroup
   }
   return undefined

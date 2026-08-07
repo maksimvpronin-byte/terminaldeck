@@ -104,7 +104,7 @@ all:
     expect(hosts.find((h) => h.name === 'web2')!.host).toBe('192.168.1.5')
   })
 
-  it('assigns a host listed twice to the first group that claims it', () => {
+  it('keeps a host listed twice as one host, belonging to both groups', () => {
     const dup = parse(`
 all:
   children:
@@ -115,9 +115,15 @@ all:
       hosts:
         shared: {}
 `)
-    const { hosts } = parseAnsibleInventory(dup, SRC)
+    const { hosts, memberships } = parseAnsibleInventory(dup, SRC)
     expect(hosts).toHaveLength(1)
-    expect(hosts[0].groupId).toBe(groupId(SRC, 'all/a'))
+    expect(memberships[hostId(SRC, 'shared')]).toEqual([
+      groupId(SRC, 'all/a'),
+      groupId(SRC, 'all/b')
+    ])
+    // Same depth, so the alphabetically last group supplies the settings —
+    // which is the one Ansible's own merge order would let win.
+    expect(hosts[0].groupId).toBe(groupId(SRC, 'all/b'))
   })
 
   it('handles top-level groups without an "all" wrapper', () => {
@@ -134,7 +140,96 @@ all:
   })
 
   it('returns nothing for a non-object document', () => {
-    expect(parseAnsibleInventory(null, SRC)).toEqual({ groups: [], hosts: [] })
-    expect(parseAnsibleInventory('text', SRC)).toEqual({ groups: [], hosts: [] })
+    const empty = { groups: [], hosts: [], memberships: {} }
+    expect(parseAnsibleInventory(null, SRC)).toEqual(empty)
+    expect(parseAnsibleInventory('text', SRC)).toEqual(empty)
+  })
+})
+
+describe('a host in several groups', () => {
+  // The shape that started this: web2 is named by both web and db.
+  const doc = parse(`
+all:
+  children:
+    linux:
+      children:
+        web:
+          hosts:
+            web1:
+              ansible_host: 10.10.10.245
+            web2:
+              ansible_host: 10.10.10.15
+        db:
+          hosts:
+            db1:
+              ansible_host: 10.10.10.13
+              ansible_port: 22
+            web2:
+              ansible_host: 10.10.10.15
+      vars:
+        ansible_user: max
+`)
+
+  it('keeps one host entity, not one per mention', () => {
+    const { hosts } = parseAnsibleInventory(doc, SRC)
+    expect(hosts.map((h) => h.name).sort()).toEqual(['db1', 'web1', 'web2'])
+  })
+
+  it('records every group that names it', () => {
+    const { memberships } = parseAnsibleInventory(doc, SRC)
+    expect(memberships[hostId(SRC, 'web2')]).toEqual([
+      groupId(SRC, 'all/linux/db'),
+      groupId(SRC, 'all/linux/web')
+    ])
+  })
+
+  it('lists a host named once under that group alone', () => {
+    const { memberships } = parseAnsibleInventory(doc, SRC)
+    expect(memberships[hostId(SRC, 'web1')]).toEqual([groupId(SRC, 'all/linux/web')])
+    expect(memberships[hostId(SRC, 'db1')]).toEqual([groupId(SRC, 'all/linux/db')])
+  })
+
+  it('inherits from the last group in Ansible order, alphabetically within a level', () => {
+    const { hosts } = parseAnsibleInventory(doc, SRC)
+    // db and web sit at the same depth, so 'web' is read last and wins.
+    expect(hosts.find((h) => h.name === 'web2')?.groupId).toBe(groupId(SRC, 'all/linux/web'))
+  })
+
+  it('prefers a deeper group over a shallower one', () => {
+    const nested = parse(`
+all:
+  hosts:
+    solo:
+      ansible_host: 10.0.0.1
+  children:
+    zone:
+      hosts:
+        solo:
+          ansible_host: 10.0.0.1
+`)
+    const { hosts, memberships } = parseAnsibleInventory(nested, SRC)
+    expect(memberships[hostId(SRC, 'solo')]).toEqual([groupId(SRC, 'all'), groupId(SRC, 'all/zone')])
+    expect(hosts.find((h) => h.name === 'solo')?.groupId).toBe(groupId(SRC, 'all/zone'))
+  })
+
+  it('merges inline vars across mentions, the later one winning', () => {
+    const conflicting = parse(`
+all:
+  children:
+    aaa:
+      hosts:
+        node:
+          ansible_host: 10.0.0.1
+          ansible_port: 22
+    bbb:
+      hosts:
+        node:
+          ansible_host: 10.0.0.99
+`)
+    const { hosts } = parseAnsibleInventory(conflicting, SRC)
+    const node = hosts.find((h) => h.name === 'node')
+    expect(node?.host).toBe('10.0.0.99')
+    // Only bbb restates the address, so the port from aaa survives the merge.
+    expect(node?.port).toBe(22)
   })
 })

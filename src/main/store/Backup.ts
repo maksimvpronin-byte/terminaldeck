@@ -4,6 +4,7 @@ import { deriveKey, newSalt, encrypt, decrypt, type EncryptedPayload } from '../
 import { vault } from '../vault/Vault'
 import { sessionStore } from './SessionStore'
 import { snippetStore } from './SnippetStore'
+import { collectionStore } from './CollectionStore'
 import { inventoryStore } from '../inventory/InventoryStore'
 import type {
   ImportSummary,
@@ -11,7 +12,8 @@ import type {
   InventorySource,
   SessionGroup,
   SessionProfile,
-  Snippet
+  Snippet,
+  HostCollection
 } from '../../shared/types'
 
 interface BackupFile {
@@ -21,6 +23,7 @@ interface BackupFile {
   groups: SessionGroup[]
   sessions: SessionProfile[]
   snippets: Snippet[]
+  collections: HostCollection[]
   inventorySources: InventorySource[]
   inventoryOverrides: InventoryOverride[]
   /** Present only when secrets were included; encrypted under its own password. */
@@ -48,6 +51,7 @@ export async function exportToFile(
     groups: store.groups,
     sessions: store.sessions,
     snippets: snippetStore.list(),
+    collections: collectionStore.list(),
     inventorySources: inventoryStore.sources(),
     inventoryOverrides: inventoryStore.overrides()
   }
@@ -108,6 +112,7 @@ export async function importFromFile(
     groups: 0,
     sessions: 0,
     snippets: 0,
+    collections: 0,
     inventorySources: 0,
     inventoryOverrides: 0,
     secrets: 0
@@ -140,6 +145,10 @@ export async function importFromFile(
   for (const snippet of parsed.snippets ?? []) {
     snippetStore.save(snippet)
     summary.snippets++
+  }
+  for (const collection of parsed.collections ?? []) {
+    collectionStore.save(collection)
+    summary.collections++
   }
   for (const source of parsed.inventorySources ?? []) {
     inventoryStore.saveSource(source)

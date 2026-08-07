@@ -1,5 +1,5 @@
 import { app } from 'electron'
-import { join, dirname, extname } from 'path'
+import { join, dirname, extname, relative } from 'path'
 import { readFileSync, writeFileSync, renameSync, existsSync, mkdirSync, readdirSync, statSync } from 'fs'
 import { parse } from 'yaml'
 import type {
@@ -177,7 +177,8 @@ class InventoryStore {
       const tree: InventoryTree = {
         sourceId,
         groups: [{ ...withoutBlanks(sourceAuth), id: rootId, name, parentId: null }],
-        sessions: []
+        sessions: [],
+        memberships: {}
       }
       for (const file of files) {
         const baseDir = dirname(file)
@@ -194,14 +195,25 @@ class InventoryStore {
         for (const h of parsed.hosts) {
           if (!tree.sessions.some((x) => x.id === h.id)) tree.sessions.push(h)
         }
+        // Memberships are unioned rather than kept from the first file: a host
+        // named in two files belongs to the groups of both.
+        for (const [hostKey, groupIds] of Object.entries(parsed.memberships)) {
+          tree.memberships[hostKey] = [
+            ...new Set([...(tree.memberships[hostKey] ?? []), ...groupIds])
+          ]
+        }
       }
 
       this.trees.set(sourceId, tree)
       source.lastSyncedAt = Date.now()
       source.lastRevision = await headRevision(dir).catch(() => undefined)
       source.lastError = undefined
+      source.lastFiles = files.map((f) => relative(dir, f))
       if (files.length === 0) {
-        source.lastError = `No .yml inventory files found at: ${source.paths.join(', ') || '(repo root)'}`
+        source.lastError =
+          `No .yml or .yaml files found at: ${source.paths.join(', ') || '(repo root)'}. ` +
+          'A directory is read one level deep, and an inventory in INI format ' +
+          '(often just named "hosts", with no extension) is not read at all.'
       }
       this.persist()
       return tree

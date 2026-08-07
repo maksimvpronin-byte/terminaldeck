@@ -36,6 +36,12 @@ export const IPC = {
   snippetsSave: 'snippets:save',
   snippetsDelete: 'snippets:delete',
 
+  // Collections
+  collectionsList: 'collections:list',
+  collectionsSave: 'collections:save',
+  collectionsDelete: 'collections:delete',
+  collectionsReorder: 'collections:reorder',
+
   // SSH connection lifecycle
   sshConnect: 'ssh:connect',
   sshQuickConnect: 'ssh:quickConnect',

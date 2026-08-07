@@ -1,13 +1,17 @@
 import { useState } from 'react'
 import type {
+  AppearanceDefaults,
   AuthMethod,
   InventoryOverride,
   SessionGroup,
   SessionProfile
 } from '../../../shared/types'
 import { resolveAuth } from '../../../shared/authResolution'
+import { applyOverride, isSet } from '../../../shared/overrides'
+import { appearanceSource, resolveAppearance } from '../../../shared/appearance'
 import { useStore } from '../state/store'
 import { SESSION_COLOURS } from '../state/colours'
+import AppearanceFields from './AppearanceFields'
 import ModalBackdrop from './ModalBackdrop'
 
 interface Props {
@@ -27,6 +31,7 @@ export default function InventoryOverrideDialog({ node, groups, onClose }: Props
   const saveInventoryOverride = useStore((s) => s.saveInventoryOverride)
   const clearInventoryOverride = useStore((s) => s.clearInventoryOverride)
   const sessions = useStore((s) => s.sessions)
+  const settings = useStore((s) => s.settings)
 
   const [override, setOverride] = useState<InventoryOverride>(existing ?? { nodeId: node.id })
   const [secret, setSecret] = useState('')
@@ -35,11 +40,32 @@ export default function InventoryOverrideDialog({ node, groups, onClose }: Props
     setOverride((o) => ({ ...o, [key]: value }))
   }
 
+  function setLook<K extends keyof AppearanceDefaults>(key: K, value: AppearanceDefaults[K]): void {
+    setOverride((o) => ({ ...o, [key]: value }))
+  }
+
   // A group inherits from its parent; a host from the group it sits in.
   const parentId = isHost(node) ? node.groupId : node.parentId
   // What the repository alone would give this node, ignoring the override.
   const fromRepo = resolveAuth(node, parentId, groups)
   const effective = resolveAuth({ ...node, ...override }, parentId, groups)
+
+  // Appearance layers the same way: the override, then what the repository and
+  // its groups say, then the application-wide settings.
+  const merged = applyOverride(node, override)
+  const appearance = resolveAppearance(merged, parentId, groups, settings)
+  const inheritedLook = resolveAppearance(
+    { ...node, inheritAppearance: merged.inheritAppearance },
+    parentId,
+    groups,
+    settings
+  )
+  const appearanceFrom = (key: keyof AppearanceDefaults): string => {
+    const own: AppearanceDefaults = node
+    if (isSet(own[key])) return 'the inventory'
+    const source = appearanceSource(node, parentId, groups, key)
+    return source ? `the group ${source.name}` : 'Settings'
+  }
 
   async function pickKey(): Promise<void> {
     const path = await window.td.dialogs.pickPrivateKey()
@@ -187,6 +213,22 @@ export default function InventoryOverrideDialog({ node, groups, onClose }: Props
             ))}
           </div>
         </label>
+
+        <details className="settings-section">
+          <summary>Appearance</summary>
+          <p className="settings-note">
+            Kept locally like everything else here, so a sync never takes it away.
+            {!isHost(node) && ' Hosts in this group inherit it.'}
+          </p>
+          <AppearanceFields
+            value={override}
+            set={setLook}
+            effective={appearance}
+            inherited={inheritedLook}
+            inheritedFrom={appearanceFrom}
+            inheritToggle={{ label: 'Inherit appearance from the inventory groups' }}
+          />
+        </details>
 
         {isHost(node) && (
           <p className="settings-note">

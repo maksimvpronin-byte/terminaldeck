@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import type { DragEvent as ReactDragEvent } from 'react'
 import type { PaneNode, PaneTarget } from '../state/store'
-import { useStore, collectBroadcastTargets, collectLeaves } from '../state/store'
+import { useStore, collectBroadcastTargets, collectLeaves, activeTab, allTabs, findTab } from '../state/store'
 import { DRAG_MIME, edgeFromPoint, edgeToSplit, type DragItem, type DropEdge } from '../state/dnd'
 import TerminalHost from './TerminalHost'
 import SftpPanel from './SftpPanel'
@@ -16,15 +16,16 @@ export default function Pane({
   tabId: string
   node: Extract<PaneNode, { type: 'leaf' }>
 }): JSX.Element {
-  const activePaneId = useStore((s) => s.tabs.find((t) => t.id === tabId)?.activePaneId)
-  const isActiveTab = useStore((s) => s.activeTabId === tabId)
+  const activePaneId = useStore((s) => findTab(s, tabId)?.activePaneId)
+  // On screen only when this tab is the current one of the current workspace.
+  const isActiveTab = useStore((s) => activeTab(s)?.id === tabId)
   const setActivePane = useStore((s) => s.setActivePane)
   const markActivity = useStore((s) => s.markActivity)
   const setPaneConnection = useStore((s) => s.setPaneConnection)
   const splitPane = useStore((s) => s.splitPane)
   const closePane = useStore((s) => s.closePane)
   const detachPane = useStore((s) => s.detachPane)
-  const isSplit = useStore((s) => s.tabs.find((t) => t.id === tabId)?.root.type === 'split')
+  const isSplit = useStore((s) => findTab(s, tabId)?.root.type === 'split')
   const toggleSftp = useStore((s) => s.toggleSftp)
   const toggleTunnels = useStore((s) => s.toggleTunnels)
   const broadcast = useStore((s) => s.broadcast)
@@ -61,7 +62,7 @@ export default function Pane({
       title = session.name
       target = { kind: 'session', sessionId: session.id }
     } else if (item.kind === 'tab') {
-      const sourceTab = useStore.getState().tabs.find((t) => t.id === item.id)
+      const sourceTab = findTab(useStore.getState(), item.id)
       if (!sourceTab || sourceTab.id === tabId) return
       const leaf = collectLeaves(sourceTab.root)[0]
       if (!leaf) return
@@ -153,7 +154,7 @@ export default function Pane({
             const state = useStore.getState()
             // A terminal excluded from broadcast keeps its own input to itself.
             if (!state.broadcast || !node.broadcastEnabled) return [own]
-            const all = state.tabs.flatMap((t) => collectBroadcastTargets(t.root))
+            const all = allTabs(state).flatMap((t) => collectBroadcastTargets(t.root))
             return all.length > 0 ? all : [own]
           }}
         />

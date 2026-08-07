@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useStore } from '../state/store'
-import { FONT_CHOICES, THEMES, DEFAULT_SETTINGS, themeOf } from '../state/settings'
+import { FONT_CHOICES, THEME_GROUPS, DEFAULT_SETTINGS, themeOf } from '../state/settings'
 import SecuritySettings from './SecuritySettings'
 import BackupSettings from './BackupSettings'
 import ModalBackdrop from './ModalBackdrop'
@@ -76,6 +76,11 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
 
         {tab === 'terminal' && (
           <>
+        <p className="settings-note">
+          The defaults every terminal starts from. A group or a single host can override any of
+          this in its own dialog, under Appearance.
+        </p>
+
         <label>
           Font
           <select
@@ -130,10 +135,14 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
             value={settings.themeName}
             onChange={(e) => updateSettings({ themeName: e.target.value })}
           >
-            {Object.keys(THEMES).map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
+            {THEME_GROUPS.map((group) => (
+              <optgroup key={group.label} label={group.label}>
+                {group.names.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </label>

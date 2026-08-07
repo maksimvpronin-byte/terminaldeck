@@ -1,6 +1,7 @@
 import type { TerminalSettings } from '../settings'
 import type { PaneNode, PaneTarget } from '../paneTree'
 import type {
+  HostCollection,
   InventoryOverride,
   InventorySource,
   InventoryTree,
@@ -9,6 +10,11 @@ import type {
   Snippet
 } from '../../../../shared/types'
 
+/**
+ * One host-level tab: a tree of panes, so a tab can still be split.
+ * Ids are unique across every workspace, which lets the pane actions keep
+ * taking a bare tabId instead of threading a workspace id through the UI.
+ */
 export interface WorkspaceTab {
   id: string
   title: string
@@ -18,11 +24,30 @@ export interface WorkspaceTab {
   hasActivity?: boolean
 }
 
+/**
+ * The top strip: a named container holding its own row of tabs, the way a
+ * Chrome window holds tabs. Opening a whole host group gives you one of these
+ * with a tab per host.
+ */
+export interface Workspace {
+  id: string
+  title: string
+  color?: string
+  tabs: WorkspaceTab[]
+  activeTabId: string | null
+}
+
 export interface OpenRequest {
   title: string
   target: PaneTarget
   color?: string
 }
+
+/**
+ * Where a batch of hosts should land: one tab each in the current workspace,
+ * all tiled into a single tab, or a new workspace of their own.
+ */
+export type OpenMode = 'tabs' | 'grid' | 'workspace'
 
 export interface VaultSlice {
   vaultLocked: boolean
@@ -52,6 +77,11 @@ export interface InventorySlice {
   inventoryOverrides: InventoryOverride[]
   inventoryTrees: InventoryTree[]
   inventorySyncing: string[]
+  /**
+   * Errors the sync raised before it could be recorded on the source itself —
+   * without these the renderer swallowed them and the button did nothing at all.
+   */
+  inventorySyncErrors: Record<string, string>
   gitAvailable: boolean
   loadInventory: () => Promise<void>
   syncInventory: (sourceId?: string) => Promise<void>
@@ -59,6 +89,23 @@ export interface InventorySlice {
   removeInventorySource: (id: string) => Promise<void>
   saveInventoryOverride: (override: InventoryOverride, secret?: string) => Promise<void>
   clearInventoryOverride: (nodeId: string) => Promise<void>
+}
+
+export interface CollectionsSlice {
+  collections: HostCollection[]
+  loadCollections: () => Promise<void>
+  upsertCollection: (collection: HostCollection) => Promise<void>
+  removeCollection: (id: string) => Promise<void>
+  /**
+   * Shifts a collection up or down the list. The order is the tie-break for a
+   * host that belongs to several, so it has to be the user's to set.
+   */
+  moveCollection: (id: string, delta: -1 | 1) => Promise<void>
+  /** Appends hosts, keeping the existing order and ignoring ones already in. */
+  addToCollection: (id: string, hostIds: string[]) => Promise<void>
+  removeFromCollection: (id: string, hostId: string) => Promise<void>
+  /** Reopens a collection: a workspace of its own, one tab per host. */
+  openCollection: (id: string) => void
 }
 
 export interface SnippetsSlice {
@@ -69,9 +116,9 @@ export interface SnippetsSlice {
 }
 
 export interface WorkspaceSlice {
-  tabs: WorkspaceTab[]
-  activeTabId: string | null
-  /** When on, typing in any terminal is mirrored to every open pane, in every tab. */
+  workspaces: Workspace[]
+  activeWorkspaceId: string | null
+  /** When on, typing in any terminal is mirrored to every open pane, everywhere. */
   broadcast: boolean
 
   /** Hosts ticked in the tree, across both the saved and inventory tabs. */
@@ -81,11 +128,20 @@ export interface WorkspaceSlice {
   /** Shift-click: everything between the previous click and this one. */
   selectHostRange: (orderedIds: string[], toId: string) => void
   clearHostSelection: () => void
-  openSelectedHosts: (mode: 'tabs' | 'grid') => void
+  openSelectedHosts: (mode: OpenMode) => void
 
+  /** Creates an empty workspace and makes it current; returns its id. */
+  openWorkspace: (title?: string, color?: string) => string
+  closeWorkspace: (workspaceId: string) => void
+  setActiveWorkspace: (workspaceId: string) => void
+  renameWorkspace: (workspaceId: string, title: string) => void
+  /** Drag a tab onto another workspace's header to move it there. */
+  moveTabToWorkspace: (tabId: string, workspaceId: string) => void
+
+  /** Opens a tab in the current workspace, creating one if there is none. */
   openTab: (title: string, target: PaneTarget, color?: string) => string
-  /** Opens several hosts at once, each in its own tab or all tiled in one. */
-  openMany: (items: OpenRequest[], mode: 'tabs' | 'grid') => void
+  /** Opens several hosts at once — see OpenMode. */
+  openMany: (items: OpenRequest[], mode: OpenMode, workspaceTitle?: string) => void
   closeTab: (tabId: string) => void
   setActiveTab: (tabId: string) => void
   /** Flags a background tab that produced output, so the tab bar can show it. */
@@ -122,4 +178,5 @@ export type AppState = VaultSlice &
   SessionsSlice &
   InventorySlice &
   SnippetsSlice &
+  CollectionsSlice &
   WorkspaceSlice

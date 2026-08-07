@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { nanoid } from 'nanoid'
-import type { AuthMethod, InventorySource } from '../../../shared/types'
+import type { AppearanceDefaults, AuthMethod, InventorySource } from '../../../shared/types'
+import { resolveAppearance } from '../../../shared/appearance'
 import { useStore } from '../state/store'
 import { SESSION_COLOURS } from '../state/colours'
+import AppearanceFields from './AppearanceFields'
 import ModalBackdrop from './ModalBackdrop'
 
 export default function InventorySourceDialog({
@@ -14,6 +16,7 @@ export default function InventorySourceDialog({
 }): JSX.Element {
   const saveInventorySource = useStore((s) => s.saveInventorySource)
   const sessions = useStore((s) => s.sessions)
+  const settings = useStore((s) => s.settings)
 
   const [source, setSource] = useState<InventorySource>(
     initial ?? { id: nanoid(), name: '', repoUrl: '', paths: [] }
@@ -25,6 +28,14 @@ export default function InventorySourceDialog({
   function set<K extends keyof InventorySource>(key: K, value: InventorySource[K]): void {
     setSource((s) => ({ ...s, [key]: value }))
   }
+
+  function setLook<K extends keyof AppearanceDefaults>(key: K, value: AppearanceDefaults[K]): void {
+    setSource((s) => ({ ...s, [key]: value }))
+  }
+
+  // The source is its own tree's root, so it has no group above it to inherit
+  // from — only the application-wide settings.
+  const appearance = resolveAppearance(source, null, [], settings)
 
   async function pickKey(): Promise<void> {
     const path = await window.td.dialogs.pickPrivateKey()
@@ -89,8 +100,15 @@ export default function InventorySourceDialog({
           </label>
         </div>
         <p className="settings-note">
-          A path may be a file or a directory of *.yml files. Leave empty to scan the repository
+          A path may be a file or a directory of *.yml files — a directory is read one level deep,
+          and an inventory in INI format is not read at all. Leave empty to scan the repository
           root. Neighbouring group_vars/ and host_vars/ are read automatically.
+        </p>
+        <p className="settings-note">
+          Leaving <strong>Branch</strong> empty follows the repository&apos;s default branch,
+          usually <code>main</code>. Work committed to another branch will not appear here until
+          you name that branch or merge it — the sync succeeds either way, so it looks like
+          nothing changed.
         </p>
 
         <h3 className="settings-heading">Default connection settings</h3>
@@ -192,6 +210,21 @@ export default function InventorySourceDialog({
             ))}
           </div>
         </label>
+
+        <details className="settings-section">
+          <summary>Appearance</summary>
+          <p className="settings-note">
+            Every host from this repository inherits it, so a whole environment can be told apart
+            at a glance without touching a single host.
+          </p>
+          <AppearanceFields
+            value={source}
+            set={setLook}
+            effective={appearance}
+            inherited={settings}
+            inheritedFrom={() => 'Settings'}
+          />
+        </details>
 
         {error && <span className="error-text">{error}</span>}
 

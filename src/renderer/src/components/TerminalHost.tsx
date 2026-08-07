@@ -6,6 +6,7 @@ import 'xterm/css/xterm.css'
 import type { PaneTarget } from '../state/store'
 import { useStore } from '../state/store'
 import { themeOf } from '../state/settings'
+import { useAppearance } from '../hooks/useAppearance'
 import ContextMenu, { type MenuItem } from './ContextMenu'
 
 interface Props {
@@ -55,7 +56,11 @@ export default function TerminalHost({
   const onOutputRef = useRef(onOutput)
   onOutputRef.current = onOutput
 
+  // Behaviour stays application-wide; only the look is per host.
   const settings = useStore((s) => s.settings)
+  const appearance = useAppearance(target)
+  const appearanceRef = useRef(appearance)
+  appearanceRef.current = appearance
 
   const [closed, setClosed] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -123,15 +128,15 @@ export default function TerminalHost({
   useEffect(() => {
     if (!hostRef.current) return
     const generation = ++generationRef.current
-    const s = useStore.getState().settings
+    const a = appearanceRef.current
     const term = new Terminal({
       convertEol: true,
-      fontFamily: s.fontFamily,
-      fontSize: s.fontSize,
-      theme: themeOf(s),
-      cursorBlink: s.cursorBlink,
-      cursorStyle: s.cursorStyle,
-      scrollback: s.scrollback
+      fontFamily: a.fontFamily,
+      fontSize: a.fontSize,
+      theme: themeOf(a),
+      cursorBlink: a.cursorBlink,
+      cursorStyle: a.cursorStyle,
+      scrollback: a.scrollback
     })
     const fit = new FitAddon()
     const search = new SearchAddon()
@@ -205,15 +210,15 @@ export default function TerminalHost({
   useEffect(() => {
     const term = termRef.current
     if (!term) return
-    term.options.fontFamily = settings.fontFamily
-    term.options.fontSize = settings.fontSize
-    term.options.theme = themeOf(settings)
-    term.options.cursorBlink = settings.cursorBlink
-    term.options.cursorStyle = settings.cursorStyle
-    term.options.scrollback = settings.scrollback
+    term.options.fontFamily = appearance.fontFamily
+    term.options.fontSize = appearance.fontSize
+    term.options.theme = themeOf(appearance)
+    term.options.cursorBlink = appearance.cursorBlink
+    term.options.cursorStyle = appearance.cursorStyle
+    term.options.scrollback = appearance.scrollback
     fitRef.current?.fit()
     if (connIdRef.current) window.td.ssh.resize(connIdRef.current, term.cols, term.rows)
-  }, [settings])
+  }, [appearance])
 
   function handleClick(): void {
     onFocus()

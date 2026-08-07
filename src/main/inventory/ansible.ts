@@ -3,6 +3,16 @@ import type { AuthDefaults, SessionGroup, SessionProfile } from '../../shared/ty
 export interface ParsedInventory {
   groups: SessionGroup[]
   hosts: SessionProfile[]
+  /**
+   * Host id to every group id that names it, in Ansible's own merge order:
+   * parents before children, and alphabetically within a level.
+   *
+   * Ansible lets a host belong to any number of groups, so the tree has to be
+   * able to show it under each of them. The host itself stays a single entity —
+   * one id, one set of local overrides, one entry in a collection — and only
+   * its placement is plural.
+   */
+  memberships: Record<string, string[]>
 }
 
 /** Vars as they appear in an inventory, group_vars or host_vars file. */
@@ -63,10 +73,19 @@ export function parseAnsibleInventory(
 ): ParsedInventory {
   const groups: SessionGroup[] = []
   const hosts: SessionProfile[] = []
-  const claimed = new Set<string>()
+  const memberships: Record<string, string[]> = {}
   const now = Date.now()
 
-  if (!doc || typeof doc !== 'object') return { groups, hosts }
+  if (!doc || typeof doc !== 'object') return { groups, hosts, memberships }
+
+  /** One group naming a host, carrying the vars stated at that mention. */
+  interface Claim {
+    id: string
+    depth: number
+    name: string
+    vars: AnsibleVars
+  }
+  const seen = new Map<string, { name: string; claims: Claim[] }>()
 
   const walk = (name: string, raw: RawGroup | null, parentPath: string | null): void => {
     const path = parentPath ? `${parentPath}/${name}` : name
@@ -81,25 +100,10 @@ export function parseAnsibleInventory(
     })
 
     for (const [hostName, inlineVars] of Object.entries(raw?.hosts ?? {})) {
-      // Ansible lets a host sit in several groups; our tree has one parent, so
-      // the first group that mentions it wins.
-      if (claimed.has(hostName)) continue
-      claimed.add(hostName)
-
-      const hostVars = { ...lookupVars('host', hostName), ...(inlineVars ?? {}) }
-      const auth = varsToAuth(hostVars)
-      hosts.push({
-        id: hostId(sourceId, hostName),
-        name: hostName,
-        host: str(hostVars.ansible_host) ?? hostName,
-        groupId: id,
-        tags: [],
-        logToFile: false,
-        portForwards: [],
-        createdAt: now,
-        updatedAt: now,
-        ...auth
-      })
+      const key = hostId(sourceId, hostName)
+      const entry = seen.get(key) ?? { name: hostName, claims: [] }
+      entry.claims.push({ id, depth: path.split('/').length, name, vars: inlineVars ?? {} })
+      seen.set(key, entry)
     }
 
     for (const [childName, child] of Object.entries(raw?.children ?? {})) {
@@ -112,5 +116,33 @@ export function parseAnsibleInventory(
   if (root.all) walk('all', root.all, null)
   else for (const [name, raw] of Object.entries(root)) walk(name, raw, null)
 
-  return { groups, hosts }
+  for (const [key, entry] of seen) {
+    // Ansible merges group vars parents-first and alphabetically within a level,
+    // with the last one read winning. The same order picks the group whose
+    // connection settings this host inherits.
+    const ordered = [...entry.claims].sort(
+      (a, b) => a.depth - b.depth || a.name.localeCompare(b.name)
+    )
+    const primary = ordered[ordered.length - 1]
+    // Vars stated at each mention are merged along that same order, so the
+    // group that supplies the settings is also the one that wins a conflict.
+    const inline = ordered.reduce<AnsibleVars>((acc, claim) => ({ ...acc, ...claim.vars }), {})
+    const hostVars = { ...lookupVars('host', entry.name), ...inline }
+
+    hosts.push({
+      id: key,
+      name: entry.name,
+      host: str(hostVars.ansible_host) ?? entry.name,
+      groupId: primary.id,
+      tags: [],
+      logToFile: false,
+      portForwards: [],
+      createdAt: now,
+      updatedAt: now,
+      ...varsToAuth(hostVars)
+    })
+    memberships[key] = [...new Set(ordered.map((c) => c.id))]
+  }
+
+  return { groups, hosts, memberships }
 }

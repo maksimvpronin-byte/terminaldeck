@@ -1,6 +1,9 @@
+// First, so it is listening before any other module can throw on evaluation.
+import './crashReporter'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
+import ErrorBoundary from './components/ErrorBoundary'
 import './styles.css'
 
 // Without this, a file dropped anywhere outside a drop zone makes the window
@@ -10,6 +13,8 @@ window.addEventListener('drop', (e) => e.preventDefault())
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </React.StrictMode>
 )

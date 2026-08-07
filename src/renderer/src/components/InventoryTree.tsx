@@ -3,7 +3,13 @@ import type { MouseEvent as ReactMouseEvent } from 'react'
 import type { InventorySource, SessionGroup, SessionProfile } from '../../../shared/types'
 import { resolveAuth } from '../../../shared/authResolution'
 import { applyOverride } from '../../../shared/overrides'
-import { useStore, collectConnectedSessionIds } from '../state/store'
+import { colorOf } from '../state/hosts'
+import {
+  useStore,
+  collectConnectedSessionIds,
+  activeTab as currentTab,
+  allRoots
+} from '../state/store'
 import InventorySourceDialog from './InventorySourceDialog'
 import InventoryOverrideDialog from './InventoryOverrideDialog'
 import ContextMenu, { type MenuItem } from './ContextMenu'
@@ -34,6 +40,7 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
   const trees = useStore((s) => s.inventoryTrees)
   const overrides = useStore((s) => s.inventoryOverrides)
   const syncing = useStore((s) => s.inventorySyncing)
+  const syncErrors = useStore((s) => s.inventorySyncErrors)
   const gitAvailable = useStore((s) => s.gitAvailable)
   const loadInventory = useStore((s) => s.loadInventory)
   const syncInventory = useStore((s) => s.syncInventory)
@@ -45,8 +52,12 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
   const toggleHostSelection = useStore((s) => s.toggleHostSelection)
   const selectHostRange = useStore((s) => s.selectHostRange)
   const clearHostSelection = useStore((s) => s.clearHostSelection)
-  const tabs = useStore((s) => s.tabs)
-  const connected = new Set(tabs.flatMap((t) => collectConnectedSessionIds(t.root)))
+  const openMany = useStore((s) => s.openMany)
+  const collections = useStore((s) => s.collections)
+  const workspaces = useStore((s) => s.workspaces)
+  const connected = new Set(
+    allRoots({ workspaces }).flatMap(collectConnectedSessionIds)
+  )
 
   const [editing, setEditing] = useState<InventorySource | 'new' | undefined>(undefined)
   const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsed)
@@ -78,17 +89,47 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
   // different bastion or user without touching the repository.
   const allGroups: SessionGroup[] = trees.flatMap((t) => t.groups).map(withOverride)
 
+  /**
+   * Hosts a group names. A host in several groups appears under each of them —
+   * it is one host throughout, so selecting or colouring it in one place shows
+   * everywhere. Older synced trees have no memberships; those fall back to the
+   * single parent they were stored with.
+   */
   function hostsOf(groupId: string): SessionProfile[] {
     return trees
-      .flatMap((t) => t.sessions)
-      .filter((h) => h.groupId === groupId)
+      .flatMap((t) =>
+        t.sessions.filter((h) => {
+          const claims = t.memberships?.[h.id]
+          return claims ? claims.includes(groupId) : h.groupId === groupId
+        })
+      )
       .map(withOverride)
       .filter((h) => !needle || `${h.name} ${h.host}`.toLowerCase().includes(needle))
+  }
+
+  /** How many groups name this host, so the tree can point out the duplicates. */
+  function membershipCount(hostId: string): number {
+    for (const t of trees) {
+      const claims = t.memberships?.[hostId]
+      if (claims) return claims.length
+    }
+    return 1
   }
 
   function subtreeHasMatch(groupId: string): boolean {
     if (hostsOf(groupId).length > 0) return true
     return allGroups.filter((g) => g.parentId === groupId).some((g) => subtreeHasMatch(g.id))
+  }
+
+  /** What the last sync actually produced for a source, shown next to the revision. */
+  function countsFor(sourceId: string): string {
+    const tree = trees.find((t) => t.sourceId === sourceId)
+    if (!tree) return 'not synced yet'
+    const hosts = tree.sessions.length
+    // The source itself is always one group, so it does not count as content.
+    const groups = Math.max(0, tree.groups.length - 1)
+    if (hosts === 0) return 'no hosts found'
+    return `${hosts} host${hosts === 1 ? '' : 's'}, ${groups} group${groups === 1 ? '' : 's'}`
   }
 
   function connect(host: SessionProfile, colour?: string): void {
@@ -97,7 +138,7 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
 
   function hostMenu(host: SessionProfile, colour?: string): MenuItem[] {
     const state = useStore.getState()
-    const activeTab = state.tabs.find((t) => t.id === state.activeTabId)
+    const activeTab = currentTab(state)
     const auth = resolveAuth(host, host.groupId, allGroups)
     const overridden = overrides.some((o) => o.nodeId === host.id)
     return [
@@ -136,11 +177,53 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
     ]
   }
 
+  /**
+   * Every host under a group, including its nested groups, each listed once
+   * however many of those groups happen to name it.
+   */
+  function hostsUnder(groupId: string): SessionProfile[] {
+    const ids = new Set([groupId])
+    let grew = true
+    while (grew) {
+      grew = false
+      for (const g of allGroups) {
+        if (g.parentId && ids.has(g.parentId) && !ids.has(g.id)) {
+          ids.add(g.id)
+          grew = true
+        }
+      }
+    }
+    const out = new Map<string, SessionProfile>()
+    for (const t of trees) {
+      for (const h of t.sessions) {
+        const claims = t.memberships?.[h.id] ?? (h.groupId ? [h.groupId] : [])
+        if (claims.some((g) => ids.has(g))) out.set(h.id, withOverride(h))
+      }
+    }
+    return [...out.values()]
+  }
+
   function groupMenu(group: SessionGroup): MenuItem[] {
     const overridden = overrides.some((o) => o.nodeId === group.id)
+    const hosts = hostsUnder(group.id)
     return [
       {
+        label: `Open all in a new workspace (${hosts.length})`,
+        disabled: hosts.length === 0,
+        onSelect: () =>
+          openMany(
+            hosts.map((h) => ({
+              title: h.name,
+              target: { kind: 'session' as const, sessionId: h.id },
+              color: h.color
+            })),
+            'workspace',
+            group.name
+          )
+      },
+      {
         label: overridden ? 'Local settings…' : 'Override locally…',
+        separated: true,
         onSelect: () => setOverriding(group)
       },
       {
@@ -152,8 +235,23 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
   }
 
   function sourceMenu(source: InventorySource): MenuItem[] {
+    const hosts = hostsUnder(`inv:${source.id}:root`)
     return [
-      { label: 'Sync now', onSelect: () => syncInventory(source.id) },
+      {
+        label: `Open all in a new workspace (${hosts.length})`,
+        disabled: hosts.length === 0,
+        onSelect: () =>
+          openMany(
+            hosts.map((h) => ({
+              title: h.name,
+              target: { kind: 'session' as const, sessionId: h.id },
+              color: h.color ?? source.color
+            })),
+            'workspace',
+            source.name
+          )
+      },
+      { label: 'Sync now', separated: true, onSelect: () => syncInventory(source.id) },
       { label: 'Edit…', onSelect: () => setEditing(source) },
       {
         label: 'Remove source',
@@ -209,7 +307,9 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
       if (needle === '' && collapsed.has(g.id)) continue
       out.push(...flattenOrder(g.id))
     }
-    return out
+    // A host shown under two groups would otherwise appear twice here, and a
+    // Shift-click range would stop at whichever copy came first.
+    return [...new Set(out)]
   }
 
   function onHostClick(e: ReactMouseEvent, host: SessionProfile, colour?: string): void {
@@ -227,7 +327,8 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
   }
 
   function renderHost(host: SessionProfile, paddingLeft: number, colour?: string): JSX.Element {
-    const dotColour = host.color ?? colour
+    // Own colour, then the collection that governs it, then the repository's.
+    const dotColour = colorOf({ collections }, host) ?? colour
     return (
       <div
         className={`tree-item ${selectedHostIds.includes(host.id) ? 'selected' : ''}`}
@@ -248,6 +349,16 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
           />
           {host.name}
           {connected.has(host.id) && <span className="live-dot" title="Connected" />}
+          {membershipCount(host.id) > 1 && (
+            <span
+              className="no-inherit"
+              title={`In ${membershipCount(host.id)} groups — the same host, shown under each. Its connection settings come from ${
+                allGroups.find((g) => g.id === host.groupId)?.name ?? 'its group'
+              }.`}
+            >
+              ×{membershipCount(host.id)}
+            </span>
+          )}
           {overrides.some((o) => o.nodeId === host.id) && (
             <span className="no-inherit" title="Has a local override">
               ✎
@@ -327,13 +438,30 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
                 </div>
               </div>
 
+              {/* Branch, revision, counts and files together say which step of a
+                  sync went wrong — every one of these failures otherwise looks
+                  identical from the outside: a sync that reports success and
+                  leaves the hosts exactly as they were. */}
               <div className="inventory-meta" style={{ paddingLeft: 26 }}>
                 {busy ? 'syncing…' : ago(source.lastSyncedAt)}
+                {` · ${source.branch || 'default branch'}`}
                 {source.lastRevision ? ` · ${source.lastRevision}` : ''}
+                {!busy && ` · ${countsFor(source.id)}`}
               </div>
-              {source.lastError && (
+              {!busy && source.lastFiles && (
+                <div
+                  className="inventory-meta"
+                  style={{ paddingLeft: 26 }}
+                  title={source.lastFiles.join('\n') || 'none'}
+                >
+                  read {source.lastFiles.length} file
+                  {source.lastFiles.length === 1 ? '' : 's'}
+                  {source.lastFiles.length > 0 ? `: ${source.lastFiles.join(', ')}` : ''}
+                </div>
+              )}
+              {(source.lastError || syncErrors[source.id]) && (
                 <div className="inventory-error" style={{ paddingLeft: 26 }}>
-                  {source.lastError}
+                  {source.lastError ?? syncErrors[source.id]}
                 </div>
               )}
 
