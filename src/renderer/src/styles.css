@@ -271,6 +271,9 @@ label {
 }
 .selection-bar {
   display: flex;
+  /* Five controls do not fit across a sidebar this narrow. Without the wrap they
+     spilled over its edge and painted on top of the terminal. */
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   padding: 6px 8px;
@@ -278,6 +281,11 @@ label {
   background: var(--accent-dim);
   font-size: 11px;
   flex-shrink: 0;
+}
+/* The count keeps the top line to itself, next to Clear, rather than being
+   squeezed until it breaks in two. */
+.selection-bar .count {
+  white-space: nowrap;
 }
 .selection-bar button {
   height: 24px;
@@ -288,9 +296,31 @@ label {
   width: 26px;
   padding: 0;
 }
+.selection-actions {
+  flex: 1 0 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+/* They share the row evenly, and take a second one if the sidebar is narrowed.
+   Tighter than the other buttons — four verbs and their gaps have very little
+   room to spare across the default width. Declared after .selection-bar button,
+   which is equally specific and would otherwise win. */
+.selection-actions button {
+  flex: 1 1 auto;
+  padding: 0 6px;
+}
 .tree-item.drop-target {
   background: var(--accent-dim);
   outline: 1px solid var(--accent);
+}
+/* Sorting hosts: the line marks the gap the row will drop into. Drawn inside
+   the row, so nothing in the tree shifts while the drag is in flight. */
+.tree-item.drop-before {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+.tree-item.drop-after {
+  box-shadow: inset 0 -2px 0 var(--accent);
 }
 .root-drop-zone {
   margin: 8px 6px;

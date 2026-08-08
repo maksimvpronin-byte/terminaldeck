@@ -54,6 +54,8 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
       lastSelectedHostId: id
     })),
 
+  selectOnlyHost: (id) => set({ selectedHostIds: [id], lastSelectedHostId: id }),
+
   selectHostRange: (orderedIds, toId) =>
     set((s) => {
       const to = orderedIds.indexOf(toId)

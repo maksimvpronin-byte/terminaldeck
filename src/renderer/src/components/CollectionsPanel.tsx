@@ -203,7 +203,8 @@ export default function CollectionsPanel({ query }: { query: string }): JSX.Elem
                     key={m.id}
                     className="tree-item"
                     style={{ paddingLeft: 28 }}
-                    onClick={() => {
+                    title={m.missing ? undefined : 'Double-click to connect'}
+                    onDoubleClick={() => {
                       if (!m.missing) {
                         // Opened from here, so this set lends its look.
                         openTab(

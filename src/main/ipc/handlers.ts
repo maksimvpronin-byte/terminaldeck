@@ -103,6 +103,9 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.storeDeleteSession, (_e, id: string) => {
     sessionStore.deleteSession(id)
   })
+  ipcMain.handle(IPC.storeReorderSessions, (_e, orderedIds: string[]) => {
+    sessionStore.reorderSessions(orderedIds)
+  })
   ipcMain.handle(IPC.storeSaveGroup, (_e, group: SessionGroup, secret?: string) => {
     if (secret !== undefined) {
       group.secretRef = group.secretRef ?? randomUUID()

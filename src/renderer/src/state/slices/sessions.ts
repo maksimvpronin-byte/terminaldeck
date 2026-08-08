@@ -1,6 +1,7 @@
 import type { StateCreator } from 'zustand'
 import type { SessionStoreData } from '../../../../shared/types'
 import type { AppState, SessionsSlice } from './types'
+import { moveRelativeTo } from '../../../../shared/ordering'
 
 export const createSessionsSlice: StateCreator<AppState, [], [], SessionsSlice> = (set, get) => ({
   groups: [],
@@ -52,6 +53,32 @@ export const createSessionsSlice: StateCreator<AppState, [], [], SessionsSlice> 
     const session = get().sessions.find((s) => s.id === sessionId)
     if (!session || session.groupId === groupId) return
     await get().upsertSession({ ...session, groupId, updatedAt: Date.now() })
+  },
+
+  reorderSession: async (sessionId, targetId, place) => {
+    if (sessionId === targetId) return
+    const { sessions } = get()
+    const dragged = sessions.find((s) => s.id === sessionId)
+    const target = sessions.find((s) => s.id === targetId)
+    if (!dragged || !target) return
+
+    // Landing next to a host means landing in its group: one gesture, so the
+    // group change and the new position are applied together.
+    const moved =
+      dragged.groupId === target.groupId
+        ? dragged
+        : { ...dragged, groupId: target.groupId, updatedAt: Date.now() }
+
+    const next = moveRelativeTo(
+      sessions.map((s) => (s.id === sessionId ? moved : s)),
+      sessionId,
+      targetId,
+      place
+    )
+
+    set({ sessions: next })
+    if (moved !== dragged) await window.td.store.saveSession(moved)
+    await window.td.store.reorderSessions(next.map((s) => s.id))
   },
 
   moveGroup: async (groupId, parentId) => {

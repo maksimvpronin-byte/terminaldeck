@@ -71,6 +71,15 @@ export interface SessionsSlice {
   upsertGroup: (group: SessionGroup, secret?: string) => Promise<void>
   removeGroup: (id: string) => Promise<void>
   moveSession: (sessionId: string, groupId: string | null) => Promise<void>
+  /**
+   * Drops a session immediately before or after another one, joining that
+   * session's group on the way. This is how the tree is sorted by hand.
+   */
+  reorderSession: (
+    sessionId: string,
+    targetId: string,
+    place: 'before' | 'after'
+  ) => Promise<void>
   moveGroup: (groupId: string, parentId: string | null) => Promise<void>
 }
 
@@ -124,6 +133,8 @@ export interface WorkspaceSlice {
   selectedHostIds: string[]
   lastSelectedHostId: string | null
   toggleHostSelection: (id: string) => void
+  /** Plain click: this host alone, and the anchor for the next Shift-click. */
+  selectOnlyHost: (id: string) => void
   /** Shift-click: everything between the previous click and this one. */
   selectHostRange: (orderedIds: string[], toId: string) => void
   clearHostSelection: () => void

@@ -49,8 +49,8 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
   const splitPaneWith = useStore((s) => s.splitPaneWith)
   const selectedHostIds = useStore((s) => s.selectedHostIds)
   const toggleHostSelection = useStore((s) => s.toggleHostSelection)
+  const selectOnlyHost = useStore((s) => s.selectOnlyHost)
   const selectHostRange = useStore((s) => s.selectHostRange)
-  const clearHostSelection = useStore((s) => s.clearHostSelection)
   const openMany = useStore((s) => s.openMany)
   const workspaces = useStore((s) => s.workspaces)
   const connected = new Set(
@@ -310,7 +310,7 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
     return [...new Set(out)]
   }
 
-  function onHostClick(e: ReactMouseEvent, host: SessionProfile, colour?: string): void {
+  function onHostClick(e: ReactMouseEvent, host: SessionProfile): void {
     if (e.metaKey || e.ctrlKey) {
       toggleHostSelection(host.id)
       return
@@ -320,8 +320,9 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
       selectHostRange(order, host.id)
       return
     }
-    clearHostSelection()
-    connect(host, colour)
+    // Matches the saved-sessions tree: a plain click only selects, connecting
+    // is a double-click.
+    selectOnlyHost(host.id)
   }
 
   function renderHost(host: SessionProfile, paddingLeft: number, colour?: string): JSX.Element {
@@ -331,7 +332,9 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
         className={`tree-item ${selectedHostIds.includes(host.id) ? 'selected' : ''}`}
         key={host.id}
         style={{ paddingLeft }}
-        onClick={(e) => onHostClick(e, host, dotColour)}
+        onClick={(e) => onHostClick(e, host)}
+        onDoubleClick={() => connect(host, dotColour)}
+        title="Double-click to connect"
         onContextMenu={(e) => {
           e.preventDefault()
           e.stopPropagation()

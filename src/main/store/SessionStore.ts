@@ -2,6 +2,7 @@ import { app } from 'electron'
 import { join } from 'path'
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import type { SessionGroup, SessionProfile, SessionStoreData } from '../../shared/types'
+import { applyOrder } from '../../shared/ordering'
 
 function storePath(): string {
   return join(app.getPath('userData'), 'sessions.json')
@@ -44,6 +45,12 @@ class SessionStore {
     else this.data.sessions.push(session)
     this.persist()
     return session
+  }
+
+  /** The order the sidebar shows hosts in, saved as the array's own order. */
+  reorderSessions(orderedIds: string[]): void {
+    this.data.sessions = applyOrder(this.data.sessions, orderedIds)
+    this.persist()
   }
 
   deleteSession(id: string): void {

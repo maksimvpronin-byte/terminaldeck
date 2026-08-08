@@ -62,6 +62,11 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
   move a pane back out into its own tab
 - **Broadcast** input to the terminals you tick, across every tab
 - **Snippet library** (`⌘K`): saved commands, run or merely pasted, stating where they will land
+- The session tree connects on **double-click** — a single click only selects, so a stray one
+  cannot open a terminal — and deleting a host or a group lives in the right-click menu behind a
+  prompt, never as a button on the row
+- Hosts are **sorted by hand**: drag one onto the upper or lower edge of another to drop it into
+  that gap, in its group or into a different one, and the order is kept between launches
 - **Host palette** (`⌘P`) searching saved sessions and inventories together; tick several hosts
   in the tree with `⌘`/`⇧` click and open them as tabs or tiled in one
 - **Appearance profiles**: font, size, colour theme, cursor and scrollback are set globally in

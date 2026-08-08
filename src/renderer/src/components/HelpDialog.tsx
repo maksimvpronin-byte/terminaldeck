@@ -89,12 +89,16 @@ const SECTIONS: Section[] = [
   {
     title: 'Sessions',
     rows: [
-      { what: 'Click a host to connect; right-click for connect, split, duplicate, delete' },
-      { keys: '⌘ click', what: 'Tick a host instead of connecting, to open several at once' },
+      { what: 'Double-click a host to connect; a single click only selects it' },
+      { what: 'Right-click for connect, split, duplicate, edit and delete' },
+      { what: 'Deleting lives in that menu alone, behind a prompt — no button to misclick' },
+      { keys: '⌘ click', what: 'Tick a host as well, to open several at once' },
       { keys: '⇧ click', what: 'Tick everything between the last click and this one' },
       { what: 'A bar appears with Open, for separate tabs, and Tile, for one tab' },
       { what: 'The selection spans both tabs, so saved and inventory hosts mix freely' },
       { what: 'Drag hosts and groups between groups, or onto empty space for the top level' },
+      { what: 'Drop a host onto the top or bottom edge of another to sort the list by hand' },
+      { what: 'A line shows the gap it will land in; the order is kept between launches' },
       { what: 'A group holds a shared login, key and port — hosts inside inherit them' },
       { what: 'A blank field means inherit; untick "Inherit" on a host to stand alone' },
       { what: '“On connect” types commands into the shell as soon as it opens' },

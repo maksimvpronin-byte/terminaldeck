@@ -48,9 +48,11 @@ export default function Sidebar({
   const openTab = useStore((s) => s.openTab)
   const lockVault = useStore((s) => s.lockVault)
   const moveSession = useStore((s) => s.moveSession)
+  const reorderSession = useStore((s) => s.reorderSession)
   const moveGroup = useStore((s) => s.moveGroup)
   const selectedHostIds = useStore((s) => s.selectedHostIds)
   const toggleHostSelection = useStore((s) => s.toggleHostSelection)
+  const selectOnlyHost = useStore((s) => s.selectOnlyHost)
   const selectHostRange = useStore((s) => s.selectHostRange)
   const clearHostSelection = useStore((s) => s.clearHostSelection)
   const openSelectedHosts = useStore((s) => s.openSelectedHosts)
@@ -73,6 +75,13 @@ export default function Sidebar({
     { group?: SessionGroup; parentId: string | null } | null
   >(null)
   const [dropTarget, setDropTarget] = useState<string | null>(null)
+  /** The gap a host is about to land in: which row, and which side of it. */
+  const [dropEdge, setDropEdge] = useState<{ id: string; place: 'before' | 'after' } | null>(null)
+  /**
+   * What is being dragged right now. dragover only exposes the MIME type, not
+   * the payload, so telling a host drag from a group drag needs this.
+   */
+  const [dragItem, setDragItem] = useState<DragItem | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null)
   const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsed)
@@ -131,8 +140,25 @@ export default function Sidebar({
       selectHostRange([...flattenOrder(null), ...rootSessions.map((x) => x.id)], s.id)
       return
     }
+    // Selects, never connects: opening a host is a double-click, so that a
+    // stray click on the tree cannot start a session by itself.
+    selectOnlyHost(s.id)
+  }
+
+  /**
+   * Deleting is permanent and the secret goes with it, so it always asks first
+   * — and it lives in the context menu only, never as a button on the row.
+   */
+  async function deleteSessions(ids: string[]): Promise<void> {
+    const names = ids
+      .map((id) => sessions.find((s) => s.id === id)?.name)
+      .filter((n): n is string => Boolean(n))
+    if (names.length === 0) return
+    const what =
+      names.length === 1 ? `“${names[0]}”` : `${names.length} hosts:\n\n${names.join('\n')}`
+    if (!window.confirm(`Delete ${what}?\n\nThis cannot be undone.`)) return
+    for (const id of ids) await removeSession(id)
     clearHostSelection()
-    connect(s)
   }
 
   /** A group survives filtering if it, or any descendant, still holds a match. */
@@ -147,6 +173,7 @@ export default function Sidebar({
     // Panes accept the same payload as a 'copy' (open here), the tree as a 'move'.
     e.dataTransfer.effectAllowed = 'copyMove'
     setIsDragging(true)
+    setDragItem(item)
 
     // The default drag image is the row plus whatever it contains, which reads
     // as though the branch is moving. A plain chip says exactly what is moving.
@@ -161,7 +188,9 @@ export default function Sidebar({
 
   function endDrag(): void {
     setIsDragging(false)
+    setDragItem(null)
     setDropTarget(null)
+    setDropEdge(null)
   }
 
   function allowDrop(e: ReactDragEvent, targetId: string | null): void {
@@ -170,12 +199,52 @@ export default function Sidebar({
     e.stopPropagation()
     e.dataTransfer.dropEffect = 'move'
     setDropTarget(targetId ?? ROOT_TARGET)
+    setDropEdge(null)
+  }
+
+  /** Above the middle of a row means before it, below means after it. */
+  function placeFor(e: ReactDragEvent): 'before' | 'after' {
+    const rect = e.currentTarget.getBoundingClientRect()
+    return e.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
+  }
+
+  /**
+   * Hosts are sorted by dropping them into the gap between two rows. Only a host
+   * drag does this — a group dragged over a host row still means nothing, so it
+   * falls through to the group it is over.
+   */
+  function allowReorder(e: ReactDragEvent, target: SessionProfile): void {
+    if (!dragItem || dragItem.kind !== 'session' || dragItem.id === target.id) return
+    if (!e.dataTransfer.types.includes(DRAG_MIME)) return
+    e.preventDefault()
+    e.stopPropagation()
+    e.dataTransfer.dropEffect = 'move'
+    setDropTarget(null)
+    // dragover fires continuously; keeping the same object while the gap has not
+    // changed spares the whole tree a redraw on every mouse move.
+    const place = placeFor(e)
+    setDropEdge((cur) =>
+      cur?.id === target.id && cur.place === place ? cur : { id: target.id, place }
+    )
+  }
+
+  async function handleReorderDrop(e: ReactDragEvent, target: SessionProfile): Promise<void> {
+    e.preventDefault()
+    e.stopPropagation()
+    const place = placeFor(e)
+    setDropEdge(null)
+    const raw = e.dataTransfer.getData(DRAG_MIME)
+    if (!raw) return
+    const item = JSON.parse(raw) as DragItem
+    if (item.kind !== 'session' || item.id === target.id) return
+    await reorderSession(item.id, target.id, place)
   }
 
   async function handleDrop(e: ReactDragEvent, targetGroupId: string | null): Promise<void> {
     e.preventDefault()
     e.stopPropagation()
     setDropTarget(null)
+    setDropEdge(null)
     const raw = e.dataTransfer.getData(DRAG_MIME)
     if (!raw) return
     const item = JSON.parse(raw) as DragItem
@@ -186,6 +255,11 @@ export default function Sidebar({
   function sessionMenu(s: SessionProfile): MenuItem[] {
     const state = useStore.getState()
     const activeTab = currentTab(state)
+    // Right-clicking inside a selection acts on the whole of it; right-clicking
+    // outside one acts on that row alone, whatever else happens to be ticked.
+    const targets = selectedHostIds.includes(s.id)
+      ? selectedHostIds.filter((id) => sessions.some((x) => x.id === id))
+      : [s.id]
     return [
       { label: 'Connect', onSelect: () => connect(s) },
       {
@@ -226,7 +300,12 @@ export default function Sidebar({
         label: `Copy ${addressOf(s)}`,
         onSelect: () => window.td.clipboard.write(addressOf(s))
       },
-      { label: 'Delete', danger: true, separated: true, onSelect: () => removeSession(s.id) }
+      {
+        label: targets.length > 1 ? `Delete ${targets.length} hosts…` : 'Delete…',
+        danger: true,
+        separated: true,
+        onSelect: () => deleteSessions(targets)
+      }
     ]
   }
 
@@ -273,14 +352,25 @@ export default function Sidebar({
       },
       { label: 'New session here', onSelect: () => setEditingSession('new') },
       { label: 'New subgroup…', onSelect: () => setGroupDialog({ parentId: groupId }) },
-      { label: 'Delete group', danger: true, separated: true, onSelect: () => removeGroup(groupId) }
+      {
+        label: 'Delete group…',
+        danger: true,
+        separated: true,
+        onSelect: () => {
+          // The hosts survive — they move up to the parent — so the prompt says so.
+          const moved = sessions.filter((s) => s.groupId === groupId).length
+          const note = moved > 0 ? `\n\nIts ${moved} host(s) move up a level; nothing is lost.` : ''
+          if (window.confirm(`Delete the group “${group?.name ?? ''}”?${note}`)) removeGroup(groupId)
+        }
+      }
     ]
   }
 
   function renderSession(s: SessionProfile, paddingLeft: number): JSX.Element {
+    const edge = dropEdge?.id === s.id ? ` drop-${dropEdge.place}` : ''
     return (
       <div
-        className={`tree-item ${selectedHostIds.includes(s.id) ? 'selected' : ''}`}
+        className={`tree-item ${selectedHostIds.includes(s.id) ? 'selected' : ''}${edge}`}
         onContextMenu={(e) => {
           e.preventDefault()
           e.stopPropagation()
@@ -291,7 +381,12 @@ export default function Sidebar({
         draggable
         onDragStart={(e) => startDrag(e, { kind: 'session', id: s.id }, s.name)}
         onDragEnd={endDrag}
+        onDragOver={(e) => allowReorder(e, s)}
+        onDragLeave={() => setDropEdge((cur) => (cur?.id === s.id ? null : cur))}
+        onDrop={(e) => handleReorderDrop(e, s)}
         onClick={(e) => onSessionClick(e, s)}
+        onDoubleClick={() => connect(s)}
+        title="Double-click to connect · drag to sort or to move between groups"
       >
         <span className="name">
           <span
@@ -307,9 +402,17 @@ export default function Sidebar({
             </span>
           )}
         </span>
+        {/* No delete button here on purpose: one stray click must not be able
+            to destroy a host. Deleting is in the context menu, behind a prompt. */}
         <div className="actions">
-          <button onClick={() => setEditingSession(s)}>Edit</button>
-          <button onClick={() => removeSession(s.id)}>✕</button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              setEditingSession(s)
+            }}
+          >
+            Edit
+          </button>
         </div>
       </div>
     )
@@ -357,14 +460,6 @@ export default function Sidebar({
                   }}
                 >
                   +
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    removeGroup(g.id)
-                  }}
-                >
-                  ✕
                 </button>
               </div>
             </div>
@@ -464,53 +559,57 @@ export default function Sidebar({
 
       {selectedHostIds.length > 0 && (
         <div className="selection-bar">
-          <span>{selectedHostIds.length} selected</span>
+          <span className="count">{selectedHostIds.length} selected</span>
           <span style={{ flex: 1 }} />
-          <button
-            title="Each in its own tab, in the current workspace"
-            onClick={() => openSelectedHosts('tabs')}
-          >
-            Open
-          </button>
-          <button title="All tiled in one tab" onClick={() => openSelectedHosts('grid')}>
-            Tile
-          </button>
-          <button
-            title="A new workspace with a tab per host"
-            onClick={() => openSelectedHosts('workspace')}
-          >
-            Workspace
-          </button>
-          <button
-            title="Save these hosts as a collection you can reopen later"
-            onClick={(e) => {
-              e.stopPropagation()
-              const picked = [...selectedHostIds]
-              setMenu({
-                x: e.clientX,
-                y: e.clientY,
-                items: [
-                  ...collections.map((c) => ({
-                    label: `Add to “${c.name}”`,
-                    onSelect: async () => {
-                      await addToCollection(c.id, picked)
-                      clearHostSelection()
-                    }
-                  })),
-                  {
-                    label: 'New collection…',
-                    separated: collections.length > 0,
-                    onSelect: () => setCollecting(picked)
-                  }
-                ]
-              })
-            }}
-          >
-            Collect
-          </button>
           <button className="icon-button" title="Clear" onClick={clearHostSelection}>
             ✕
           </button>
+          {/* The four verbs cannot fit beside the count in a sidebar this narrow,
+              so they take a row of their own and wrap within it. */}
+          <div className="selection-actions">
+            <button
+              title="Each in its own tab, in the current workspace"
+              onClick={() => openSelectedHosts('tabs')}
+            >
+              Open
+            </button>
+            <button title="All tiled in one tab" onClick={() => openSelectedHosts('grid')}>
+              Tile
+            </button>
+            <button
+              title="A new workspace with a tab per host"
+              onClick={() => openSelectedHosts('workspace')}
+            >
+              Workspace
+            </button>
+            <button
+              title="Save these hosts as a collection you can reopen later"
+              onClick={(e) => {
+                e.stopPropagation()
+                const picked = [...selectedHostIds]
+                setMenu({
+                  x: e.clientX,
+                  y: e.clientY,
+                  items: [
+                    ...collections.map((c) => ({
+                      label: `Add to “${c.name}”`,
+                      onSelect: async () => {
+                        await addToCollection(c.id, picked)
+                        clearHostSelection()
+                      }
+                    })),
+                    {
+                      label: 'New collection…',
+                      separated: collections.length > 0,
+                      onSelect: () => setCollecting(picked)
+                    }
+                  ]
+                })
+              }}
+            >
+              Collect
+            </button>
+          </div>
         </div>
       )}
 

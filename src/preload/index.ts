@@ -45,6 +45,9 @@ const api = {
     saveSession: (session: SessionProfile, secret?: string): Promise<SessionProfile> =>
       ipcRenderer.invoke(IPC.storeSaveSession, session, secret),
     deleteSession: (id: string): Promise<void> => ipcRenderer.invoke(IPC.storeDeleteSession, id),
+    /** The full list of session ids, in the order the tree should show them. */
+    reorderSessions: (orderedIds: string[]): Promise<void> =>
+      ipcRenderer.invoke(IPC.storeReorderSessions, orderedIds),
     saveGroup: (group: SessionGroup, secret?: string): Promise<SessionGroup> =>
       ipcRenderer.invoke(IPC.storeSaveGroup, group, secret),
     deleteGroup: (id: string): Promise<void> => ipcRenderer.invoke(IPC.storeDeleteGroup, id)
