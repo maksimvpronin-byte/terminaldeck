@@ -91,6 +91,15 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
 
 - SFTP browser: multi-select, context menu, rename, delete, mkdir, whole-directory transfers,
   Finder drag-and-drop upload, transfer progress, and auto-refresh
+- Columns for size, modification time, **permissions** — `rwxr-xr-x`, setuid, setgid and the
+  sticky bit included — owner and group. Name, mode and owner share one colour per kind: blue
+  directories, cyan symlinks, red executables, so what a file is and what made it so sit side
+  by side
+- **Everything is draggable**: the panel by its left edge, the tree by its divider, and each
+  column by its header. Widths are remembered. Ask for more width than there is and the
+  listing scrolls sideways rather than dropping a column on you
+- A **folder tree** beside the listing, filled in a level at a time as folders are opened. It
+  reveals wherever the listing went, whether you clicked, typed a path, or the terminal `cd`-ed
 - An **editable path box** with breadcrumbs: type or paste a path and press `⏎`. `~` and `..`
   are resolved by the server rather than guessed at, so they land where the shell would, and a
   path pointing at a file opens its folder with the file selected

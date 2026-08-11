@@ -3,6 +3,7 @@ import { readdir, mkdir, stat, lstat, readFile } from 'fs/promises'
 import { join, basename } from 'path'
 import { sshManager } from './SSHManager'
 import { buildTransferPlan, shouldWrite, type DestInfo } from '../../shared/transferPlan'
+import { parseLongnameOwner } from '../../shared/permissions'
 import type {
   FileComparison,
   SftpEntry,
@@ -50,15 +51,23 @@ class SFTPManager {
     const entries = await new Promise<import('ssh2').FileEntry[]>((resolve, reject) => {
       sftp.readdir(remotePath, (err, list) => (err ? reject(err) : resolve(list)))
     })
-    return entries.map((e) => ({
-      name: e.filename,
-      path: remotePath.replace(/\/$/, '') + '/' + e.filename,
-      isDirectory: (e.attrs.mode & 0o170000) === 0o040000,
-      isSymlink: (e.attrs.mode & 0o170000) === 0o120000,
-      size: e.attrs.size ?? 0,
-      mtime: (e.attrs.mtime ?? 0) * 1000,
-      permissions: (e.attrs.mode & 0o777).toString(8)
-    }))
+    return entries.map((e) => {
+      // Names if the server's listing line has them, numbers if it does not.
+      const named = parseLongnameOwner(e.longname ?? '')
+      return {
+        name: e.filename,
+        path: remotePath.replace(/\/$/, '') + '/' + e.filename,
+        isDirectory: (e.attrs.mode & 0o170000) === 0o040000,
+        isSymlink: (e.attrs.mode & 0o170000) === 0o120000,
+        size: e.attrs.size ?? 0,
+        mtime: (e.attrs.mtime ?? 0) * 1000,
+        // 0o7777, not 0o777: setuid, setgid and the sticky bit are part of what
+        // the panel shows, and /tmp reading as drwxrwxrwx would be a lie.
+        permissions: (e.attrs.mode & 0o7777).toString(8),
+        owner: named?.owner ?? String(e.attrs.uid ?? ''),
+        group: named?.group ?? String(e.attrs.gid ?? '')
+      }
+    })
   }
 
   /**
@@ -93,7 +102,11 @@ class SFTPManager {
           isSymlink: stats.isSymbolicLink(),
           size: stats.size,
           mtime: (stats.mtime ?? 0) * 1000,
-          permissions: (stats.mode & 0o777).toString(8)
+          permissions: (stats.mode & 0o7777).toString(8),
+          // lstat answers about one path and sends no listing line, so there
+          // are no names to be had here — only the ids.
+          owner: String(stats.uid ?? ''),
+          group: String(stats.gid ?? '')
         })
       })
     })

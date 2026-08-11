@@ -10,6 +10,11 @@
   --accent-dim: #2e4a75;
   --danger: #e5534b;
   --success: #3fb950;
+  /* Entry kinds in the SFTP list, following the palette file managers use:
+     executables stand out in red rather than the green `ls` would pick. */
+  --file-dir: #5b9dff;
+  --file-link: #4dd0d8;
+  --file-exec: #e5534b;
 }
 
 * {
@@ -744,12 +749,83 @@ label {
   background: rgba(23, 24, 28, 0.72);
 }
 .sftp-panel {
-  width: 320px;
   flex-shrink: 0;
   border-left: 1px solid var(--border);
   background: var(--bg-1);
   display: flex;
   flex-direction: column;
+  /* Anchors the resize grip that sits over the left border. Width is inline,
+     set by that grip. */
+  position: relative;
+}
+/* A grab strip over the panel's own border, wider than the border so it can
+   actually be hit. */
+.sftp-resize {
+  position: absolute;
+  top: 0;
+  left: -3px;
+  width: 7px;
+  height: 100%;
+  z-index: 5;
+  cursor: col-resize;
+}
+.sftp-resize:hover {
+  background: var(--accent-dim);
+}
+.sftp-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+.sftp-tree-wrap {
+  flex-shrink: 0;
+  min-width: 0;
+  display: flex;
+}
+.sftp-tree {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding: 2px 0;
+  font-size: 12px;
+  white-space: nowrap;
+}
+/* The grip between tree and listing, drawn as the border it replaces. */
+.sftp-split {
+  flex: 0 0 4px;
+  background: var(--border);
+  cursor: col-resize;
+}
+.sftp-split:hover {
+  background: var(--accent);
+}
+.sftp-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px 2px 0;
+  cursor: pointer;
+}
+.sftp-tree-row:hover {
+  background: var(--bg-2);
+}
+.sftp-tree-row.current {
+  background: var(--accent-dim);
+}
+.sftp-tree-row .twisty {
+  width: 12px;
+  flex-shrink: 0;
+  color: var(--text-dim);
+  font-size: 10px;
+  text-align: center;
+  transition: transform 0.1s;
+}
+.sftp-tree-row .twisty.open {
+  transform: rotate(90deg);
+}
+.sftp-tree-row .label {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .sftp-panel.drop-target {
   outline: 2px dashed var(--accent);
@@ -817,20 +893,76 @@ label {
 }
 .sftp-list {
   flex: 1;
-  overflow-y: auto;
+  min-width: 0;
+  overflow: auto;
+}
+.sftp-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 8px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 11px;
+}
+/* Basis 0, not auto: the name must take what the columns leave rather than
+   size itself to its text, or a long filename would push that one row's
+   columns out of line with the rest. */
+.sftp-head .name,
+.sftp-row .name {
+  flex: 1 1 0;
+  min-width: 0;
+}
+/* Each header cell owns the grip on its right edge; the cell is the positioning
+   context so the grip lands on the boundary it moves. */
+.sftp-head .head-cell {
+  position: relative;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Inside the cell, not overhanging it: the cell clips its label, and an
+   overhanging grip would be clipped with it. */
+.sftp-head .col-grip {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 8px;
+  cursor: col-resize;
+}
+.sftp-head .col-grip:hover {
+  background: var(--accent);
 }
 .sftp-row {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
   padding: 5px 8px;
   cursor: pointer;
+  /* min-width comes from the columns, inline. Past that the row fills the pane;
+     below it the listing scrolls sideways rather than dropping a column. */
 }
 .sftp-row:hover {
   background: var(--bg-2);
 }
 .sftp-row .size {
+  text-align: right;
   color: var(--text-dim);
   font-size: 11px;
+}
+/* Fixed width and a monospace face keep the triads under one another, which is
+   what makes an odd mode stand out while scanning the column. */
+.sftp-row .perms {
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  overflow: hidden;
+  white-space: nowrap;
 }
 .sftp-row.selected {
   background: var(--accent-dim);
@@ -839,6 +971,26 @@ label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.sftp-row .changed,
+.sftp-row .owner,
+.sftp-row .group {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-dim);
+  font-size: 11px;
+  white-space: nowrap;
+}
+/* Name, mode and owner carry the same colour, so a row reads as one thing: the
+   red of a script sits next to the rwx that made it one. */
+.sftp-row .kind-directory {
+  color: var(--file-dir);
+}
+.sftp-row .kind-symlink {
+  color: var(--file-link);
+}
+.sftp-row .kind-executable {
+  color: var(--file-exec);
 }
 .rename-input {
   width: 100%;

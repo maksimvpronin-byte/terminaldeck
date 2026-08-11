@@ -326,4 +326,11 @@ export interface SftpEntry {
   size: number
   mtime: number
   permissions: string
+  /**
+   * Names when the server's listing carried them, otherwise the numeric ids
+   * SFTP itself reports. Empty only for entries reached by a bare stat, which
+   * has no listing line to read them from.
+   */
+  owner: string
+  group: string
 }

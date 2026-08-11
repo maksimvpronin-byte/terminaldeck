@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from 'react'
 import type { SftpEntry, TransferDecisions, TransferPlan } from '../../../shared/types'
 import { parentOf, segmentsOf } from '../../../shared/remotePath'
+import { formatChanged, formatPermissions, kindOf } from '../../../shared/permissions'
+import SftpTree from './SftpTree'
 import ModalBackdrop from './ModalBackdrop'
 import ContextMenu, { type MenuItem } from './ContextMenu'
 import TransferConflictDialog from './TransferConflictDialog'
@@ -33,6 +35,84 @@ interface MenuState {
   entries: SftpEntry[]
 }
 
+const WIDTH_KEY = 'sftp.panelWidth'
+const TREE_KEY = 'sftp.treeOpen'
+const TREE_WIDTH_KEY = 'sftp.treeWidth'
+const COLS_KEY = 'sftp.columnWidths'
+/** Narrow enough to still show a name; wide enough for every column. */
+const MIN_WIDTH = 260
+const MAX_WIDTH = 1400
+const MIN_TREE = 120
+const MIN_COL = 44
+
+/** Every column but the name, which takes whatever is left over. */
+interface ColumnWidths {
+  size: number
+  changed: number
+  perms: number
+  owner: number
+  group: number
+}
+
+const DEFAULT_COLUMNS: ColumnWidths = {
+  size: 66,
+  changed: 132,
+  perms: 76,
+  owner: 84,
+  group: 84
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value))
+}
+
+function loadNumber(key: string, fallback: number, min: number, max: number): number {
+  const stored = Number(localStorage.getItem(key))
+  if (!Number.isFinite(stored) || stored <= 0) return fallback
+  return clamp(stored, min, max)
+}
+
+function loadColumns(): ColumnWidths {
+  try {
+    const raw = localStorage.getItem(COLS_KEY)
+    if (!raw) return DEFAULT_COLUMNS
+    const stored = JSON.parse(raw) as Partial<ColumnWidths>
+    const out = { ...DEFAULT_COLUMNS }
+    for (const key of Object.keys(DEFAULT_COLUMNS) as (keyof ColumnWidths)[]) {
+      const value = Number(stored[key])
+      if (Number.isFinite(value) && value > 0) out[key] = clamp(value, MIN_COL, 400)
+    }
+    return out
+  } catch {
+    // A layout is not worth failing over; fall back to the stock widths.
+    return DEFAULT_COLUMNS
+  }
+}
+
+/** A fixed column: never grows, never shrinks, so the header stays over its rows. */
+function col(width: number): { flex: string; width: number } {
+  return { flex: `0 0 ${width}px`, width }
+}
+
+/** Must match the row's `gap`, horizontal `padding`, and the name's floor. */
+const ROW_GAP = 10
+const ROW_PADDING = 16
+const NAME_MIN = 90
+
+/**
+ * How wide a row has to be for every column to fit.
+ *
+ * Rows cannot be sized by their content: a long filename would widen that row's
+ * name cell and shove the columns after it out of line with every other row.
+ * So the width comes from the columns themselves, and the name takes what is
+ * left — the same amount on every row, whatever it holds.
+ */
+function minRowWidth(columns: ColumnWidths): number {
+  const fixed = Object.values(columns).reduce((sum, w) => sum + w, 0)
+  const gaps = ROW_GAP * Object.keys(columns).length
+  return NAME_MIN + fixed + gaps + ROW_PADDING
+}
+
 export default function SftpPanel({ connectionId }: { connectionId?: string }): JSX.Element {
   const externalEditor = useStore((s) => s.settings.externalEditor)
   const [path, setPath] = useState('.')
@@ -60,10 +140,75 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
    * connection, switched right where the directory is being looked at.
    */
   const [following, setFollowing] = useState(false)
+  const [treeOpen, setTreeOpen] = useState(() => localStorage.getItem(TREE_KEY) !== 'false')
+  const [width, setWidth] = useState(() => loadNumber(WIDTH_KEY, 560, MIN_WIDTH, MAX_WIDTH))
+  const [treeWidth, setTreeWidth] = useState(() => loadNumber(TREE_WIDTH_KEY, 190, MIN_TREE, 600))
+  const [columns, setColumns] = useState<ColumnWidths>(loadColumns)
+  const rowWidth = minRowWidth(columns)
   const lastClickedRef = useRef<string | null>(null)
   /** Read inside the cwd listener, which is registered once per connection. */
   const pathRef = useRef(path)
   pathRef.current = path
+
+  /**
+   * One drag, wherever the grip is. `sign` is -1 for a handle on the left of
+   * what it sizes — the panel's own edge, which widens as the pointer goes
+   * left — and 1 for the ordinary case of a grip on the right.
+   *
+   * Every width is remembered: a layout arranged once should survive closing
+   * the panel, and the next connection.
+   */
+  function startDrag(
+    down: React.MouseEvent,
+    from: number,
+    sign: 1 | -1,
+    min: number,
+    max: number,
+    apply: (next: number) => void,
+    persist: (final: number) => void
+  ): void {
+    down.preventDefault()
+    down.stopPropagation()
+    const startX = down.clientX
+    let latest = from
+    const onMove = (move: MouseEvent): void => {
+      latest = clamp(from + (move.clientX - startX) * sign, min, max)
+      apply(latest)
+    }
+    const onUp = (): void => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      // Held on the body so the cursor does not flicker while the pointer is
+      // dragged off the grip and over the terminal.
+      document.body.style.cursor = ''
+      persist(latest)
+    }
+    document.body.style.cursor = 'col-resize'
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+
+  function resizeColumn(key: keyof ColumnWidths, down: React.MouseEvent): void {
+    startDrag(
+      down,
+      columns[key],
+      1,
+      MIN_COL,
+      400,
+      (next) => setColumns((cur) => ({ ...cur, [key]: next })),
+      (final) => {
+        const next = { ...columns, [key]: final }
+        localStorage.setItem(COLS_KEY, JSON.stringify(next))
+      }
+    )
+  }
+
+  function toggleTree(): void {
+    setTreeOpen((open) => {
+      localStorage.setItem(TREE_KEY, String(!open))
+      return !open
+    })
+  }
 
   useEffect(() => {
     if (!connectionId) return
@@ -421,6 +566,7 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
   return (
     <div
       className={`sftp-panel ${dragging ? 'drop-target' : ''}`}
+      style={{ width }}
       onDragOver={(e) => {
         if (!e.dataTransfer.types.includes('Files')) return
         e.preventDefault()
@@ -434,7 +580,23 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
       }}
       onClick={() => setSelected(new Set())}
     >
+      <div
+        className="sftp-resize"
+        title="Drag to resize the panel"
+        onMouseDown={(e) =>
+          startDrag(e, width, -1, MIN_WIDTH, MAX_WIDTH, setWidth, (final) =>
+            localStorage.setItem(WIDTH_KEY, String(final))
+          )
+        }
+      />
       <div className="sftp-path" onClick={(e) => e.stopPropagation()}>
+        <button
+          className={treeOpen ? 'active' : ''}
+          title={treeOpen ? 'Hide the folder tree' : 'Show the folder tree'}
+          onClick={toggleTree}
+        >
+          ⊞
+        </button>
         <button
           title="Up one level"
           disabled={path === '/' || path === '.'}
@@ -488,66 +650,124 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
           </span>
         ))}
       </div>
-      <div className="sftp-list">
-        {path !== '.' && path !== '/' && (
-          <div className="sftp-row" onDoubleClick={() => load(parentOf(path))}>
-            <span className="name">..</span>
-          </div>
+      <div className="sftp-body">
+        {treeOpen && (
+          <>
+            <div style={{ width: treeWidth }} className="sftp-tree-wrap">
+              <SftpTree connectionId={connectionId} path={path} onOpen={(p) => load(p)} />
+            </div>
+            <div
+              className="sftp-split"
+              title="Drag to resize the tree"
+              onMouseDown={(e) =>
+                startDrag(e, treeWidth, 1, MIN_TREE, 600, setTreeWidth, (final) =>
+                  localStorage.setItem(TREE_WIDTH_KEY, String(final))
+                )
+              }
+            />
+          </>
         )}
-        {entries.map((e) => (
-          <div
-            key={e.path}
-            className={`sftp-row ${selected.has(e.path) ? 'selected' : ''}`}
-            onClick={(ev) => onRowClick(ev, e)}
-            onContextMenu={(ev) => onRowContextMenu(ev, e)}
-            onDoubleClick={() => (e.isDirectory ? load(e.path) : download(e))}
-            title={e.isDirectory ? 'Double-click to open' : 'Double-click to download'}
-          >
-            {renaming?.entry.path === e.path ? (
+        <div className="sftp-list">
+          <div className="sftp-head" style={{ minWidth: rowWidth }}>
+            <span className="name">Name</span>
+            {(
+              [
+                ['size', 'Size'],
+                ['changed', 'Changed'],
+                ['perms', 'Rights'],
+                ['owner', 'Owner'],
+                ['group', 'Group']
+              ] as [keyof ColumnWidths, string][]
+            ).map(([key, label]) => (
+              <span key={key} className={`head-cell ${key}`} style={col(columns[key])}>
+                {label}
+                <span className="col-grip" onMouseDown={(e) => resizeColumn(key, e)} />
+              </span>
+            ))}
+          </div>
+          {path !== '.' && path !== '/' && (
+            <div
+              className="sftp-row"
+              style={{ minWidth: rowWidth }}
+              onDoubleClick={() => load(parentOf(path))}
+            >
+              <span className="name">..</span>
+            </div>
+          )}
+          {entries.map((e) => (
+            <div
+              key={e.path}
+              className={`sftp-row ${selected.has(e.path) ? 'selected' : ''}`}
+              style={{ minWidth: rowWidth }}
+              onClick={(ev) => onRowClick(ev, e)}
+              onContextMenu={(ev) => onRowContextMenu(ev, e)}
+              onDoubleClick={() => (e.isDirectory ? load(e.path) : download(e))}
+              title={e.isDirectory ? 'Double-click to open' : 'Double-click to download'}
+            >
+              {renaming?.entry.path === e.path ? (
+                <input
+                  autoFocus
+                  className="rename-input"
+                  value={renaming.value}
+                  onClick={(ev) => ev.stopPropagation()}
+                  onChange={(ev) => setRenaming({ entry: e, value: ev.target.value })}
+                  onBlur={doRename}
+                  onKeyDown={(ev) => {
+                    if (ev.key === 'Enter') doRename()
+                    if (ev.key === 'Escape') setRenaming(null)
+                  }}
+                />
+              ) : (
+                <>
+                  <span className={`name kind-${kindOf(e)}`}>
+                    {e.isDirectory ? '📁' : '📄'} {e.name}
+                    {editing.has(e.path) && (
+                      <span className="no-inherit" title="Open in a local editor; saves upload">
+                        ✎
+                      </span>
+                    )}
+                  </span>
+                  <span className="size" style={col(columns.size)}>
+                    {e.isDirectory ? '' : formatSize(e.size)}
+                  </span>
+                  <span className="changed" style={col(columns.changed)}>
+                    {formatChanged(e.mtime)}
+                  </span>
+                  <span
+                    className={`perms kind-${kindOf(e)}`}
+                    style={col(columns.perms)}
+                    title={`Mode ${e.permissions}`}
+                  >
+                    {formatPermissions(e.permissions)}
+                  </span>
+                  <span className={`owner kind-${kindOf(e)}`} style={col(columns.owner)}>
+                    {e.owner}
+                  </span>
+                  <span className="group" style={col(columns.group)}>
+                    {e.group}
+                  </span>
+                </>
+              )}
+            </div>
+          ))}
+          {newFolder !== null && (
+            <div className="sftp-row" style={{ minWidth: rowWidth }}>
               <input
                 autoFocus
                 className="rename-input"
-                value={renaming.value}
+                placeholder="New folder name"
+                value={newFolder}
                 onClick={(ev) => ev.stopPropagation()}
-                onChange={(ev) => setRenaming({ entry: e, value: ev.target.value })}
-                onBlur={doRename}
+                onChange={(ev) => setNewFolder(ev.target.value)}
+                onBlur={doMkdir}
                 onKeyDown={(ev) => {
-                  if (ev.key === 'Enter') doRename()
-                  if (ev.key === 'Escape') setRenaming(null)
+                  if (ev.key === 'Enter') doMkdir()
+                  if (ev.key === 'Escape') setNewFolder(null)
                 }}
               />
-            ) : (
-              <>
-                <span className="name">
-                  {e.isDirectory ? '📁' : '📄'} {e.name}
-                  {editing.has(e.path) && (
-                    <span className="no-inherit" title="Open in a local editor; saves upload">
-                      ✎
-                    </span>
-                  )}
-                </span>
-                {!e.isDirectory && <span className="size">{formatSize(e.size)}</span>}
-              </>
-            )}
-          </div>
-        ))}
-        {newFolder !== null && (
-          <div className="sftp-row">
-            <input
-              autoFocus
-              className="rename-input"
-              placeholder="New folder name"
-              value={newFolder}
-              onClick={(ev) => ev.stopPropagation()}
-              onChange={(ev) => setNewFolder(ev.target.value)}
-              onBlur={doMkdir}
-              onKeyDown={(ev) => {
-                if (ev.key === 'Enter') doMkdir()
-                if (ev.key === 'Escape') setNewFolder(null)
-              }}
-            />
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </div>
 
       {error && (
