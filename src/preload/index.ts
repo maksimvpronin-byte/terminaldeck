@@ -42,13 +42,14 @@ const api = {
   },
   store: {
     load: (): Promise<SessionStoreData> => ipcRenderer.invoke(IPC.storeLoad),
-    saveSession: (session: SessionProfile, secret?: string): Promise<SessionProfile> =>
+    /** `secret`: a string stores it, undefined keeps what is there, null forgets it. */
+    saveSession: (session: SessionProfile, secret?: string | null): Promise<SessionProfile> =>
       ipcRenderer.invoke(IPC.storeSaveSession, session, secret),
     deleteSession: (id: string): Promise<void> => ipcRenderer.invoke(IPC.storeDeleteSession, id),
     /** The full list of session ids, in the order the tree should show them. */
     reorderSessions: (orderedIds: string[]): Promise<void> =>
       ipcRenderer.invoke(IPC.storeReorderSessions, orderedIds),
-    saveGroup: (group: SessionGroup, secret?: string): Promise<SessionGroup> =>
+    saveGroup: (group: SessionGroup, secret?: string | null): Promise<SessionGroup> =>
       ipcRenderer.invoke(IPC.storeSaveGroup, group, secret),
     deleteGroup: (id: string): Promise<void> => ipcRenderer.invoke(IPC.storeDeleteGroup, id)
   },
@@ -65,7 +66,7 @@ const api = {
       ipcRenderer.invoke(IPC.inventoryRemoveSource, id),
     sync: (id: string): Promise<InventoryTree> => ipcRenderer.invoke(IPC.inventorySync, id),
     syncAll: (): Promise<void> => ipcRenderer.invoke(IPC.inventorySyncAll),
-    saveOverride: (override: InventoryOverride, secret?: string): Promise<void> =>
+    saveOverride: (override: InventoryOverride, secret?: string | null): Promise<void> =>
       ipcRenderer.invoke(IPC.inventorySaveOverride, override, secret),
     clearOverride: (nodeId: string): Promise<void> =>
       ipcRenderer.invoke(IPC.inventoryClearOverride, nodeId)

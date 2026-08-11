@@ -67,6 +67,22 @@ function firstDefined<K extends keyof AuthDefaults>(
 }
 
 /**
+ * Which level a value actually comes from: the item itself, a group, or nowhere.
+ * `inheritedFrom` cannot tell "the item's own" from "nobody states it", which is
+ * exactly the difference when two values are compared to see whether they were
+ * set together — a key file and its passphrase, say.
+ */
+export function sourceOf(
+  own: AuthDefaults,
+  groupId: string | null,
+  groups: SessionGroup[],
+  key: keyof AuthDefaults
+): 'self' | SessionGroup | undefined {
+  if (isSet(own[key])) return 'self'
+  return inheritedFrom(own, groupId, groups, key)
+}
+
+/**
  * Where each effective value came from, so the UI can show what a blank field
  * will actually use. Returns undefined when the value is the item's own.
  */

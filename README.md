@@ -28,10 +28,15 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
 ### Credentials
 
 - Encrypted local vault (AES-256-GCM, master password via scrypt), with a lock button, `⌘L`,
-  and a 15-minute idle auto-lock; the master password can be rotated without losing secrets
+  and a 15-minute idle auto-lock; the master password can be rotated without losing secrets.
+  Deleting a host, a group, a repository or a local override takes its stored credential with it,
+  rather than leaving it in the vault
 - **Inheritance**: a session leaves fields unset to take them from its group, a group from its
   parent, and an inventory host from its repository — so a shared login is set once. Inheritance
-  can be switched off per host or group
+  can be switched off per host or group. The nearest value wins, so a host that has a password of
+  its own keeps using it after being moved into a group; its dialog says so, and setting the auth
+  method back to **Inherit** drops that password in the same move, so the group's is used — one
+  click, and reversible before saving
 - Host key verification against a local `known_hosts`, prompting on first contact and warning
   loudly when a stored key changes; stored keys can be reviewed and revoked
 - **On-connect commands**: lines typed into the shell as soon as it opens — `sudo -i`,

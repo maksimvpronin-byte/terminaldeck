@@ -46,6 +46,20 @@ function reportTransfer(
   win.webContents.send(`${IPC.sftpProgress}:${connectionId}`, { path, transferred, total })
 }
 
+/**
+ * Drops an item's own credential so it inherits again. Without this a host that
+ * once had a password of its own keeps using it forever: the nearest value wins,
+ * so moving the host into a group leaves the group's credentials unused.
+ *
+ * The reference goes even if the vault is locked and the ciphertext cannot be
+ * removed right now — an unreferenced secret is unreachable, and leaving the
+ * reference behind would keep the old password in use.
+ */
+function forgetSecret(item: { secretRef?: string }): void {
+  if (item.secretRef && vault.status().unlocked) vault.deleteSecret(item.secretRef)
+  item.secretRef = undefined
+}
+
 function describeRule(rule: PortForwardRule): string {
   const src = `${rule.srcHost}:${rule.srcPort}`
   if (rule.type === 'dynamic') return `SOCKS ${src}`
@@ -92,8 +106,9 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.storeLoad, () => sessionStore.getAll())
   ipcMain.handle(
     IPC.storeSaveSession,
-    (_e, session: SessionProfile, secret?: string) => {
-      if (secret !== undefined) {
+    (_e, session: SessionProfile, secret?: string | null) => {
+      if (secret === null) forgetSecret(session)
+      else if (secret !== undefined) {
         session.secretRef = session.secretRef ?? randomUUID()
         vault.setSecret(session.secretRef, secret)
       }
@@ -101,19 +116,30 @@ export function registerIpcHandlers(): void {
     }
   )
   ipcMain.handle(IPC.storeDeleteSession, (_e, id: string) => {
+    // The credential goes with the host. Left behind it would sit in the vault
+    // for good, since nothing points at it any more.
+    const session = sessionStore.getAll().sessions.find((s) => s.id === id)
+    if (session) forgetSecret(session)
     sessionStore.deleteSession(id)
   })
   ipcMain.handle(IPC.storeReorderSessions, (_e, orderedIds: string[]) => {
     sessionStore.reorderSessions(orderedIds)
   })
-  ipcMain.handle(IPC.storeSaveGroup, (_e, group: SessionGroup, secret?: string) => {
-    if (secret !== undefined) {
+  ipcMain.handle(IPC.storeSaveGroup, (_e, group: SessionGroup, secret?: string | null) => {
+    if (secret === null) forgetSecret(group)
+    else if (secret !== undefined) {
       group.secretRef = group.secretRef ?? randomUUID()
       vault.setSecret(group.secretRef, secret)
     }
     return sessionStore.saveGroup(group)
   })
-  ipcMain.handle(IPC.storeDeleteGroup, (_e, id: string) => sessionStore.deleteGroup(id))
+  ipcMain.handle(IPC.storeDeleteGroup, (_e, id: string) => {
+    // Only the group's own credential: hosts and subgroups are re-parented, not
+    // deleted, and keep whatever they hold themselves.
+    const group = sessionStore.getAll().groups.find((g) => g.id === id)
+    if (group) forgetSecret(group)
+    return sessionStore.deleteGroup(id)
+  })
 
   // --- Inventory ---
   ipcMain.handle(IPC.inventoryGitAvailable, () => isGitAvailable())
@@ -125,22 +151,34 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.inventorySaveSource, (_e, source: InventorySource) =>
     inventoryStore.saveSource(source)
   )
-  ipcMain.handle(IPC.inventoryRemoveSource, (_e, id: string) => inventoryStore.removeSource(id))
+  ipcMain.handle(IPC.inventoryRemoveSource, (_e, id: string) => {
+    // Removing a repository takes its overrides with it, so their credentials go
+    // too — along with the repository's own.
+    const source = inventoryStore.sources().find((s) => s.id === id)
+    if (source) forgetSecret(source)
+    for (const override of inventoryStore.overrides()) {
+      if (override.nodeId.startsWith(`inv:${id}:`)) forgetSecret(override)
+    }
+    return inventoryStore.removeSource(id)
+  })
   ipcMain.handle(IPC.inventorySync, (_e, id: string) => inventoryStore.sync(id))
   ipcMain.handle(IPC.inventorySyncAll, () => inventoryStore.syncAll())
   ipcMain.handle(
     IPC.inventorySaveOverride,
-    (_e, override: InventoryOverride, secret?: string) => {
-      if (secret !== undefined) {
+    (_e, override: InventoryOverride, secret?: string | null) => {
+      if (secret === null) forgetSecret(override)
+      else if (secret !== undefined) {
         override.secretRef = override.secretRef ?? randomUUID()
         vault.setSecret(override.secretRef, secret)
       }
       return inventoryStore.saveOverride(override)
     }
   )
-  ipcMain.handle(IPC.inventoryClearOverride, (_e, nodeId: string) =>
-    inventoryStore.clearOverride(nodeId)
-  )
+  ipcMain.handle(IPC.inventoryClearOverride, (_e, nodeId: string) => {
+    const override = inventoryStore.overrides().find((o) => o.nodeId === nodeId)
+    if (override) forgetSecret(override)
+    return inventoryStore.clearOverride(nodeId)
+  })
 
   // --- Backup ---
   ipcMain.handle(IPC.backupExport, (_e, includeSecrets: boolean, password?: string) =>

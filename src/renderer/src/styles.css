@@ -1258,6 +1258,12 @@ textarea:focus {
   color: var(--text-dim);
   line-height: 1.5;
 }
+/* A note about something that will probably not work, rather than an error. */
+.warning-note {
+  color: var(--text);
+  border-left: 2px solid var(--danger);
+  padding-left: 8px;
+}
 .success-text {
   color: var(--success);
   font-size: 12px;

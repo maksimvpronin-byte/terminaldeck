@@ -35,6 +35,9 @@ export default function InventoryOverrideDialog({ node, groups, onClose }: Props
 
   const [override, setOverride] = useState<InventoryOverride>(existing ?? { nodeId: node.id })
   const [secret, setSecret] = useState('')
+  // A credential kept here wins over anything the inventory says, so dropping it
+  // has to be possible without throwing the rest of the override away.
+  const [forgetSecret, setForgetSecret] = useState(false)
 
   function set<K extends keyof InventoryOverride>(key: K, value: InventoryOverride[K]): void {
     setOverride((o) => ({ ...o, [key]: value }))
@@ -73,18 +76,21 @@ export default function InventoryOverrideDialog({ node, groups, onClose }: Props
   }
 
   async function submit(): Promise<void> {
+    const toSave: InventoryOverride = forgetSecret ? { ...override, secretRef: undefined } : override
     const hasContent =
       secret !== '' ||
-      Object.entries(override).some(
+      Object.entries(toSave).some(
         ([key, value]) => key !== 'nodeId' && value !== undefined && value !== null && value !== ''
       )
     // An override with nothing in it would still mark the host as customised.
+    // Clearing it drops the credential too, so forgetting one is not lost here.
     if (!hasContent) {
       if (existing) await clearInventoryOverride(node.id)
       onClose()
       return
     }
-    await saveInventoryOverride(override, secret || undefined)
+    // A password typed in now beats the "forget" tick — it is the later answer.
+    await saveInventoryOverride(toSave, secret || (forgetSecret ? null : undefined))
     onClose()
   }
 
@@ -130,7 +136,12 @@ export default function InventoryOverrideDialog({ node, groups, onClose }: Props
           Auth method
           <select
             value={override.authMethod ?? ''}
-            onChange={(e) => set('authMethod', (e.target.value || undefined) as AuthMethod)}
+            onChange={(e) => {
+              set('authMethod', (e.target.value || undefined) as AuthMethod)
+              // Handing the method back to the inventory hands the credential
+              // back with it, rather than leaving a local password in the way.
+              if (isSet(override.secretRef)) setForgetSecret(e.target.value === '')
+            }}
           >
             <option value="">From the inventory ({fromRepo.authMethod})</option>
             <option value="password">Password</option>
@@ -141,9 +152,23 @@ export default function InventoryOverrideDialog({ node, groups, onClose }: Props
 
         {effective.authMethod === 'password' && (
           <label>
-            Password (leave blank to keep the current one)
+            Password{' '}
+            {isSet(override.secretRef) && !forgetSecret
+              ? '(saved here, and it overrides the inventory)'
+              : '(leave blank to keep the current one)'}
             <input type="password" value={secret} onChange={(e) => setSecret(e.target.value)} />
           </label>
+        )}
+
+        {isSet(override.secretRef) && effective.authMethod !== 'agent' && (
+          <p className="settings-note">
+            {forgetSecret
+              ? 'On save this password is forgotten, and the host is asked for one on connect.'
+              : 'This password is kept locally for this host alone, so nothing set on a group above it is used.'}{' '}
+            <button type="button" onClick={() => setForgetSecret(!forgetSecret)}>
+              {forgetSecret ? 'Keep it' : 'Forget it'}
+            </button>
+          </p>
         )}
 
         {effective.authMethod === 'privateKey' && (

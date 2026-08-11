@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolveAuth, inheritedFrom } from './authResolution'
+import { resolveAuth, inheritedFrom, sourceOf } from './authResolution'
 import type { SessionGroup } from './types'
 
 const groups: SessionGroup[] = [
@@ -29,6 +29,13 @@ describe('resolveAuth', () => {
 
   it('inherits from the immediate group', () => {
     expect(resolveAuth({}, 'prod', groups).username).toBe('root')
+    expect(resolveAuth({}, 'prod', groups).secretRef).toBe('prod-secret')
+  })
+
+  it("keeps a host's own credential when it joins a group that states one", () => {
+    // Dragging a host into a group does not re-credential it: the nearest value
+    // wins, so the group's password stays unused until the host's own is dropped.
+    expect(resolveAuth({ secretRef: 'own-secret' }, 'prod', groups).secretRef).toBe('own-secret')
     expect(resolveAuth({}, 'prod', groups).secretRef).toBe('prod-secret')
   })
 
@@ -122,6 +129,30 @@ describe('inheritedFrom', () => {
 
   it('returns nothing when no ancestor defines it', () => {
     expect(inheritedFrom({}, 'prod', groups, 'privateKeyPath')).toBeUndefined()
+  })
+})
+
+describe('sourceOf', () => {
+  it("calls the item's own value its own, which inheritedFrom cannot", () => {
+    expect(sourceOf({ secretRef: 'mine' }, 'prod', groups, 'secretRef')).toBe('self')
+  })
+
+  it('names the group a blank field takes its value from', () => {
+    expect(sourceOf({}, 'prod', groups, 'secretRef')).toMatchObject({ id: 'prod' })
+  })
+
+  it('is undefined when nothing in the chain states it', () => {
+    expect(sourceOf({}, 'prod', groups, 'privateKeyPath')).toBeUndefined()
+  })
+
+  it('tells a key file and its passphrase apart when they come from different levels', () => {
+    const chain: SessionGroup[] = [
+      { id: 'keys', name: 'Keys', parentId: null, privateKeyPath: '/k/id_ed25519' }
+    ]
+    // A leftover password on the host would be handed to the group's key.
+    const host = { secretRef: 'old-password' }
+    expect(sourceOf(host, 'keys', chain, 'privateKeyPath')).toMatchObject({ id: 'keys' })
+    expect(sourceOf(host, 'keys', chain, 'secretRef')).toBe('self')
   })
 })
 

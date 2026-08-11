@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { nanoid } from 'nanoid'
 import type { AppearanceDefaults, AuthMethod, SessionGroup } from '../../../shared/types'
 import { resolveAuth, inheritedFrom } from '../../../shared/authResolution'
+import { isSet } from '../../../shared/overrides'
 import {
   appearanceSource,
   inheritedAppearance,
@@ -27,6 +28,7 @@ export default function GroupDialog({ initial, parentId = null, onClose }: Props
     initial ?? { id: nanoid(), name: '', parentId }
   )
   const [secret, setSecret] = useState('')
+  const [forgetSecret, setForgetSecret] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   function set<K extends keyof SessionGroup>(key: K, value: SessionGroup[K]): void {
@@ -37,12 +39,24 @@ export default function GroupDialog({ initial, parentId = null, onClose }: Props
     setGroup((g) => ({ ...g, [key]: value }))
   }
 
-  // What this group would use if it defines nothing itself.
-  const effective = resolveAuth(group, group.parentId, groups)
+  /**
+   * "Inherit" covers the credential as well: the group's own is dropped in the
+   * same move, so it stops shadowing the parent's. Picking a method again keeps
+   * it, and the note below says which way it stands.
+   */
+  function chooseInheritance(inherit: boolean): void {
+    if (ownSecret) setForgetSecret(inherit)
+  }
+
+  // What this group would use if it defines nothing itself. A pending "forget"
+  // counts, so the note can say what the group falls back to.
+  const pending: SessionGroup = forgetSecret ? { ...group, secretRef: undefined } : group
+  const effective = resolveAuth(pending, pending.parentId, groups)
   const from = (key: Parameters<typeof inheritedFrom>[3]): string => {
-    const source = inheritedFrom(group, group.parentId, groups, key)
+    const source = inheritedFrom(pending, pending.parentId, groups, key)
     return source ? `inherited from ${source.name}` : ''
   }
+  const ownSecret = isSet(group.secretRef)
 
   const appearance = resolveAppearance(group, group.parentId, groups, settings)
   const inheritedLook = inheritedAppearance(group, group.parentId, groups, settings)
@@ -61,9 +75,31 @@ export default function GroupDialog({ initial, parentId = null, onClose }: Props
       setError('Name is required')
       return
     }
-    await upsertGroup(group, secret || undefined)
+    // A password typed in now beats the "forget" tick — it is the later answer.
+    await upsertGroup(group, secret || (forgetSecret ? null : undefined))
     onClose()
   }
+
+  const secretHint =
+    ownSecret && !forgetSecret
+      ? '(saved on this group)'
+      : from('secretRef')
+        ? `(blank keeps the one ${from('secretRef')})`
+        : '(leave blank to keep or inherit)'
+
+  /** Lets a group hand the credential back to its parent, or drop a wrong one. */
+  const ownSecretNote = ownSecret ? (
+    <p className="settings-note">
+      {forgetSecret
+        ? `On save this group forgets its own, and uses ${
+            from('secretRef') ? `the one ${from('secretRef')}` : 'whatever each host is asked for'
+          }.`
+        : 'Hosts inside use this unless they hold one of their own — a host that does keeps using it.'}{' '}
+      <button type="button" onClick={() => setForgetSecret(!forgetSecret)}>
+        {forgetSecret ? 'Keep it' : 'Forget it'}
+      </button>
+    </p>
+  ) : null
 
   // A group cannot become its own descendant.
   const candidateParents = groups.filter((g) => {
@@ -112,7 +148,10 @@ export default function GroupDialog({ initial, parentId = null, onClose }: Props
             <input
               type="checkbox"
               checked={group.inheritAuth !== false}
-              onChange={(e) => set('inheritAuth', e.target.checked ? undefined : false)}
+              onChange={(e) => {
+                set('inheritAuth', e.target.checked ? undefined : false)
+                chooseInheritance(e.target.checked)
+              }}
             />
             Inherit connection settings from the parent group
           </label>
@@ -142,7 +181,10 @@ export default function GroupDialog({ initial, parentId = null, onClose }: Props
           Auth method
           <select
             value={group.authMethod ?? ''}
-            onChange={(e) => set('authMethod', (e.target.value || undefined) as AuthMethod)}
+            onChange={(e) => {
+              set('authMethod', (e.target.value || undefined) as AuthMethod)
+              chooseInheritance(e.target.value === '')
+            }}
           >
             <option value="">Inherit ({effective.authMethod})</option>
             <option value="password">Password</option>
@@ -153,7 +195,7 @@ export default function GroupDialog({ initial, parentId = null, onClose }: Props
 
         {(group.authMethod ?? effective.authMethod) === 'password' && (
           <label>
-            Password (leave blank to keep or inherit)
+            Password {secretHint}
             <input type="password" value={secret} onChange={(e) => setSecret(e.target.value)} />
           </label>
         )}
@@ -174,11 +216,13 @@ export default function GroupDialog({ initial, parentId = null, onClose }: Props
               </button>
             </div>
             <label>
-              Passphrase (leave blank to keep or inherit)
+              Passphrase {secretHint}
               <input type="password" value={secret} onChange={(e) => setSecret(e.target.value)} />
             </label>
           </>
         )}
+
+        {(group.authMethod ?? effective.authMethod) !== 'agent' && ownSecretNote}
 
         <label>
           On connect
