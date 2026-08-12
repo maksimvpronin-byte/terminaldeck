@@ -1,3 +1,5 @@
+import type { Protocol } from './protocols'
+
 export type AuthMethod = 'password' | 'privateKey' | 'agent'
 
 /**
@@ -96,6 +98,13 @@ export interface PortForwardRule {
 export interface SessionProfile extends AuthDefaults, AppearanceDefaults {
   id: string
   name: string
+  /**
+   * What this machine speaks. Absent means SSH — every host saved before the
+   * field existed is one, and unlike the AuthDefaults fields this one does not
+   * inherit: it says what a machine is, and a group holds Linux and Windows
+   * boxes alike. See shared/protocols.ts.
+   */
+  protocol?: Protocol
   host: string
   groupId: string | null
   tags: string[]

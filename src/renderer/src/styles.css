@@ -1046,6 +1046,46 @@ label {
   font-size: 12px;
 }
 
+/* --- graphical sessions --- */
+.graphical-host {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-0);
+}
+/* The client owns this element and puts its canvas inside; nothing else may lay
+   it out, or the framebuffer is measured against the wrong box. */
+.graphical-screen {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+/* Over the screen rather than instead of it: the element the client drew into
+   has to stay mounted while credentials are being asked for. */
+.graphical-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+}
+.graphical-notice {
+  width: 340px;
+  max-width: 90%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-align: center;
+}
+
 /* --- context menu --- */
 .context-menu {
   position: fixed;

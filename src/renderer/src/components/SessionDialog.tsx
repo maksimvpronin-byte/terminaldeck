@@ -14,6 +14,7 @@ import {
   resolveAppearance
 } from '../../../shared/appearance'
 import { groupPath } from '../../../shared/groups'
+import { PROTOCOLS, protocolOf, traitsOf, type Protocol } from '../../../shared/protocols'
 import { useStore } from '../state/store'
 import { SESSION_COLOURS } from '../state/colours'
 import AppearanceFields from './AppearanceFields'
@@ -188,6 +189,19 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
         </label>
 
         <div className="form-row">
+          <label style={{ flex: 1 }}>
+            Protocol
+            <select
+              value={protocolOf(profile)}
+              onChange={(e) => set('protocol', e.target.value as Protocol)}
+            >
+              {PROTOCOLS.map((p) => (
+                <option key={p} value={p}>
+                  {traitsOf(p).label}
+                </option>
+              ))}
+            </select>
+          </label>
           <label style={{ flex: 3 }}>
             Host
             <input value={profile.host} onChange={(e) => set('host', e.target.value)} />
@@ -197,11 +211,23 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
             <input
               type="number"
               value={profile.port ?? ''}
-              placeholder={String(effective.port)}
+              // The protocol's own default, so switching to RDP offers 3389
+              // rather than the 22 an SSH chain would have inherited.
+              placeholder={String(
+                protocolOf(profile) === 'ssh' ? effective.port : traitsOf(protocolOf(profile)).port
+              )}
               onChange={(e) => set('port', e.target.value ? Number(e.target.value) : undefined)}
             />
           </label>
         </div>
+
+        {protocolOf(profile) !== 'ssh' && (
+          <p className="settings-note warning-note">
+            {traitsOf(protocolOf(profile)).label} sessions open a desktop rather than a shell, so
+            the file browser, port forwarding, monitoring and broadcast do not apply to them. The
+            desktop itself is not carried yet — the proxy that speaks it is still to come.
+          </p>
+        )}
 
         {profile.groupId && (
           <label className="checkbox-row" style={{ flexDirection: 'row' }}>

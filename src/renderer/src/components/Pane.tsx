@@ -4,9 +4,11 @@ import type { PaneNode, PaneTarget } from '../state/store'
 import { useStore, collectBroadcastTargets, collectLeaves, activeTab, allTabs, findTab } from '../state/store'
 import { DRAG_MIME, edgeFromPoint, edgeToSplit, type DragItem, type DropEdge } from '../state/dnd'
 import TerminalHost from './TerminalHost'
+import GraphicalHost from './GraphicalHost'
 import SftpPanel from './SftpPanel'
 import TunnelsPanel from './TunnelsPanel'
 import MonitorBar from './MonitorBar'
+import { protocolOf, traitsOf } from '../../../shared/protocols'
 import { SplitRightIcon, SplitDownIcon, CloseIcon, DetachIcon } from './icons'
 import { keyHint } from '../state/keys'
 
@@ -35,6 +37,23 @@ export default function Pane({
 
   const splitPaneWith = useStore((s) => s.splitPaneWith)
   const closeTab = useStore((s) => s.closeTab)
+
+  // Read from the profile rather than copied onto the leaf: changing a host's
+  // protocol should take effect in its open panes, not only in the next one.
+  // Quick-connect has no profile and is SSH by definition.
+  const sessionId = node.target.kind === 'session' ? node.target.sessionId : null
+  const protocol = useStore((s) =>
+    sessionId ? protocolOf(s.sessions.find((x) => x.id === sessionId)) : 'ssh'
+  )
+  const host = useStore((s) =>
+    sessionId ? s.sessions.find((x) => x.id === sessionId)?.host : undefined
+  )
+  // Unset means the protocol's own default, which GraphicalHost fills in. The
+  // SSH inheritance chain is not consulted: it resolves to 22.
+  const port = useStore((s) =>
+    sessionId ? s.sessions.find((x) => x.id === sessionId)?.port : undefined
+  )
+  const traits = traitsOf(protocol)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const [dropEdge, setDropEdge] = useState<DropEdge | null>(null)
 
@@ -95,7 +114,7 @@ export default function Pane({
       >
         <span>{node.title}</span>
         <div className="actions">
-          {broadcast && (
+          {broadcast && traits.broadcast && (
             <label className="broadcast-check" title="Include this terminal in broadcast">
               <input
                 type="checkbox"
@@ -119,20 +138,28 @@ export default function Pane({
           >
             <SplitDownIcon />
           </button>
-          <button title="Toggle SFTP browser" onClick={() => toggleSftp(tabId, node.id)}>
-            SFTP
-          </button>
-          <button title="Toggle port forwarding" onClick={() => toggleTunnels(tabId, node.id)}>
-            Tunnels
-          </button>
-          <button
-            className={node.monitorOpen ? 'active' : ''}
-            disabled={!node.connectionId}
-            title="Toggle remote monitoring"
-            onClick={() => toggleMonitor(tabId, node.id)}
-          >
-            Monitor
-          </button>
+          {/* Hidden rather than disabled: these ride on an SSH connection, and a
+              desktop session will never have one to offer them. */}
+          {traits.files && (
+            <button title="Toggle SFTP browser" onClick={() => toggleSftp(tabId, node.id)}>
+              SFTP
+            </button>
+          )}
+          {traits.tunnels && (
+            <button title="Toggle port forwarding" onClick={() => toggleTunnels(tabId, node.id)}>
+              Tunnels
+            </button>
+          )}
+          {traits.monitor && (
+            <button
+              className={node.monitorOpen ? 'active' : ''}
+              disabled={!node.connectionId}
+              title="Toggle remote monitoring"
+              onClick={() => toggleMonitor(tabId, node.id)}
+            >
+              Monitor
+            </button>
+          )}
           {isSplit && (
             <button
               className="icon-button"
@@ -152,25 +179,29 @@ export default function Pane({
         </div>
       </div>
       <div className="pane-body">
-        <TerminalHost
-          target={node.target}
-          viaCollectionId={node.viaCollectionId}
-          connectionId={node.connectionId}
-          active={isActive}
-          restored={node.restored}
-          onFocus={() => setActivePane(tabId, node.id)}
-          onOutput={() => markActivity(tabId)}
-          onConnected={(connectionId) => setPaneConnection(tabId, node.id, connectionId)}
-          resolveWriteTargets={(own) => {
-            const state = useStore.getState()
-            // A terminal excluded from broadcast keeps its own input to itself.
-            if (!state.broadcast || !node.broadcastEnabled) return [own]
-            const all = allTabs(state).flatMap((t) => collectBroadcastTargets(t.root))
-            return all.length > 0 ? all : [own]
-          }}
-        />
-        {node.sftpOpen && <SftpPanel connectionId={node.connectionId} />}
-        {node.tunnelsOpen && (
+        {traits.textual ? (
+          <TerminalHost
+            target={node.target}
+            viaCollectionId={node.viaCollectionId}
+            connectionId={node.connectionId}
+            active={isActive}
+            restored={node.restored}
+            onFocus={() => setActivePane(tabId, node.id)}
+            onOutput={() => markActivity(tabId)}
+            onConnected={(connectionId) => setPaneConnection(tabId, node.id, connectionId)}
+            resolveWriteTargets={(own) => {
+              const state = useStore.getState()
+              // A terminal excluded from broadcast keeps its own input to itself.
+              if (!state.broadcast || !node.broadcastEnabled) return [own]
+              const all = allTabs(state).flatMap((t) => collectBroadcastTargets(t.root))
+              return all.length > 0 ? all : [own]
+            }}
+          />
+        ) : (
+          <GraphicalHost protocol={protocol} host={host} port={port} />
+        )}
+        {traits.files && node.sftpOpen && <SftpPanel connectionId={node.connectionId} />}
+        {traits.tunnels && node.tunnelsOpen && (
           <TunnelsPanel
             connectionId={node.connectionId}
             sessionId={node.target.kind === 'session' ? node.target.sessionId : undefined}
@@ -179,7 +210,7 @@ export default function Pane({
       </div>
       {/* Below the body, not inside it: the strip is about the host, so it
           spans the terminal and any panel open beside it. */}
-      {node.monitorOpen && <MonitorBar connectionId={node.connectionId} />}
+      {traits.monitor && node.monitorOpen && <MonitorBar connectionId={node.connectionId} />}
     </div>
   )
 }
