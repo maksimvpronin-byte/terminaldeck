@@ -140,6 +140,8 @@ paths have only ever been exercised by unit tests or by hand on a local stand-in
 
 **Written but not yet proven in real use**
 
+- **Host-to-host copying.** The planner is unit-tested, but the transfer itself — two SFTP
+  channels piped together — has never run against two real servers, only been reasoned about
 - Jump host / ProxyJump, including for inventory hosts
 - Inventory sync from a *remote* repository — only a local `file://` clone has been run, so
   authentication through SSH keys and credential helpers is untested
@@ -179,7 +181,10 @@ npm test
 Tests cover the parts where a silent failure costs most: vault crypto, the `~/.ssh/config` and
 Ansible inventory parsers, the credential and appearance inheritance chains, the pane tree, the
 workspace selectors with the migration of layouts saved before workspaces existed, remote path
-handling, the transfer conflict planner, and the diff engine.
+handling, the transfer conflict planner, and the diff engine. Also the readers that parse what a
+host sends back — the `/proc` monitoring probe, `OSC 7` directory reports and the suppression of
+their echo, permission bits — and the hand-sorting order, since all of these fail by quietly
+producing a plausible wrong answer rather than by throwing.
 
 ## Building installers
 

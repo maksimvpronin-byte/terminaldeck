@@ -4,11 +4,12 @@ The version in `package.json` is the one the app reports and the one
 `electron-updater` compares against. A `v*` tag matching it is what actually
 publishes a release — see [Releasing](README.md#releasing). Bumping one without
 the other produces a version nobody can install, which is how 0.1.10 through
-0.3.2 came to be built and never shipped.
+0.3.2 came to be written and never released: no tag, so no build ever ran.
 
-## 0.4.0 — not yet released
+## 0.4.0
 
-Everything below landed after 0.3.2 without a version bump of its own.
+The first release since 0.1.9 — see the note above. Everything below had landed
+after 0.3.2 without a version bump of its own.
 
 ### Added
 
