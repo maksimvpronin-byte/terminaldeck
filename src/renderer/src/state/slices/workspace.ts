@@ -398,6 +398,15 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
     }))
   },
 
+  toggleMonitor: (tabId, paneId) => {
+    set((s) => ({
+      workspaces: mapTab(s.workspaces, tabId, (t) => ({
+        ...t,
+        root: mapPane(t.root, paneId, (leaf) => ({ ...leaf, monitorOpen: !leaf.monitorOpen }))
+      }))
+    }))
+  },
+
   resizeSplit: (tabId, splitId, sizes) => {
     set((s) => ({
       workspaces: mapTab(s.workspaces, tabId, (t) => ({

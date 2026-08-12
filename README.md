@@ -91,6 +91,10 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
 
 - SFTP browser: multi-select, context menu, rename, delete, mkdir, whole-directory transfers,
   Finder drag-and-drop upload, transfer progress, and auto-refresh
+- **Host-to-host copying**: drag files or folders from one open SFTP panel onto another and they
+  are streamed across, source socket to destination socket. The two servers need no route to
+  each other, and nothing is staged on your disk on the way. Drop onto a folder row to land
+  inside it rather than in the directory being listed
 - Columns for size, modification time, **permissions** — `rwxr-xr-x`, setuid, setgid and the
   sticky bit included — owner and group. Name, mode and owner share one colour per kind: blue
   directories, cyan symlinks, red executables, so what a file is and what made it so sit side
@@ -103,6 +107,10 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
 - An **editable path box** with breadcrumbs: type or paste a path and press `⏎`. `~` and `..`
   are resolved by the server rather than guessed at, so they land where the shell would, and a
   path pointing at a file opens its folder with the file selected
+- **Remote monitoring**: a strip under the pane with processor load and a short history of it,
+  memory in use, network throughput, uptime, the logged-in user, and how full each mounted disk
+  is, with a warning colour past 75% and an alarm past 90%. It polls on its own channel, so
+  nothing is typed into your shell, and only while the strip is open
 - **Follow the terminal**, optionally: the `⇉` button in the path bar makes the panel track the
   shell's `cd`, and switches it back off, on the live connection — no dialog, no reconnect. It
   watches for the `OSC 7` sequence a shell prints on each prompt and types a one-line setup into
@@ -208,10 +216,28 @@ open dist/mac-arm64/TerminalDeck.app
 Pushing a `v*` tag runs `.github/workflows/release.yml`, which builds macOS, Windows and Linux
 artifacts and publishes them to a GitHub release. The in-app updater reads that release.
 
+**The tag is what ships, not the version in `package.json`.** Editing the version by hand
+changes what the app reports about itself and nothing else: no build runs, no release appears,
+and nobody is offered the update. Versions 0.1.10 through 0.3.2 were bumped this way and never
+published, which is why the newest release on GitHub is far behind the source.
+
+`npm version` does both halves at once and is the only route that cannot drift:
+
 ```bash
-npm version patch    # or minor / major — creates the commit and tag
+npm version minor    # or patch / major — bumps package.json, commits, and tags
 git push --follow-tags
 ```
+
+It refuses to run on a dirty working tree, so commit first. If a version has already been set
+by hand, tag that same version rather than bumping past it:
+
+```bash
+git tag "v$(node -p "require('./package.json').version")"
+git push --follow-tags
+```
+
+The workflow checks the tag against `package.json` before building and fails on a mismatch.
+Record what changed in [CHANGELOG.md](CHANGELOG.md) as part of the release commit.
 
 ## Code signing and notarization
 

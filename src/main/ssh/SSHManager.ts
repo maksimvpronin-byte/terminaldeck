@@ -383,6 +383,56 @@ class SSHManager {
     return this.connections.get(connectionId)?.clients
   }
 
+  /**
+   * Runs a command on its own channel and returns what it printed.
+   *
+   * Deliberately not the shell: anything written there is the user's session,
+   * and a background poll typing into it would scroll their terminal and land
+   * in their history. stderr is dropped — callers here probe for files that
+   * may not exist, and a complaint about one is not a failure of the whole.
+   */
+  exec(connectionId: string, command: string, timeoutMs = 10_000): Promise<string> {
+    const chain = this.connections.get(connectionId)?.clients
+    if (!chain || chain.length === 0) return Promise.reject(new Error('No active SSH connection'))
+    const target = chain[chain.length - 1]
+
+    return new Promise((resolve, reject) => {
+      target.exec(command, (err, stream) => {
+        if (err) {
+          reject(err)
+          return
+        }
+        let out = ''
+        let settled = false
+        const finish = (fn: () => void): void => {
+          if (settled) return
+          settled = true
+          clearTimeout(timer)
+          fn()
+        }
+        // A host that accepts the channel and then says nothing must not leave
+        // a poll pending for ever.
+        const timer = setTimeout(() => {
+          finish(() => {
+            try {
+              stream.close()
+            } catch {
+              /* already gone */
+            }
+            reject(new Error('Timed out'))
+          })
+        }, timeoutMs)
+
+        stream.on('data', (chunk: Buffer) => {
+          out += chunk.toString('utf8')
+        })
+        stream.stderr.resume()
+        stream.on('close', () => finish(() => resolve(out)))
+        stream.on('error', (streamErr: Error) => finish(() => reject(streamErr)))
+      })
+    })
+  }
+
   private teardown(connectionId: string): void {
     const conn = this.connections.get(connectionId)
     if (!conn) return

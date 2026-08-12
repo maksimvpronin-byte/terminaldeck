@@ -35,6 +35,24 @@ interface MenuState {
   entries: SftpEntry[]
 }
 
+/** Rows dragged out of an SFTP panel, as opposed to files from the desktop. */
+const SFTP_DRAG = 'application/x-td-sftp'
+
+interface SftpDragPayload {
+  connectionId: string
+  paths: string[]
+}
+
+/**
+ * What is currently being dragged out of some panel, for as long as it lasts.
+ *
+ * `dataTransfer` refuses to hand over its payload during `dragover` — only the
+ * list of types is readable then — so without this a panel could not tell rows
+ * from another host apart from the ones being dragged out of itself until the
+ * drop had already happened, which is too late to decline it.
+ */
+let activeDrag: SftpDragPayload | null = null
+
 const WIDTH_KEY = 'sftp.panelWidth'
 const TREE_KEY = 'sftp.treeOpen'
 const TREE_WIDTH_KEY = 'sftp.treeWidth'
@@ -42,11 +60,19 @@ const COLS_KEY = 'sftp.columnWidths'
 /** Narrow enough to still show a name; wide enough for every column. */
 const MIN_WIDTH = 260
 const MAX_WIDTH = 1400
+/**
+ * Wide enough to hold `DEFAULT_COLUMNS` without scrolling sideways, with room
+ * left for the vertical scrollbar — which any listing longer than the panel
+ * puts there, and which would otherwise squeeze the last column back out.
+ */
+const DEFAULT_WIDTH = 680
 const MIN_TREE = 120
 const MIN_COL = 44
+/** Generous enough for a long name or a full path, short of silly. */
+const MAX_COL = 600
 
-/** Every column but the name, which takes whatever is left over. */
 interface ColumnWidths {
+  name: number
   size: number
   changed: number
   perms: number
@@ -54,13 +80,29 @@ interface ColumnWidths {
   group: number
 }
 
+/**
+ * Chosen to add up — with the gaps and padding — to just under `DEFAULT_WIDTH`,
+ * so a panel nobody has resized shows all six columns instead of opening on a
+ * horizontal scrollbar with the last one already cut in half.
+ */
 const DEFAULT_COLUMNS: ColumnWidths = {
-  size: 66,
-  changed: 132,
+  name: 200,
+  size: 62,
+  changed: 124,
   perms: 76,
-  owner: 84,
-  group: 84
+  owner: 64,
+  group: 64
 }
+
+/** Header order, which is also row order — the two are drawn from this list. */
+const COLUMNS: [keyof ColumnWidths, string][] = [
+  ['name', 'Name'],
+  ['size', 'Size'],
+  ['changed', 'Changed'],
+  ['perms', 'Rights'],
+  ['owner', 'Owner'],
+  ['group', 'Group']
+]
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
@@ -80,7 +122,9 @@ function loadColumns(): ColumnWidths {
     const out = { ...DEFAULT_COLUMNS }
     for (const key of Object.keys(DEFAULT_COLUMNS) as (keyof ColumnWidths)[]) {
       const value = Number(stored[key])
-      if (Number.isFinite(value) && value > 0) out[key] = clamp(value, MIN_COL, 400)
+      // A layout saved before the name was resizable simply has no entry for it,
+      // and keeps the default.
+      if (Number.isFinite(value) && value > 0) out[key] = clamp(value, minWidthOf(key), MAX_COL)
     }
     return out
   } catch {
@@ -94,23 +138,29 @@ function col(width: number): { flex: string; width: number } {
   return { flex: `0 0 ${width}px`, width }
 }
 
-/** Must match the row's `gap`, horizontal `padding`, and the name's floor. */
+/** Must match the row's `gap` and horizontal `padding`. */
 const ROW_GAP = 10
 const ROW_PADDING = 16
+/** A name column narrower than this shows nothing useful, so dragging stops here. */
 const NAME_MIN = 90
+
+/** The floor a given column may be dragged down to. */
+function minWidthOf(key: keyof ColumnWidths): number {
+  return key === 'name' ? NAME_MIN : MIN_COL
+}
 
 /**
  * How wide a row has to be for every column to fit.
  *
  * Rows cannot be sized by their content: a long filename would widen that row's
- * name cell and shove the columns after it out of line with every other row.
- * So the width comes from the columns themselves, and the name takes what is
- * left — the same amount on every row, whatever it holds.
+ * name cell and shove the columns after it out of line with every other row. So
+ * every column, the name included, is exactly as wide as it was dragged to be,
+ * and the listing scrolls sideways when the panel cannot hold them all.
  */
 function minRowWidth(columns: ColumnWidths): number {
-  const fixed = Object.values(columns).reduce((sum, w) => sum + w, 0)
-  const gaps = ROW_GAP * Object.keys(columns).length
-  return NAME_MIN + fixed + gaps + ROW_PADDING
+  const widths = Object.values(columns)
+  const gaps = ROW_GAP * (widths.length - 1)
+  return widths.reduce((sum, w) => sum + w, 0) + gaps + ROW_PADDING
 }
 
 export default function SftpPanel({ connectionId }: { connectionId?: string }): JSX.Element {
@@ -122,6 +172,11 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
   const [error, setError] = useState<string | null>(null)
   const [transfer, setTransfer] = useState<Transfer | null>(null)
   const [dragging, setDragging] = useState(false)
+  /**
+   * The folder under the pointer during a drag, which a drop lands in instead of
+   * the directory being listed. Null means the panel's own current directory.
+   */
+  const [dropDir, setDropDir] = useState<string | null>(null)
   /** Remote paths currently open in a local editor. */
   const [editing, setEditing] = useState<Set<string>>(new Set())
   const [saved, setSaved] = useState<string | null>(null)
@@ -131,7 +186,11 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
   const [pendingDelete, setPendingDelete] = useState<SftpEntry[] | null>(null)
   const [newFolder, setNewFolder] = useState<string | null>(null)
   /** A planned transfer waiting on an answer about what it would overwrite. */
-  const [pendingTransfer, setPendingTransfer] = useState<TransferPlan | null>(null)
+  const [pendingTransfer, setPendingTransfer] = useState<{
+    plan: TransferPlan
+    /** The host the files come from, when they come from another one. */
+    source?: string
+  } | null>(null)
   /** A file being compared, remote against local. */
   const [comparing, setComparing] = useState<{ remote: string; local: string } | null>(null)
   /**
@@ -141,7 +200,9 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
    */
   const [following, setFollowing] = useState(false)
   const [treeOpen, setTreeOpen] = useState(() => localStorage.getItem(TREE_KEY) !== 'false')
-  const [width, setWidth] = useState(() => loadNumber(WIDTH_KEY, 560, MIN_WIDTH, MAX_WIDTH))
+  const [width, setWidth] = useState(() =>
+    loadNumber(WIDTH_KEY, DEFAULT_WIDTH, MIN_WIDTH, MAX_WIDTH)
+  )
   const [treeWidth, setTreeWidth] = useState(() => loadNumber(TREE_WIDTH_KEY, 190, MIN_TREE, 600))
   const [columns, setColumns] = useState<ColumnWidths>(loadColumns)
   const rowWidth = minRowWidth(columns)
@@ -193,8 +254,8 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
       down,
       columns[key],
       1,
-      MIN_COL,
-      400,
+      minWidthOf(key),
+      MAX_COL,
       (next) => setColumns((cur) => ({ ...cur, [key]: next })),
       (final) => {
         const next = { ...columns, [key]: final }
@@ -380,36 +441,79 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
    * Every batch asks afresh — no answer is remembered between transfers, so a
    * decision made once in a hurry never governs a later copy.
    */
-  async function runTransfer(plan: TransferPlan): Promise<void> {
+  async function runTransfer(plan: TransferPlan, source?: string): Promise<void> {
     if (plan.items.length === 0) return
     if (plan.conflicts.length === 0 && plan.collisions.length === 0) {
-      await execute(plan, {})
+      await execute(plan, {}, source)
       return
     }
-    setPendingTransfer(plan)
+    setPendingTransfer({ plan, source })
   }
 
-  async function execute(plan: TransferPlan, decisions: TransferDecisions): Promise<void> {
+  /**
+   * `source` is the host a relayed batch comes from. It leads the call because
+   * `runPlan` reads from the first connection and writes to the second, and for
+   * a relay this panel is the writing end.
+   */
+  async function execute(
+    plan: TransferPlan,
+    decisions: TransferDecisions,
+    source?: string
+  ): Promise<void> {
     if (!connectionId) return
     setPendingTransfer(null)
     setError(null)
     try {
-      await window.td.sftp.runPlan(connectionId, plan, decisions)
+      await window.td.sftp.runPlan(
+        source ?? connectionId,
+        plan,
+        decisions,
+        source ? connectionId : undefined
+      )
     } catch (err) {
       setError((err as Error).message)
     }
     setTransfer(null)
-    if (plan.direction === 'upload') load(path)
+    if (plan.direction !== 'download') load(path)
   }
 
-  async function planAndUpload(localPaths: string[]): Promise<void> {
+  async function planAndUpload(localPaths: string[], destination = path): Promise<void> {
     if (!connectionId) return
     setError(null)
     try {
       // Sequential on purpose: fastPut on one SFTP channel dislikes concurrent
       // writers, and one dialog per dropped item is clearer than one merged.
       for (const localPath of localPaths.filter(Boolean)) {
-        await runTransfer(await window.td.sftp.planUpload(connectionId, localPath, path))
+        await runTransfer(await window.td.sftp.planUpload(connectionId, localPath, destination))
+      }
+    } catch (err) {
+      setError((err as Error).message)
+    }
+  }
+
+  /**
+   * Copies paths from another connected host into `destination` on this one.
+   *
+   * The two servers need no route to each other: the bytes are streamed through
+   * this process, source socket to destination socket, without being staged on
+   * disk on the way.
+   */
+  async function planAndRelay(payload: SftpDragPayload, destination: string): Promise<void> {
+    if (!connectionId || payload.connectionId === connectionId) return
+    setError(null)
+    try {
+      // One plan per dropped item, for the same reason uploads are sequential:
+      // a single merged dialog would hide which item each clash belongs to.
+      for (const remotePath of payload.paths) {
+        await runTransfer(
+          await window.td.sftp.planRelay(
+            payload.connectionId,
+            remotePath,
+            connectionId,
+            destination
+          ),
+          payload.connectionId
+        )
       }
     } catch (err) {
       setError((err as Error).message)
@@ -459,12 +563,58 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
     if (localPath) await planAndUpload([localPath])
   }
 
+  /** Starts dragging rows out towards another host's panel. */
+  function onRowDragStart(e: ReactDragEvent, entry: SftpEntry): void {
+    if (!connectionId) return
+    // Dragging a row outside the selection takes that row alone, matching what
+    // right-clicking one does.
+    const targets = selected.has(entry.path) ? selectedEntries() : [entry]
+    activeDrag = { connectionId, paths: targets.map((t) => t.path) }
+    e.dataTransfer.setData(SFTP_DRAG, JSON.stringify(activeDrag))
+    e.dataTransfer.effectAllowed = 'copy'
+  }
+
+  /**
+   * Whether this panel wants what is being dragged: files from the desktop, or
+   * rows from a *different* host. Rows from this same connection are declined —
+   * dropping a file back onto its own host would be a copy onto itself.
+   */
+  function acceptsDrag(e: ReactDragEvent): boolean {
+    if (!connectionId) return false
+    if (e.dataTransfer.types.includes('Files')) return true
+    return e.dataTransfer.types.includes(SFTP_DRAG) && activeDrag?.connectionId !== connectionId
+  }
+
+  /** Marks a folder row as where the drop would land, instead of the listing. */
+  function onFolderDragOver(e: ReactDragEvent, entry: SftpEntry): void {
+    if (!acceptsDrag(e)) return
+    e.preventDefault()
+    // Stops the panel's own handler from immediately clearing the folder again;
+    // moving back off the row lets it run and reset this.
+    e.stopPropagation()
+    e.dataTransfer.dropEffect = 'copy'
+    setDragging(true)
+    setDropDir(entry.path)
+  }
+
   async function onDrop(e: ReactDragEvent): Promise<void> {
     e.preventDefault()
+    const destination = dropDir ?? path
     setDragging(false)
+    setDropDir(null)
     if (!connectionId) return
+
+    const raw = e.dataTransfer.getData(SFTP_DRAG)
+    if (raw) {
+      try {
+        await planAndRelay(JSON.parse(raw) as SftpDragPayload, destination)
+      } catch (err) {
+        setError((err as Error).message)
+      }
+      return
+    }
     const paths = Array.from(e.dataTransfer.files).map((f) => window.td.files.pathFor(f))
-    await planAndUpload(paths)
+    await planAndUpload(paths, destination)
   }
 
   async function doDelete(targets: SftpEntry[]): Promise<void> {
@@ -568,11 +718,19 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
       className={`sftp-panel ${dragging ? 'drop-target' : ''}`}
       style={{ width }}
       onDragOver={(e) => {
-        if (!e.dataTransfer.types.includes('Files')) return
+        if (!acceptsDrag(e)) return
         e.preventDefault()
+        e.dataTransfer.dropEffect = 'copy'
         setDragging(true)
+        setDropDir(null)
       }}
-      onDragLeave={() => setDragging(false)}
+      onDragLeave={(e) => {
+        // Crossing between the panel's own children fires dragleave too; only a
+        // pointer that has actually left the panel should drop the highlight.
+        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return
+        setDragging(false)
+        setDropDir(null)
+      }}
       onDrop={onDrop}
       onContextMenu={(e) => {
         e.preventDefault()
@@ -669,19 +827,14 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
         )}
         <div className="sftp-list">
           <div className="sftp-head" style={{ minWidth: rowWidth }}>
-            <span className="name">Name</span>
-            {(
-              [
-                ['size', 'Size'],
-                ['changed', 'Changed'],
-                ['perms', 'Rights'],
-                ['owner', 'Owner'],
-                ['group', 'Group']
-              ] as [keyof ColumnWidths, string][]
-            ).map(([key, label]) => (
+            {COLUMNS.map(([key, label]) => (
               <span key={key} className={`head-cell ${key}`} style={col(columns[key])}>
                 {label}
-                <span className="col-grip" onMouseDown={(e) => resizeColumn(key, e)} />
+                <span
+                  className="col-grip"
+                  title={`Drag to resize ${label}`}
+                  onMouseDown={(e) => resizeColumn(key, e)}
+                />
               </span>
             ))}
           </div>
@@ -691,18 +844,34 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
               style={{ minWidth: rowWidth }}
               onDoubleClick={() => load(parentOf(path))}
             >
-              <span className="name">..</span>
+              <span className="name" style={col(columns.name)}>
+                ..
+              </span>
             </div>
           )}
           {entries.map((e) => (
             <div
               key={e.path}
-              className={`sftp-row ${selected.has(e.path) ? 'selected' : ''}`}
+              className={`sftp-row ${selected.has(e.path) ? 'selected' : ''} ${
+                dropDir === e.path ? 'drop-into' : ''
+              }`}
               style={{ minWidth: rowWidth }}
+              draggable={!renaming}
+              onDragStart={(ev) => onRowDragStart(ev, e)}
+              onDragEnd={() => {
+                activeDrag = null
+                setDragging(false)
+                setDropDir(null)
+              }}
+              onDragOver={e.isDirectory ? (ev) => onFolderDragOver(ev, e) : undefined}
               onClick={(ev) => onRowClick(ev, e)}
               onContextMenu={(ev) => onRowContextMenu(ev, e)}
               onDoubleClick={() => (e.isDirectory ? load(e.path) : download(e))}
-              title={e.isDirectory ? 'Double-click to open' : 'Double-click to download'}
+              title={
+                e.isDirectory
+                  ? 'Double-click to open, or drag onto another host’s panel to copy'
+                  : 'Double-click to download, or drag onto another host’s panel to copy'
+              }
             >
               {renaming?.entry.path === e.path ? (
                 <input
@@ -719,7 +888,7 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
                 />
               ) : (
                 <>
-                  <span className={`name kind-${kindOf(e)}`}>
+                  <span className={`name kind-${kindOf(e)}`} style={col(columns.name)} title={e.name}>
                     {e.isDirectory ? '📁' : '📄'} {e.name}
                     {editing.has(e.path) && (
                       <span className="no-inherit" title="Open in a local editor; saves upload">
@@ -778,10 +947,12 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
 
       {pendingTransfer && (
         <TransferConflictDialog
-          plan={pendingTransfer}
+          plan={pendingTransfer.plan}
           onCompare={(remote, local) => setComparing({ remote, local })}
           onCancel={() => setPendingTransfer(null)}
-          onConfirm={(decisions) => execute(pendingTransfer, decisions)}
+          onConfirm={(decisions) =>
+            execute(pendingTransfer.plan, decisions, pendingTransfer.source)
+          }
         />
       )}
 

@@ -3,6 +3,7 @@ import { readdir, mkdir, stat, lstat, readFile } from 'fs/promises'
 import { join, basename } from 'path'
 import { sshManager } from './SSHManager'
 import { buildTransferPlan, shouldWrite, type DestInfo } from '../../shared/transferPlan'
+import { baseNameOf, joinRemote, parentOf } from '../../shared/remotePath'
 import { parseLongnameOwner } from '../../shared/permissions'
 import type {
   FileComparison,
@@ -179,6 +180,88 @@ class SFTPManager {
     })
   }
 
+  /**
+   * Copies one file straight from one host to another.
+   *
+   * The two servers usually have no route to each other, so the bytes come
+   * through this process — but they never touch the disk on the way. `pipe`
+   * carries the backpressure, so a 40 GB file costs a stream buffer instead of
+   * 40 GB of temporary space and a directory to tidy up after the next crash.
+   */
+  async relay(
+    srcConnectionId: string,
+    srcPath: string,
+    dstConnectionId: string,
+    dstPath: string,
+    onProgress?: (transferred: number, total: number) => void
+  ): Promise<void> {
+    const [srcSftp, dstSftp] = await Promise.all([
+      this.getSftp(srcConnectionId),
+      this.getSftp(dstConnectionId)
+    ])
+    // Read once up front: the progress bar needs a denominator, and the source
+    // stream never reports one.
+    const total = (await this.statPath(srcConnectionId, srcPath))?.size ?? 0
+
+    await new Promise<void>((resolve, reject) => {
+      const read = srcSftp.createReadStream(srcPath)
+      let write: ReturnType<SFTPWrapper['createWriteStream']> | null = null
+      let settled = false
+
+      // Either end can fail on its own. Whichever speaks first wins, and the
+      // other is torn down rather than left holding a half-written file open.
+      const fail = (err: Error): void => {
+        if (settled) return
+        settled = true
+        read.destroy()
+        write?.destroy()
+        reject(err)
+      }
+      read.on('error', fail)
+
+      // The destination is not touched until the source is known to be readable.
+      // Opening both at once would leave an empty file behind on the far host
+      // every time a permission error stopped the read — a copy that looks like
+      // it worked until someone opens the result.
+      read.on('open', () => {
+        write = dstSftp.createWriteStream(dstPath)
+        write.on('error', fail)
+        // 'close', not 'finish': ssh2 emits it once the remote handle is really
+        // closed, and resolving earlier races whatever reads the file next.
+        write.on('close', () => {
+          if (settled) return
+          settled = true
+          resolve()
+        })
+        // Attached here rather than earlier: a 'data' listener puts the stream
+        // into flowing mode, and anything it emitted before `pipe` was attached
+        // would be counted and then dropped.
+        let transferred = 0
+        read.on('data', (chunk: Buffer) => {
+          transferred += chunk.length
+          onProgress?.(transferred, total)
+        })
+        read.pipe(write)
+      })
+    })
+  }
+
+  /**
+   * Creates `dir` and every missing level above it.
+   *
+   * SFTP `mkdir` makes one level and fails if the parent is absent, so a
+   * transfer into a destination that does not exist yet needs the whole chain
+   * walked. Errors are swallowed — a directory that cannot be made will be
+   * reported by the write that follows, in terms of the file it was for.
+   */
+  private async ensureRemoteDir(connectionId: string, dir: string): Promise<void> {
+    if (!dir || dir === '/' || dir === '.') return
+    const existing = await this.statPath(connectionId, dir).catch(() => null)
+    if (existing) return
+    await this.ensureRemoteDir(connectionId, parentOf(dir))
+    await this.mkdir(connectionId, dir).catch(() => undefined)
+  }
+
   /** Mirrors a remote directory into `localDir`, creating it if needed. */
   async downloadDirectory(
     connectionId: string,
@@ -277,11 +360,19 @@ class SFTPManager {
     return out
   }
 
-  /** Every file a download of `remotePath` into `localDir` would write. */
+  /**
+   * Every file reading `remotePath` into `destDir` would write.
+   *
+   * `joinPath` decides whose path rules the destination follows: the local
+   * filesystem's for a download, POSIX for a copy to another host. Using
+   * `join` for the latter would produce `\home\user\x` on Windows and hand a
+   * remote server a path it cannot make sense of.
+   */
   private async remoteTree(
     connectionId: string,
     remotePath: string,
-    localDir: string
+    destDir: string,
+    joinPath: (dir: string, name: string) => string = join
   ): Promise<TransferItem[]> {
     const info = await this.statPath(connectionId, remotePath)
     if (!info) return []
@@ -289,7 +380,7 @@ class SFTPManager {
       return [
         {
           sourcePath: remotePath,
-          destPath: join(localDir, info.name),
+          destPath: joinPath(destDir, info.name),
           sourceSize: info.size,
           sourceMtime: info.mtime
         }
@@ -297,11 +388,11 @@ class SFTPManager {
     }
     const out: TransferItem[] = []
     for (const entry of await this.list(connectionId, remotePath)) {
-      const target = join(localDir, entry.name)
+      const target = joinPath(destDir, entry.name)
       // Symlinked directories are skipped here for the same reason the transfer
       // itself skips them: following one can loop or escape the tree.
       if (entry.isDirectory && !entry.isSymlink) {
-        out.push(...(await this.remoteTree(connectionId, entry.path, target)))
+        out.push(...(await this.remoteTree(connectionId, entry.path, target, joinPath)))
       } else if (!entry.isDirectory) {
         out.push({
           sourcePath: entry.path,
@@ -400,13 +491,72 @@ class SFTPManager {
     return buildTransferPlan('download', items, (p) => found.get(p) ?? null)
   }
 
-  /** Runs a planned transfer, honouring the answers collected for it. */
+  /**
+   * Every file a copy of `remotePath` into `destParent` on another host would
+   * write, checked against what is already sitting there.
+   *
+   * A directory is copied as itself — into `destParent/<name>` — while a single
+   * file lands in `destParent` directly, which is the same rule the upload and
+   * download planners follow.
+   */
+  async planRelay(
+    srcConnectionId: string,
+    srcPath: string,
+    dstConnectionId: string,
+    destParent: string
+  ): Promise<TransferPlan> {
+    const source = await this.statPath(srcConnectionId, srcPath)
+    const destDir = source?.isDirectory
+      ? joinRemote(destParent, baseNameOf(srcPath))
+      : destParent
+    const items = await this.remoteTree(srcConnectionId, srcPath, destDir, joinRemote)
+
+    const found = new Map<string, DestInfo | null>()
+    for (const item of items) {
+      if (found.has(item.destPath)) continue
+      try {
+        const info = await this.statPath(dstConnectionId, item.destPath)
+        found.set(
+          item.destPath,
+          info
+            ? {
+                size: info.size,
+                mtime: info.mtime,
+                isDirectory: info.isDirectory,
+                isSymlink: info.isSymlink
+              }
+            : null
+        )
+      } catch {
+        // Could not be stated at all — treated as occupied, never as empty.
+        found.set(item.destPath, {
+          size: 0,
+          mtime: 0,
+          isDirectory: false,
+          isSymlink: false,
+          unreadable: true
+        })
+      }
+    }
+    return buildTransferPlan('relay', items, (p) => found.get(p) ?? null)
+  }
+
+  /**
+   * Runs a planned transfer, honouring the answers collected for it.
+   *
+   * `destConnectionId` is the far end of a relay, and is ignored by the other
+   * two directions — for those, `connectionId` is the only host involved.
+   */
   async runPlan(
     connectionId: string,
     plan: TransferPlan,
     decisions: TransferDecisions = NO_DECISIONS,
-    onProgress?: ProgressFn
+    onProgress?: ProgressFn,
+    destConnectionId?: string
   ): Promise<{ written: number; skipped: number }> {
+    if (plan.direction === 'relay' && !destConnectionId) {
+      throw new Error('A host-to-host copy needs a destination connection')
+    }
     let written = 0
     let skipped = 0
     for (const item of plan.items) {
@@ -414,9 +564,17 @@ class SFTPManager {
         skipped++
         continue
       }
-      if (plan.direction === 'upload') {
-        const parent = item.destPath.slice(0, item.destPath.lastIndexOf('/'))
-        if (parent) await this.mkdir(connectionId, parent).catch(() => undefined)
+      if (plan.direction === 'relay') {
+        await this.ensureRemoteDir(destConnectionId!, parentOf(item.destPath))
+        await this.relay(
+          connectionId,
+          item.sourcePath,
+          destConnectionId!,
+          item.destPath,
+          (t, total) => onProgress?.(t, total, item.sourcePath)
+        )
+      } else if (plan.direction === 'upload') {
+        await this.ensureRemoteDir(connectionId, parentOf(item.destPath))
         await this.upload(connectionId, item.sourcePath, item.destPath, (t, total) =>
           onProgress?.(t, total, item.sourcePath)
         )

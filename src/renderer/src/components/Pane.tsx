@@ -6,6 +6,7 @@ import { DRAG_MIME, edgeFromPoint, edgeToSplit, type DragItem, type DropEdge } f
 import TerminalHost from './TerminalHost'
 import SftpPanel from './SftpPanel'
 import TunnelsPanel from './TunnelsPanel'
+import MonitorBar from './MonitorBar'
 import { SplitRightIcon, SplitDownIcon, CloseIcon, DetachIcon } from './icons'
 import { keyHint } from '../state/keys'
 
@@ -28,6 +29,7 @@ export default function Pane({
   const isSplit = useStore((s) => findTab(s, tabId)?.root.type === 'split')
   const toggleSftp = useStore((s) => s.toggleSftp)
   const toggleTunnels = useStore((s) => s.toggleTunnels)
+  const toggleMonitor = useStore((s) => s.toggleMonitor)
   const broadcast = useStore((s) => s.broadcast)
   const togglePaneBroadcast = useStore((s) => s.togglePaneBroadcast)
 
@@ -123,6 +125,14 @@ export default function Pane({
           <button title="Toggle port forwarding" onClick={() => toggleTunnels(tabId, node.id)}>
             Tunnels
           </button>
+          <button
+            className={node.monitorOpen ? 'active' : ''}
+            disabled={!node.connectionId}
+            title="Toggle remote monitoring"
+            onClick={() => toggleMonitor(tabId, node.id)}
+          >
+            Monitor
+          </button>
           {isSplit && (
             <button
               className="icon-button"
@@ -167,6 +177,9 @@ export default function Pane({
           />
         )}
       </div>
+      {/* Below the body, not inside it: the strip is about the host, so it
+          spans the terminal and any panel open beside it. */}
+      {node.monitorOpen && <MonitorBar connectionId={node.connectionId} />}
     </div>
   )
 }

@@ -180,6 +180,7 @@ export interface WorkspaceSlice {
   detachPane: (tabId: string, paneId: string) => void
   toggleSftp: (tabId: string, paneId: string) => void
   toggleTunnels: (tabId: string, paneId: string) => void
+  toggleMonitor: (tabId: string, paneId: string) => void
   toggleBroadcast: () => void
   togglePaneBroadcast: (tabId: string, paneId: string) => void
   setAllPanesBroadcast: (enabled: boolean) => void

@@ -18,6 +18,7 @@ export type PaneNode =
       restored?: boolean
       sftpOpen: boolean
       tunnelsOpen: boolean
+      monitorOpen: boolean
       /** Whether this terminal takes part in broadcast input. */
       broadcastEnabled: boolean
       /**
@@ -53,6 +54,7 @@ export function makeLeaf(
     viaCollectionId,
     sftpOpen: false,
     tunnelsOpen: false,
+    monitorOpen: false,
     broadcastEnabled: true
   }
 }

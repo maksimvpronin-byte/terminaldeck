@@ -12,6 +12,7 @@ import { sshManager } from '../ssh/SSHManager'
 import { sftpManager } from '../ssh/SFTPManager'
 import { remoteEdit } from '../ssh/RemoteEdit'
 import { portForwardManager } from '../ssh/PortForwardManager'
+import { remoteMonitor } from '../ssh/RemoteMonitor'
 import { readSshConfigHosts } from '../ssh/sshConfig'
 import { knownHosts } from '../ssh/KnownHosts'
 import { inventoryStore } from '../inventory/InventoryStore'
@@ -245,6 +246,7 @@ export function registerIpcHandlers(): void {
     remoteEdit.stopAllFor(connectionId)
     sftpManager.releaseConnection(connectionId)
     portForwardManager.stopAllForConnection(connectionId)
+    remoteMonitor.stop(connectionId)
     sshManager.disconnect(connectionId)
   })
   ipcMain.on(IPC.sshWrite, (_e, connectionId: string, data: string) => {
@@ -269,10 +271,37 @@ export function registerIpcHandlers(): void {
       sftpManager.planDownload(connectionId, remotePath, localTarget, exactFile)
   )
   ipcMain.handle(
+    IPC.sftpPlanRelay,
+    (
+      _e,
+      srcConnectionId: string,
+      srcPath: string,
+      dstConnectionId: string,
+      destParent: string
+    ) => sftpManager.planRelay(srcConnectionId, srcPath, dstConnectionId, destParent)
+  )
+  ipcMain.handle(
     IPC.sftpRunPlan,
-    (_e, connectionId: string, plan: TransferPlan, decisions: TransferDecisions) =>
-      sftpManager.runPlan(connectionId, plan, decisions, (transferred, total, path) =>
-        reportTransfer(connectionId, path, transferred, total)
+    (
+      _e,
+      connectionId: string,
+      plan: TransferPlan,
+      decisions: TransferDecisions,
+      destConnectionId?: string
+    ) =>
+      sftpManager.runPlan(
+        connectionId,
+        plan,
+        decisions,
+        (transferred, total, path) => {
+          reportTransfer(connectionId, path, transferred, total)
+          // A relay concerns two panels, and the one the files were dropped on
+          // is the one the user is watching. Both get the bar.
+          if (destConnectionId && destConnectionId !== connectionId) {
+            reportTransfer(destConnectionId, path, transferred, total)
+          }
+        },
+        destConnectionId
       )
   )
   ipcMain.handle(
@@ -336,6 +365,14 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.sftpStopEdit, (_e, connectionId: string, remotePath: string) =>
     remoteEdit.stop(connectionId, remotePath)
   )
+
+  // --- Remote monitoring ---
+  ipcMain.handle(IPC.monitorStart, (_e, connectionId: string) => {
+    remoteMonitor.start(focusedWin(), connectionId)
+  })
+  ipcMain.handle(IPC.monitorStop, (_e, connectionId: string) => {
+    remoteMonitor.stop(connectionId)
+  })
 
   // --- Port forwarding ---
   ipcMain.handle(IPC.pfStart, (_e, connectionId: string, rule: PortForwardRule) =>

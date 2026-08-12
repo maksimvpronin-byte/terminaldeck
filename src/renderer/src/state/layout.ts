@@ -33,7 +33,14 @@ function sanitise(node: PaneNode): PaneNode | null {
 
   const strip = (n: PaneNode): PaneNode =>
     n.type === 'leaf'
-      ? { ...n, connectionId: undefined, restored: true, sftpOpen: false, tunnelsOpen: false }
+      ? {
+          ...n,
+          connectionId: undefined,
+          restored: true,
+          sftpOpen: false,
+          tunnelsOpen: false,
+          monitorOpen: false
+        }
       : { ...n, children: [strip(n.children[0]), strip(n.children[1])] }
   return strip(result)
 }

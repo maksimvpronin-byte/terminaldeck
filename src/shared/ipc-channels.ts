@@ -70,6 +70,8 @@ export const IPC = {
   sftpUploadPath: 'sftp:uploadPath',
   sftpPlanUpload: 'sftp:planUpload',
   sftpPlanDownload: 'sftp:planDownload',
+  /** Host to host, through us: neither server can reach the other directly. */
+  sftpPlanRelay: 'sftp:planRelay',
   sftpRunPlan: 'sftp:runPlan',
   sftpCompare: 'sftp:compare',
   sftpEdit: 'sftp:edit',
@@ -78,6 +80,12 @@ export const IPC = {
   sftpEdited: 'sftp:edited',
   /** main -> renderer, suffixed with connectionId */
   sftpProgress: 'sftp:progress',
+
+  // Remote monitoring
+  monitorStart: 'monitor:start',
+  monitorStop: 'monitor:stop',
+  /** main -> renderer, suffixed with connectionId; null means it gave up */
+  monitorStats: 'monitor:stats',
 
   // Port forwarding
   pfStart: 'pf:start',

@@ -290,8 +290,15 @@ export interface TransferConflict extends TransferItem {
   reason: ConflictReason
 }
 
+/**
+ * `relay` is host to host: both ends are remote, and the bytes pass through this
+ * process because the two servers have no route to each other. Everything else
+ * about it — planning, conflicts, decisions — is the same as the other two.
+ */
+export type TransferDirection = 'upload' | 'download' | 'relay'
+
 export interface TransferPlan {
-  direction: 'upload' | 'download'
+  direction: TransferDirection
   items: TransferItem[]
   conflicts: TransferConflict[]
   /** Two sources landing on one destination; the batch is refused, not merged. */

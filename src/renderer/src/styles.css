@@ -748,6 +748,49 @@ label {
   justify-content: center;
   background: rgba(23, 24, 28, 0.72);
 }
+/* --- remote monitoring strip --- */
+.monitor-bar {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  flex-shrink: 0;
+  overflow-x: auto;
+  border-top: 1px solid var(--border);
+  background: var(--bg-0);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.monitor-bar .cell {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  background: var(--bg-1);
+  color: var(--text);
+}
+.monitor-bar .cell.dim {
+  color: var(--text-dim);
+}
+.monitor-bar .cell.warn {
+  color: #d9a441;
+}
+.monitor-bar .cell.alarm {
+  color: var(--danger);
+}
+/* Bars grow from the bottom, so the line reads as a graph rather than a row
+   of blocks hanging off the top. */
+.monitor-bar .spark {
+  align-items: flex-end;
+  gap: 1px;
+  height: 18px;
+  padding: 2px 8px;
+}
+.monitor-bar .spark i {
+  width: 2px;
+  min-height: 1px;
+  background: var(--accent);
+}
+
 .sftp-panel {
   flex-shrink: 0;
   border-left: 1px solid var(--border);
@@ -909,12 +952,10 @@ label {
   color: var(--text-dim);
   font-size: 11px;
 }
-/* Basis 0, not auto: the name must take what the columns leave rather than
-   size itself to its text, or a long filename would push that one row's
-   columns out of line with the rest. */
+/* Every cell's width is set inline, the name included, so a long filename
+   cannot push that one row's columns out of line with the rest. */
 .sftp-head .name,
 .sftp-row .name {
-  flex: 1 1 0;
   min-width: 0;
 }
 /* Each header cell owns the grip on its right edge; the cell is the positioning
@@ -966,6 +1007,13 @@ label {
 }
 .sftp-row.selected {
   background: var(--accent-dim);
+}
+/* A folder the drag would drop *into*, rather than beside. Outlined instead of
+   filled so it stays distinguishable from a merely selected row underneath. */
+.sftp-row.drop-into {
+  background: var(--accent-dim);
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
 }
 .sftp-row .name {
   overflow: hidden;
@@ -1303,6 +1351,15 @@ textarea:focus {
   flex-direction: column;
   gap: 12px;
 }
+/* The card is a column flex container, so when its content is taller than
+   85vh the browser first tries to shrink the children instead of scrolling.
+   Text blocks refuse (their min-height is their content), but a child that
+   scrolls has a min-height of 0 and silently absorbs the whole overflow —
+   a 200px list gets squashed to 40px and clipped. Pin every child to its
+   own height and let the card scroll, which is what it is set up to do. */
+.modal-card > * {
+  flex-shrink: 0;
+}
 .modal-card h2 {
   margin: 0;
   font-size: 15px;
@@ -1426,10 +1483,12 @@ textarea:focus {
   gap: 4px;
   max-height: 200px;
   overflow-y: auto;
+  /* Room for the scrollbar so it never sits on top of the Forget buttons. */
+  padding-right: 2px;
 }
 .known-host-row {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 2px 8px;
   align-items: center;
   padding: 6px 8px;
@@ -1438,6 +1497,7 @@ textarea:focus {
 }
 .known-host-name {
   font-size: 12px;
+  overflow-wrap: anywhere;
 }
 .known-host-fp {
   grid-column: 1;

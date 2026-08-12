@@ -34,6 +34,22 @@ jobs:
           node-version: 22
           cache: npm
 
+      # electron-updater compares against the version baked into the app from
+      # package.json, not against the tag. A tag that disagrees with it publishes
+      # a release nobody is ever offered, so fail here rather than after three
+      # runners have spent ten minutes building it.
+      - name: Check the tag matches package.json
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$pkg" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME says $tag, package.json says $pkg. Bump one to match the other."
+            exit 1
+          fi
+          echo "Tag and package.json agree on $pkg."
+
       - name: Install dependencies
         run: npm ci
 

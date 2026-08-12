@@ -2,6 +2,7 @@ import type {
   ConflictReason,
   TransferConflict,
   TransferDecisions,
+  TransferDirection,
   TransferItem,
   TransferPlan
 } from './types'
@@ -34,7 +35,7 @@ function reasonFor(info: DestInfo): ConflictReason {
  * where the rules live for both directions.
  */
 export function buildTransferPlan(
-  direction: 'upload' | 'download',
+  direction: TransferDirection,
   items: TransferItem[],
   lookup: (destPath: string) => DestInfo | null
 ): TransferPlan {

@@ -53,7 +53,15 @@ export default function TransferConflictDialog({
   const refused = plan.conflicts.filter((c) => isRefusable(c.reason))
   const overwriting = replaceable.filter((c) => decisions[c.destPath] === 'overwrite').length
   const untouched = plan.items.length - plan.conflicts.length
-  const direction = plan.direction === 'upload' ? 'Uploading' : 'Downloading'
+  const direction =
+    plan.direction === 'upload'
+      ? 'Uploading'
+      : plan.direction === 'download'
+        ? 'Downloading'
+        : 'Copying'
+  // Comparing means reading both sides, and the differ only knows how to fetch
+  // one remote file and one local one. Host to host has no local side to offer.
+  const canCompare = plan.direction !== 'relay'
 
   function decide(destPath: string, choice: 'overwrite' | 'skip'): void {
     setDecisions((prev) => ({ ...prev, [destPath]: choice }))
@@ -134,17 +142,19 @@ export default function TransferConflictDialog({
                       </span>
                     </div>
                     <div className="conflict-choice">
-                      <button
-                        title="See what is different before deciding"
-                        onClick={() =>
-                          onCompare(
-                            plan.direction === 'upload' ? c.destPath : c.sourcePath,
-                            plan.direction === 'upload' ? c.sourcePath : c.destPath
-                          )
-                        }
-                      >
-                        Compare
-                      </button>
+                      {canCompare && (
+                        <button
+                          title="See what is different before deciding"
+                          onClick={() =>
+                            onCompare(
+                              plan.direction === 'upload' ? c.destPath : c.sourcePath,
+                              plan.direction === 'upload' ? c.sourcePath : c.destPath
+                            )
+                          }
+                        >
+                          Compare
+                        </button>
+                      )}
                       <button
                         className={choice === 'skip' ? 'active' : ''}
                         onClick={() => decide(c.destPath, 'skip')}

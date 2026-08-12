@@ -21,6 +21,7 @@ import type {
   TransferDecisions,
   FileComparison
 } from '../shared/types'
+import type { RemoteStats } from '../shared/remoteStats'
 
 const api = {
   vault: {
@@ -172,12 +173,21 @@ const api = {
       exactFile?: boolean
     ): Promise<TransferPlan> =>
       ipcRenderer.invoke(IPC.sftpPlanDownload, connectionId, remotePath, localTarget, exactFile),
+    planRelay: (
+      srcConnectionId: string,
+      srcPath: string,
+      dstConnectionId: string,
+      destParent: string
+    ): Promise<TransferPlan> =>
+      ipcRenderer.invoke(IPC.sftpPlanRelay, srcConnectionId, srcPath, dstConnectionId, destParent),
     runPlan: (
       connectionId: string,
       plan: TransferPlan,
-      decisions: TransferDecisions
+      decisions: TransferDecisions,
+      /** The far end of a relay; unused by uploads and downloads. */
+      destConnectionId?: string
     ): Promise<{ written: number; skipped: number }> =>
-      ipcRenderer.invoke(IPC.sftpRunPlan, connectionId, plan, decisions),
+      ipcRenderer.invoke(IPC.sftpRunPlan, connectionId, plan, decisions, destConnectionId),
     compare: (
       connectionId: string,
       remotePath: string,
@@ -209,6 +219,18 @@ const api = {
         _e: unknown,
         payload: { path: string; transferred: number; total: number }
       ): void => cb(payload)
+      ipcRenderer.on(channel, listener)
+      return () => ipcRenderer.removeListener(channel, listener)
+    }
+  },
+  monitor: {
+    start: (connectionId: string): Promise<void> =>
+      ipcRenderer.invoke(IPC.monitorStart, connectionId),
+    stop: (connectionId: string): Promise<void> => ipcRenderer.invoke(IPC.monitorStop, connectionId),
+    /** `null` arrives when the poll gave up, so the strip can say so. */
+    onStats: (connectionId: string, cb: (stats: RemoteStats | null) => void): (() => void) => {
+      const channel = `${IPC.monitorStats}:${connectionId}`
+      const listener = (_e: unknown, stats: RemoteStats | null): void => cb(stats)
       ipcRenderer.on(channel, listener)
       return () => ipcRenderer.removeListener(channel, listener)
     }

@@ -100,6 +100,22 @@ describe('buildTransferPlan', () => {
     expect(plan.direction).toBe('download')
     expect(plan.conflicts[0].destPath).toBe('/home/a')
   })
+
+  it('works the same host to host, where both paths are remote', () => {
+    const plan = buildTransferPlan('relay', [item('/srv/a', '/opt/a')], () => file())
+    expect(plan.direction).toBe('relay')
+    expect(plan.conflicts[0].destPath).toBe('/opt/a')
+    // The far side is asked about exactly as a local destination would be: a
+    // file that is already there is replaceable, and nothing else is.
+    expect(isRefusable(plan.conflicts[0].reason)).toBe(false)
+  })
+
+  it('refuses a relay onto a directory, same as any other direction', () => {
+    const plan = buildTransferPlan('relay', [item('/srv/a', '/opt/a')], () =>
+      file({ isDirectory: true })
+    )
+    expect(plan.conflicts[0].reason).toBe('directory')
+  })
 })
 
 describe('defaultDecisions', () => {
