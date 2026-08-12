@@ -101,6 +101,11 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
   needs it because CredSSP binds to the server's public key
 - Panels that ride on an SSH connection — the file browser, port forwarding, monitoring,
   broadcast — are hidden for a desktop rather than greyed out, since none of them is coming
+- **Clipboard** in both directions, so text copied in the session pastes locally and back
+- When a session will not start, set `TERMINALDECK_RDP_TRACE=1` and the local gateway reports
+  each step it took — whether the host answered, what it agreed to during protocol negotiation,
+  whether TLS came up. The client reports nearly every fault as "General failure", so this is
+  usually the only way to see where it actually stopped
 
 ### Files and networking
 
@@ -171,10 +176,12 @@ paths have only ever been exercised by unit tests or by hand on a local stand-in
   pull in a native module and complicate every build. RDP *was* on this list — "a graphical
   client, not a terminal, and not doable well as a side feature" — until it turned out to be
   doable without a native dependency at all. See **Desktops** above.
-- Session shadowing (`mstsc /shadow`) and the console session (`/admin`). Connecting as the
-  same user already reconnects to that user's existing session, which covers most of what
-  people want from them; watching *another* user's session needs a Remote Desktop Services
-  feature the client does not implement.
+- The console session (`/admin`) and session shadowing (`mstsc /shadow`). Connecting as the
+  same user already reconnects to that user's existing session, which is most of what these
+  are wanted for. Beyond that they are blocked rather than merely unwritten: the flag that
+  selects the console session exists in IronRDP's protocol layer but is not exposed through
+  its WebAssembly client, and shadowing is a Remote Desktop Services feature the client does
+  not implement at all. Both would need changes upstream.
 - PuTTY session import — Windows-only value, deferred since the MVP.
 - Code signing and notarization. Configured and documented below, but no certificate is in use,
   which also means macOS auto-update downloads an update it cannot apply.

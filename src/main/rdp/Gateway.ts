@@ -139,9 +139,18 @@ class RdpGateway {
  *
  * The client reports nearly every protocol fault as "General failure", so
  * without a record of what this side did, a failed session says nothing about
- * where it stopped.
+ * where it stopped. On in development, and switchable on in a shipped build
+ * with `TERMINALDECK_RDP_TRACE=1` — the one case where it is worth the noise is
+ * the one where someone is already stuck.
  */
+// Read from the environment rather than through @electron-toolkit/utils, which
+// imports electron: this file is covered by tests that run under plain Node,
+// and pulling electron in there breaks every one of them at import time.
+const tracing =
+  process.env.NODE_ENV === 'development' || process.env.TERMINALDECK_RDP_TRACE === '1'
+
 function trace(message: string): void {
+  if (!tracing) return
   // eslint-disable-next-line no-console
   console.log(`[rdp gateway] ${message}`)
 }

@@ -181,6 +181,17 @@ export default function GraphicalHost({
       // ends, so nothing but the caller ever turns it on. Without it the
       // session runs perfectly and paints where nobody can see it.
       interaction.setVisibility(true)
+
+      // Copy and paste across the session boundary. Off until asked for, and
+      // asked for here rather than in the builder because it is a property of
+      // the live session — a failure to enable it must not cost the desktop.
+      try {
+        interaction.setEnableClipboard(true)
+        interaction.setEnableAutoClipboard(true)
+      } catch {
+        // An older client without the channel; the desktop still works.
+      }
+
       setPhase({ at: 'connected' })
 
       // Resolves when the far end goes away, which is the session ending

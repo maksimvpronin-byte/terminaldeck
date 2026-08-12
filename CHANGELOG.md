@@ -14,6 +14,11 @@ the other produces a version nobody can install, which is how 0.1.10 through
   beside the terminals, using the login already stored on it or on its group.
 - A host now has a **protocol**, and a pane dispatches on it: the panels that
   ride on an SSH connection are hidden for a desktop rather than disabled.
+- **Clipboard** across an RDP session, in both directions.
+- `TERMINALDECK_RDP_TRACE=1` turns on the local gateway's step-by-step report in
+  a shipped build. It is on by default in development. The client reports nearly
+  every fault as "General failure", so this is usually the only way to see where
+  a session actually stopped.
 
 ### Notes
 
