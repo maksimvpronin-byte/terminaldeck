@@ -135,6 +135,13 @@ const api = {
       return () => ipcRenderer.removeListener(channel, listener)
     }
   },
+  rdp: {
+    /** A single-use ws:// address on the gateway that main stands up locally. */
+    reserve: (): Promise<string> => ipcRenderer.invoke(IPC.rdpReserve),
+    /** The stored login for one host; the password is empty when none is saved. */
+    credentials: (sessionId: string): Promise<{ username: string; password: string }> =>
+      ipcRenderer.invoke(IPC.rdpCredentials, sessionId)
+  },
   sftp: {
     list: (connectionId: string, path: string): Promise<SftpEntry[]> =>
       ipcRenderer.invoke(IPC.sftpList, connectionId, path),

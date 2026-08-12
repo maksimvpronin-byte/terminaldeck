@@ -13,6 +13,9 @@ import { sftpManager } from '../ssh/SFTPManager'
 import { remoteEdit } from '../ssh/RemoteEdit'
 import { portForwardManager } from '../ssh/PortForwardManager'
 import { remoteMonitor } from '../ssh/RemoteMonitor'
+import { rdpGateway } from '../rdp/Gateway'
+import { resolveAuth } from '../../shared/authResolution'
+import { protocolOf } from '../../shared/protocols'
 import { readSshConfigHosts } from '../ssh/sshConfig'
 import { knownHosts } from '../ssh/KnownHosts'
 import { inventoryStore } from '../inventory/InventoryStore'
@@ -365,6 +368,36 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.sftpStopEdit, (_e, connectionId: string, remotePath: string) =>
     remoteEdit.stop(connectionId, remotePath)
   )
+
+  // --- Graphical sessions ---
+  ipcMain.handle(IPC.rdpReserve, () => rdpGateway.reserve())
+
+  /**
+   * The login for one host, resolved through the same inheritance chain SSH
+   * uses, so a group can state it once.
+   *
+   * This is the only place a stored secret leaves the main process, and it is
+   * deliberately narrow: it answers for one named host and returns nothing else,
+   * so the window cannot walk the vault. It exists because an RDP client
+   * authenticates where it draws — CredSSP happens in the WebAssembly module —
+   * and there is no way to do that from here without implementing CredSSP too.
+   */
+  ipcMain.handle(IPC.rdpCredentials, (_e, sessionId: string) => {
+    const profile =
+      sessionStore.getAll().sessions.find((s) => s.id === sessionId) ??
+      inventoryStore.findSession(sessionId)
+    if (!profile) throw new Error('Unknown session')
+    if (protocolOf(profile) !== 'rdp') throw new Error('That host is not an RDP host')
+
+    const groups = [...sessionStore.getAll().groups, ...inventoryStore.allGroups()]
+    const auth = resolveAuth(profile, profile.groupId, groups)
+    return {
+      username: auth.username,
+      // Empty rather than absent when nothing is stored: the window then asks,
+      // which is also the path for people who deliberately save no password.
+      password: auth.secretRef ? vault.getSecret(auth.secretRef) ?? '' : ''
+    }
+  })
 
   // --- Remote monitoring ---
   ipcMain.handle(IPC.monitorStart, (_e, connectionId: string) => {

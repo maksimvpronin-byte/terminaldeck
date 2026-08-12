@@ -23,11 +23,14 @@
     "url": "https://github.com/maksimvpronin-byte/terminaldeck.git"
   },
   "dependencies": {
+    "@devolutions/iron-remote-desktop": "^0.11.0",
+    "@devolutions/iron-remote-desktop-rdp": "^0.7.0",
     "electron-updater": "^6.8.9",
     "nanoid": "^5.0.7",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "ssh2": "^1.16.0",
+    "ws": "^8.18.0",
     "xterm": "^5.3.0",
     "xterm-addon-fit": "^0.8.0",
     "xterm-addon-search": "^0.13.0",
@@ -42,6 +45,7 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@types/ssh2": "^1.15.0",
+    "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^4.3.1",
     "electron": "^33.0.0",
     "electron-builder": "^24.13.3",

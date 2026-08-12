@@ -6,6 +6,28 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## Unreleased
+
+### Added
+
+- **RDP desktops in a pane.** A host can be marked RDP and opens as a desktop
+  beside the terminals, using the login already stored on it or on its group.
+- A host now has a **protocol**, and a pane dispatches on it: the panels that
+  ride on an SSH connection are hidden for a desktop rather than disabled.
+
+### Notes
+
+- The RDP client is IronRDP compiled to WebAssembly, and the main process
+  impersonates a Devolutions Gateway on loopback to satisfy it. Nothing native
+  is added and nothing external has to be installed, but the renderer bundle
+  grows from about 1 MB to 7 MB, since the client ships inside it.
+- The window's Content-Security-Policy gained three narrow allowances the client
+  cannot run without; `src/renderer/csp.test.ts` states what breaks if they are
+  removed.
+- Reading the stored password for an RDP host is the only place a saved secret
+  leaves the main process. It is scoped to one named host, because the client
+  authenticates in the window and CredSSP cannot be done from anywhere else.
+
 ## 0.4.0
 
 The first release since 0.1.9 — see the note above. Everything below had landed

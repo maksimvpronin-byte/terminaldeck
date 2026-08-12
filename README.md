@@ -87,6 +87,21 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
   are optional and re-encrypted under a password of their own
 - Optional per-session logging to a local file
 
+### Desktops
+
+- **RDP sessions in a pane**, beside the terminals rather than in a separate window. A host is
+  marked RDP in its own dialog and opens as a desktop; the login comes from the host or the
+  group above it, like every other credential here, and a domain travels in the username as
+  `DOMAIN\user`
+- **No native dependency and no external service.** The client is
+  [IronRDP](https://github.com/Devolutions/IronRDP) compiled to WebAssembly, so the same build
+  works on every platform. It insists on talking to a Devolutions Gateway, so the main process
+  stands one up on loopback: a single-use address per session, which performs the X.224
+  exchange and the TLS handshake and reports the server's certificate chain back — the client
+  needs it because CredSSP binds to the server's public key
+- Panels that ride on an SSH connection — the file browser, port forwarding, monitoring,
+  broadcast — are hidden for a desktop rather than greyed out, since none of them is coming
+
 ### Files and networking
 
 - SFTP browser: multi-select, context menu, rename, delete, mkdir, whole-directory transfers,
@@ -152,9 +167,14 @@ paths have only ever been exercised by unit tests or by hand on a local stand-in
 
 **Deliberately not doing**
 
-- Telnet, serial and RDP. Telnet is plaintext and only useful for legacy network gear; serial
-  would pull in a native module and complicate every build; RDP is a graphical client, not a
-  terminal, and cannot be done well as a side feature.
+- Telnet and serial. Telnet is plaintext and only useful for legacy network gear; serial would
+  pull in a native module and complicate every build. RDP *was* on this list — "a graphical
+  client, not a terminal, and not doable well as a side feature" — until it turned out to be
+  doable without a native dependency at all. See **Desktops** above.
+- Session shadowing (`mstsc /shadow`) and the console session (`/admin`). Connecting as the
+  same user already reconnects to that user's existing session, which covers most of what
+  people want from them; watching *another* user's session needs a Remote Desktop Services
+  feature the client does not implement.
 - PuTTY session import — Windows-only value, deferred since the MVP.
 - Code signing and notarization. Configured and documented below, but no certificate is in use,
   which also means macOS auto-update downloads an update it cannot apply.

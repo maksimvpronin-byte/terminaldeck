@@ -81,6 +81,17 @@ export const IPC = {
   /** main -> renderer, suffixed with connectionId */
   sftpProgress: 'sftp:progress',
 
+  /**
+   * Reserves a single-use address on the local gateway that stands in for a
+   * Devolutions Gateway, which IronRDP's client insists on talking to.
+   */
+  rdpReserve: 'rdp:reserve',
+  /**
+   * The stored login for one host, for a client that signs in from the window.
+   * Scoped to a single session on purpose — see the handler.
+   */
+  rdpCredentials: 'rdp:credentials',
+
   // Remote monitoring
   monitorStart: 'monitor:start',
   monitorStop: 'monitor:stop',

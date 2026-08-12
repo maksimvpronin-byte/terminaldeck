@@ -198,7 +198,12 @@ export default function Pane({
             }}
           />
         ) : (
-          <GraphicalHost protocol={protocol} host={host} port={port} />
+          <GraphicalHost
+            protocol={protocol}
+            host={host}
+            port={port}
+            sessionId={sessionId ?? undefined}
+          />
         )}
         {traits.files && node.sftpOpen && <SftpPanel connectionId={node.connectionId} />}
         {traits.tunnels && node.tunnelsOpen && (

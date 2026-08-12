@@ -2,9 +2,24 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!--
+      Each allowance below is here for one reason and no more:
+
+      wasm-unsafe-eval  Chromium refuses to compile WebAssembly under a CSP
+                        without it. Narrower than 'unsafe-eval', which would also
+                        hand back eval() and new Function() for JavaScript.
+      connect-src data:  The RDP client's WebAssembly is embedded as a
+                        data:application/wasm URL and loaded by fetching it.
+      connect-src ws://127.0.0.1:*  The RDP client opens its own socket to the
+                        gateway the main process runs on loopback, on a port the
+                        operating system picks. Loopback only — no host beyond
+                        this machine is reachable from the window.
+      img-src data:     Remote cursors arrive as base64 images and are set as CSS
+                        cursors.
+    -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';"
+      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' data: ws://127.0.0.1:*;"
     />
     <title>TerminalDeck</title>
   </head>
