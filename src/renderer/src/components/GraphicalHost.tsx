@@ -3,9 +3,11 @@ import '@devolutions/iron-remote-desktop'
 import { Backend, init as initRdp } from '@devolutions/iron-remote-desktop-rdp'
 import type { UserInteraction } from '@devolutions/iron-remote-desktop'
 import { traitsOf, type Protocol } from '../../../shared/protocols'
+import { shadowable, type WinSession } from '../../../shared/winSessions'
 
 type Phase =
   | { at: 'loading' }
+  | { at: 'choosing' }
   | { at: 'password' }
   | { at: 'connecting' }
   | { at: 'connected' }
@@ -67,6 +69,11 @@ export default function GraphicalHost({
    * being in a value the component renders from.
    */
   const lastUsed = useRef<{ user: string; secret: string } | null>(null)
+  /** What the host had saved, kept so the chooser can dial without asking. */
+  const [storedPassword, setStoredPassword] = useState('')
+  const [sessions, setSessions] = useState<WinSession[]>([])
+  const [sessionsLoading, setSessionsLoading] = useState(true)
+  const [sessionsProblem, setSessionsProblem] = useState<string | undefined>()
 
   const traits = traitsOf(protocol)
   const target = `${host ?? ''}:${port ?? traits.port}`
@@ -134,13 +141,28 @@ export default function GraphicalHost({
       .then((stored) => {
         if (!alive) return
         setUsername(stored.username)
-        // Straight in when there is a password to use; otherwise ask for that
-        // one field, with the username already filled from the host.
-        if (stored.password) void connect(stored.username, stored.password)
-        else setPhase({ at: 'password' })
+        setStoredPassword(stored.password)
+        setPhase({ at: 'choosing' })
       })
       .catch((err: Error) => {
         if (alive) setPhase({ at: 'failed', reason: err.message })
+      })
+
+    // Who is already on the host, asked alongside rather than before: the query
+    // goes over RPC and can take seconds or never answer, and a new session
+    // must not wait on the optional half of the choice.
+    window.td.rdp
+      .listSessions(host)
+      .then((found) => {
+        if (!alive) return
+        setSessions(shadowable(found.sessions))
+        setSessionsProblem(found.problem)
+      })
+      .catch(() => {
+        if (alive) setSessionsProblem('Could not ask the host who is logged on')
+      })
+      .finally(() => {
+        if (alive) setSessionsLoading(false)
       })
 
     return () => {
@@ -148,6 +170,25 @@ export default function GraphicalHost({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [protocol, sessionId, host, target])
+
+  /** A new desktop of our own, in this pane. */
+  function connectFresh(): void {
+    if (storedPassword) void connect(username, storedPassword)
+    else setPhase({ at: 'password' })
+  }
+
+  /** Someone else's desktop, in a window Windows owns. */
+  async function shadow(session: WinSession, control: boolean): Promise<void> {
+    if (!host) return
+    try {
+      await window.td.rdp.shadow(host, session.id, { control, skipPrompt: false })
+      // The pane has nothing to show: the picture is in the other window. Stay
+      // on the chooser so another session can be picked without reopening.
+      setPhase({ at: 'choosing' })
+    } catch (err) {
+      setPhase({ at: 'failed', reason: describe(err) })
+    }
+  }
 
   async function connect(user: string, secret: string): Promise<void> {
     const interaction = interactionRef.current
@@ -232,6 +273,59 @@ export default function GraphicalHost({
                   {traits.label} — {host ? target : 'no host'}
                 </strong>
                 <p className="settings-note">Reading the login for this host.</p>
+              </>
+            )}
+
+            {phase.at === 'choosing' && (
+              <>
+                <strong>{host ? target : 'no host'}</strong>
+                <button className="primary" onClick={connectFresh}>
+                  New session
+                </button>
+
+                <div className="session-pick-head">
+                  <span>Or join a session already open</span>
+                  {sessionsLoading && <span className="settings-note">looking…</span>}
+                </div>
+
+                {sessions.length > 0 && (
+                  <div className="session-pick-list">
+                    {sessions.map((s) => (
+                      <div className="session-pick-row" key={s.id}>
+                        <span className="session-pick-who">
+                          {s.user}
+                          <span className="settings-note">
+                            {' '}
+                            {s.name} · {s.state}
+                            {s.current ? ' · you' : ''}
+                          </span>
+                        </span>
+                        <button title="Watch without touching" onClick={() => void shadow(s, false)}>
+                          Watch
+                        </button>
+                        <button
+                          title="Watch and take the keyboard and mouse"
+                          onClick={() => void shadow(s, true)}
+                        >
+                          Control
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {!sessionsLoading && sessions.length === 0 && (
+                  <p className="settings-note">
+                    {sessionsProblem ?? 'Nobody is logged on to that host right now.'}
+                  </p>
+                )}
+
+                {sessions.length > 0 && (
+                  <p className="settings-note">
+                    A joined session opens in a window of its own — Windows draws it, not this
+                    app. The person at the far end is asked to allow it.
+                  </p>
+                )}
               </>
             )}
 

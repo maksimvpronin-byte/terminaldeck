@@ -102,6 +102,12 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
 - Panels that ride on an SSH connection — the file browser, port forwarding, monitoring,
   broadcast — are hidden for a desktop rather than greyed out, since none of them is coming
 - **Clipboard** in both directions, so text copied in the session pastes locally and back
+- Opening a host asks what you want: a **new session** in the pane, or one of the sessions
+  already logged on to that machine — watched, or with the keyboard and mouse taken. The list
+  comes from the host itself and is read positionally rather than by column heading, so a
+  translated Windows is read as well as an English one. Joining an existing session opens a
+  window Windows draws, not this app: the mechanism runs over RPC and SMB rather than RDP, and
+  no client that could be embedded here speaks it. Windows only, for the same reason
 - When a session will not start, set `TERMINALDECK_RDP_TRACE=1` and the local gateway reports
   each step it took — whether the host answered, what it agreed to during protocol negotiation,
   whether TLS came up. The client reports nearly every fault as "General failure", so this is
@@ -176,12 +182,14 @@ paths have only ever been exercised by unit tests or by hand on a local stand-in
   pull in a native module and complicate every build. RDP *was* on this list — "a graphical
   client, not a terminal, and not doable well as a side feature" — until it turned out to be
   doable without a native dependency at all. See **Desktops** above.
-- The console session (`/admin`) and session shadowing (`mstsc /shadow`). Connecting as the
-  same user already reconnects to that user's existing session, which is most of what these
-  are wanted for. Beyond that they are blocked rather than merely unwritten: the flag that
-  selects the console session exists in IronRDP's protocol layer but is not exposed through
-  its WebAssembly client, and shadowing is a Remote Desktop Services feature the client does
-  not implement at all. Both would need changes upstream.
+- Joining an existing session **inside a pane**. It is offered, but the window belongs to
+  Windows: the mechanism goes over RPC and SMB rather than RDP, and the embedded client does
+  not implement it. Drawing it here would mean implementing Remote Desktop Services shadowing
+  from scratch.
+- The console session (`/admin`). The flag that selects it exists in IronRDP's protocol layer
+  but is not exposed through its WebAssembly client, so this needs a change upstream.
+  Connecting as the same user already reconnects to that user's existing session, which is
+  most of what it is wanted for.
 - PuTTY session import — Windows-only value, deferred since the MVP.
 - Code signing and notarization. Configured and documented below, but no certificate is in use,
   which also means macOS auto-update downloads an update it cannot apply.

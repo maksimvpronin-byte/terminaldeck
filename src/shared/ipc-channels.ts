@@ -91,6 +91,10 @@ export const IPC = {
    * Scoped to a single session on purpose — see the handler.
    */
   rdpCredentials: 'rdp:credentials',
+  /** Who is logged on to a Windows host, for the shadow picker. */
+  rdpListSessions: 'rdp:listSessions',
+  /** Opens the Windows client on an existing session, in a window of its own. */
+  rdpShadow: 'rdp:shadow',
 
   // Remote monitoring
   monitorStart: 'monitor:start',

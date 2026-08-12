@@ -22,6 +22,7 @@ import type {
   FileComparison
 } from '../shared/types'
 import type { RemoteStats } from '../shared/remoteStats'
+import type { WinSession } from '../shared/winSessions'
 
 const api = {
   vault: {
@@ -140,7 +141,16 @@ const api = {
     reserve: (): Promise<string> => ipcRenderer.invoke(IPC.rdpReserve),
     /** The stored login for one host; the password is empty when none is saved. */
     credentials: (sessionId: string): Promise<{ username: string; password: string }> =>
-      ipcRenderer.invoke(IPC.rdpCredentials, sessionId)
+      ipcRenderer.invoke(IPC.rdpCredentials, sessionId),
+    /** Who is logged on to a host. Never rejects; says why it found nobody. */
+    listSessions: (host: string): Promise<{ sessions: WinSession[]; problem?: string }> =>
+      ipcRenderer.invoke(IPC.rdpListSessions, host),
+    /** Opens the Windows client on an existing session, in a window of its own. */
+    shadow: (
+      host: string,
+      sessionId: number,
+      options: { control: boolean; skipPrompt: boolean }
+    ): Promise<void> => ipcRenderer.invoke(IPC.rdpShadow, host, sessionId, options)
   },
   sftp: {
     list: (connectionId: string, path: string): Promise<SftpEntry[]> =>

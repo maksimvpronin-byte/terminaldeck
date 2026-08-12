@@ -14,6 +14,7 @@ import { remoteEdit } from '../ssh/RemoteEdit'
 import { portForwardManager } from '../ssh/PortForwardManager'
 import { remoteMonitor } from '../ssh/RemoteMonitor'
 import { rdpGateway } from '../rdp/Gateway'
+import { listSessions, shadowSession } from '../rdp/WinSessions'
 import { resolveAuth } from '../../shared/authResolution'
 import { protocolOf } from '../../shared/protocols'
 import { readSshConfigHosts } from '../ssh/sshConfig'
@@ -398,6 +399,13 @@ export function registerIpcHandlers(): void {
       password: auth.secretRef ? vault.getSecret(auth.secretRef) ?? '' : ''
     }
   })
+
+  ipcMain.handle(IPC.rdpListSessions, (_e, host: string) => listSessions(host))
+  ipcMain.handle(
+    IPC.rdpShadow,
+    (_e, host: string, sessionId: number, options: { control: boolean; skipPrompt: boolean }) =>
+      shadowSession(host, sessionId, options)
+  )
 
   // --- Remote monitoring ---
   ipcMain.handle(IPC.monitorStart, (_e, connectionId: string) => {

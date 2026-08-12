@@ -1083,8 +1083,47 @@ label {
   justify-content: center;
   background: rgba(0, 0, 0, 0.55);
 }
+/* --- picking a session to join --- */
+.session-pick-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.session-pick-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 160px;
+  overflow-y: auto;
+  text-align: left;
+}
+.session-pick-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+/* Takes the slack so the two buttons stay put however long a name is. */
+.session-pick-who {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+/* Wide enough for a session row: a `DOMAIN\user` beside two buttons, without
+   the name ellipsising down to nothing. */
 .graphical-notice {
-  width: 340px;
+  width: 400px;
   max-width: 90%;
   display: flex;
   flex-direction: column;

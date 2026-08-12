@@ -15,6 +15,11 @@ the other produces a version nobody can install, which is how 0.1.10 through
 - A host now has a **protocol**, and a pane dispatches on it: the panels that
   ride on an SSH connection are hidden for a desktop rather than disabled.
 - **Clipboard** across an RDP session, in both directions.
+- Opening an RDP host offers a **choice**: a new session in the pane, or one of
+  the sessions already logged on to that machine — watched or controlled. The
+  list is read from the host with `qwinsta`. Joining one opens a window Windows
+  draws rather than a pane, because the mechanism runs over RPC and SMB rather
+  than RDP; Windows only.
 - `TERMINALDECK_RDP_TRACE=1` turns on the local gateway's step-by-step report in
   a shipped build. It is on by default in development. The client reports nearly
   every fault as "General failure", so this is usually the only way to see where
