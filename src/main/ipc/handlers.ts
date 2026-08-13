@@ -15,6 +15,11 @@ import { portForwardManager } from '../ssh/PortForwardManager'
 import { remoteMonitor } from '../ssh/RemoteMonitor'
 import { rdpGateway } from '../rdp/Gateway'
 import { listSessions, shadowSession } from '../rdp/WinSessions'
+import {
+  shadowHostBridge,
+  type PaneRect,
+  type ShadowRequest
+} from '../rdp/ShadowHostBridge'
 import { resolveAuth } from '../../shared/authResolution'
 import { protocolOf } from '../../shared/protocols'
 import { readSshConfigHosts } from '../ssh/sshConfig'
@@ -400,7 +405,39 @@ export function registerIpcHandlers(): void {
     }
   })
 
-  ipcMain.handle(IPC.rdpListSessions, (_e, host: string) => listSessions(host))
+  /**
+   * Takes a host id rather than an address so the credentials can be resolved
+   * here: `qwinsta` signs in as the Windows account running this app, which is
+   * the wrong one for any host outside its domain, and the right one is already
+   * in the vault. The password is used and dropped without reaching the window.
+   */
+  ipcMain.handle(IPC.shadowStart, (_e, request: ShadowRequest) => {
+    const win = focusedWin()
+    if (!win) throw new Error('No window to draw into')
+    return shadowHostBridge.start(win, request)
+  })
+  ipcMain.on(IPC.shadowPlace, (_e, id: string, rect: PaneRect) =>
+    shadowHostBridge.place(id, rect)
+  )
+  ipcMain.on(IPC.shadowVisible, (_e, id: string, visible: boolean) =>
+    shadowHostBridge.setVisible(id, visible)
+  )
+  ipcMain.handle(IPC.shadowStop, (_e, id: string) => shadowHostBridge.stop(id))
+
+  ipcMain.handle(IPC.rdpListSessions, (_e, sessionId: string) => {
+    const profile =
+      sessionStore.getAll().sessions.find((s) => s.id === sessionId) ??
+      inventoryStore.findSession(sessionId)
+    if (!profile) throw new Error('Unknown session')
+
+    const groups = [...sessionStore.getAll().groups, ...inventoryStore.allGroups()]
+    const auth = resolveAuth(profile, profile.groupId, groups)
+    const password = auth.secretRef ? vault.getSecret(auth.secretRef) : undefined
+    return listSessions(
+      profile.host,
+      password ? { username: auth.username, password } : undefined
+    )
+  })
   ipcMain.handle(
     IPC.rdpShadow,
     (_e, host: string, sessionId: number, options: { control: boolean; skipPrompt: boolean }) =>

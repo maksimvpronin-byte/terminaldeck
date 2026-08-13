@@ -9,3 +9,9 @@ build/
 .idea/
 .claude/settings.local.json
 graphify-out/
+
+# Built from ShadowHost.cs by npm run build:shadowhost; not a source file.
+resources/shadowhost/*.exe
+
+# Editor/tooling scratch, not part of the project.
+.claude/

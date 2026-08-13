@@ -108,6 +108,15 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
   translated Windows is read as well as an English one. Joining an existing session opens a
   window Windows draws, not this app: the mechanism runs over RPC and SMB rather than RDP, and
   no client that could be embedded here speaks it. Windows only, for the same reason
+- **Listing sessions asks as whoever runs this app**, not as the login saved for the host —
+  `qwinsta` authenticates its own RPC and no stored credential can change that. Against a
+  machine outside your domain the practical answer is to run TerminalDeck as an account that
+  host knows; failing that it tries PowerShell remoting with the saved login, which needs
+  WinRM on the host and that host named in this machine's `TrustedHosts`. None of this touches
+  ordinary RDP sessions, which need none of it
+- Joining without the prompt is a **checkbox, off by default**. The host's policy decides
+  whether it is permitted at all; where it is not, asking for it is refused outright rather
+  than quietly falling back to asking
 - When a session will not start, set `TERMINALDECK_RDP_TRACE=1` and the local gateway reports
   each step it took — whether the host answered, what it agreed to during protocol negotiation,
   whether TLS came up. The client reports nearly every fault as "General failure", so this is

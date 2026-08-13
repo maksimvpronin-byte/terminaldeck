@@ -1,5 +1,11 @@
 import { execFile } from 'child_process'
-import { parseSessions, shadowArgs, type WinSession } from '../../shared/winSessions'
+import {
+  errorCode,
+  parseSessions,
+  qualifyUser,
+  shadowArgs,
+  type WinSession
+} from '../../shared/winSessions'
 
 /**
  * Listing and shadowing the sessions on a Windows host.
@@ -11,13 +17,101 @@ import { parseSessions, shadowArgs, type WinSession } from '../../shared/winSess
  * having it at all.
  */
 
-/** Long enough for a slow domain lookup, short enough not to wedge a pane. */
-const QUERY_TIMEOUT_MS = 8000
+/**
+ * Reaching the far machine is the slow step and needs room: signing in over
+ * remoting takes seconds, and an earlier version cut it off at eight and blamed
+ * a firewall that was open.
+ *
+ * Neither of these blocks the pane — the query runs beside the credentials, and
+ * a new session can be started while it is still going.
+ */
+const REMOTE_TIMEOUT_MS = 25000
+const QUERY_TIMEOUT_MS = 15000
 
 export interface SessionQuery {
   sessions: WinSession[]
   /** Why the list is empty, when it is empty for a reason worth showing. */
   problem?: string
+}
+
+interface Credentials {
+  username: string
+  password: string
+}
+
+
+interface Run {
+  code: number | null
+  output: string
+  timedOut: boolean
+}
+
+/**
+ * A line in the terminal running the app, on the same switch the RDP gateway
+ * uses. Which of these three steps failed is not guessable from the pane.
+ */
+const tracing =
+  process.env.NODE_ENV === 'development' || process.env.TERMINALDECK_RDP_TRACE === '1'
+
+function trace(message: string): void {
+  if (!tracing) return
+  // eslint-disable-next-line no-console
+  console.log(`[rdp sessions] ${message}`)
+}
+
+/**
+ * Runs a Windows tool, answering rather than throwing whatever happens.
+ *
+ * `secret` names an argument to hide from the trace. `extraEnv` is how a
+ * password reaches a command without ever being one of its arguments, since an
+ * argument is readable in the process list for as long as the command runs.
+ */
+function run(
+  file: string,
+  args: string[],
+  timeout: number,
+  secret?: number,
+  extraEnv?: Record<string, string>,
+  encoding: 'latin1' | 'utf8' = 'latin1'
+): Promise<Run> {
+  const started = Date.now()
+  const shown = args.map((a, i) => (i === secret ? '***' : a)).join(' ')
+  return new Promise((resolve) => {
+    const child = execFile(
+      file,
+      args,
+      // latin1 by default: the console tools answer in the console codepage —
+      // cp866 on a Russian Windows — and decoding that as UTF-8 destroys the
+      // bytes. latin1 maps every byte to a character reversibly, so the message
+      // is unreadable but the numeric codes inside it survive, and those are
+      // what the answers are matched on.
+      //
+      // The remoting path asks PowerShell for UTF-8 and must be read as UTF-8,
+      // or its message is mangled twice over and stops being matchable at all.
+      {
+        timeout,
+        windowsHide: true,
+        encoding,
+        env: extraEnv ? { ...process.env, ...extraEnv } : process.env
+      },
+      (err, stdout, stderr) => {
+        const result: Run = {
+          code: typeof err?.code === 'number' ? err.code : err ? 1 : 0,
+          output: `${stdout}${stderr}`,
+          timedOut: Boolean(err && 'killed' in err && (err as { killed?: boolean }).killed)
+        }
+        trace(
+          `${file} ${shown} → exit ${result.code}` +
+            `${result.timedOut ? ' (timed out)' : ''} in ${Date.now() - started}ms` +
+            `${result.output.trim() ? ` — ${result.output.trim().split(/\r?\n/)[0]}` : ''}`
+        )
+        resolve(result)
+      }
+    )
+    // Nothing is written in: closing it stops `net` waiting on a console
+    // prompt if it ever decides to ask for something.
+    child.stdin?.end()
+  })
 }
 
 /**
@@ -26,50 +120,221 @@ export interface SessionQuery {
  * Never rejects: an unreachable host, a refused query and a machine with nobody
  * on it are all ordinary answers here, and a pane that opened to a thrown error
  * because the *optional* half of the dialog failed would be a poor trade.
+ *
+ * Two routes, because `qwinsta /server:` signs its own RPC in as whoever runs
+ * this app — a stranger to any machine outside the domain, and no share
+ * connection opened beforehand changes that. So a host with a login saved is
+ * asked to run the query itself; everything else is asked directly.
  */
-export async function listSessions(host: string): Promise<SessionQuery> {
+export function listSessions(host: string, credentials?: Credentials): Promise<SessionQuery> {
   if (process.platform !== 'win32') {
-    return { sessions: [], problem: 'Shadowing needs the Windows client, which only Windows has' }
+    return Promise.resolve({
+      sessions: [],
+      problem: 'Shadowing needs the Windows client, which only Windows has'
+    })
   }
 
-  return new Promise<SessionQuery>((resolve) => {
-    execFile(
-      'qwinsta',
-      [`/server:${host}`],
-      { timeout: QUERY_TIMEOUT_MS, windowsHide: true },
-      (err, stdout, stderr) => {
-        const text = `${stdout}${stderr}`
-        const sessions = parseSessions(text)
-        if (sessions.length > 0) {
-          resolve({ sessions })
-          return
-        }
-        resolve({ sessions: [], problem: explain(err, text) })
-      }
-    )
-  })
+  // One query per host at a time, shared by everyone who asks while it runs.
+  // A pane can mount more than once — React does exactly that in development —
+  // and four `net use` calls racing for the same share end up fighting each
+  // other over the single connection Windows allows per server.
+  const running = inFlight.get(host)
+  if (running) return running
+
+  const query = ask(host, credentials).finally(() => inFlight.delete(host))
+  inFlight.set(host, query)
+  return query
+}
+
+const inFlight = new Map<string, Promise<SessionQuery>>()
+
+async function ask(host: string, credentials?: Credentials): Promise<SessionQuery> {
+  // The host's own login first, when there is one. `qwinsta /server:` cannot
+  // make use of it — see runOnHost — so the query runs on the far machine.
+  let remotingProblem: string | undefined
+  if (credentials?.username && credentials.password) {
+    const remote = await runOnHost(host, credentials)
+    if (remote.sessions.length > 0) return remote
+    remotingProblem = remote.problem
+  }
+
+  // Still worth asking directly: this is the ordinary route on a domain member,
+  // and also the one that works when the app itself runs as someone the host
+  // knows.
+  const query = await queryDirect(host)
+  // Only a command that succeeded has a table to read. An error message is
+  // shaped enough like a row to be parsed as one — `Ошибка 5 получения имен
+  // сеансов` has a bare integer in the middle of it, and turned a refusal into
+  // a session nobody was in.
+  const sessions = query.code === 0 ? parseSessions(query.output) : []
+  if (sessions.length > 0) return { sessions }
+
+  // The remoting failure is the more useful thing to report when there was one:
+  // it is the route that was meant to work, and the direct one's complaint —
+  // "save a login for this host" — is nonsense to someone who just did.
+  return { sessions: [], problem: remotingProblem ?? explainQuery(query) }
 }
 
 /**
- * Turns a failed query into something worth reading.
+ * Asks the host directly, with the console set to UTF-8 first.
  *
- * The two answers that actually happen are "no rights on that machine" and
- * "the firewall is not open for this", and neither is guessable from
- * `Error [5]`.
+ * `qwinsta` writes in the console codepage, so a Cyrillic account name came
+ * back as mojibake and was shown that way in the picker — the one thing in the
+ * list a person actually reads. `chcp` has to be set in the same console the
+ * tool inherits, which means going through `cmd`; there is no way to ask
+ * `execFile` for it.
  */
-function explain(err: Error | null, output: string): string | undefined {
-  const text = output.trim()
-  if (/denied|отказано/i.test(text)) {
-    return 'Access denied — shadowing needs administrator rights on that host'
+function queryDirect(host: string): Promise<Run> {
+  const script = [
+    // Captured first, while the console is still on its own codepage: that is
+    // what `qwinsta` writes in, and PowerShell decodes it correctly by default.
+    '$out = & qwinsta "/server:$env:TD_HOST" 2>&1 | Out-String -Width 200',
+    // Read before anything else can overwrite it, and made this process's own
+    // exit code: with -Command PowerShell exits 0 even when the tool it ran did
+    // not, and a refusal that looks like success gets its error text parsed as
+    // a session table.
+    '$code = $LASTEXITCODE',
+    // UTF-8 only now, for writing the answer out where Node can read it.
+    // Setting it any earlier breaks the capture instead of helping it — the
+    // tool then writes bytes PowerShell reads as invalid UTF-8, and a Cyrillic
+    // account name arrives as a row of replacement characters.
+    '[Console]::OutputEncoding = [Text.Encoding]::UTF8',
+    '$out',
+    'exit $code'
+  ].join('; ')
+
+  return run(
+    'powershell',
+    ['-NoProfile', '-NonInteractive', '-Command', script],
+    QUERY_TIMEOUT_MS,
+    undefined,
+    // Through the environment rather than into the script text, so no host name
+    // can end the argument and begin another one.
+    { TD_HOST: host },
+    'utf8'
+  )
+}
+
+/**
+ * Runs the query on the host itself, over PowerShell remoting.
+ *
+ * `qwinsta /server:` authenticates its own RPC with the credentials of the
+ * process that calls it — not with any share connection opened beforehand. So
+ * carrying the host's login through `net use` did nothing for it: the query
+ * still went out as whoever is running this app, who is nobody on a machine
+ * outside the domain, and came back denied. `runas /netonly` fixes exactly that
+ * by hand and cannot be scripted — it refuses a password from anywhere but the
+ * keyboard, on purpose.
+ *
+ * Running the query on the far side sidesteps all of it. There it is a local
+ * call, needing no remote enumeration rights at all.
+ *
+ * Always answers, never throws. An empty result with a `problem` says why this
+ * route did not work, which the caller keeps in case the direct one fails too.
+ */
+async function runOnHost(host: string, credentials: Credentials): Promise<SessionQuery> {
+  const script = [
+    '$ErrorActionPreference = "Continue"',
+    // Read from the environment, never from the command line: an argument is
+    // visible in the process list for as long as the command runs.
+    '$sec = ConvertTo-SecureString $env:TD_PW -AsPlainText -Force',
+    '$cred = New-Object System.Management.Automation.PSCredential($env:TD_USER, $sec)',
+    '$out = Invoke-Command -ComputerName $env:TD_HOST -Credential $cred' +
+      ' -ScriptBlock { qwinsta } 2>&1 | Out-String -Width 200',
+    '$failed = -not $?',
+    // Same ordering as the direct route, and for the same reason: UTF-8 goes on
+    // only to write the answer out. Setting it before the call breaks what
+    // comes back rather than helping it.
+    '[Console]::OutputEncoding = [Text.Encoding]::UTF8',
+    '$out',
+    'if ($failed) { exit 1 }'
+  ].join('; ')
+
+  const attempt = await run(
+    'powershell',
+    ['-NoProfile', '-NonInteractive', '-Command', script],
+    REMOTE_TIMEOUT_MS,
+    undefined,
+    {
+      TD_HOST: host,
+      TD_USER: qualifyUser(credentials.username, host),
+      TD_PW: credentials.password
+    },
+    'utf8'
+  )
+
+  // Same rule as the direct route: a failed command has no table, and its error
+  // text parses into a fake row if given the chance.
+  if (attempt.code === 0) {
+    const sessions = parseSessions(attempt.output)
+    if (sessions.length > 0) return { sessions }
+    return { sessions: [], problem: undefined }
   }
-  if (/\[1722\]|RPC server is unavailable|RPC-сервер недоступен/i.test(text)) {
-    return 'The host did not answer the query — file and printer sharing must be open on it, not only Remote Desktop'
+
+  /*
+   * These are matched on words Windows does not translate — `TrustedHosts`,
+   * `WSMan`, `WinRM`, `quickconfig`. Everything around them arrives in the
+   * host's own language and the console codepage, so the prose is unreadable
+   * here; an earlier version matched an English sentence and recognised
+   * nothing on a Russian machine.
+   */
+  const text = attempt.output
+  const trust = `Set-Item WSMan:\\localhost\\Client\\TrustedHosts -Value '${host}' -Concatenate -Force`
+
+  // `cannot process the request` is the signature of the trust problem, and the
+  // sentence naming TrustedHosts is often further into a message that gets cut
+  // short — so the phrase is worth matching in its own right.
+  if (/TrustedHosts/i.test(text) || /cannot process|не может обработать/i.test(text)) {
+    return {
+      sessions: [],
+      problem: `This machine has to be told to trust ${host} before Windows will sign in to it over remoting — hosts outside a domain need that. Run once *here*, as administrator, and check it took: ${trust}`
+    }
   }
-  if (err && 'killed' in err && (err as { killed?: boolean }).killed) {
-    return 'The host did not answer in time'
+  if (/quickconfig|WSMan|WinRM/i.test(text)) {
+    // Which of the two it is cannot always be told apart from the text, and
+    // both are one-liners, so both are named rather than guessed between.
+    return {
+      sessions: [],
+      problem: `${host} could not be reached over WinRM, which is how a host outside a domain is asked who is logged on. Two things it needs, and it is usually the second: run Enable-PSRemoting -Force on that machine, and run this one here, as administrator: ${trust}`
+    }
   }
-  if (text) return text.split(/\r?\n/)[0]
-  // A clean run that listed nobody: the machine simply has no one on it.
+
+  return { sessions: [], problem: undefined }
+}
+
+/** Why the query itself came back with nothing. */
+function explainQuery(attempt: Run): string | undefined {
+  const code = errorCode(attempt.output)
+  if (attempt.timedOut) {
+    return 'The host did not answer in time. This query signs in as the Windows account running this app — save an administrator login on the host and it can be asked over PowerShell remoting instead.'
+  }
+  if (code === 5) {
+    // This is the direct route, so the query went out as whoever runs this app
+    // — not as the login saved for the host, which no amount of policy on the
+    // far side can change. The way through is remoting, which is tried first
+    // whenever a login is saved and is what failed if we are here at all.
+    return 'Access denied. This query goes out as the Windows account running this app, which the host does not know. Saving that host an administrator login lets it be asked over PowerShell remoting instead, which needs WinRM enabled on it.'
+  }
+  if (code === 1722 || code === 1723) {
+    // Reached over RPC on 135 and a dynamic port above it — a different door
+    // from the 445 that got us this far, and commonly still shut.
+    return 'The host did not answer the session query (RPC). Port 445 is open, but this call goes over RPC on port 135 as well — that has to be reachable too.'
+  }
+  if (code) return `The host answered the query with error ${code}.`
+
+  // The exit code is the reliable signal, and the last line of defence: the
+  // message it came with is unreadable here, and a number cannot always be
+  // picked out of it. Anything non-zero failed, whatever it said.
+  if (attempt.code !== 0) {
+    return 'The host refused the session query. Save it an administrator login and it can be asked over PowerShell remoting instead, which does not need remote enumeration rights at all.'
+  }
+
+  // No rows at all is not the same as a host with nobody on it: a real answer
+  // always lists at least the services session and the listener. Saying "nobody
+  // is logged on" for silence would be inventing a fact.
+  if (!attempt.output.trim()) {
+    return 'The host answered the query with nothing at all. It signed in, but the session service did not reply.'
+  }
   return undefined
 }
 

@@ -4,6 +4,7 @@ import { Backend, init as initRdp } from '@devolutions/iron-remote-desktop-rdp'
 import type { UserInteraction } from '@devolutions/iron-remote-desktop'
 import { traitsOf, type Protocol } from '../../../shared/protocols'
 import { shadowable, type WinSession } from '../../../shared/winSessions'
+import ShadowView from './ShadowView'
 
 type Phase =
   | { at: 'loading' }
@@ -50,12 +51,16 @@ export default function GraphicalHost({
   protocol,
   host,
   port,
-  sessionId
+  sessionId,
+  paneVisible
 }: {
   protocol: Protocol
   host?: string
   port?: number
   sessionId?: string
+  /** False while another tab is in front: a window over a hidden pane would
+   *  sit on top of whatever replaced it. */
+  paneVisible: boolean
 }): JSX.Element {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const interactionRef = useRef<UserInteraction | null>(null)
@@ -74,6 +79,17 @@ export default function GraphicalHost({
   const [sessions, setSessions] = useState<WinSession[]>([])
   const [sessionsLoading, setSessionsLoading] = useState(true)
   const [sessionsProblem, setSessionsProblem] = useState<string | undefined>()
+  /**
+   * Whether to join without asking the person at the far end.
+   *
+   * Off by default, because taking someone's screen unannounced should be a
+   * decision rather than a default. The host has the final say either way:
+   * where its policy does not allow this, asking for it is refused outright
+   * rather than quietly downgraded to asking.
+   */
+  const [skipPrompt, setSkipPrompt] = useState(false)
+  /** The session being watched in this pane, once one has been chosen. */
+  const [joined, setJoined] = useState<{ session: WinSession; control: boolean } | null>(null)
 
   const traits = traitsOf(protocol)
   const target = `${host ?? ''}:${port ?? traits.port}`
@@ -152,7 +168,7 @@ export default function GraphicalHost({
     // goes over RPC and can take seconds or never answer, and a new session
     // must not wait on the optional half of the choice.
     window.td.rdp
-      .listSessions(host)
+      .listSessions(sessionId)
       .then((found) => {
         if (!alive) return
         setSessions(shadowable(found.sessions))
@@ -177,17 +193,10 @@ export default function GraphicalHost({
     else setPhase({ at: 'password' })
   }
 
-  /** Someone else's desktop, in a window Windows owns. */
-  async function shadow(session: WinSession, control: boolean): Promise<void> {
+  /** Someone else's desktop, shown in this pane. */
+  function shadow(session: WinSession, control: boolean): void {
     if (!host) return
-    try {
-      await window.td.rdp.shadow(host, session.id, { control, skipPrompt: false })
-      // The pane has nothing to show: the picture is in the other window. Stay
-      // on the chooser so another session can be picked without reopening.
-      setPhase({ at: 'choosing' })
-    } catch (err) {
-      setPhase({ at: 'failed', reason: describe(err) })
-    }
+    setJoined({ session, control })
   }
 
   async function connect(user: string, secret: string): Promise<void> {
@@ -242,6 +251,21 @@ export default function GraphicalHost({
     } catch (err) {
       setPhase({ at: 'failed', reason: describe(err) })
     }
+  }
+
+  // A joined session takes the pane over entirely: its picture belongs to a
+  // window sitting on top, and anything rendered here would be hidden by it.
+  if (joined && host) {
+    return (
+      <ShadowView
+        host={host}
+        session={joined.session}
+        control={joined.control}
+        noPrompt={skipPrompt}
+        visible={paneVisible}
+        onClose={() => setJoined(null)}
+      />
+    )
   }
 
   if (protocol === 'ssh') {
@@ -321,10 +345,23 @@ export default function GraphicalHost({
                 )}
 
                 {sessions.length > 0 && (
-                  <p className="settings-note">
-                    A joined session opens in a window of its own — Windows draws it, not this
-                    app. The person at the far end is asked to allow it.
-                  </p>
+                  <>
+                    <label className="checkbox-row session-pick-quiet">
+                      <input
+                        type="checkbox"
+                        checked={skipPrompt}
+                        onChange={(e) => setSkipPrompt(e.target.checked)}
+                      />
+                      Join without asking the person there
+                    </label>
+                    <p className="settings-note">
+                      A joined session opens in a window of its own — Windows draws it, not this
+                      app.{' '}
+                      {skipPrompt
+                        ? 'The host allows this only where its policy says so; where it does not, the connection is refused rather than falling back to asking.'
+                        : 'The person at the far end is asked to allow it.'}
+                    </p>
+                  </>
                 )}
               </>
             )}

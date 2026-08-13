@@ -29,6 +29,12 @@ mac:
   notarize: false
 win:
   icon: resources/icon.png
+  # Shadow sessions are drawn by a window this app positions rather than paints,
+  # and ShadowHost.exe is what holds it. Windows only, because shadowing is.
+  # Built by `npm run build:shadowhost`, which build:win runs first.
+  extraResources:
+    - from: resources/shadowhost/ShadowHost.exe
+      to: shadowhost/ShadowHost.exe
   target:
     - target: nsis
       arch: [x64, arm64]

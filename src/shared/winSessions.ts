@@ -78,6 +78,51 @@ export function parseSessions(output: string): WinSession[] {
 }
 
 /**
+ * Names an account on the host rather than on the machine asking.
+ *
+ * Windows reads a bare `administrator` as a *local* account of the computer
+ * running the command, so a standalone server answers 1326 — the same code as a
+ * wrong password, which is what makes this worth doing rather than diagnosing.
+ * A name that already carries a domain or is a UPN is left alone.
+ */
+export function qualifyUser(username: string, host: string): string {
+  const name = username.trim()
+  if (!name || name.includes('\\') || name.includes('@')) return name
+  return `${host}\\${name}`
+}
+
+/**
+ * The Windows error number in a command's output, if it named one.
+ *
+ * Read from the digits rather than the words. These tools answer in the console
+ * codepage and in the machine's own language — `System error 1326 has occurred`
+ * on one host, `Системная ошибка 1326` on another — so the number is the only
+ * part that can be relied on.
+ */
+export function errorCode(output: string): number | null {
+  // No `\b` before the word: JavaScript's word boundary is ASCII-only, so there
+  // is no boundary at all between a space and a Cyrillic letter, and the
+  // Russian form would never match.
+  const named = output.match(/(?:error|ошибка)\D{0,12}?(\d{1,5})/i)
+  if (named) return Number(named[1])
+
+  // `Ошибка [5]:Отказано в доступе` — one digit, and the commonest of all.
+  const bracketed = output.match(/\[(\d{1,5})\]/)
+  if (bracketed) return Number(bracketed[1])
+
+  // Last resort, and the one that carries the load in practice: this output is
+  // read in the console codepage, so the word around the number is mojibake
+  // and only the digits survive.
+  //
+  // One digit counts. `Access denied` is error 5, and requiring three left the
+  // commonest failure of all looking like a clean empty answer. Safe only
+  // because this is asked about output from a command that failed — never
+  // about a session table, where the numbers are ids.
+  const bare = output.match(/(?:^|\D)(\d{1,5})(?:\D|$)/)
+  return bare ? Number(bare[1]) : null
+}
+
+/**
  * The command line for shadowing one session.
  *
  * `/control` asks for the keyboard and mouse as well as the picture; without it

@@ -1111,6 +1111,13 @@ label {
   border: 1px solid var(--border);
   border-radius: 5px;
 }
+/* Left-aligned against the centred card: a checkbox reads as a statement about
+   itself, not as part of the heading above it. */
+.session-pick-quiet {
+  justify-content: flex-start;
+  font-size: 11px;
+  color: var(--text-dim);
+}
 /* Takes the slack so the two buttons stay put however long a name is. */
 .session-pick-who {
   flex: 1;

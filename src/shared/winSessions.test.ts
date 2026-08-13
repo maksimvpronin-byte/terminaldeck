@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseSessions, shadowArgs, shadowable } from './winSessions'
+import { errorCode, parseSessions, qualifyUser, shadowArgs, shadowable } from './winSessions'
 
 /** Real `qwinsta /server:` output from an English host. */
 const ENGLISH = [
@@ -19,6 +19,35 @@ const RUSSIAN = [
   ' rdp-tcp#2         maksim                    2  Активно',
   ''
 ].join('\r\n')
+
+/**
+ * Captured verbatim from `qwinsta` on a real Windows 11 machine, trailing
+ * spaces and all. The hand-written tables above are what the format is believed
+ * to look like; this one is what it actually is.
+ */
+const CAPTURED =
+  ' SESSIONNAME               USERNAME                 ID  STATE   TYPE        DEVICE \r\n' +
+  ' services                                            0  Disc                        \r\n' +
+  '>console                   Fidel                     1  Active'
+
+describe('a table captured from a real host', () => {
+  it('reads both rows and neither heading', () => {
+    expect(parseSessions(CAPTURED).map((s) => s.id)).toEqual([0, 1])
+  })
+
+  it('gets the logged-on user off the console row', () => {
+    expect(parseSessions(CAPTURED).find((s) => s.id === 1)).toMatchObject({
+      name: 'console',
+      user: 'Fidel',
+      state: 'Active',
+      current: true
+    })
+  })
+
+  it('offers only the console session, not services', () => {
+    expect(shadowable(parseSessions(CAPTURED)).map((s) => s.user)).toEqual(['Fidel'])
+  })
+})
 
 describe('parseSessions', () => {
   it('reads every row of an ordinary table', () => {
@@ -64,6 +93,16 @@ describe('parseSessions', () => {
     expect(parseSessions('Error [5]: Access is denied.')).toEqual([])
     expect(parseSessions('')).toEqual([])
   })
+
+  it('cannot always tell an error message from a row, which is why callers check the exit code', () => {
+    // Documented rather than fixed here. A translated error read in the console
+    // codepage — `Ошибка 5 получения имен сеансов` — has a bare integer in the
+    // middle of it and is shaped exactly like a session row. Nothing about the
+    // text distinguishes them, so the caller must not offer this function the
+    // output of a command that failed.
+    const mojibake = 'РћС€РёР±РєР° 5 РїРѕР»СѓС‡РµРЅРёСЏ РёРјРµРЅ СЃРµР°РЅСЃРѕРІ'
+    expect(parseSessions(mojibake).length).toBeGreaterThan(0)
+  })
 })
 
 describe('shadowable', () => {
@@ -82,6 +121,68 @@ describe('shadowable', () => {
 
   it('keeps a translated active session', () => {
     expect(shadowable(parseSessions(RUSSIAN)).map((s) => s.id)).toEqual([1, 2])
+  })
+})
+
+describe('qualifyUser', () => {
+  it('points a bare name at the host, not at this machine', () => {
+    // The whole point: Windows reads an unqualified name as a local account of
+    // the computer running the command, and a standalone server then answers
+    // 1326 — indistinguishable from a wrong password.
+    expect(qualifyUser('administrator', '10.10.10.9')).toBe('10.10.10.9\\administrator')
+  })
+
+  it('leaves a name that already names its domain', () => {
+    expect(qualifyUser('CONTOSO\\maksim', '10.0.0.1')).toBe('CONTOSO\\maksim')
+    expect(qualifyUser('.\\local', '10.0.0.1')).toBe('.\\local')
+  })
+
+  it('leaves a UPN alone', () => {
+    expect(qualifyUser('maksim@contoso.local', '10.0.0.1')).toBe('maksim@contoso.local')
+  })
+
+  it('handles a localised account name', () => {
+    expect(qualifyUser('Администратор', 'srv')).toBe('srv\\Администратор')
+  })
+
+  it('does not invent a name out of nothing', () => {
+    expect(qualifyUser('   ', 'srv')).toBe('')
+  })
+})
+
+describe('errorCode', () => {
+  it('reads the number out of an English message', () => {
+    expect(errorCode('System error 1326 has occurred.')).toBe(1326)
+  })
+
+  it('reads it out of a translated one', () => {
+    // The reason codes are matched rather than words: this arrives in the
+    // console codepage and in the machine's own language.
+    expect(errorCode('Системная ошибка 1326.')).toBe(1326)
+  })
+
+  it('reads a bracketed code, which is how qwinsta reports one', () => {
+    // Verbatim from a real host: `Ошибка [5]:Отказано в доступе`.
+    expect(errorCode('Error [5]: Access is denied.')).toBe(5)
+    expect(errorCode('Error [1722]: RPC server unavailable')).toBe(1722)
+  })
+
+  it('says nothing when the output named no code', () => {
+    expect(errorCode('The command completed successfully.')).toBeNull()
+    expect(errorCode('')).toBeNull()
+  })
+
+  it('reads a single-digit code, which is the commonest one there is', () => {
+    // `Access denied` is error 5. Requiring three digits made every one of
+    // those look like a clean, empty answer.
+    expect(errorCode('Error 5: Access is denied.')).toBe(5)
+    expect(errorCode('РћС€РёР±РєР° 5')).toBe(5)
+  })
+
+  it('finds the number even when the words around it are mojibake', () => {
+    // What actually arrives: the message is read in the console codepage, so
+    // only the digits survive intact. This is the case that carries the load.
+    expect(errorCode('РЎРёСЃС‚РµРјРЅР°СЏ РѕС€РёР±РєР° 1326.')).toBe(1326)
   })
 })
 

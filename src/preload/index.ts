@@ -142,9 +142,40 @@ const api = {
     /** The stored login for one host; the password is empty when none is saved. */
     credentials: (sessionId: string): Promise<{ username: string; password: string }> =>
       ipcRenderer.invoke(IPC.rdpCredentials, sessionId),
-    /** Who is logged on to a host. Never rejects; says why it found nobody. */
-    listSessions: (host: string): Promise<{ sessions: WinSession[]; problem?: string }> =>
-      ipcRenderer.invoke(IPC.rdpListSessions, host),
+    /**
+     * Who is logged on to a host, by host id: the query needs that host's own
+     * login, which main resolves without handing it here. Never rejects; says
+     * why it found nobody.
+     */
+    listSessions: (sessionId: string): Promise<{ sessions: WinSession[]; problem?: string }> =>
+      ipcRenderer.invoke(IPC.rdpListSessions, sessionId),
+    /**
+     * Shows a shadow session inside a pane. The picture belongs to a window
+     * this app positions rather than draws, so the pane has to keep reporting
+     * where it is.
+     */
+    shadowStart: (request: {
+      host: string
+      sessionId: number
+      control: boolean
+      noPrompt: boolean
+    }): Promise<string> => ipcRenderer.invoke(IPC.shadowStart, request),
+    shadowPlace: (
+      id: string,
+      rect: { x: number; y: number; width: number; height: number }
+    ): void => ipcRenderer.send(IPC.shadowPlace, id, rect),
+    shadowVisible: (id: string, visible: boolean): void =>
+      ipcRenderer.send(IPC.shadowVisible, id, visible),
+    shadowStop: (id: string): Promise<void> => ipcRenderer.invoke(IPC.shadowStop, id),
+    onShadowEvent: (
+      id: string,
+      cb: (p: { event: string; detail?: string }) => void
+    ): (() => void) => {
+      const channel = `${IPC.shadowEvent}:${id}`
+      const listener = (_e: unknown, p: { event: string; detail?: string }): void => cb(p)
+      ipcRenderer.on(channel, listener)
+      return () => ipcRenderer.removeListener(channel, listener)
+    },
     /** Opens the Windows client on an existing session, in a window of its own. */
     shadow: (
       host: string,

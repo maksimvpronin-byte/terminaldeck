@@ -203,6 +203,7 @@ export default function Pane({
             host={host}
             port={port}
             sessionId={sessionId ?? undefined}
+            paneVisible={isActiveTab}
           />
         )}
         {traits.files && node.sftpOpen && <SftpPanel connectionId={node.connectionId} />}
