@@ -72,11 +72,17 @@ requested, the call will wait until the user responds." Anything calling this
 needs a generous timeout and a way to give up — the person at the far end may
 be at lunch.
 
-**The picture is not carried by an ordinary RDP connection.** The invitation is
-"a Unicode string in the XML format specified in **[MS-RAI] section 2.2.2**" —
-Remote Assistance Initiation. So the viewer speaks Remote Assistance, which is
-why `mstsc` hosts the Desktop Sharing viewer control rather than drawing the
-session with its own RDP client.
+**What comes back is not a ticket for a connection but an invitation to one.**
+It is "a Unicode string in the XML format specified in **[MS-RAI] section
+2.2.2**" — Remote Assistance Initiation. So the viewer speaks Remote Assistance,
+which is why `mstsc` hosts the Desktop Sharing viewer control rather than
+drawing the session with its own RDP client.
+
+That sounded at first like a different protocol carrying the picture. It is not:
+the two sections below establish that the invitation names an ordinary RDP
+endpoint and that Remote Assistance rides on top of core RDP. Recorded here
+because the first reading cost an evening, and the wording of this sentence is
+what caused it.
 
 ## What the invitation contains — answered
 
