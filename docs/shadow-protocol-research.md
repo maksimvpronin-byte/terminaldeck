@@ -78,34 +78,63 @@ Remote Assistance Initiation. So the viewer speaks Remote Assistance, which is
 why `mstsc` hosts the Desktop Sharing viewer control rather than drawing the
 session with its own RDP client.
 
-This corrects the hopeful reading in the previous section. Core RDP is the
-transport underneath Remote Assistance, so IronRDP's decoding is not wasted —
-but the connection sequence is a protocol IronRDP does not implement, on top of
-one it does.
+## What the invitation contains — answered
 
-## Open
+[MS-RAI] Appendix A gives the format. The useful part is one attribute:
 
-**What the Remote Assistance connection sequence requires**, in [MS-RA] and
-[MS-RAI]: how the invitation's contents lead to a connection, and how much of it
-sits above RDP rather than beside it. This decides whether shadowing is a mode
-added to IronRDP's connector or a second connector alongside it.
+```xml
+<UPLOADDATA USERNAME="jeff"
+  RCTICKET="65538,1,192.168.1.65:3389;jeff_xp:3389,*,<base64>,*,*,<base64>"
+  RCTICKETENCRYPTED="1" PassStub="o2*5GdBARK_JBB" DtStart="…" DtLength="60" />
+```
+
+The connection string carries **an address and port 3389**, a stub password and
+two tokens. So the picture does travel over the ordinary RDP port after all, and
+the invitation is what says where and with what.
+
+`DtLength` is worth noting: the ticket is valid for minutes, not indefinitely.
+Anything that caches one has to re-request rather than retry.
+
+## How Remote Assistance relates to RDP — answered
+
+[MS-RA] section 1.4 settles it:
+
+> The Remote Assistance Protocol also assumes that underlying protocols,
+> specifically **[MS-RDPBCGR]** and **[MS-RDPEGDI]**, will be available to
+> **transport the protocol messages** after the basic Remote Assistance
+> connection is made.
+
+Remote Assistance is a layer *over* core RDP, not an alternative to it. Its own
+messages are a small set of control packets — `REMOTEDESKTOP_CTL_AUTHENTICATE`,
+`_VERSIONINFO`, `_SERVER_ANNOUNCE`, `_ISCONNECTED`, `_DISCONNECT` — carried on a
+virtual channel, the same mechanism IronRDP already uses for the clipboard and
+for file redirection.
+
+That corrects the pessimism of the previous revision. IronRDP is not merely
+"not wasted": it does the whole transport, and what is missing is a channel with
+a handful of message types on it.
 
 ## Next
 
-1. Read [MS-RA] and [MS-RAI] section 2.2.2, and write the sequence here.
-2. Decide where the RPC client lives. Nothing in this codebase speaks DCE/RPC,
-   and the renderer is the wrong place for it: it belongs in the main process,
-   beside the gateway that already does the network half of RDP. Note that this
-   is a real dependency — an RPC client is not a small thing to write, and there
-   is no pure-JavaScript one worth having.
-3. Only then estimate the IronRDP work, with both sequences in hand.
+1. Read [MS-RA] section 2.2.1 and write out the control packets and their order.
+2. Decide where the DCE/RPC client lives. Nothing here speaks DCE/RPC and there
+   is no pure-JavaScript implementation worth having, so this remains the
+   largest single unknown. It belongs in the main process, beside the gateway
+   that already does the network half of RDP.
+3. Then a staged plan against IronRDP.
 
-## Estimate, revised
+## Estimate
 
-Larger than the previous note implied. Three pieces rather than one: a DCE/RPC
-client for the initiation, an invitation parser, and a Remote Assistance
-connector over IronRDP's RDP. The shipping implementation — `mstsc` adopted into
-the pane — stays where it is until all three exist and are proven.
+Three pieces, and they are not equal:
+
+- **DCE/RPC client** for `RpcShadow2`. The real cost. Authenticated RPC over
+  SMB, which is a protocol stack in its own right.
+- **Invitation parser.** Small — XML with one attribute worth reading.
+- **Remote Assistance channel.** Bounded: five or so packet types on a virtual
+  channel IronRDP already knows how to open.
+
+The shipping implementation — `mstsc` adopted into the pane — stays where it is
+until all three exist and are proven against a real host.
 
 ## Not worth revisiting
 
