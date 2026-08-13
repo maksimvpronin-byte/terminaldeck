@@ -143,12 +143,39 @@ header, then `AUTHENTICATE`, `VERSIONINFO`, `SERVER_ANNOUNCE`, `ISCONNECTED`,
 `RESULT`, `VERIFY_PASSWORD`, `TOKEN` and the two name packets. A dozen small
 structures.
 
+## Windows already has the RPC client
+
+The expensive item on the list below was a DCE/RPC client. It turns out not to
+be needed: `winsta.dll` **is** the client side of these interfaces, and it
+exports the calls.
+
+```
+WinStationOpenServerW       exported     -- a handle to a remote machine
+WinStationRcmShadow2        exported     -- the one that returns an invitation
+WinStationShadow            exported     -- the older, blocking form
+WinStationShadowStop        exported
+```
+
+Checked by resolving the entry points rather than by calling them, so nothing
+was started by accident. The library does the binding and authenticates as the
+calling process — which is also why the app has to run as an account the host
+knows, exactly as the session listing already does.
+
+From ShadowHost, already C#, this is a `DllImport` rather than a protocol stack.
+
+Two cautions. `WinStationRcmShadow2` is not documented on MSDN — the RPC beneath
+it is, in MS-TSTS, but the wrapper is not, so its signature has to be confirmed
+against the specification's parameter list and its behaviour pinned by a test.
+And an undocumented export can move between Windows versions; the fallback if it
+ever does is the documented RPC, which is the work this finding avoids rather
+than removes.
+
 ## The plan
 
-1. **Prove the RPC first.** It is the largest unknown and everything else
-   depends on it, so it should fail early if it is going to. A standalone call
-   to `RpcShadow2` that returns an invitation string is the milestone — no RDP,
-   no UI. If this cannot be made to work, nothing after it matters.
+1. **Prove the call first.** It is still the largest unknown and everything
+   depends on it, so it should fail early if it is going to. A standalone
+   `WinStationRcmShadow2` returning an invitation string is the milestone — no
+   RDP, no UI. If this cannot be made to work, nothing after it matters.
 2. **Parse the invitation.** Small, and testable against the sample in [MS-RAI]
    appendix A without a server.
 3. **Session initialization channel** over IronRDP, against a real host.
@@ -161,8 +188,8 @@ Stages 1 and 2 are testable in isolation, which is the point of that order.
 
 Three pieces, and they are not equal:
 
-- **DCE/RPC client** for `RpcShadow2`. The real cost. Authenticated RPC over
-  SMB, which is a protocol stack in its own right.
+- **The shadow call.** No longer the real cost: winsta.dll exports it, so this
+  is a P/Invoke whose signature needs confirming, not an RPC stack to write.
 - **Invitation parser.** Small — XML with one attribute worth reading.
 - **Remote Assistance channel.** Bounded: five or so packet types on a virtual
   channel IronRDP already knows how to open.
