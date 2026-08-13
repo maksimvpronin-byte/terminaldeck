@@ -1,8 +1,8 @@
 # Research: implementing RDS shadowing in the embedded client
 
-> **Status: in progress.** Enough is settled to say the work is bounded and not
-> archaeology. The display half is not yet pinned down, and that is the next
-> thing to read.
+> **Status: research complete.** The sequence is known end to end and the work
+> is staged below. Nothing is implemented yet — the shipping path is still
+> `mstsc` adopted into the pane.
 
 Today a joined session is drawn by `mstsc`, adopted into the pane by
 ShadowHost — see [the commit](../resources/shadowhost/ShadowHost.cs). It works,
@@ -114,14 +114,42 @@ That corrects the pessimism of the previous revision. IronRDP is not merely
 "not wasted": it does the whole transport, and what is missing is a channel with
 a handful of message types on it.
 
-## Next
+## What has to be implemented, and what does not
 
-1. Read [MS-RA] section 2.2.1 and write out the control packets and their order.
-2. Decide where the DCE/RPC client lives. Nothing here speaks DCE/RPC and there
-   is no pure-JavaScript implementation worth having, so this remains the
-   largest single unknown. It belongs in the main process, beside the gateway
-   that already does the network half of RDP.
-3. Then a staged plan against IronRDP.
+[MS-RA] uses four virtual channels, and only one of them is on the path to a
+picture:
+
+- **Session initialization** — created with the connection and kept for its
+  duration. "This exchange has to be completed successfully for the Remote
+  Assistance session to be established. Once the Remote Assistance session is
+  established, the expert can view the novice's screen." This one is required.
+- **Chat** — also created when the connection is established.
+- **File transfer** and **share control / VoIP** — created on demand, for
+  capabilities shadowing does not need.
+
+So watching a session needs the RDP connection, one virtual channel, and its
+control packets. The screen itself arrives as ordinary RDP graphics, decoded by
+code IronRDP already has. Nothing about file transfer, chat or voice is on the
+critical path.
+
+The control packets are listed in [MS-RA] section 2.2.1: a channel and packet
+header, then `AUTHENTICATE`, `VERSIONINFO`, `SERVER_ANNOUNCE`, `ISCONNECTED`,
+`RESULT`, `VERIFY_PASSWORD`, `TOKEN` and the two name packets. A dozen small
+structures.
+
+## The plan
+
+1. **Prove the RPC first.** It is the largest unknown and everything else
+   depends on it, so it should fail early if it is going to. A standalone call
+   to `RpcShadow2` that returns an invitation string is the milestone — no RDP,
+   no UI. If this cannot be made to work, nothing after it matters.
+2. **Parse the invitation.** Small, and testable against the sample in [MS-RAI]
+   appendix A without a server.
+3. **Session initialization channel** over IronRDP, against a real host.
+4. **Replace ShadowHost** only once a session is actually visible this way. Not
+   before: the working implementation is the fallback until it is not needed.
+
+Stages 1 and 2 are testable in isolation, which is the point of that order.
 
 ## Estimate
 
