@@ -1,5 +1,5 @@
 use std::io::{self, Read, Write};
-use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
+use std::net::{TcpStream, ToSocketAddrs};
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -9,7 +9,13 @@ use anyhow::{Context, Result};
 use ironrdp_connector::{ClientConnector, Config, ConnectionResult, Credentials, DesktopSize};
 use ironrdp_core::{impl_as_any, Encode, EncodeResult, WriteCursor};
 use ironrdp_dvc::{DrdynvcClient, DvcMessage, DvcProcessor};
+
+use ironrdp_egfx::pdu::{
+    CapabilitiesAdvertisePdu, CapabilitiesV104Flags, CapabilitiesV81Flags, CapabilitiesV8Flags,
+    CapabilitySet, GfxPdu,
+};
 use ironrdp_graphics::image_processing::PixelFormat;
+use ironrdp_graphics::zgfx::{wrap_uncompressed, Decompressor as ZgfxDecompressor};
 use ironrdp_pdu::gcc::{ChannelName, KeyboardType};
 use ironrdp_pdu::rdp::capability_sets::MajorPlatformType;
 use ironrdp_pdu::rdp::client_info::{CompressionType, PerformanceFlags, TimezoneInfo};
@@ -17,8 +23,7 @@ use ironrdp_pdu::PduResult;
 use ironrdp_session::image::DecodedImage;
 use ironrdp_session::{ActiveStageBuilder, ActiveStageOutput};
 use ironrdp_svc::{
-    CompressionCondition, StaticChannelSet, StaticVirtualChannel, SvcClientProcessor, SvcMessage,
-    SvcProcessor, SvcProcessorMessages,
+    CompressionCondition, StaticChannelSet, SvcClientProcessor, SvcMessage, SvcProcessor,
 };
 use sspi::network_client::reqwest_network_client::ReqwestNetworkClient;
 use tokio_rustls::rustls;
@@ -57,58 +62,106 @@ channel_processor!(RemoteAssistanceChat, "70");
 channel_processor!(RemoteAssistanceShare, "71");
 channel_processor!(RemoteAssistanceMultiparty, "encomsp");
 
-#[derive(Debug, Clone)]
-struct RemoteAssistanceControl {
-    trace: Trace,
-    expert_name: String,
-    setup_sent: bool,
-}
+/// The control channel, under both names it is known by.
+///
+/// [MS-RA] section 3.5.3 says a channel named `RC_CTL` must be opened before
+/// any control message can be exchanged. FreeRDP names it `remdesk` instead,
+/// and that is the name this client used while the novice stayed silent — a
+/// server grants whatever channel a client asks for, so the mistake is not
+/// visible in the channel list. Both are registered until a live session says
+/// which one the novice actually speaks on.
+macro_rules! control_processor {
+    ($type:ident, $name:literal) => {
+        #[derive(Debug, Clone)]
+        struct $type {
+            trace: Trace,
+            expert_name: String,
+            expert_on_vista_sent: bool,
+            verify_password_sent: bool,
+        }
 
-impl_as_any!(RemoteAssistanceControl);
-
-impl SvcProcessor for RemoteAssistanceControl {
-    fn channel_name(&self) -> ChannelName {
-        ChannelName::from_utf8("remdesk").expect("valid RDP channel name")
-    }
-
-    fn compression_condition(&self) -> CompressionCondition {
-        CompressionCondition::Never
-    }
-
-    fn process(&mut self, payload: &[u8]) -> PduResult<Vec<SvcMessage>> {
-        eprintln!(
-            "svc remdesk data bytes={} prefix={}",
-            payload.len(),
-            hex_prefix(payload)
-        );
-        if let Ok(mut trace) = self.trace.lock() {
-            if trace.len() < 16 {
-                trace.push(("remdesk".to_owned(), payload.to_vec()));
+        impl $type {
+            fn new(trace: Trace, expert_name: String) -> Self {
+                Self {
+                    trace,
+                    expert_name,
+                    expert_on_vista_sent: false,
+                    verify_password_sent: false,
+                }
             }
         }
 
-        let Some((message_type, body)) = parse_remote_assistance_packet(payload) else {
-            eprintln!("svc remdesk data is not a valid Remote Assistance packet");
-            return Ok(Vec::new());
-        };
-        eprintln!(
-            "svc remdesk RC_CTL msgType={} ({}) bodyBytes={}",
-            message_type,
-            remote_assistance_message_name(message_type),
-            body.len()
-        );
+        impl_as_any!($type);
 
-        let responses = remote_assistance_control_responses(
-            message_type,
-            body,
-            &self.expert_name,
-            &mut self.setup_sent,
-        );
-        Ok(responses.into_iter().map(SvcMessage::from).collect())
-    }
+        impl SvcProcessor for $type {
+            fn channel_name(&self) -> ChannelName {
+                ChannelName::from_utf8($name).expect("valid RDP channel name")
+            }
+
+            fn compression_condition(&self) -> CompressionCondition {
+                CompressionCondition::Never
+            }
+
+            fn process(&mut self, payload: &[u8]) -> PduResult<Vec<SvcMessage>> {
+                Ok(process_remote_assistance_control(
+                    $name,
+                    payload,
+                    &self.trace,
+                    &self.expert_name,
+                    &mut self.expert_on_vista_sent,
+                    &mut self.verify_password_sent,
+                ))
+            }
+        }
+
+        impl SvcClientProcessor for $type {}
+    };
 }
 
-impl SvcClientProcessor for RemoteAssistanceControl {}
+control_processor!(RemoteAssistanceControl, "RC_CTL");
+control_processor!(RemoteAssistanceControlRemdesk, "remdesk");
+
+fn process_remote_assistance_control(
+    channel: &str,
+    payload: &[u8],
+    trace: &Trace,
+    expert_name: &str,
+    expert_on_vista_sent: &mut bool,
+    verify_password_sent: &mut bool,
+) -> Vec<SvcMessage> {
+    eprintln!(
+        "svc {channel} data bytes={} prefix={}",
+        payload.len(),
+        hex_prefix(payload)
+    );
+    if let Ok(mut trace) = trace.lock() {
+        if trace.len() < 16 {
+            trace.push((channel.to_owned(), payload.to_vec()));
+        }
+    }
+
+    let Some((message_type, body)) = parse_remote_assistance_packet(payload) else {
+        eprintln!("svc {channel} data is not a valid Remote Assistance packet");
+        return Vec::new();
+    };
+    eprintln!(
+        "svc {channel} RC_CTL msgType={} ({}) bodyBytes={}",
+        message_type,
+        remote_assistance_message_name(message_type),
+        body.len()
+    );
+
+    remote_assistance_control_responses(
+        message_type,
+        body,
+        expert_name,
+        expert_on_vista_sent,
+        verify_password_sent,
+    )
+    .into_iter()
+    .map(SvcMessage::from)
+    .collect()
+}
 
 #[derive(Debug, Clone)]
 struct RdpEchoDynamic {
@@ -165,85 +218,117 @@ impl DvcProcessor for RdpEchoDynamic {
     }
 }
 
+/// Raw bytes already framed for a dynamic channel.
+#[derive(Debug, Clone)]
+struct RawDvcMessage {
+    name: &'static str,
+    bytes: Vec<u8>,
+}
+
+impl Encode for RawDvcMessage {
+    fn encode(&self, dst: &mut WriteCursor<'_>) -> EncodeResult<()> {
+        dst.write_slice(&self.bytes);
+        Ok(())
+    }
+    fn name(&self) -> &'static str {
+        self.name
+    }
+    fn size(&self) -> usize {
+        self.bytes.len()
+    }
+}
+
+impl ironrdp_dvc::DvcEncode for RawDvcMessage {}
+
+/// The graphics channel, with the segment wrapping the server expects.
+///
+/// `ironrdp-egfx` 0.3.0 wraps outgoing PDUs on its server side — "Windows
+/// clients expect this wrapping on the EGFX DVC" — but its client side sends
+/// them bare. A Windows server expects it just the same, so the capability
+/// advertise this client sent could not be read, and the session was dropped
+/// the moment it arrived. Everything outgoing goes through `wrap_uncompressed`
+/// here for that reason.
+struct GraphicsPipelineDvc {
+    decompressor: ZgfxDecompressor,
+    buffer: Vec<u8>,
+    pdus: usize,
+    claim_avc: bool,
+}
+
+impl GraphicsPipelineDvc {
+    fn new(claim_avc: bool) -> Self {
+        Self {
+            decompressor: ZgfxDecompressor::new(),
+            buffer: Vec::new(),
+            pdus: 0,
+            claim_avc,
+        }
+    }
+}
+
+impl_as_any!(GraphicsPipelineDvc);
+
+impl DvcProcessor for GraphicsPipelineDvc {
+    fn channel_name(&self) -> &str {
+        ironrdp_egfx::CHANNEL_NAME
+    }
+
+    fn start(&mut self, channel_id: u32) -> PduResult<Vec<DvcMessage>> {
+        // The listener runs version 10.6 — the client-side RDP log records
+        // 0xA0600 — so offer that, and older versions behind it.
+        //
+        // AVC is declared off, honestly, because there is no H.264 decoder here.
+        // Whether a listener that can only encode AVC will hold a session open
+        // for a client that refuses it is still unanswered: the target grew too
+        // erratic to measure it, creating the graphics channel on some runs and
+        // not others with the same bytes on the wire. `--claim-avc` says it is
+        // supported so the question can be settled in one command.
+        let mut flags = CapabilitiesV104Flags::SMALL_CACHE;
+        if !self.claim_avc {
+            flags |= CapabilitiesV104Flags::AVC_DISABLED;
+        }
+        let caps = [
+            CapabilitySet::V10_6 { flags },
+            CapabilitySet::V8_1 {
+                flags: CapabilitiesV81Flags::SMALL_CACHE,
+            },
+            CapabilitySet::V8 {
+                flags: CapabilitiesV8Flags::SMALL_CACHE,
+            },
+        ];
+        let pdu = GfxPdu::CapabilitiesAdvertise(CapabilitiesAdvertisePdu::from_typed(&caps));
+        let mut bytes = vec![0u8; pdu.size()];
+        pdu.encode(&mut WriteCursor::new(&mut bytes))
+            .map_err(|error| ironrdp_pdu::encode_err!(error))?;
+
+        eprintln!(
+            "egfx channel opened id={channel_id}; advertising 10.6, 8.1 and 8 in a ZGFX segment"
+        );
+        Ok(vec![Box::new(RawDvcMessage {
+            name: "RDPGFX_CAPS_ADVERTISE_PDU",
+            bytes: wrap_uncompressed(&bytes),
+        })])
+    }
+
+    fn process(&mut self, _channel_id: u32, payload: &[u8]) -> PduResult<Vec<DvcMessage>> {
+        self.buffer.clear();
+        if let Err(error) = self.decompressor.decompress(payload, &mut self.buffer) {
+            eprintln!("egfx payload could not be decompressed: {error}");
+            return Ok(Vec::new());
+        }
+        self.pdus += 1;
+        eprintln!(
+            "egfx payload {} decompressed to {} bytes, prefix={}",
+            self.pdus,
+            self.buffer.len(),
+            hex_prefix(&self.buffer)
+        );
+        Ok(Vec::new())
+    }
+}
+
+
 fn main() -> io::Result<()> {
-    // Keep the first native milestone deterministic and dependency-light: read
-    // stdin so the helper can be supervised by Electron, and expose the fact
-    // that the remdesk processor is compiled into this binary.
-    let trace = Arc::new(Mutex::new(Vec::new()));
-    let channel = StaticVirtualChannel::new(RemoteAssistanceControl {
-        trace: trace.clone(),
-        expert_name: "Expert".to_owned(),
-        setup_sent: false,
-    });
-    assert_eq!(
-        channel.channel_name(),
-        ChannelName::from_utf8("remdesk").unwrap()
-    );
-
-    let config = Config {
-        credentials: Credentials::UsernamePassword {
-            username: "remote-assistance".to_owned(),
-            password: String::new(),
-        },
-        domain: None,
-        desktop_size: DesktopSize {
-            width: 1280,
-            height: 720,
-        },
-        desktop_scale_factor: 0,
-        // The RpcShadow2 listener is a Remote Assistance endpoint, not a
-        // normal interactive RDP logon. The invitation is authenticated later
-        // on RC_CTL, so do not start CredSSP/NLA here.
-        enable_tls: true,
-        enable_credssp: false,
-        client_build: 0,
-        client_name: "terminaldeck-shadow".to_owned(),
-        keyboard_type: KeyboardType::IbmEnhanced,
-        keyboard_subtype: 0,
-        keyboard_functional_keys_count: 12,
-        keyboard_layout: 0,
-        ime_file_name: String::new(),
-        bitmap: None,
-        dig_product_id: String::new(),
-        client_dir: "C:\\Windows\\System32\\mstscax.dll".to_owned(),
-        alternate_shell: String::new(),
-        work_dir: String::new(),
-        platform: MajorPlatformType::WINDOWS,
-        hardware_id: None,
-        request_data: None,
-        autologon: false,
-        enable_audio_playback: false,
-        compression_type: Some(CompressionType::Rdp61),
-        pointer_software_rendering: true,
-        enable_server_pointer: false,
-        multitransport_flags: None,
-        performance_flags: PerformanceFlags::default(),
-        timezone_info: TimezoneInfo::default(),
-        license_cache: None,
-    };
-    let connector = ClientConnector::new(config, SocketAddr::from(([127, 0, 0, 1], 0)))
-        .with_static_channel(RemoteAssistanceControl {
-            trace: trace.clone(),
-            expert_name: "Expert".to_owned(),
-            setup_sent: false,
-        })
-        .with_static_channel(DrdynvcClient::new().with_dynamic_channel(RdpEchoDynamic {
-            trace: trace.clone(),
-        }))
-        .with_static_channel(RemoteAssistanceChat {
-            trace: trace.clone(),
-        })
-        .with_static_channel(RemoteAssistanceShare {
-            trace: trace.clone(),
-        })
-        .with_static_channel(RemoteAssistanceMultiparty {
-            trace: trace.clone(),
-        });
-    assert!(connector
-        .static_channels
-        .get_by_channel_name(&ChannelName::from_utf8("remdesk").unwrap())
-        .is_some());
-
     // host, port and the expert's name. The account's password is deliberately
     // not taken: Remote Assistance requires "*" in the Client Info PDU password
     // field, so the helper has no use for the real one.
@@ -257,11 +342,20 @@ fn main() -> io::Result<()> {
             connect_direct_tls(&args[1], args[2].parse().unwrap_or(51878))
                 .map(|trace| format!("remote assistance TLS connected\n{}", trace))
         } else {
+            // The password never travels on the command line, where it would be
+            // visible in the process list for as long as the client runs.
+            let logon_password = args
+                .iter()
+                .any(|arg| arg == "--logon")
+                .then(|| std::env::var("TD_PW").unwrap_or_default());
             connect_once(
                 &args[1],
                 args[2].parse().unwrap_or(3389),
                 &args[3],
                 invitation.as_deref(),
+                logon_password.as_deref(),
+                args.iter().any(|arg| arg == "--bare-info"),
+                args.iter().any(|arg| arg == "--claim-avc"),
             )
             .map(|(user_channel_id, trace)| {
                 format!(
@@ -371,65 +465,56 @@ fn parse_remote_assistance_packet(payload: &[u8]) -> Option<(u32, &[u8])> {
     Some((message_type, &payload[channel_end + 4..data_end]))
 }
 
-/// The expert's side of the control exchange.
+/// The expert's side of the control exchange, as [MS-RA] section 3.5.5 sets it
+/// out: the novice speaks first, and each of its two opening messages draws a
+/// different reply.
 ///
-/// The novice drives it with a single VERSIONINFO, and everything the expert
-/// has to say for protocol v2 goes out in reply to that one message. Nothing
-/// may be gated on SERVER_ANNOUNCE: it carries no expert response, and a novice
-/// that never sends one would leave the handshake waiting forever.
+/// > As soon as the basic Remote Assistance Connection is established, the
+/// > expert receives the REMOTEDESKTOP_CTL_SERVER_ANNOUNCE and
+/// > REMOTEDESKTOP_CTL_VERSIONINFO packets. The expert drops the
+/// > REMOTEDESKTOP_CTL_VERSIONINFO packet and announces to the novice to use the
+/// > version 2 protocol by sending the REMOTEDESKTOP_EXPERT_ON_VISTA packet. The
+/// > expert also responds to the REMOTEDESKTOP_CTL_SERVER_ANNOUNCE packet by
+/// > sending the REMOTEDESKTOP_CTL_VERIFY_PASSWORD packet.
 fn remote_assistance_control_responses(
     message_type: u32,
     body: &[u8],
     expert_name: &str,
-    setup_sent: &mut bool,
+    expert_on_vista_sent: &mut bool,
+    verify_password_sent: &mut bool,
 ) -> Vec<Vec<u8>> {
     match message_type {
+        // RESULT carries the novice's verdict on VERIFY_PASSWORD.
         2 => {
             match read_u32(body) {
-                Some(0) => eprintln!("remote assistance RESULT ok"),
+                Some(0) => eprintln!("remote assistance RESULT: no error, shadowing starts"),
                 Some(code) => eprintln!("remote assistance RESULT error 0x{code:08x}"),
                 None => eprintln!("remote assistance RESULT is truncated"),
             }
             Vec::new()
         }
-        6 => {
-            let Some((major, minor)) = read_version(body) else {
-                eprintln!("remote assistance VERSIONINFO is truncated");
-                return Vec::new();
-            };
-            eprintln!("remote assistance novice announced protocol {major}.{minor}");
-            if *setup_sent {
-                return Vec::new();
+        4 if !*verify_password_sent => {
+            *verify_password_sent = true;
+            eprintln!("remote assistance sending VERIFY_PASSWORD");
+            // A shadow invitation carries no PassStub, so the password segment
+            // is counted but empty.
+            vec![build_remote_assistance_packet(
+                8,
+                &utf16le_null_terminated(&expert_blob(expert_name, "")),
+            )]
+        }
+        // The version the novice announces is dropped; sending EXPERT_ON_VISTA
+        // is itself what selects version 2.
+        6 if !*expert_on_vista_sent => {
+            if let Some((major, minor)) = read_version(body) {
+                eprintln!("remote assistance novice announced protocol {major}.{minor}");
             }
-            // The negotiated version is the novice's minor number.
-            if major != 1 || minor != 2 {
-                eprintln!(
-                    "remote assistance protocol {major}.{minor} needs the AUTHENTICATE and \
-                     REMOTE_CONTROL_DESKTOP exchange, which this helper does not implement"
-                );
-                return Vec::new();
-            }
-            *setup_sent = true;
-            remote_assistance_expert_opening(expert_name)
+            *expert_on_vista_sent = true;
+            eprintln!("remote assistance sending EXPERT_ON_VISTA");
+            vec![build_remote_assistance_packet(9, &[])]
         }
         _ => Vec::new(),
     }
-}
-
-/// What the expert says to open the exchange.
-///
-/// The novice does not announce a version and wait to be answered: it picks the
-/// protocol version from what it *receives*, and EXPERT_ON_VISTA is the message
-/// that selects version 2. An expert that waits to be spoken to first leaves
-/// both sides silent until the listener gives up on the connection.
-fn remote_assistance_expert_opening(expert_name: &str) -> Vec<Vec<u8>> {
-    eprintln!("remote assistance sending EXPERT_ON_VISTA and VERIFY_PASSWORD");
-    vec![
-        // A shadow invitation carries no PassStub, so there is no password to
-        // encrypt into this message's body.
-        build_remote_assistance_packet(9, &[]),
-        build_remote_assistance_packet(8, &utf16le_null_terminated(&expert_blob(expert_name, ""))),
-    ]
 }
 
 /// The blob the novice reads is two counted segments, `<count>;NAME=<expert>`
@@ -537,6 +622,9 @@ fn connect_once(
     port: u16,
     username: &str,
     invitation: Option<&str>,
+    logon_password: Option<&str>,
+    bare_info: bool,
+    claim_avc: bool,
 ) -> Result<(u16, Trace)> {
     let address = (host, port)
         .to_socket_addrs()
@@ -546,31 +634,51 @@ fn connect_once(
     let stream = TcpStream::connect_timeout(&address, Duration::from_secs(15))?;
     stream.set_read_timeout(Some(Duration::from_secs(30)))?;
     let local = stream.local_addr()?;
-    let mut framed = ironrdp_blocking::Framed::new(BareNegotiation::new(stream));
-    let trace: Trace = Arc::new(Mutex::new(Vec::new()));
-
     let auth_string = invitation.and_then(auth_string_id);
-    match &auth_string {
-        Some(id) => eprintln!(
-            "remote assistance invitation loaded bytes={} auth string id={id}",
-            invitation.map_or(0, str::len)
-        ),
-        None => eprintln!(
-            "remote assistance invitation has no auth string id: the novice has \
-             nothing to match this connection against and will drop it"
-        ),
-    }
-    let config = build_config(username, auth_string.as_deref().unwrap_or_default());
+    let info = match (logon_password, bare_info) {
+        (Some(password), _) => {
+            eprintln!("client info: ordinary RDP logon as {username}, no invitation used");
+            ClientInfoFields::logon(password)
+        }
+        (None, true) => {
+            eprintln!("client info: every Remote Assistance field left empty");
+            ClientInfoFields::bare()
+        }
+        (None, false) => {
+            match &auth_string {
+                Some(id) => eprintln!(
+                    "client info: Remote Assistance, invitation {} bytes, auth string id={id}",
+                    invitation.map_or(0, str::len)
+                ),
+                None => eprintln!(
+                    "remote assistance invitation has no auth string id: the novice has \
+                     nothing to match this connection against and will drop it"
+                ),
+            }
+            ClientInfoFields::remote_assistance(auth_string.as_deref().unwrap_or_default())
+        }
+    };
+
+    let mut framed = ironrdp_blocking::Framed::new(BareNegotiation::new(stream, !info.credssp));
+    let trace: Trace = Arc::new(Mutex::new(Vec::new()));
+    let config = build_config(username, &info);
     let expert_name = username.rsplit('\\').next().unwrap_or(username).to_owned();
     let mut connector = ClientConnector::new(config, local)
-        .with_static_channel(RemoteAssistanceControl {
-            trace: trace.clone(),
-            expert_name: expert_name.clone(),
-            setup_sent: false,
-        })
-        .with_static_channel(DrdynvcClient::new().with_dynamic_channel(RdpEchoDynamic {
-            trace: trace.clone(),
-        }))
+        .with_static_channel(RemoteAssistanceControl::new(
+            trace.clone(),
+            expert_name.clone(),
+        ))
+        .with_static_channel(RemoteAssistanceControlRemdesk::new(
+            trace.clone(),
+            expert_name,
+        ))
+        .with_static_channel(
+            DrdynvcClient::new()
+                .with_dynamic_channel(RdpEchoDynamic {
+                    trace: trace.clone(),
+                })
+                .with_dynamic_channel(GraphicsPipelineDvc::new(claim_avc)),
+        )
         .with_static_channel(RemoteAssistanceChat {
             trace: trace.clone(),
         })
@@ -585,7 +693,7 @@ fn connect_once(
     let stream = framed.into_inner_no_leftover().into_inner();
     let (tls_stream, public_key) = tls_upgrade(stream, host)?;
     let upgraded_connector = ironrdp_blocking::mark_as_upgraded(upgrade, &mut connector);
-    let mut upgraded = ironrdp_blocking::Framed::new(tls_stream);
+    let mut upgraded = ironrdp_blocking::Framed::new(GraphicsPipelineAnnounced::new(tls_stream));
     let mut network_client = ReqwestNetworkClient;
     let result = ironrdp_blocking::connect_finalize(
         upgraded_connector,
@@ -597,7 +705,7 @@ fn connect_once(
         None,
     )?;
     let user_channel_id = result.user_channel_id;
-    if let Err(error) = run_active_stage(result, &expert_name, upgraded) {
+    if let Err(error) = run_active_stage(result, upgraded) {
         if let Ok(trace) = trace.lock() {
             for (index, (name, packet)) in trace.iter().enumerate() {
                 eprintln!(
@@ -627,10 +735,24 @@ fn log_granted_channels(channels: &StaticChannelSet) {
 
 fn run_active_stage(
     result: ConnectionResult,
-    expert_name: &str,
-    mut framed: ironrdp_blocking::Framed<rustls::StreamOwned<rustls::ClientConnection, TcpStream>>,
+    mut framed: ironrdp_blocking::Framed<GraphicsPipelineAnnounced>,
 ) -> Result<()> {
+    // The handshake has to fail rather than hang, but an active session that
+    // nobody is touching legitimately sends nothing for minutes. Keeping the
+    // handshake's timeout here makes the client hang up on an idle desktop.
+    if let Err(error) = framed.get_inner_mut().0.socket().set_read_timeout(None) {
+        eprintln!("could not clear the read timeout for the active session: {error}");
+    }
+
     log_granted_channels(&result.static_channels);
+    eprintln!(
+        "session active: desktop {}x{} share-id={} compression={:?} server-pointer={}",
+        result.desktop_size.width,
+        result.desktop_size.height,
+        result.share_id,
+        result.compression_type,
+        result.enable_server_pointer
+    );
     let mut stage = ActiveStageBuilder {
         static_channels: result.static_channels,
         user_channel_id: result.user_channel_id,
@@ -647,21 +769,6 @@ fn run_active_stage(
         result.desktop_size.width,
         result.desktop_size.height,
     );
-
-    let opening: Vec<SvcMessage> = remote_assistance_expert_opening(expert_name)
-        .into_iter()
-        .map(SvcMessage::from)
-        .collect();
-    let frame = stage
-        .process_svc_processor_messages(SvcProcessorMessages::<RemoteAssistanceControl>::new(
-            opening,
-        ))
-        .context("encode the expert's opening remdesk messages")?;
-    framed.write_all(&frame)?;
-    // The reactive path must not repeat what has just gone out.
-    if let Some(control) = stage.get_svc_processor_mut::<RemoteAssistanceControl>() {
-        control.setup_sent = true;
-    }
 
     // Whether the server rejects this client or waits for something it never
     // sends looks identical in a log without time in it.
@@ -766,16 +873,113 @@ fn x224_request_without_cookie(request: &[u8]) -> Option<Vec<u8>> {
     Some(bare)
 }
 
-/// Carries the X.224 exchange with the cookie removed from the first request.
+type TlsStream = rustls::StreamOwned<rustls::ClientConnection, TcpStream>;
+
+/// Byte offset of `earlyCapabilityFlags` from the start of a TS_UD_CS_CORE
+/// block: four bytes of header, then the fixed fields ahead of it.
+const EARLY_CAPABILITY_FLAGS_AT: usize = 4 + 140;
+/// RNS_UD_CS_SUPPORT_DYNVC_GFX_PROTOCOL.
+const SUPPORT_DYNVC_GFX_PROTOCOL: u16 = 0x0100;
+
+/// Announces the graphics pipeline in the client core data of an MCS Connect
+/// Initial, returning the amended message.
+///
+/// A shadow listener hands its picture over [MS-RDPEGFX] and has no legacy path
+/// to fall back to — the client-side RDP log records `0xA0600` for every session
+/// that works. A client is asked about it exactly once, through this flag in
+/// TS_UD_CS_CORE, and IronRDP's connector never sets it: registering a handler
+/// for the channel is invisible to the server, because dynamic channels are
+/// created by the server and the client's handlers are never advertised.
+///
+/// Returns `None` when there is no client core data here, or when the flag is
+/// already set.
+fn advertise_graphics_pipeline(message: &[u8]) -> Option<Vec<u8>> {
+    let mut at = 0;
+    while at + 4 <= message.len() {
+        // TS_UD_CS_CORE, little-endian type 0xC001 followed by its length.
+        if message[at] != 0x01 || message[at + 1] != 0xc0 {
+            at += 1;
+            continue;
+        }
+        let length = usize::from(u16::from_le_bytes([message[at + 2], message[at + 3]]));
+        let flags_at = at + EARLY_CAPABILITY_FLAGS_AT;
+        if length < EARLY_CAPABILITY_FLAGS_AT + 2
+            || at + length > message.len()
+            || flags_at + 2 > message.len()
+        {
+            at += 1;
+            continue;
+        }
+
+        let flags = u16::from_le_bytes([message[flags_at], message[flags_at + 1]]);
+        if flags & SUPPORT_DYNVC_GFX_PROTOCOL != 0 {
+            return None;
+        }
+        let mut amended = message.to_vec();
+        amended[flags_at..flags_at + 2]
+            .copy_from_slice(&(flags | SUPPORT_DYNVC_GFX_PROTOCOL).to_le_bytes());
+        return Some(amended);
+    }
+    None
+}
+
+/// Carries the connection sequence with the graphics pipeline announced.
+struct GraphicsPipelineAnnounced {
+    inner: TlsStream,
+    announced: bool,
+}
+
+impl GraphicsPipelineAnnounced {
+    fn new(inner: TlsStream) -> Self {
+        Self {
+            inner,
+            announced: false,
+        }
+    }
+
+    fn socket(&self) -> &TcpStream {
+        &self.inner.sock
+    }
+}
+
+impl Read for GraphicsPipelineAnnounced {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.inner.read(buf)
+    }
+}
+
+impl Write for GraphicsPipelineAnnounced {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        if !self.announced {
+            if let Some(amended) = advertise_graphics_pipeline(buf) {
+                self.announced = true;
+                eprintln!("client core data now announces the graphics pipeline");
+                self.inner.write_all(&amended)?;
+                return Ok(buf.len());
+            }
+        }
+        self.inner.write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+/// Carries the X.224 exchange, optionally with the cookie removed from the first
+/// request. An ordinary RDP server expects the cookie, so it is only stripped
+/// for a Remote Assistance listener.
 struct BareNegotiation<S> {
     inner: S,
+    strip: bool,
     negotiated: bool,
 }
 
 impl<S> BareNegotiation<S> {
-    fn new(inner: S) -> Self {
+    fn new(inner: S, strip: bool) -> Self {
         Self {
             inner,
+            strip,
             negotiated: false,
         }
     }
@@ -793,7 +997,7 @@ impl<S: Read> Read for BareNegotiation<S> {
 
 impl<S: Write> Write for BareNegotiation<S> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        if !self.negotiated {
+        if self.strip && !self.negotiated {
             self.negotiated = true;
             if let Some(bare) = x224_request_without_cookie(buf) {
                 eprintln!(
@@ -823,17 +1027,58 @@ fn hex_prefix(bytes: &[u8]) -> String {
         .join("")
 }
 
-/// Remote Assistance replaces four fields of the ordinary Client Info PDU
-/// ([MS-RA] section 2.2.7.2): the auth string identifier goes in **WorkingDir**,
-/// **AlternateShell** holds the invitation's password or `*` when it has none,
-/// and **Password** is always `*`. The identifier is how the novice recognises
-/// which invitation this connection is answering; without it the connection
-/// completes and is then dropped.
-fn build_config(username: &str, auth_string_id: &str) -> Config {
+/// The three fields Remote Assistance redefines, and the security to reach them
+/// with. Held together so the modes can be compared one against another rather
+/// than reasoned about from the specification alone.
+struct ClientInfoFields {
+    work_dir: String,
+    alternate_shell: String,
+    password: String,
+    credssp: bool,
+}
+
+impl ClientInfoFields {
+    /// What [MS-RA] section 2.2.7.2 prescribes: the auth string identifier in
+    /// **WorkingDir**, `*` in **AlternateShell** because a shadow invitation has
+    /// no password, and `*` in **Password**.
+    fn remote_assistance(auth_string_id: &str) -> Self {
+        Self {
+            work_dir: auth_string_id.to_owned(),
+            alternate_shell: "*".to_owned(),
+            password: "*".to_owned(),
+            credssp: false,
+        }
+    }
+
+    /// The same connection with all three fields left empty. The listener never
+    /// performs a logon, so this is a control: if it fails too, the contents of
+    /// the Client Info PDU are not what the listener objects to.
+    fn bare() -> Self {
+        Self {
+            work_dir: String::new(),
+            alternate_shell: String::new(),
+            password: String::new(),
+            credssp: false,
+        }
+    }
+
+    /// An ordinary RDP logon, which fills none of that in and authenticates for
+    /// real. This is the control that says whether the client works at all.
+    fn logon(password: &str) -> Self {
+        Self {
+            work_dir: String::new(),
+            alternate_shell: String::new(),
+            password: password.to_owned(),
+            credssp: true,
+        }
+    }
+}
+
+fn build_config(username: &str, info: &ClientInfoFields) -> Config {
     Config {
         credentials: Credentials::UsernamePassword {
             username: username.to_owned(),
-            password: "*".to_owned(),
+            password: info.password.clone(),
         },
         domain: None,
         desktop_size: DesktopSize {
@@ -842,7 +1087,10 @@ fn build_config(username: &str, auth_string_id: &str) -> Config {
         },
         desktop_scale_factor: 0,
         enable_tls: true,
-        enable_credssp: false,
+        // The listener authenticates through the invitation, not a logon, so
+        // CredSSP has nothing to offer it. An ordinary server usually demands
+        // it: this host has UserAuthentication set.
+        enable_credssp: info.credssp,
         client_build: 0,
         client_name: "terminaldeck-shadow".to_owned(),
         keyboard_type: KeyboardType::IbmEnhanced,
@@ -853,9 +1101,8 @@ fn build_config(username: &str, auth_string_id: &str) -> Config {
         bitmap: None,
         dig_product_id: String::new(),
         client_dir: "C:\\Windows\\System32\\mstscax.dll".to_owned(),
-        // A shadow invitation is never password protected.
-        alternate_shell: "*".to_owned(),
-        work_dir: auth_string_id.to_owned(),
+        alternate_shell: info.alternate_shell.clone(),
+        work_dir: info.work_dir.clone(),
         platform: MajorPlatformType::WINDOWS,
         hardware_id: None,
         request_data: None,
@@ -983,25 +1230,36 @@ mod tests {
     }
 
     #[test]
-    fn version_info_carries_the_whole_expert_setup() {
-        let body = [1u32.to_le_bytes(), 2u32.to_le_bytes()].concat();
-        let mut setup_sent = false;
+    fn each_opening_message_from_the_novice_draws_its_own_reply() {
+        let mut vista = false;
+        let mut verify = false;
 
-        let responses = remote_assistance_control_responses(6, &body, "Admin", &mut setup_sent);
-        assert_eq!(message_types(&responses), vec![9, 8]);
-        assert!(setup_sent);
+        // VERSIONINFO is dropped; sending EXPERT_ON_VISTA is what selects v2.
+        let version = [1u32.to_le_bytes(), 2u32.to_le_bytes()].concat();
+        let answered =
+            remote_assistance_control_responses(6, &version, "Admin", &mut vista, &mut verify);
+        assert_eq!(message_types(&answered), vec![9]);
 
-        // A repeated announcement must not restart the exchange.
-        let repeat = remote_assistance_control_responses(6, &body, "Admin", &mut setup_sent);
-        assert!(repeat.is_empty());
+        // VERIFY_PASSWORD answers SERVER_ANNOUNCE, not the version.
+        let announced =
+            remote_assistance_control_responses(4, &[], "Admin", &mut vista, &mut verify);
+        assert_eq!(message_types(&announced), vec![8]);
+
+        assert!(vista && verify);
     }
 
     #[test]
-    fn a_version_the_helper_cannot_speak_sends_nothing() {
-        let body = [1u32.to_le_bytes(), 1u32.to_le_bytes()].concat();
-        let mut setup_sent = false;
-        assert!(remote_assistance_control_responses(6, &body, "Admin", &mut setup_sent).is_empty());
-        assert!(!setup_sent);
+    fn neither_reply_is_sent_twice() {
+        let version = [1u32.to_le_bytes(), 2u32.to_le_bytes()].concat();
+        let mut vista = true;
+        let mut verify = true;
+        assert!(
+            remote_assistance_control_responses(6, &version, "Admin", &mut vista, &mut verify)
+                .is_empty()
+        );
+        assert!(
+            remote_assistance_control_responses(4, &[], "Admin", &mut vista, &mut verify).is_empty()
+        );
     }
 
     #[test]
@@ -1029,6 +1287,54 @@ mod tests {
         assert!(x224_request_without_cookie(&[0x17, 0x03, 0x03, 0x00, 0x40]).is_none());
     }
 
+    /// A TS_UD_CS_CORE block long enough to carry earlyCapabilityFlags, with
+    /// the flags IronRDP actually sets.
+    fn client_core_data(flags: u16) -> Vec<u8> {
+        let length = EARLY_CAPABILITY_FLAGS_AT + 2 + 70;
+        let mut block = vec![0u8; length];
+        block[0..2].copy_from_slice(&0xc001u16.to_le_bytes());
+        block[2..4].copy_from_slice(&(length as u16).to_le_bytes());
+        block[EARLY_CAPABILITY_FLAGS_AT..EARLY_CAPABILITY_FLAGS_AT + 2]
+            .copy_from_slice(&flags.to_le_bytes());
+        block
+    }
+
+    fn flags_of(message: &[u8], at: usize) -> u16 {
+        u16::from_le_bytes([
+            message[at + EARLY_CAPABILITY_FLAGS_AT],
+            message[at + EARLY_CAPABILITY_FLAGS_AT + 1],
+        ])
+    }
+
+    #[test]
+    fn the_graphics_pipeline_is_announced_without_disturbing_other_flags() {
+        // What the connector sets: valid connection type, error info, strong
+        // keys, autodetect, skip channel join.
+        let existing = 0x0020 | 0x0001 | 0x0008 | 0x0080 | 0x0800;
+        let mut message = vec![0xde, 0xad, 0xbe, 0xef];
+        let block_at = message.len();
+        message.extend_from_slice(&client_core_data(existing));
+
+        let amended = advertise_graphics_pipeline(&message).expect("a block to amend");
+        assert_eq!(amended.len(), message.len());
+        assert_eq!(&amended[..block_at], &message[..block_at]);
+        assert_eq!(
+            flags_of(&amended, block_at),
+            existing | SUPPORT_DYNVC_GFX_PROTOCOL
+        );
+    }
+
+    #[test]
+    fn a_message_that_needs_no_change_is_left_alone() {
+        // Already announced.
+        let mut message = client_core_data(SUPPORT_DYNVC_GFX_PROTOCOL);
+        assert!(advertise_graphics_pipeline(&message).is_none());
+
+        // Not client core data at all, and too short to be mistaken for it.
+        message = vec![0x01, 0xc0, 0x10, 0x00, 0x00, 0x00];
+        assert!(advertise_graphics_pipeline(&message).is_none());
+    }
+
     #[test]
     fn the_auth_string_id_comes_from_the_auth_string_node() {
         let invitation = "<E><A KH=\"hash\" KH2=\"sha256:hash\" ID=\"AUTHSTRING\" CE=\"cert\"/>\
@@ -1043,9 +1349,19 @@ mod tests {
     }
 
     #[test]
-    fn server_announce_never_holds_up_the_handshake() {
-        let mut setup_sent = false;
-        assert!(remote_assistance_control_responses(4, &[], "Admin", &mut setup_sent).is_empty());
-        assert!(!setup_sent);
+    fn the_control_channel_is_named_by_the_specification() {
+        // [MS-RA] 3.5.3 names RC_CTL; remdesk is FreeRDP's name for it and is
+        // registered alongside only until a live session settles which one the
+        // novice speaks on.
+        assert_eq!(
+            RemoteAssistanceControl::new(Arc::new(Mutex::new(Vec::new())), "a".to_owned())
+                .channel_name(),
+            ChannelName::from_utf8("RC_CTL").unwrap()
+        );
+        assert_eq!(
+            RemoteAssistanceControlRemdesk::new(Arc::new(Mutex::new(Vec::new())), "a".to_owned())
+                .channel_name(),
+            ChannelName::from_utf8("remdesk").unwrap()
+        );
     }
 }

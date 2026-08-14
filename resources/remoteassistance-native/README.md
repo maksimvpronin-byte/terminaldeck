@@ -50,6 +50,11 @@ resources/remoteassistance-native/target/debug/terminaldeck-remoteassistance.exe
 
 # Diagnostic only: direct TLS, without RDP/X.224
 resources/remoteassistance-native/target/debug/terminaldeck-remoteassistance.exe 10.10.10.9 51878 USER --tls-probe
+
+# Control: an ordinary RDP logon, to see whether the client works at all.
+# The password comes from the environment, never from the command line.
+$env:TD_PW = (Get-Credential USER).GetNetworkCredential().Password
+resources/remoteassistance-native/target/debug/terminaldeck-remoteassistance.exe 10.10.10.9 3389 USER --logon
 ```
 
 The unified `resources/shadowprobe/shadow-connect.cmd` wrapper requests a fresh

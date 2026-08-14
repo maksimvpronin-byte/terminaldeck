@@ -15,7 +15,15 @@ param(
   [uint32] $SessionId,
   [string] $NativeClient,
   [pscredential] $Credential,
-  [uint32] $HoldSeconds = 180
+  [uint32] $HoldSeconds = 180,
+  # Connect with every Remote Assistance field of the Client Info PDU left
+  # empty. A control: the listener performs no logon, so if this fails the same
+  # way, those fields are not what it objects to.
+  [switch] $BareInfo,
+  # Tell the listener the graphics pipeline may use AVC, although this client
+  # has no H.264 decoder. Whether a listener that can only encode AVC will hold
+  # a session open for a client that refuses it is still unmeasured.
+  [switch] $ClaimAvc
 )
 
 $ErrorActionPreference = 'Stop'
@@ -150,8 +158,12 @@ try {
   # section 2.2.7.2 describes as the expert's name.
   $nativeUser = ($nativeUser -split '\\')[-1]
 
+  $clientArgs = @($hostAddress, $port, $nativeUser, '--invitation-file', $invitationFile)
+  if ($BareInfo) { $clientArgs += '--bare-info' }
+  if ($ClaimAvc) { $clientArgs += '--claim-avc' }
+
   Write-Host "Connecting to $hostAddress`:$port as $nativeUser while the shadow session is held open..."
-  & $NativeClient $hostAddress $port $nativeUser '--invitation-file' $invitationFile
+  & $NativeClient @clientArgs
   $exitCode = $LASTEXITCODE
 }
 finally {

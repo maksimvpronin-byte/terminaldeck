@@ -17,3 +17,4 @@ sspi = { version = "0.21.3", features = ["network_client"] }
 tokio-rustls = "0.26.4"
 x509-cert = "0.2.5"
 anyhow = "1.0"
+ironrdp-egfx = "0.3.0"
