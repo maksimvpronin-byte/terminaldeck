@@ -1,0 +1,42 @@
+// Minimal client IDL from MS-TSTS Appendix A.8.
+// MIDL generates the NDR format strings; do not hand-maintain an ABI variant.
+import "oaidl.idl";
+
+typedef enum {
+  SHADOW_CONTROL_REQUEST_VIEW = 0,
+  SHADOW_CONTROL_REQUEST_TAKECONTROL = 1
+} SHADOW_CONTROL_REQUEST;
+
+typedef enum {
+  SHADOW_PERMISSION_REQUEST_SILENT = 0,
+  SHADOW_PERMISSION_REQUEST_REQUESTPERMISSION = 1
+} SHADOW_PERMISSION_REQUEST;
+
+typedef enum {
+  SHADOW_REQUEST_RESPONSE_ALLOW = 0,
+  SHADOW_REQUEST_RESPONSE_DECLINE = 1,
+  SHADOW_REQUEST_RESPONSE_POLICY_PERMISSION_REQUIRED = 2,
+  SHADOW_REQUEST_RESPONSE_POLICY_DISABLED = 3,
+  SHADOW_REQUEST_RESPONSE_POLICY_VIEW_ONLY = 4,
+  SHADOW_REQUEST_RESPONSE_POLICY_VIEW_ONLY_PERMISSION_REQUIRED = 5,
+  SHADOW_REQUEST_RESPONSE_SESSION_ALREADY_CONTROLLED = 6
+} SHADOW_REQUEST_RESPONSE;
+
+[
+  uuid(1257B580-CE2F-4109-82D6-A9459D0BF6BC),
+  version(1.0),
+  pointer_default(unique)
+]
+interface SessEnvPublicRpc {
+  const wchar_t *SESSENVPUBLICRPC_ENDPOINT = L"\\pipe\\SessEnvPublicRpc";
+
+  HRESULT RpcShadow2(
+    [in] handle_t hBinding,
+    [in] unsigned long TargetSessionId,
+    [in] SHADOW_CONTROL_REQUEST eRequestControl,
+    [in] SHADOW_PERMISSION_REQUEST eRequestPermission,
+    [out] SHADOW_REQUEST_RESPONSE *pePermission,
+    [out, string, size_is(cchInvitation)] wchar_t *pszInvitation,
+    [in, range(1,8192)] unsigned long cchInvitation
+  );
+}

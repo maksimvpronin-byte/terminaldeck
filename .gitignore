@@ -12,6 +12,17 @@ graphify-out/
 
 # Built from ShadowHost.cs by npm run build:shadowhost; not a source file.
 resources/shadowhost/*.exe
+resources/shadowprobe/*.exe
+resources/shadowprobe/SessEnvPublicRpc.h
+resources/shadowprobe/SessEnvPublicRpc_c.c
+resources/shadowprobe/SessEnvPublicRpc_s.c
+resources/shadowprobe/oaidl.*
+resources/shadowprobe/objidl.*
+resources/shadowprobe/unknwn.*
+resources/shadowprobe/wtypes.*
+resources/shadowprobe/basetsd.h
+resources/shadowprobe/guiddef.h
+resources/shadowprobe/*.obj
 
 # Editor/tooling scratch, not part of the project.
 .claude/
