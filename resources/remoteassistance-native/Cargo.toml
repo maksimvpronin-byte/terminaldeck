@@ -1,0 +1,19 @@
+[package]
+name = "terminaldeck-remoteassistance"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+ironrdp-core = "0.2.1"
+ironrdp-connector = "0.10.0"
+ironrdp-blocking = "0.10.0"
+ironrdp-pdu = "0.9.0"
+ironrdp-svc = "0.8.0"
+ironrdp-dvc = "0.8.0"
+ironrdp-session = "0.11.0"
+ironrdp-graphics = "0.9.0"
+sspi = { version = "0.21.3", features = ["network_client"] }
+tokio-rustls = "0.26.4"
+x509-cert = "0.2.5"
+anyhow = "1.0"
