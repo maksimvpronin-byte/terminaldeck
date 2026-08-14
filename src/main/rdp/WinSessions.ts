@@ -234,20 +234,29 @@ function queryDirect(host: string): Promise<Run> {
  */
 async function runOnHost(host: string, credentials: Credentials): Promise<SessionQuery> {
   const script = [
-    '$ErrorActionPreference = "Continue"',
+    '$ErrorActionPreference = "Stop"',
     // Read from the environment, never from the command line: an argument is
     // visible in the process list for as long as the command runs.
     '$sec = ConvertTo-SecureString $env:TD_PW -AsPlainText -Force',
     '$cred = New-Object System.Management.Automation.PSCredential($env:TD_USER, $sec)',
-    '$out = Invoke-Command -ComputerName $env:TD_HOST -Credential $cred' +
-      ' -ScriptBlock { qwinsta } 2>&1 | Out-String -Width 200',
-    '$failed = -not $?',
+    'try {',
+    '  $out = Invoke-Command -ComputerName $env:TD_HOST -Credential $cred' +
+      // WinRM otherwise inherits the machine's configured HTTP proxy and
+      // refuses the connection outright — "proxy is not supported when using
+      // the HTTP transport" — even though the host is on the local network.
+      ' -SessionOption (New-PSSessionOption -ProxyAccessType NoProxyServer)' +
+      ' -ScriptBlock { $result = (& qwinsta 2>&1 | Out-String -Width 200);' +
+      ' if ($LASTEXITCODE -ne 0) { throw $result }; $result }',
     // Same ordering as the direct route, and for the same reason: UTF-8 goes on
     // only to write the answer out. Setting it before the call breaks what
     // comes back rather than helping it.
-    '[Console]::OutputEncoding = [Text.Encoding]::UTF8',
-    '$out',
-    'if ($failed) { exit 1 }'
+    '  [Console]::OutputEncoding = [Text.Encoding]::UTF8',
+    '  $out',
+    '} catch {',
+    '  [Console]::OutputEncoding = [Text.Encoding]::UTF8',
+    '  $_ | Out-String -Width 200',
+    '  exit 1',
+    '}'
   ].join('; ')
 
   const attempt = await run(
