@@ -143,6 +143,51 @@ export default function GraphicalHost({
   }, [protocol])
 
   /**
+   * Makes the desktop the size of the pane, rather than scaling it into one.
+   *
+   * The element is told to fit what it is given, which stretches a picture of a
+   * fixed size and blurs it. Asking the far end to change resolution instead
+   * keeps every pixel its own, and is what a desktop client does when its window
+   * is dragged. Only the connected session can do this — a shadowed one belongs
+   * to whoever is working in it, and resizing it would resize their screen.
+   */
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container || protocol !== 'rdp') return
+
+    let pending: number | undefined
+    const send = (): void => {
+      const interaction = interactionRef.current
+      const rect = container.getBoundingClientRect()
+      if (!interaction || rect.width < 1 || rect.height < 1) return
+      // [MS-RDPEDISP] takes 200 to 8192 pixels and refuses an odd width.
+      const width = Math.min(8192, Math.max(200, Math.round(rect.width))) & ~1
+      const height = Math.min(8192, Math.max(200, Math.round(rect.height)))
+      try {
+        interaction.resize(width, height)
+      } catch {
+        // The session went while this was in flight. The next one will fit.
+      }
+    }
+
+    const observer = new ResizeObserver(() => {
+      // Dragging a split fires this every frame, and each one is a round trip
+      // and a full redraw. The far end only needs the size the drag ended on.
+      window.clearTimeout(pending)
+      pending = window.setTimeout(send, 250)
+    })
+    observer.observe(container)
+    // The observer says nothing when a session arrives into a pane that has not
+    // moved since, which is the common case.
+    if (phase.at === 'connected') send()
+
+    return () => {
+      observer.disconnect()
+      window.clearTimeout(pending)
+    }
+  }, [protocol, phase.at])
+
+  /**
    * Uses what the host already has. The login and password live on the host —
    * or on a group above it — like every other credential in this app, so asking
    * again would be asking twice. A domain goes in the username as `DOMAIN\user`,
