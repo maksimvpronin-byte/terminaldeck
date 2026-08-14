@@ -262,6 +262,7 @@ export default function GraphicalHost({
         session={joined.session}
         control={joined.control}
         noPrompt={skipPrompt}
+        profileId={sessionId}
         visible={paneVisible}
         onClose={() => setJoined(null)}
       />

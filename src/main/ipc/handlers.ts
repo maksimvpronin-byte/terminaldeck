@@ -21,6 +21,7 @@ import {
   type ShadowRequest
 } from '../rdp/ShadowHostBridge'
 import { resolveAuth } from '../../shared/authResolution'
+import { qualifyUser } from '../../shared/winSessions'
 import { protocolOf } from '../../shared/protocols'
 import { readSshConfigHosts } from '../ssh/sshConfig'
 import { knownHosts } from '../ssh/KnownHosts'
@@ -68,6 +69,34 @@ function reportTransfer(
 function forgetSecret(item: { secretRef?: string }): void {
   if (item.secretRef && vault.status().unlocked) vault.deleteSecret(item.secretRef)
   item.secretRef = undefined
+}
+
+/**
+ * The host's credentials for the shadow viewer, if the vault holds any.
+ *
+ * `mstsc` carries none of its own: shadowing authenticates over RPC with the
+ * identity of whoever started it, so a viewer started as the signed-in Windows
+ * user is refused by any host that does not know that account. The account name
+ * is qualified with the host for the same reason the session listing qualifies
+ * it — a bare name means this machine's domain, not the target's.
+ */
+function shadowCredentials(
+  profileId: string | undefined,
+  host: string
+): { username: string; password: string } | undefined {
+  if (!profileId) return undefined
+
+  const profile =
+    sessionStore.getAll().sessions.find((s) => s.id === profileId) ??
+    inventoryStore.findSession(profileId)
+  if (!profile) return undefined
+
+  const groups = [...sessionStore.getAll().groups, ...inventoryStore.allGroups()]
+  const auth = resolveAuth(profile, profile.groupId, groups)
+  const password = auth.secretRef ? vault.getSecret(auth.secretRef) : undefined
+  if (!auth.username || !password) return undefined
+
+  return { username: qualifyUser(auth.username, host), password }
 }
 
 function describeRule(rule: PortForwardRule): string {
@@ -414,7 +443,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.shadowStart, (_e, request: ShadowRequest) => {
     const win = focusedWin()
     if (!win) throw new Error('No window to draw into')
-    return shadowHostBridge.start(win, request)
+    return shadowHostBridge.start(win, request, shadowCredentials(request.profileId, request.host))
   })
   ipcMain.on(IPC.shadowPlace, (_e, id: string, rect: PaneRect) =>
     shadowHostBridge.place(id, rect)

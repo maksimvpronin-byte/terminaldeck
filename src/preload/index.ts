@@ -159,6 +159,9 @@ const api = {
       sessionId: number
       control: boolean
       noPrompt: boolean
+      /** The saved connection, so the main process can find the host's
+       *  credentials. The password never comes back through here. */
+      profileId?: string
     }): Promise<string> => ipcRenderer.invoke(IPC.shadowStart, request),
     shadowPlace: (
       id: string,

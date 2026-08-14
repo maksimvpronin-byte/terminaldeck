@@ -19,6 +19,7 @@ export default function ShadowView({
   session,
   control,
   noPrompt,
+  profileId,
   visible,
   onClose
 }: {
@@ -26,6 +27,9 @@ export default function ShadowView({
   session: WinSession
   control: boolean
   noPrompt: boolean
+  /** The saved connection, so the viewer can be started as the host's user
+   *  rather than as whoever is signed in to this machine. */
+  profileId?: string
   /** False while another tab is in front, or the pane is otherwise hidden. */
   visible: boolean
   onClose: () => void
@@ -40,7 +44,7 @@ export default function ShadowView({
     let stopEvents: (() => void) | undefined
 
     window.td.rdp
-      .shadowStart({ host, sessionId: session.id, control, noPrompt })
+      .shadowStart({ host, sessionId: session.id, control, noPrompt, profileId })
       .then((id) => {
         if (!alive) {
           // Unmounted while starting; the host must not be left holding a
@@ -81,6 +85,10 @@ export default function ShadowView({
     const area = areaRef.current
     if (!id || !area) return
     const rect = area.getBoundingClientRect()
+    // A pane behind another tab measures as nothing. Sending that would collapse
+    // the window into a corner, and the session would come back from the tab
+    // switch mispositioned rather than where it was left.
+    if (rect.width < 1 || rect.height < 1) return
     window.td.rdp.shadowPlace(id, {
       x: rect.left,
       y: rect.top,

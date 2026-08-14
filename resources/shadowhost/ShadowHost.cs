@@ -17,9 +17,11 @@
 // Talks JSON lines on stdin and stdout. One line, one message; nothing is
 // buffered waiting for a matching brace.
 using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -48,6 +50,43 @@ static class Native {
   public const uint SWP_NOZORDER = 0x0004;
   public const uint SWP_NOACTIVATE = 0x0010;
   public const uint SWP_FRAMECHANGED = 0x0020;
+
+  // Starting the viewer under the host's account. Only the network identity is
+  // replaced, which is what `runas /netonly` does: the process still runs as the
+  // signed-in user, and the account need not exist on this machine.
+  public const uint LOGON_NETCREDENTIALS_ONLY = 0x00000002;
+  public const uint CREATE_UNICODE_ENVIRONMENT = 0x00000400;
+
+  [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+  public struct STARTUPINFO {
+    public int cb;
+    public string lpReserved, lpDesktop, lpTitle;
+    public int dwX, dwY, dwXSize, dwYSize, dwXCountChars, dwYCountChars, dwFillAttribute, dwFlags;
+    public short wShowWindow, cbReserved2;
+    public IntPtr lpReserved2, hStdInput, hStdOutput, hStdError;
+  }
+
+  [StructLayout(LayoutKind.Sequential)]
+  public struct PROCESS_INFORMATION {
+    public IntPtr hProcess, hThread;
+    public int dwProcessId, dwThreadId;
+  }
+
+  [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+  public static extern bool CreateProcessWithLogonW(
+    string username, string domain, string password, uint logonFlags,
+    string applicationName, StringBuilder commandLine, uint creationFlags,
+    IntPtr environment, string currentDirectory,
+    ref STARTUPINFO startupInfo, out PROCESS_INFORMATION processInfo);
+
+  [DllImport("kernel32.dll", SetLastError = true)] public static extern bool CloseHandle(IntPtr h);
+
+  [DllImport("user32.dll")] public static extern bool RedrawWindow(IntPtr h, IntPtr rect, IntPtr region, uint flags);
+  public const uint RDW_INVALIDATE = 0x0001;
+  public const uint RDW_ERASE = 0x0004;
+  public const uint RDW_ALLCHILDREN = 0x0080;
+  public const uint RDW_UPDATENOW = 0x0100;
+  public const uint RDW_FRAME = 0x0400;
 }
 
 /// The frame mstsc's window lives in. Frameless: the tab already has a border.
@@ -72,6 +111,14 @@ static class Program {
 
   [STAThread]
   static int Main() {
+    // Both pipes carry UTF-8, because the app on the other end writes it. Left
+    // to itself .NET decodes a redirected stream in the machine's OEM code page,
+    // which turns a Cyrillic account name into one that does not exist — and the
+    // only symptom is the host refusing the viewer.
+    var utf8 = new UTF8Encoding(false);
+    Console.SetIn(new StreamReader(Console.OpenStandardInput(), utf8));
+    Console.SetOut(new StreamWriter(Console.OpenStandardOutput(), utf8) { AutoFlush = true });
+
     Application.EnableVisualStyles();
     form = new HostForm();
     form.CreateControl();
@@ -162,7 +209,9 @@ static class Program {
       switch (Field(json, "action")) {
         case "start": Start(json); break;
         case "bounds": Bounds(json); break;
-        case "show": form.Visible = true; break;
+        // Fitting again on the way back: the pane may have been resized while
+        // this was hidden, and a hidden window is not re-laid-out when it moves.
+        case "show": form.Visible = true; Fit(); break;
         case "hide": form.Visible = false; break;
         case "stop": Application.ExitThread(); break;
       }
@@ -172,6 +221,53 @@ static class Program {
   }
 
   // --- the session ----------------------------------------------------------
+
+  /// <summary>
+  /// Starts the viewer, under the host's own account when one was given.
+  /// </summary>
+  /// <remarks>
+  /// mstsc takes no credentials of its own. Shadowing authenticates over RPC
+  /// with whatever identity the process already carries, so a viewer started by
+  /// the signed-in user reaches a host that has never heard of them and is
+  /// refused — which is why shadowing worked here only where the local account
+  /// happened to match one the host knew.
+  ///
+  /// Only the network identity is replaced. The process still runs as the user
+  /// who started it, nothing needs the account to exist on this machine, and no
+  /// profile is loaded.
+  /// </remarks>
+  static Process Launch(string args, string user, string password) {
+    var mstsc = Path.Combine(Environment.SystemDirectory, "mstsc.exe");
+    if (string.IsNullOrEmpty(user) || string.IsNullOrEmpty(password)) {
+      var info = new ProcessStartInfo(mstsc, args);
+      info.UseShellExecute = false;
+      return Process.Start(info);
+    }
+
+    // CreateProcessWithLogonW wants the domain apart from the name.
+    string domain = null;
+    var slash = user.IndexOf('\\');
+    if (slash > 0) {
+      domain = user.Substring(0, slash);
+      user = user.Substring(slash + 1);
+    }
+
+    var command = new StringBuilder("\"" + mstsc + "\" " + args);
+    var startup = new Native.STARTUPINFO();
+    startup.cb = Marshal.SizeOf(typeof(Native.STARTUPINFO));
+
+    Native.PROCESS_INFORMATION created;
+    if (!Native.CreateProcessWithLogonW(
+          user, domain, password, Native.LOGON_NETCREDENTIALS_ONLY,
+          mstsc, command, Native.CREATE_UNICODE_ENVIRONMENT,
+          IntPtr.Zero, null, ref startup, out created)) {
+      throw new Win32Exception(Marshal.GetLastWin32Error());
+    }
+
+    Native.CloseHandle(created.hThread);
+    Native.CloseHandle(created.hProcess);
+    return Process.GetProcessById(created.dwProcessId);
+  }
 
   static void Start(string json) {
     var host = Field(json, "host");
@@ -187,9 +283,7 @@ static class Program {
     if (Bool(json, "control")) args += " /control";
     if (Bool(json, "noPrompt")) args += " /noconsentprompt";
 
-    var info = new ProcessStartInfo("mstsc", args);
-    info.UseShellExecute = false;
-    viewer = Process.Start(info);
+    viewer = Launch(args, Field(json, "user"), Field(json, "password"));
     viewer.EnableRaisingEvents = true;
     viewer.Exited += delegate {
       try { form.BeginInvoke((MethodInvoker)delegate { Event("ended", "the viewer closed"); }); } catch { }
@@ -272,6 +366,14 @@ static class Program {
     int y = Math.Max(0, (area.Height - h) / 2);
     Native.SetWindowPos(adopted, IntPtr.Zero, x, y, w, h,
       Native.SWP_NOZORDER | Native.SWP_NOACTIVATE | Native.SWP_FRAMECHANGED);
+
+    // Moving a window only invalidates what newly came into view, and the
+    // viewer repaints just that. Without asking for the whole client area back,
+    // a move leaves the picture in pieces: fresh strips where the window now is,
+    // stale ones everywhere it used to be.
+    Native.RedrawWindow(adopted, IntPtr.Zero, IntPtr.Zero,
+      Native.RDW_INVALIDATE | Native.RDW_ERASE | Native.RDW_FRAME |
+      Native.RDW_ALLCHILDREN | Native.RDW_UPDATENOW);
   }
 
   static void Cleanup() {

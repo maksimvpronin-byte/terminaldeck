@@ -20,6 +20,15 @@ export interface ShadowRequest {
   sessionId: number
   control: boolean
   noPrompt: boolean
+  /** The saved connection this came from, so the host's credentials can be
+   *  looked up. Not the Windows session number above. */
+  profileId?: string
+}
+
+/** What the viewer needs to be the host's user rather than this machine's. */
+export interface ShadowCredentials {
+  username: string
+  password: string
 }
 
 /** A rectangle in the renderer's CSS pixels, relative to the page. */
@@ -35,6 +44,16 @@ interface Session {
   window: BrowserWindow
 }
 
+/** A line in the terminal running the app, on the same switch the rest of RDP uses. */
+const tracing =
+  process.env.NODE_ENV === 'development' || process.env.TERMINALDECK_RDP_TRACE === '1'
+
+function trace(message: string): void {
+  if (!tracing) return
+  // eslint-disable-next-line no-console
+  console.log(`[shadow] ${message}`)
+}
+
 function hostExecutable(): string {
   // Packaged, the executable travels in resources beside app.asar; in
   // development it sits where the compiler put it.
@@ -47,8 +66,19 @@ class ShadowHostBridge {
   private sessions = new Map<string, Session>()
   private nextId = 1
 
-  start(window: BrowserWindow, request: ShadowRequest): string {
+  start(window: BrowserWindow, request: ShadowRequest, credentials?: ShadowCredentials): string {
     if (process.platform !== 'win32') throw new Error('Shadowing is only possible on Windows')
+
+    // Which identity the viewer gets decides whether the host will talk to it at
+    // all, and the pane can only ever report "access denied" either way.
+    trace(
+      credentials
+        ? `starting the viewer as ${credentials.username}`
+        : `starting the viewer as this machine's signed-in user: ` +
+            (request.profileId
+              ? 'the saved connection has no username and password'
+              : 'no saved connection was named')
+    )
 
     const id = `shadow${this.nextId++}`
     const child = spawn(hostExecutable(), [], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true })
@@ -84,7 +114,11 @@ class ShadowHostBridge {
       noPrompt: request.noPrompt,
       // So the host's window can be owned by this one: owned floats above and
       // minimises with it, without tying the two input queues together.
-      owner: readHandle(window)
+      owner: readHandle(window),
+      // Down the pipe, never on a command line or in the environment: an
+      // argument is readable by anything that can list processes.
+      user: credentials?.username,
+      password: credentials?.password
     })
     return id
   }
