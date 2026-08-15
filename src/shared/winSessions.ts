@@ -1,76 +1,86 @@
 /**
- * The sessions logged on to a Windows host, as `qwinsta` reports them.
+ * The sessions on a Windows host, as the Terminal Services API reports them.
  *
- * Parsed positionally rather than by column heading, because that output is
- * translated: an English host says `SESSIONNAME USERNAME ID STATE`, a Russian
- * one says `СЕАНС ПОЛЬЗОВАТЕЛЬ ID СОСТОЯНИЕ`, and matching on the words would
- * work on exactly one machine. What does not move is the shape — every row
- * carries exactly one bare integer, and that is the session id.
+ * Read through `WTSEnumerateSessions` rather than out of `qwinsta`. That tool
+ * answers in the host's own language and writes in its console code page, so its
+ * table arrived through remoting as mojibake — unreadable by a person and
+ * unparseable by a script. Worse, the state it names is translated too, which
+ * left no way to tell an active session from a disconnected one, and
+ * disconnected sessions were offered as shadow targets they can never be.
+ *
+ * The API answers with a number for the state and Unicode for the rest. Neither
+ * the host's language nor its code page can change that.
  */
+
+/** `WTS_CONNECTSTATE_CLASS`, in the order the API numbers it. */
+const STATES = [
+  'Active',
+  'Connected',
+  'ConnectQuery',
+  'Shadow',
+  'Disconnected',
+  'Idle',
+  'Listen',
+  'Reset',
+  'Down',
+  'Init'
+] as const
 
 export interface WinSession {
   /** Session id, which is what `mstsc /shadow:` takes. */
   id: number
   /** The logged-on user, or empty for a session nobody is using. */
   user: string
-  /** `console`, `rdp-tcp#3`, `services`; the transport, not a person. */
+  /** `Console`, `RDP-Tcp#3`, `Services`; the transport, not a person. */
   name: string
-  /** Whatever the host called it — `Active`, `Активно`, `Disc`. Shown as sent. */
+  /** The API's own state, so always this spelling whatever the host's language. */
   state: string
-  /** Whether the host marked this as the session the query came from. */
-  current: boolean
-}
-
-/** Sessions worth offering: a real user is logged on and it is not a listener. */
-export function shadowable(sessions: WinSession[]): WinSession[] {
-  return sessions.filter((s) => s.user !== '' && s.id > 0 && !/^listen/i.test(s.state))
 }
 
 /**
- * Reads a `qwinsta` table.
+ * Sessions worth offering.
  *
- * Rows look like these, with the current session marked by a leading `>`:
+ * Only a session somebody is signed in to and using can be shadowed. Asking for
+ * one that is merely disconnected gets an invitation to a listener with nothing
+ * behind it: the connection completes, and is then dropped without a word.
+ */
+export function shadowable(sessions: WinSession[]): WinSession[] {
+  return sessions.filter((s) => s.state === 'Active' && s.user !== '')
+}
+
+/**
+ * Reads the rows the enumerator writes: id, station, state and user, separated
+ * by tabs.
  *
  * ```text
- *  SESSIONNAME       USERNAME          ID  STATE   TYPE        DEVICE
- *  services                             0  Disc
- * >console           Administrator      1  Active
- *  rdp-tcp#3         maksim             3  Active
- *  rdp-tcp                          65536  Listen
+ * 0	Services	4
+ * 1	Console	0	Администратор
+ * 3	RDP-Tcp#1	0	adminrdp
+ * 65537	RDP-Tcp	6
  * ```
+ *
+ * A row whose state is not a number the API defines is dropped rather than
+ * guessed at: anything else on this stream is an error message, and one parsed
+ * as a session turns a refusal into a machine nobody is using.
  */
 export function parseSessions(output: string): WinSession[] {
   const sessions: WinSession[] = []
 
-  for (const raw of output.split(/\r?\n/)) {
-    const line = raw.trimEnd()
+  for (const line of output.split(/\r?\n/)) {
     if (!line.trim()) continue
+    const fields = line.split('\t')
+    if (fields.length < 3) continue
 
-    const current = line.trimStart().startsWith('>')
-    const body = line.replace(/^\s*>/, ' ')
-    const tokens = body.trim().split(/\s+/)
-    if (tokens.length < 2) continue
-
-    // The id is the only bare integer on the row. The heading line has none,
-    // so it drops out here without being recognised as a heading at all.
-    const idAt = tokens.findIndex((t) => /^\d+$/.test(t))
-    if (idAt < 1) continue
-    const id = Number(tokens[idAt])
-    if (!Number.isSafeInteger(id)) continue
-
-    // Before the id: the session name, then a username if anyone is logged on.
-    // A session with no user leaves that column blank, so one token means the
-    // name alone — never a username with no session name.
-    const before = tokens.slice(0, idAt)
-    const name = before[0] ?? ''
-    const user = before.length > 1 ? before.slice(1).join(' ') : ''
+    const id = Number(fields[0])
+    const state = Number(fields[2])
+    if (!Number.isSafeInteger(id) || id < 0) continue
+    if (!Number.isInteger(state) || state < 0 || state >= STATES.length) continue
 
     sessions.push({
       id,
-      user,
-      name,
-      state: tokens[idAt + 1] ?? '',
-      current
+      name: fields[1].trim(),
+      state: STATES[state],
+      user: (fields[3] ?? '').trim()
     })
   }
 

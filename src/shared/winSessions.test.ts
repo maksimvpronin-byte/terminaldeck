@@ -1,128 +1,75 @@
 import { describe, it, expect } from 'vitest'
 import { errorCode, parseSessions, qualifyUser, shadowArgs, shadowable } from './winSessions'
 
-/** Real `qwinsta /server:` output from an English host. */
-const ENGLISH = [
-  ' SESSIONNAME       USERNAME                 ID  STATE   TYPE        DEVICE',
-  ' services                                    0  Disc',
-  '>console           Administrator             1  Active',
-  ' rdp-tcp#3         maksim                    3  Active',
-  ' rdp-tcp                                 65536  Listen',
-  ''
-].join('\r\n')
-
-/** The same table on a Russian host, which is why headings are not matched. */
-const RUSSIAN = [
-  ' СЕАНС             ПОЛЬЗОВАТЕЛЬ             ID  СОСТОЯНИЕ ТИП         УСТРОЙСТВО',
-  ' services                                    0  Disc',
-  '>console           Администратор             1  Активно',
-  ' rdp-tcp#2         maksim                    2  Активно',
-  ''
-].join('\r\n')
-
 /**
- * Captured verbatim from `qwinsta` on a real Windows 11 machine, trailing
- * spaces and all. The hand-written tables above are what the format is believed
- * to look like; this one is what it actually is.
+ * What the enumerator writes: id, station, state and user, separated by tabs.
+ *
+ * Captured from a Russian host, which is the point of reading the API rather
+ * than `qwinsta`. The state is a number here and the account name is Unicode,
+ * so neither the host's language nor its console code page is in the way.
  */
-const CAPTURED =
-  ' SESSIONNAME               USERNAME                 ID  STATE   TYPE        DEVICE \r\n' +
-  ' services                                            0  Disc                        \r\n' +
-  '>console                   Fidel                     1  Active'
-
-describe('a table captured from a real host', () => {
-  it('reads both rows and neither heading', () => {
-    expect(parseSessions(CAPTURED).map((s) => s.id)).toEqual([0, 1])
-  })
-
-  it('gets the logged-on user off the console row', () => {
-    expect(parseSessions(CAPTURED).find((s) => s.id === 1)).toMatchObject({
-      name: 'console',
-      user: 'Fidel',
-      state: 'Active',
-      current: true
-    })
-  })
-
-  it('offers only the console session, not services', () => {
-    expect(shadowable(parseSessions(CAPTURED)).map((s) => s.user)).toEqual(['Fidel'])
-  })
-})
+const ROWS = [
+  '0\tServices\t4\t',
+  '1\tConsole\t0\tАдминистратор',
+  '3\tRDP-Tcp#1\t0\tadminrdp',
+  '4\tRDP-Tcp#2\t4\tmaksim',
+  '65537\tRDP-Tcp\t6\t',
+  ''
+].join('\r\n')
 
 describe('parseSessions', () => {
-  it('reads every row of an ordinary table', () => {
-    const sessions = parseSessions(ENGLISH)
-    expect(sessions.map((s) => s.id)).toEqual([0, 1, 3, 65536])
+  it('reads every row', () => {
+    expect(parseSessions(ROWS).map((s) => s.id)).toEqual([0, 1, 3, 4, 65537])
   })
 
-  it('drops the heading without needing to recognise it', () => {
-    // The heading carries no bare integer, which is the whole trick: it fails
-    // the same test that finds the id, in any language.
-    expect(parseSessions(ENGLISH).some((s) => s.name === 'SESSIONNAME')).toBe(false)
+  it('names the state in one spelling, whatever the host speaks', () => {
+    const states = parseSessions(ROWS).map((s) => s.state)
+    expect(states).toEqual(['Disconnected', 'Active', 'Active', 'Disconnected', 'Listen'])
   })
 
-  it('separates the session name from the user', () => {
-    const console = parseSessions(ENGLISH).find((s) => s.id === 1)!
-    expect(console).toMatchObject({ name: 'console', user: 'Administrator', state: 'Active' })
-  })
-
-  it('leaves the user empty when nobody is logged on', () => {
-    // One token before the id is a session name, never a username: the blank
-    // column belongs to the user.
-    const services = parseSessions(ENGLISH).find((s) => s.id === 0)!
-    expect(services).toMatchObject({ name: 'services', user: '' })
-  })
-
-  it('marks the session the query came from', () => {
-    const sessions = parseSessions(ENGLISH)
-    expect(sessions.find((s) => s.id === 1)!.current).toBe(true)
-    expect(sessions.find((s) => s.id === 3)!.current).toBe(false)
-  })
-
-  it('reads a translated table exactly as well', () => {
-    const sessions = parseSessions(RUSSIAN)
-    expect(sessions.map((s) => s.id)).toEqual([0, 1, 2])
-    expect(sessions.find((s) => s.id === 1)).toMatchObject({
-      user: 'Администратор',
-      state: 'Активно'
+  it('keeps an account name that is not ASCII', () => {
+    expect(parseSessions(ROWS).find((s) => s.id === 1)).toEqual({
+      id: 1,
+      name: 'Console',
+      state: 'Active',
+      user: 'Администратор'
     })
   })
 
-  it('returns nothing for output that is not a table', () => {
-    // A refused query prints an error, and it must not become a fake session.
-    expect(parseSessions('Error [5]: Access is denied.')).toEqual([])
-    expect(parseSessions('')).toEqual([])
+  it('leaves the user empty where nobody is signed in', () => {
+    expect(parseSessions(ROWS).find((s) => s.id === 0)!.user).toBe('')
+    expect(parseSessions(ROWS).find((s) => s.id === 65537)!.user).toBe('')
   })
 
-  it('cannot always tell an error message from a row, which is why callers check the exit code', () => {
-    // Documented rather than fixed here. A translated error read in the console
-    // codepage — `Ошибка 5 получения имен сеансов` — has a bare integer in the
-    // middle of it and is shaped exactly like a session row. Nothing about the
-    // text distinguishes them, so the caller must not offer this function the
-    // output of a command that failed.
-    const mojibake = 'РћС€РёР±РєР° 5 РїРѕР»СѓС‡РµРЅРёСЏ РёРјРµРЅ СЃРµР°РЅСЃРѕРІ'
-    expect(parseSessions(mojibake).length).toBeGreaterThan(0)
+  it('reads nothing out of a message that is not a session', () => {
+    // The reason a failed command's output can be handed here safely now: an
+    // error message has neither the fields nor a state the API defines, where
+    // the old table format let `Ошибка 5 получения имен сеансов` parse as a row.
+    expect(parseSessions('Error [5]: Access is denied.')).toEqual([])
+    expect(parseSessions('РћС€РёР±РєР° 5 РїРѕР»СѓС‡РµРЅРёСЏ')).toEqual([])
+    expect(parseSessions('1\tConsole\t99\tsomebody')).toEqual([])
+    expect(parseSessions('')).toEqual([])
   })
 })
 
 describe('shadowable', () => {
-  it('offers only sessions somebody is actually using', () => {
-    const offered = shadowable(parseSessions(ENGLISH))
-    expect(offered.map((s) => s.id)).toEqual([1, 3])
+  it('offers the sessions somebody is signed in to and using', () => {
+    expect(shadowable(parseSessions(ROWS)).map((s) => s.id)).toEqual([1, 3])
   })
 
-  it('leaves out the listener, which has an id but no session behind it', () => {
-    expect(shadowable(parseSessions(ENGLISH)).some((s) => s.id === 65536)).toBe(false)
+  it('leaves out a disconnected session, which cannot be shadowed at all', () => {
+    // RpcShadow2 answers for one of these with a listener that has nothing
+    // behind it: the connection completes and is then dropped without a word.
+    expect(shadowable(parseSessions(ROWS)).some((s) => s.id === 4)).toBe(false)
   })
 
-  it('leaves out session 0, which is services rather than a desktop', () => {
-    expect(shadowable(parseSessions(ENGLISH)).some((s) => s.id === 0)).toBe(false)
-  })
-
-  it('keeps a translated active session', () => {
-    expect(shadowable(parseSessions(RUSSIAN)).map((s) => s.id)).toEqual([1, 2])
+  it('leaves out the listener and the services session', () => {
+    const offered = shadowable(parseSessions(ROWS)).map((s) => s.id)
+    expect(offered).not.toContain(65537)
+    expect(offered).not.toContain(0)
   })
 })
+
 
 describe('qualifyUser', () => {
   it('points a bare name at the host, not at this machine', () => {

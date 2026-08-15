@@ -115,16 +115,95 @@ function run(
 }
 
 /**
+ * Enumerates sessions through the Terminal Services API.
+ *
+ * The same source serves both routes: run against a host name it opens that
+ * server, run against nothing it asks the machine it is on. Either way the state
+ * comes back as a number and the names as Unicode, which is the point — `qwinsta`
+ * answers in the host's language and its console code page, and neither survives
+ * the trip.
+ *
+ * Failures are worded with the number in them, because that is all
+ * `errorCode` can rely on reading.
+ */
+const WTS_ENUMERATOR = `
+using System;
+using System.Runtime.InteropServices;
+
+public static class TerminalDeckWts
+{
+  [StructLayout(LayoutKind.Sequential)]
+  struct SessionInfo { public int SessionId; public IntPtr WinStationName; public int State; }
+
+  [DllImport("wtsapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+  static extern IntPtr WTSOpenServerW(string server);
+
+  [DllImport("wtsapi32.dll")]
+  static extern void WTSCloseServer(IntPtr server);
+
+  [DllImport("wtsapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+  static extern int WTSEnumerateSessionsW(IntPtr server, int reserved, int version, ref IntPtr sessions, ref int count);
+
+  [DllImport("wtsapi32.dll")]
+  static extern void WTSFreeMemory(IntPtr memory);
+
+  [DllImport("wtsapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+  static extern bool WTSQuerySessionInformationW(IntPtr server, int sessionId, int infoClass, out IntPtr buffer, out int bytes);
+
+  public static string[] List(string host)
+  {
+    bool remote = !string.IsNullOrEmpty(host);
+    IntPtr server = remote ? WTSOpenServerW(host) : IntPtr.Zero;
+    if (remote && server == IntPtr.Zero) throw new Exception("error " + Marshal.GetLastWin32Error());
+
+    IntPtr sessions = IntPtr.Zero;
+    int count = 0;
+    try
+    {
+      if (WTSEnumerateSessionsW(server, 0, 1, ref sessions, ref count) == 0)
+        throw new Exception("error " + Marshal.GetLastWin32Error());
+
+      string[] rows = new string[count];
+      int size = Marshal.SizeOf(typeof(SessionInfo));
+      for (int i = 0; i < count; i++)
+      {
+        IntPtr at = new IntPtr(sessions.ToInt64() + (long)i * size);
+        SessionInfo info = (SessionInfo)Marshal.PtrToStructure(at, typeof(SessionInfo));
+        rows[i] = info.SessionId + "\\t" + Marshal.PtrToStringUni(info.WinStationName)
+          + "\\t" + info.State + "\\t" + UserName(server, info.SessionId);
+      }
+      return rows;
+    }
+    finally
+    {
+      if (sessions != IntPtr.Zero) WTSFreeMemory(sessions);
+      if (server != IntPtr.Zero) WTSCloseServer(server);
+    }
+  }
+
+  static string UserName(IntPtr server, int sessionId)
+  {
+    IntPtr buffer;
+    int bytes;
+    /* WTSUserName */
+    if (!WTSQuerySessionInformationW(server, sessionId, 5, out buffer, out bytes)) return "";
+    try { return Marshal.PtrToStringUni(buffer); }
+    finally { WTSFreeMemory(buffer); }
+  }
+}
+`
+
+/**
  * Asks a host who is logged on to it.
  *
  * Never rejects: an unreachable host, a refused query and a machine with nobody
  * on it are all ordinary answers here, and a pane that opened to a thrown error
  * because the *optional* half of the dialog failed would be a poor trade.
  *
- * Two routes, because `qwinsta /server:` signs its own RPC in as whoever runs
- * this app — a stranger to any machine outside the domain, and no share
- * connection opened beforehand changes that. So a host with a login saved is
- * asked to run the query itself; everything else is asked directly.
+ * Two routes, because opening a host as a Terminal Services server signs its own
+ * RPC in as whoever runs this app — a stranger to any machine outside the
+ * domain, and no share connection opened beforehand changes that. So a host with
+ * a login saved is asked to enumerate itself; everything else is asked directly.
  */
 export function listSessions(host: string, credentials?: Credentials): Promise<SessionQuery> {
   if (process.platform !== 'win32') {
@@ -149,7 +228,7 @@ export function listSessions(host: string, credentials?: Credentials): Promise<S
 const inFlight = new Map<string, Promise<SessionQuery>>()
 
 async function ask(host: string, credentials?: Credentials): Promise<SessionQuery> {
-  // The host's own login first, when there is one. `qwinsta /server:` cannot
+  // The host's own login first, when there is one. A remote enumeration cannot
   // make use of it — see runOnHost — so the query runs on the far machine.
   let remotingProblem: string | undefined
   if (credentials?.username && credentials.password) {
@@ -176,31 +255,27 @@ async function ask(host: string, credentials?: Credentials): Promise<SessionQuer
 }
 
 /**
- * Asks the host directly, with the console set to UTF-8 first.
+ * Asks the host directly, opening it as a Terminal Services server.
  *
- * `qwinsta` writes in the console codepage, so a Cyrillic account name came
- * back as mojibake and was shown that way in the picker — the one thing in the
- * list a person actually reads. `chcp` has to be set in the same console the
- * tool inherits, which means going through `cmd`; there is no way to ask
- * `execFile` for it.
+ * Nothing native writes to this console any more, so UTF-8 can simply go on
+ * first: the enumerator answers in .NET strings, and the ordering that the
+ * `qwinsta` capture needed — codepage for the tool, UTF-8 for the answer — has
+ * nothing left to protect.
  */
 function queryDirect(host: string): Promise<Run> {
   const script = [
-    // Captured first, while the console is still on its own codepage: that is
-    // what `qwinsta` writes in, and PowerShell decodes it correctly by default.
-    '$out = & qwinsta "/server:$env:TD_HOST" 2>&1 | Out-String -Width 200',
-    // Read before anything else can overwrite it, and made this process's own
-    // exit code: with -Command PowerShell exits 0 even when the tool it ran did
-    // not, and a refusal that looks like success gets its error text parsed as
-    // a session table.
-    '$code = $LASTEXITCODE',
-    // UTF-8 only now, for writing the answer out where Node can read it.
-    // Setting it any earlier breaks the capture instead of helping it — the
-    // tool then writes bytes PowerShell reads as invalid UTF-8, and a Cyrillic
-    // account name arrives as a row of replacement characters.
+    '$ErrorActionPreference = "Stop"',
     '[Console]::OutputEncoding = [Text.Encoding]::UTF8',
-    '$out',
-    'exit $code'
+    'try {',
+    '  Add-Type -TypeDefinition $env:TD_WTS',
+    '  [TerminalDeckWts]::List($env:TD_HOST)',
+    '} catch {',
+    // The failure has to become this process's exit code: with -Command
+    // PowerShell exits 0 even after a terminating error, and a refusal that
+    // looks like success gets its message read as a session list.
+    '  $_ | Out-String -Width 200',
+    '  exit 1',
+    '}'
   ].join('; ')
 
   return run(
@@ -210,7 +285,7 @@ function queryDirect(host: string): Promise<Run> {
     undefined,
     // Through the environment rather than into the script text, so no host name
     // can end the argument and begin another one.
-    { TD_HOST: host },
+    { TD_HOST: host, TD_WTS: WTS_ENUMERATOR },
     'utf8'
   )
 }
@@ -218,13 +293,13 @@ function queryDirect(host: string): Promise<Run> {
 /**
  * Runs the query on the host itself, over PowerShell remoting.
  *
- * `qwinsta /server:` authenticates its own RPC with the credentials of the
- * process that calls it — not with any share connection opened beforehand. So
- * carrying the host's login through `net use` did nothing for it: the query
- * still went out as whoever is running this app, who is nobody on a machine
- * outside the domain, and came back denied. `runas /netonly` fixes exactly that
- * by hand and cannot be scripted — it refuses a password from anywhere but the
- * keyboard, on purpose.
+ * `WTSOpenServer` authenticates its own RPC with the credentials of the process
+ * that calls it — not with any share connection opened beforehand. So carrying
+ * the host's login through `net use` did nothing for it: the query still went
+ * out as whoever is running this app, who is nobody on a machine outside the
+ * domain, and came back denied. `runas /netonly` fixes exactly that by hand and
+ * cannot be scripted — it refuses a password from anywhere but the keyboard, on
+ * purpose.
  *
  * Running the query on the far side sidesteps all of it. There it is a local
  * call, needing no remote enumeration rights at all.
@@ -239,21 +314,20 @@ async function runOnHost(host: string, credentials: Credentials): Promise<Sessio
     // visible in the process list for as long as the command runs.
     '$sec = ConvertTo-SecureString $env:TD_PW -AsPlainText -Force',
     '$cred = New-Object System.Management.Automation.PSCredential($env:TD_USER, $sec)',
+    '[Console]::OutputEncoding = [Text.Encoding]::UTF8',
     'try {',
-    '  $out = Invoke-Command -ComputerName $env:TD_HOST -Credential $cred' +
+    '  Invoke-Command -ComputerName $env:TD_HOST -Credential $cred' +
       // WinRM otherwise inherits the machine's configured HTTP proxy and
       // refuses the connection outright — "proxy is not supported when using
       // the HTTP transport" — even though the host is on the local network.
       ' -SessionOption (New-PSSessionOption -ProxyAccessType NoProxyServer)' +
-      ' -ScriptBlock { $result = (& qwinsta 2>&1 | Out-String -Width 200);' +
-      ' if ($LASTEXITCODE -ne 0) { throw $result }; $result }',
-    // Same ordering as the direct route, and for the same reason: UTF-8 goes on
-    // only to write the answer out. Setting it before the call breaks what
-    // comes back rather than helping it.
-    '  [Console]::OutputEncoding = [Text.Encoding]::UTF8',
-    '  $out',
+      // Nothing is passed for the host: on the far side this is the machine it
+      // is already running on, and asking it to open itself as a remote server
+      // would need the very rights this route exists to avoid.
+      ' -ScriptBlock { param($source) Add-Type -TypeDefinition $source;' +
+      ' [TerminalDeckWts]::List($null) }' +
+      ' -ArgumentList $env:TD_WTS',
     '} catch {',
-    '  [Console]::OutputEncoding = [Text.Encoding]::UTF8',
     '  $_ | Out-String -Width 200',
     '  exit 1',
     '}'
@@ -267,7 +341,8 @@ async function runOnHost(host: string, credentials: Credentials): Promise<Sessio
     {
       TD_HOST: host,
       TD_USER: qualifyUser(credentials.username, host),
-      TD_PW: credentials.password
+      TD_PW: credentials.password,
+      TD_WTS: WTS_ENUMERATOR
     },
     'utf8'
   )
