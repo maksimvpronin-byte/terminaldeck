@@ -557,7 +557,10 @@ export default function Sidebar({
         </>
       )}
 
-      {selectedHostIds.length > 0 && (
+      {/* Only once there is a batch to act on. Every verb here is about several
+          hosts at once, and one host is opened by clicking it — so for a single
+          selection the bar offered nothing and took a row of the sidebar. */}
+      {selectedHostIds.length > 1 && (
         <div className="selection-bar">
           <span className="count">{selectedHostIds.length} selected</span>
           <span style={{ flex: 1 }} />
