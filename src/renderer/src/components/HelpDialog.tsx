@@ -84,7 +84,7 @@ const SECTIONS: Section[] = [
       { what: 'Drop files on the desktop, then paste there: dropping only offers them' },
       { what: 'Copy a file over there and a notice offers to save it here' },
       { what: 'The desktop takes the size of the pane, so dragging a split resizes it' },
-      { what: 'A watched session is shown scaled; taking control shows it unscaled' }
+      { what: 'A joined session keeps its own size: Windows draws it, and will not scale it' }
     ]
   },
   {

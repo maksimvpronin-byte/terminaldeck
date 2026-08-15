@@ -47,7 +47,7 @@ static class Native {
   public const int WS_POPUP = unchecked((int)0x80000000);
   public const int WS_CAPTION = 0x00C00000;
   public const int WS_THICKFRAME = 0x00040000;
-  public const uint SWP_NOSIZE = 0x0001;
+
   public const uint SWP_NOZORDER = 0x0004;
   public const uint SWP_NOACTIVATE = 0x0010;
   public const uint SWP_FRAMECHANGED = 0x0020;
@@ -83,40 +83,9 @@ static class Native {
   [DllImport("kernel32.dll", SetLastError = true)] public static extern bool CloseHandle(IntPtr h);
 
   [DllImport("user32.dll")] public static extern bool RedrawWindow(IntPtr h, IntPtr rect, IntPtr region, uint flags);
-  [DllImport("user32.dll")] public static extern int GetSystemMetrics(int index);
-  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int command);
   [DllImport("user32.dll")] public static extern IntPtr SetFocus(IntPtr h);
   public const int WM_ACTIVATE = 0x0006;
   public const int WM_SETFOCUS = 0x0007;
-  public const int GWL_EXSTYLE = -20;
-  public const int WS_EX_TOOLWINDOW = 0x00000080;
-  public const int WS_EX_APPWINDOW = 0x00040000;
-  public const int SW_HIDE = 0;
-  public const int SW_SHOWNOACTIVATE = 4;
-  public const int SM_XVIRTUALSCREEN = 76;
-  public const int SM_CXVIRTUALSCREEN = 78;
-
-  // Scaling a window belonging to another process. DWM composites every window
-  // anyway; a thumbnail is that composition drawn again, at any size we like.
-  [DllImport("dwmapi.dll")] public static extern int DwmRegisterThumbnail(IntPtr dest, IntPtr src, out IntPtr thumb);
-  [DllImport("dwmapi.dll")] public static extern int DwmUnregisterThumbnail(IntPtr thumb);
-  [DllImport("dwmapi.dll")] public static extern int DwmUpdateThumbnailProperties(IntPtr thumb, ref THUMBNAIL props);
-  [DllImport("dwmapi.dll")] public static extern int DwmQueryThumbnailSourceSize(IntPtr thumb, out SIZE size);
-
-  [StructLayout(LayoutKind.Sequential)] public struct SIZE { public int cx, cy; }
-
-  [StructLayout(LayoutKind.Sequential)]
-  public struct THUMBNAIL {
-    public int dwFlags;
-    public RECT rcDestination, rcSource;
-    public byte opacity;
-    public bool fVisible, fSourceClientAreaOnly;
-  }
-
-  public const int DWM_TNP_RECTDESTINATION = 0x1;
-  public const int DWM_TNP_OPACITY = 0x4;
-  public const int DWM_TNP_VISIBLE = 0x8;
-  public const int DWM_TNP_SOURCECLIENTAREAONLY = 0x10;
   public const uint RDW_INVALIDATE = 0x0001;
   public const uint RDW_ERASE = 0x0004;
   public const uint RDW_ALLCHILDREN = 0x0080;
@@ -158,12 +127,6 @@ static class Program {
   static HostForm form;
   static Process viewer;
   static IntPtr adopted = IntPtr.Zero;
-  /// Set when the picture is shown scaled, through a thumbnail, rather than by
-  /// adopting the viewer's own window. Watching wants the whole screen to fit;
-  /// taking control wants a window that accepts a click, and a thumbnail is an
-  /// image and accepts none.
-  static IntPtr thumbnail = IntPtr.Zero;
-  static bool scaled;
   static readonly object gate = new object();
 
   [STAThread]
@@ -337,7 +300,6 @@ static class Program {
     if (owner != IntPtr.Zero) Native.SetWindowLong(form.Handle, Native.GWLP_HWNDPARENT, owner.ToInt32());
 
     var control = Bool(json, "control");
-    scaled = !control;
 
     var args = "/v:" + host + " /shadow:" + session;
     if (control) args += " /control";
@@ -367,7 +329,7 @@ static class Program {
       var found = FindSessionWindow((uint)viewer.Id);
       if (found != IntPtr.Zero) {
         timer.Stop();
-        if (scaled) Present(found); else Adopt(found);
+        Adopt(found);
       }
     };
     timer.Start();
@@ -416,49 +378,11 @@ static class Program {
     Fit();
   }
 
-  /// <summary>Shows the session scaled, as a thumbnail of the viewer's window.</summary>
-  /// <remarks>
-  /// The window itself goes off the side of the virtual screen. DWM composites
-  /// every window whether or not anyone can see it, and the thumbnail is that
-  /// composition drawn again — so the picture stays live while the window it
-  /// comes from is nowhere on screen. The source has to stay top-level for this:
-  /// a thumbnail cannot be taken of a child window, which is why watching does
-  /// not adopt.
-  /// </remarks>
-  static void Present(IntPtr source) {
-    // Off the screen but still in the taskbar and Alt+Tab, the viewer would be
-    // a window nobody can see and anybody can switch to. A tool window appears
-    // in neither. The style only takes effect across a hide and a show, which
-    // has to happen before the thumbnail exists: a hidden window is not
-    // composited, and has nothing to show.
-    int extended = Native.GetWindowLong(source, Native.GWL_EXSTYLE);
-    extended |= Native.WS_EX_TOOLWINDOW;
-    extended &= ~Native.WS_EX_APPWINDOW;
-    Native.ShowWindow(source, Native.SW_HIDE);
-    Native.SetWindowLong(source, Native.GWL_EXSTYLE, extended);
-    Native.ShowWindow(source, Native.SW_SHOWNOACTIVATE);
-
-    Native.SetWindowPos(source, IntPtr.Zero,
-      Native.GetSystemMetrics(Native.SM_XVIRTUALSCREEN) + Native.GetSystemMetrics(Native.SM_CXVIRTUALSCREEN),
-      0, 0, 0,
-      Native.SWP_NOZORDER | Native.SWP_NOACTIVATE | Native.SWP_NOSIZE);
-
-    IntPtr made;
-    var hr = Native.DwmRegisterThumbnail(form.Handle, source, out made);
-    if (hr != 0) throw new Exception("the picture could not be scaled: DWM error 0x" + hr.ToString("X8"));
-
-    thumbnail = made;
-    adopted = source;
-    Fit();
-    Event("ready", "session shown scaled");
-  }
 
   /// The session is shown at its own size and centred: mstsc will not scale a
   /// shadow session from outside the process, so stretching the window would
-  /// crop the picture rather than fit it. Watching scales instead, through
-  /// <see cref="Present"/>.
+  /// crop the picture rather than fit it.
   static void Fit() {
-    if (thumbnail != IntPtr.Zero) { FitThumbnail(); return; }
     if (adopted == IntPtr.Zero || !Native.IsWindow(adopted)) return;
     Native.RECT r;
     Native.GetWindowRect(adopted, out r);
@@ -477,49 +401,18 @@ static class Program {
       Native.RDW_INVALIDATE | Native.RDW_ERASE | Native.RDW_FRAME |
       Native.RDW_ALLCHILDREN | Native.RDW_UPDATENOW);
   }
-
-  /// The largest rectangle of the session's own shape that the pane will hold,
-  /// centred. Letterboxed rather than stretched: a desktop shown at the wrong
-  /// aspect is worse than one with a margin.
-  static void FitThumbnail() {
-    Native.SIZE source;
-    if (Native.DwmQueryThumbnailSourceSize(thumbnail, out source) != 0) return;
-    if (source.cx <= 0 || source.cy <= 0) return;
-
-    var area = form.ClientSize;
-    if (area.Width < 1 || area.Height < 1) return;
-
-    var scale = Math.Min((double)area.Width / source.cx, (double)area.Height / source.cy);
-    int w = Math.Max(1, (int)Math.Round(source.cx * scale));
-    int h = Math.Max(1, (int)Math.Round(source.cy * scale));
-    int x = (area.Width - w) / 2;
-    int y = (area.Height - h) / 2;
-
-    var props = new Native.THUMBNAIL();
-    props.dwFlags = Native.DWM_TNP_RECTDESTINATION | Native.DWM_TNP_VISIBLE |
-                    Native.DWM_TNP_OPACITY | Native.DWM_TNP_SOURCECLIENTAREAONLY;
-    props.rcDestination = new Native.RECT { Left = x, Top = y, Right = x + w, Bottom = y + h };
-    props.opacity = 255;
-    props.fVisible = true;
-    // The viewer's own frame and title bar are not part of the session.
-    props.fSourceClientAreaOnly = true;
-    Native.DwmUpdateThumbnailProperties(thumbnail, ref props);
-  }
-
   /// <summary>Gives the keyboard to the adopted session window.</summary>
   /// <remarks>
-  /// Only for a session being controlled. A watched one is a thumbnail of a
-  /// window that is not here, and there is nothing to focus — nor anything that
-  /// would listen: mstsc without /control ignores input by design.
+  /// A watched session has nothing to hand it to: mstsc without /control
+  /// ignores input by design, so the keys go nowhere and no harm is done.
   /// </remarks>
   public static void FocusSession() {
-    if (scaled || adopted == IntPtr.Zero || !Native.IsWindow(adopted)) return;
+    if (adopted == IntPtr.Zero || !Native.IsWindow(adopted)) return;
     Native.SetFocus(adopted);
   }
 
   static void Cleanup() {
     try {
-      if (thumbnail != IntPtr.Zero) { Native.DwmUnregisterThumbnail(thumbnail); thumbnail = IntPtr.Zero; }
     } catch { }
     try {
       if (viewer != null && !viewer.HasExited) { viewer.Kill(); viewer.WaitForExit(3000); }
