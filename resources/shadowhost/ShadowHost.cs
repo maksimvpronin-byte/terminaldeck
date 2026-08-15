@@ -85,6 +85,9 @@ static class Native {
   [DllImport("user32.dll")] public static extern bool RedrawWindow(IntPtr h, IntPtr rect, IntPtr region, uint flags);
   [DllImport("user32.dll")] public static extern int GetSystemMetrics(int index);
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int command);
+  [DllImport("user32.dll")] public static extern IntPtr SetFocus(IntPtr h);
+  public const int WM_ACTIVATE = 0x0006;
+  public const int WM_SETFOCUS = 0x0007;
   public const int GWL_EXSTYLE = -20;
   public const int WS_EX_TOOLWINDOW = 0x00000080;
   public const int WS_EX_APPWINDOW = 0x00040000;
@@ -133,6 +136,22 @@ class HostForm : Form {
 
   /// Never steals focus when it appears: the tab decides what is focused.
   protected override bool ShowWithoutActivation { get { return true; } }
+
+  /// <summary>Hands the keyboard on to the session as soon as this frame has it.</summary>
+  /// <remarks>
+  /// Clicking the pane activates this window, and without this the keyboard
+  /// stops here — the frame holds it and the viewer inside never sees a
+  /// keystroke. What that looked like: keys pressed over a shadow session
+  /// arrived at whatever the app had focused instead, so Ctrl+Alt+End typed at
+  /// one session opened the security screen on another.
+  ///
+  /// The viewer is a window of another process, and adopting it attached the two
+  /// input queues, which is what makes handing focus across possible at all.
+  /// </remarks>
+  protected override void WndProc(ref Message m) {
+    base.WndProc(ref m);
+    if (m.Msg == Native.WM_ACTIVATE || m.Msg == Native.WM_SETFOCUS) Program.FocusSession();
+  }
 }
 
 static class Program {
@@ -485,6 +504,17 @@ static class Program {
     // The viewer's own frame and title bar are not part of the session.
     props.fSourceClientAreaOnly = true;
     Native.DwmUpdateThumbnailProperties(thumbnail, ref props);
+  }
+
+  /// <summary>Gives the keyboard to the adopted session window.</summary>
+  /// <remarks>
+  /// Only for a session being controlled. A watched one is a thumbnail of a
+  /// window that is not here, and there is nothing to focus — nor anything that
+  /// would listen: mstsc without /control ignores input by design.
+  /// </remarks>
+  public static void FocusSession() {
+    if (scaled || adopted == IntPtr.Zero || !Native.IsWindow(adopted)) return;
+    Native.SetFocus(adopted);
   }
 
   static void Cleanup() {
