@@ -1083,6 +1083,36 @@ label {
   justify-content: center;
   background: rgba(0, 0, 0, 0.55);
 }
+/* A file going one way or the other. In a corner rather than over the middle:
+   the desktop stays usable while a large one is still travelling. */
+.graphical-transfer {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  max-width: 60%;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.75);
+  color: var(--fg);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+/* The offer has buttons, so it is the one that takes clicks. */
+.graphical-transfer.offer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+.graphical-transfer.offer span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* --- picking a session to join --- */
 .session-pick-head {
   display: flex;

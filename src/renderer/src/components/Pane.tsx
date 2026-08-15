@@ -4,7 +4,7 @@ import type { PaneNode, PaneTarget } from '../state/store'
 import { useStore, collectBroadcastTargets, collectLeaves, activeTab, allTabs, findTab } from '../state/store'
 import { DRAG_MIME, edgeFromPoint, edgeToSplit, type DragItem, type DropEdge } from '../state/dnd'
 import TerminalHost from './TerminalHost'
-import GraphicalHost from './GraphicalHost'
+import GraphicalHost, { toggleFullscreen } from './GraphicalHost'
 import SftpPanel from './SftpPanel'
 import TunnelsPanel from './TunnelsPanel'
 import MonitorBar from './MonitorBar'
@@ -158,6 +158,18 @@ export default function Pane({
               onClick={() => toggleMonitor(tabId, node.id)}
             >
               Monitor
+            </button>
+          )}
+          {/* Only a desktop has anything to gain: full screen is where a remote
+              machine's Alt+Tab can reach it, and a terminal never wanted the
+              key in the first place. */}
+          {!traits.textual && (
+            <button
+              className="icon-button"
+              title="Full screen (F11) — hold Escape to leave"
+              onClick={() => rootRef.current && toggleFullscreen(rootRef.current)}
+            >
+              ⛶
             </button>
           )}
           {isSplit && (

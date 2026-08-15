@@ -341,7 +341,13 @@ const api = {
     pickSavePath: (defaultName: string): Promise<string | undefined> =>
       ipcRenderer.invoke(IPC.dialogPickSavePath, defaultName),
     pickOpenPath: (): Promise<string | undefined> => ipcRenderer.invoke(IPC.dialogPickOpenPath),
-    pickDirectory: (): Promise<string | undefined> => ipcRenderer.invoke(IPC.dialogPickDirectory)
+    pickDirectory: (): Promise<string | undefined> => ipcRenderer.invoke(IPC.dialogPickDirectory),
+    /**
+     * Asks where to put a file from a remote desktop and writes it there.
+     * Given a folder it writes into that instead, without asking.
+     */
+    saveAs: (name: string, bytes: Uint8Array, folder?: string): Promise<string | undefined> =>
+      ipcRenderer.invoke(IPC.fileSaveAs, name, bytes, folder)
   }
 }
 

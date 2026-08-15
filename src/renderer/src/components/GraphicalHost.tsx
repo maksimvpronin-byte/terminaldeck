@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import '@devolutions/iron-remote-desktop'
-import { Backend, init as initRdp } from '@devolutions/iron-remote-desktop-rdp'
+import {
+  Backend,
+  init as initRdp,
+  RdpFileTransferProvider,
+  type FileInfo
+} from '@devolutions/iron-remote-desktop-rdp'
 import type { UserInteraction } from '@devolutions/iron-remote-desktop'
 import { traitsOf, type Protocol } from '../../../shared/protocols'
 import { shadowable, type WinSession } from '../../../shared/winSessions'
@@ -64,7 +69,12 @@ export default function GraphicalHost({
 }): JSX.Element {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const interactionRef = useRef<UserInteraction | null>(null)
+  const transferRef = useRef<RdpFileTransferProvider | null>(null)
   const [phase, setPhase] = useState<Phase>({ at: 'loading' })
+  /** What a transfer is doing, shown over the desktop while it lasts. */
+  const [transfer, setTransfer] = useState('')
+  /** Files the far side has copied, waiting to be taken or ignored. */
+  const [offer, setOffer] = useState<FileInfo[] | null>(null)
   const [username, setUsername] = useState('')
   /** Only ever typed, and only when the host has none saved. */
   const [password, setPassword] = useState('')
@@ -112,7 +122,27 @@ export default function GraphicalHost({
     if (!container || protocol === 'ssh') return
 
     const onReady = (event: Event): void => {
-      interactionRef.current = (event as CustomEvent<ReadyDetail>).detail.irgUserInteraction
+      const detail = (event as CustomEvent<ReadyDetail>).detail
+      interactionRef.current = detail.irgUserInteraction
+
+      // Files travel over the RDP clipboard, the same way they do for the
+      // Windows client: copy on one side and the other is offered them.
+      //
+      // Turned on here rather than when the element was made, because a custom
+      // element has none of its own methods until the document has it — and
+      // still before connect, because the extensions this needs are registered
+      // while the session is built.
+      try {
+        const files = new RdpFileTransferProvider()
+        ;(detail.irgUserInteraction as unknown as FileTransferHost).enableFileTransfer(files)
+        transferRef.current = files
+        files.on('files-available', (offered) => setOffer(offered.length > 0 ? offered : null))
+        files.on('error', (failure) => setTransfer(describe(failure)))
+      } catch (err) {
+        // A session without file transfer is still a session; say so quietly
+        // rather than refusing to connect at all.
+        setTransfer(`Files cannot be transferred: ${describe(err)}`)
+      }
     }
 
     let element: HTMLElement
@@ -137,9 +167,179 @@ export default function GraphicalHost({
       } catch {
         // Already gone, or never started. Nothing to salvage either way.
       }
+      try {
+        transferRef.current?.dispose()
+      } catch {
+        // Never connected, or already gone with the session.
+      }
+      transferRef.current = null
       interactionRef.current = null
       element.remove()
     }
+  }, [protocol])
+
+  /**
+   * Fetches what the far side has offered, once someone here asks for it.
+   *
+   * Copying over there only makes a file available; it is not a decision to put
+   * anything on this machine. Fetching it the moment the offer arrived meant a
+   * save dialog on every Ctrl+C pressed in the session, for files nobody wanted
+   * here — so the offer waits until it is taken.
+   *
+   * One file is saved wherever the dialog says. Several go into one folder,
+   * because a dialog per file for a folder full of them is its own nuisance.
+   */
+  async function fetchOffered(files: RdpFileTransferProvider, offer: FileInfo[]): Promise<void> {
+    setOffer(null)
+    let folder: string | undefined
+    if (offer.length > 1) {
+      folder = await window.td.dialogs.pickDirectory()
+      if (!folder) return
+    }
+
+    for (const [index, file] of offer.entries()) {
+      try {
+        setTransfer(`Fetching ${file.name}…`)
+        const blob = await files.downloadFile(file, index).completion
+        const saved = await window.td.dialogs.saveAs(
+          file.name,
+          new Uint8Array(await blob.arrayBuffer()),
+          folder
+        )
+        if (!saved) return setTransfer('')
+        setTransfer(offer.length > 1 ? `Saved ${index + 1} of ${offer.length}` : `Saved ${file.name}`)
+      } catch (err) {
+        return setTransfer(describe(err))
+      }
+    }
+  }
+
+  /**
+   * Offers files dropped on the pane to the far side.
+   *
+   * Dropping does not send anything: it puts the files on the session's
+   * clipboard, and the far side pulls them when someone pastes there. So the
+   * notice says what is left to do rather than reporting a transfer — waiting on
+   * the completion alone would sit at "sending" until a paste that might never
+   * come.
+   *
+   * The provider walks a dropped folder itself, so a directory goes whole rather
+   * than as the one entry the browser hands over.
+   */
+  async function onDrop(event: React.DragEvent): Promise<void> {
+    const files = transferRef.current
+    if (!files || protocol !== 'rdp') return
+    event.preventDefault()
+    try {
+      const dropped = await files.handleDrop(event.nativeEvent)
+      if (dropped.length === 0) return
+
+      const what = dropped.length === 1 ? dropped[0].name : `${dropped.length} items`
+      setTransfer(`${what} — now paste on the remote desktop`)
+
+      // Reported when it happens, if it happens; the notice above is the part
+      // that matters, and it stands until the paste replaces it.
+      void files
+        .uploadFiles(dropped)
+        .completion.then(() => setTransfer(`Copied ${what}`))
+        .catch((err: unknown) => setTransfer(describe(err)))
+    } catch (err) {
+      setTransfer(describe(err))
+    }
+  }
+
+  /**
+   * Full screen, with the system keys along with it.
+   *
+   * This is the only way Alt+Tab can ever reach the far side. The shell takes it
+   * before any program sees it, and the one documented exception is a page that
+   * is full screen and has asked to hold the keyboard — which is what Keyboard
+   * Lock is for. Held, the key arrives as an ordinary keystroke and the session
+   * forwards it like any other; nothing else here has to know.
+   *
+   * The lock is dropped with the screen. Chromium drops it on its own when full
+   * screen ends, but a session closed while still in it would otherwise leave
+   * this window holding Alt+Tab for the whole desktop.
+   */
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container || protocol !== 'rdp') return
+
+    const keyboard = (navigator as Navigator & { keyboard?: { lock(keys?: string[]): Promise<void>; unlock(): void } })
+      .keyboard
+    const target = fullscreenTarget(container)
+
+    function onChange(): void {
+      if (document.fullscreenElement === target) {
+        // Named rather than blanket: everything else stays with the desktop, so
+        // the window cannot swallow keys nobody meant to give it.
+        void keyboard?.lock(['AltLeft', 'AltRight', 'Tab', 'Escape', 'MetaLeft', 'MetaRight'])
+      } else {
+        keyboard?.unlock()
+      }
+    }
+
+    document.addEventListener('fullscreenchange', onChange)
+    return () => {
+      document.removeEventListener('fullscreenchange', onChange)
+      keyboard?.unlock()
+    }
+  }, [protocol])
+
+  /**
+   * The substitutes for keys this machine keeps for itself.
+   *
+   * Windows takes Ctrl+Alt+Del in the kernel and Alt+Tab in the shell, both
+   * before any program sees them — that is the point of the first and the habit
+   * of the second. Every Windows client therefore offers stand-ins on keys the
+   * system does let through, and these are the ones they all use.
+   *
+   * Alt+Tab has no stand-in here. Even caught, there would be nothing to send
+   * it with: this client exposes a fixed handful of combinations and no way to
+   * build another. Alt+Home opens the far side's Start menu instead, which is
+   * where switching windows can be done by hand.
+   *
+   * Each is swallowed rather than passed on, because End and Home on their own
+   * mean something to whatever is running over there.
+   */
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container || protocol !== 'rdp') return
+
+    function onKeyDown(event: KeyboardEvent): void {
+      // A split can hold two of these; only the one being typed into answers.
+      if (!container?.contains(event.target as Node)) return
+
+      if (event.key === 'F11') {
+        event.preventDefault()
+        event.stopPropagation()
+        toggleFullscreen(fullscreenTarget(container))
+        return
+      }
+
+      if (!event.altKey) return
+      const interaction = interactionRef.current
+      if (!interaction) return
+
+      const send =
+        event.ctrlKey && event.key === 'End'
+          ? (): void => interaction.ctrlAltDel()
+          : !event.ctrlKey && event.key === 'Home'
+            ? (): void => interaction.metaKey()
+            : undefined
+      if (!send) return
+
+      event.preventDefault()
+      event.stopPropagation()
+      try {
+        send()
+      } catch {
+        // The session went. Nothing to send it to, and nothing to report.
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
   }, [protocol])
 
   /**
@@ -332,7 +532,30 @@ export default function GraphicalHost({
           every phase: it owns its canvas and the WebAssembly behind it, so
           remounting would throw both away mid-session. React must not manage
           its children, or it would fight the component for them. */}
-      <div className="graphical-screen" ref={containerRef} />
+      <div
+        className="graphical-screen"
+        ref={containerRef}
+        // Dropping a file on a desktop sends it there. Chromium would otherwise
+        // navigate the window to the file, taking the session with it.
+        onDragOver={(e) => protocol === 'rdp' && e.preventDefault()}
+        onDrop={(e) => void onDrop(e)}
+      />
+
+      {/* An offer, not an arrival: copying over there put these within reach,
+          and nothing comes to this machine until it is asked for. */}
+      {offer && (
+        <div className="graphical-transfer offer">
+          <span>
+            {offer.length === 1 ? offer[0].name : `${offer.length} files`} copied over there
+          </span>
+          <button onClick={() => void fetchOffered(transferRef.current!, offer)}>Save here…</button>
+          <button className="icon-button" title="Ignore" onClick={() => setOffer(null)}>
+            ✕
+          </button>
+        </div>
+      )}
+
+      {!offer && transfer && <div className="graphical-transfer">{transfer}</div>}
 
       {phase.at !== 'connected' && (
         <div className="graphical-overlay">
@@ -367,7 +590,6 @@ export default function GraphicalHost({
                           <span className="settings-note">
                             {' '}
                             {s.name} · {s.state}
-                            {s.current ? ' · you' : ''}
                           </span>
                         </span>
                         <button title="Watch without touching" onClick={() => void shadow(s, false)}>
@@ -470,6 +692,27 @@ export default function GraphicalHost({
  * from a host that could not be reached — worth keeping, because "failed" alone
  * sends people to check the wrong thing.
  */
+/**
+ * What goes full screen: the pane, not the picture inside it.
+ *
+ * So the toolbar comes along and the way back out stays visible — and so the
+ * button there and the F11 here mean the same thing, rather than each claiming
+ * the screen for a different element.
+ */
+/** The one method of the element this component needs and its types omit. */
+interface FileTransferHost {
+  enableFileTransfer(provider: RdpFileTransferProvider): unknown
+}
+
+export function fullscreenTarget(container: Element): Element {
+  return container.closest('.pane') ?? container
+}
+
+export function toggleFullscreen(target: Element): void {
+  if (document.fullscreenElement === target) void document.exitFullscreen()
+  else void target.requestFullscreen()
+}
+
 function describe(err: unknown): string {
   const KINDS = [
     'General failure',

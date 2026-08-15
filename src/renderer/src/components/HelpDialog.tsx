@@ -75,6 +75,19 @@ const SECTIONS: Section[] = [
     ]
   },
   {
+    title: 'Remote desktops',
+    rows: [
+      { keys: 'Ctrl+Alt+End', what: 'Ctrl+Alt+Del on the far side; this machine keeps the real one' },
+      { keys: 'F11', what: 'Full screen, which is the only way Alt+Tab reaches the far side' },
+      { what: 'Hold Escape to leave full screen: while there, it belongs to the session' },
+      { what: 'A watched session cannot take Alt+Tab even full screen — Windows draws it' },
+      { what: 'Drop files on the desktop, then paste there: dropping only offers them' },
+      { what: 'Copy a file over there and a notice offers to save it here' },
+      { what: 'The desktop takes the size of the pane, so dragging a split resizes it' },
+      { what: 'A watched session is shown scaled; taking control shows it unscaled' }
+    ]
+  },
+  {
     title: 'Appearance',
     rows: [
       { what: 'Settings → Terminal holds the defaults every terminal starts from' },

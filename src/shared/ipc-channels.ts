@@ -140,5 +140,8 @@ export const IPC = {
   dialogPickPrivateKey: 'dialog:pickPrivateKey',
   dialogPickSavePath: 'dialog:pickSavePath',
   dialogPickOpenPath: 'dialog:pickOpenPath',
-  dialogPickDirectory: 'dialog:pickDirectory'
+  dialogPickDirectory: 'dialog:pickDirectory',
+
+  /** Asks where to put a file that arrived from a remote desktop, then writes it. */
+  fileSaveAs: 'file:saveAs'
 } as const

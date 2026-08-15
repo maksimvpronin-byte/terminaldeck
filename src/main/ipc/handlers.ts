@@ -1,7 +1,8 @@
 import { ipcMain, BrowserWindow, dialog, shell, app } from 'electron'
 import { randomUUID } from 'crypto'
-import { join } from 'path'
+import { basename, join } from 'path'
 import { existsSync, mkdirSync } from 'fs'
+import { writeFile } from 'fs/promises'
 import { IPC } from '../../shared/ipc-channels'
 import { vault, WrongPasswordError } from '../vault/Vault'
 import { sessionStore } from '../store/SessionStore'
@@ -436,7 +437,7 @@ export function registerIpcHandlers(): void {
 
   /**
    * Takes a host id rather than an address so the credentials can be resolved
-   * here: `qwinsta` signs in as the Windows account running this app, which is
+   * here: the query signs in as the Windows account running this app, which is
    * the wrong one for any host outside its domain, and the right one is already
    * in the vault. The password is used and dropped without reaching the window.
    */
@@ -526,5 +527,36 @@ export function registerIpcHandlers(): void {
       title: 'Choose a destination folder'
     })
     return res.canceled ? undefined : res.filePaths[0]
+  })
+
+  /**
+   * Where to put a file copied out of a remote desktop, and then puts it there.
+   *
+   * Asked and written in one call so the bytes are never left in the window
+   * waiting on an answer, and so a cancelled dialog leaves nothing behind. Given
+   * a folder it writes straight into it, which is how a batch is saved without
+   * asking about every file in it.
+   *
+   * The name is stripped to its last component first. It was chosen on the far
+   * machine, and a name is all it is allowed to be: `..\..\autorun.inf` reaching
+   * a folder of its own choosing is exactly what a hostile session would send.
+   */
+  ipcMain.handle(IPC.fileSaveAs, async (_e, name: string, bytes: Uint8Array, folder?: string) => {
+    const safe = basename(name.replace(/\\/g, '/')) || 'file'
+
+    let target: string
+    if (folder) {
+      target = join(folder, safe)
+    } else {
+      const res = await dialog.showSaveDialog(focusedWin(), {
+        defaultPath: safe,
+        title: 'Save the file from the remote desktop'
+      })
+      if (res.canceled || !res.filePath) return undefined
+      target = res.filePath
+    }
+
+    await writeFile(target, Buffer.from(bytes))
+    return target
   })
 }
