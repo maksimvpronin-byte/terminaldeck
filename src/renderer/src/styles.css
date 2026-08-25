@@ -1506,6 +1506,16 @@ textarea:focus {
 }
 .form-row > label {
   flex: 1;
+  /* A flex item will not shrink below the width its content wants, and a select
+     wants the width of its longest option — so a row holding one with a long
+     label pushes whatever follows it out of the dialog. Nothing in a form row
+     needs its natural width; they are all sharing what there is. */
+  min-width: 0;
+}
+.form-row > label > select,
+.form-row > label > input {
+  width: 100%;
+  min-width: 0;
 }
 .checkbox-row {
   display: flex;
