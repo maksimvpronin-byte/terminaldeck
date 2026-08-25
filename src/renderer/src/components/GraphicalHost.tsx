@@ -108,6 +108,37 @@ export default function GraphicalHost({
    * host is still pinned to a fixed size.
    */
   const [asked, setAsked] = useState<string>('')
+
+  /**
+   * What the picture is actually made of, measured rather than assumed.
+   *
+   * Three plausible explanations for a desktop drawn too large were each ruled
+   * out only after being shipped, because nothing here reports what the client
+   * did with the size it was given. These numbers do: the pane, the element in
+   * it, the canvas's own pixels, and the size that canvas is drawn at. Where
+   * the last two differ by the screen's density, the picture is right; where
+   * they are equal, it is being drawn a device pixel per desktop pixel and is
+   * twice the size it should be.
+   */
+  function measure(): string {
+    const container = containerRef.current
+    const element = container?.querySelector('iron-remote-desktop') as HTMLElement | null
+    const canvas =
+      (element?.shadowRoot?.querySelector('canvas') as HTMLCanvasElement | null) ??
+      (element?.querySelector('canvas') as HTMLCanvasElement | null)
+    if (!container) return ''
+
+    const box = (e: Element | null): string => {
+      if (!e) return '—'
+      const r = e.getBoundingClientRect()
+      return `${Math.round(r.width)}×${Math.round(r.height)}`
+    }
+    return [
+      `pane ${box(container)}`,
+      `element ${box(element)}`,
+      canvas ? `canvas ${canvas.width}×${canvas.height} drawn ${box(canvas)}` : 'canvas —'
+    ].join(' · ')
+  }
   /** What the host had saved, kept so the chooser can dial without asking. */
   const [storedPassword, setStoredPassword] = useState('')
   /**
@@ -456,9 +487,28 @@ export default function GraphicalHost({
       if (!interaction || !size) return
       try {
         interaction.resize(size.width, size.height)
+        /**
+         * Fit again, immediately, because asking for a size undoes it.
+         *
+         * The client answers its own resize by setting the canvas to exactly
+         * the size asked for, in CSS pixels and with no scaling — so a desktop
+         * measured in the screen's pixels is drawn at twice the size of the
+         * pane and clipped. Dragging the window shows this plainly: the client's
+         * own window-resize handler fits the picture, it looks right for a
+         * moment, and the resize that follows a quarter of a second later puts
+         * it back.
+         *
+         * ScreenScale.Fit; the enum is declared in the client's types but not
+         * exported, so there is nothing to import.
+         */
+        interaction.setScale(1)
         // Kept truthful as the pane moves: a number frozen at connect describes
         // a session that no longer exists.
-        setAsked(`${size.width}×${size.height} · ×${window.devicePixelRatio}`)
+        // Replaced rather than added to: this describes the session as it is
+        // now, and a line that grew with every drag said nothing at the end.
+        const stated = `${size.width}×${size.height} · ×${window.devicePixelRatio}`
+        setAsked(stated)
+        window.setTimeout(() => setAsked(`${stated} — ${measure()}`), 400)
       } catch {
         // The session went while this was in flight. The next one will fit.
       }
@@ -637,6 +687,7 @@ export default function GraphicalHost({
         (previous) =>
           `${previous} → ${got ? `${got.width}×${got.height}` : t('size not reported')}`
       )
+      window.setTimeout(() => setAsked((was) => `${was} — ${measure()}`), 400)
 
       // The component keeps its screen hidden and translated off-view until
       // told otherwise — its own `run` sets this back to false when the session
