@@ -11,6 +11,7 @@ import MonitorBar from './MonitorBar'
 import { protocolOf, traitsOf } from '../../../shared/protocols'
 import { SplitRightIcon, SplitDownIcon, CloseIcon, DetachIcon } from './icons'
 import { keyHint } from '../state/keys'
+import { useT } from '../i18n'
 
 export default function Pane({
   tabId,
@@ -19,6 +20,7 @@ export default function Pane({
   tabId: string
   node: Extract<PaneNode, { type: 'leaf' }>
 }): JSX.Element {
+  const t = useT()
   const activePaneId = useStore((s) => findTab(s, tabId)?.activePaneId)
   // On screen only when this tab is the current one of the current workspace.
   const isActiveTab = useStore((s) => activeTab(s)?.id === tabId)
@@ -115,7 +117,7 @@ export default function Pane({
         <span>{node.title}</span>
         <div className="actions">
           {broadcast && traits.broadcast && (
-            <label className="broadcast-check" title="Include this terminal in broadcast">
+            <label className="broadcast-check" title={t("Include this terminal in broadcast")}>
               <input
                 type="checkbox"
                 checked={node.broadcastEnabled}
@@ -141,12 +143,12 @@ export default function Pane({
           {/* Hidden rather than disabled: these ride on an SSH connection, and a
               desktop session will never have one to offer them. */}
           {traits.files && (
-            <button title="Toggle SFTP browser" onClick={() => toggleSftp(tabId, node.id)}>
+            <button title={t("Toggle SFTP browser")} onClick={() => toggleSftp(tabId, node.id)}>
               SFTP
             </button>
           )}
           {traits.tunnels && (
-            <button title="Toggle port forwarding" onClick={() => toggleTunnels(tabId, node.id)}>
+            <button title={t("Toggle port forwarding")} onClick={() => toggleTunnels(tabId, node.id)}>
               Tunnels
             </button>
           )}
@@ -154,7 +156,7 @@ export default function Pane({
             <button
               className={node.monitorOpen ? 'active' : ''}
               disabled={!node.connectionId}
-              title="Toggle remote monitoring"
+              title={t("Toggle remote monitoring")}
               onClick={() => toggleMonitor(tabId, node.id)}
             >
               Monitor
@@ -166,7 +168,7 @@ export default function Pane({
           {!traits.textual && (
             <button
               className="icon-button"
-              title="Full screen (F11) — hold Escape to leave"
+              title={t("Full screen (F11) — hold Escape to leave")}
               onClick={() => rootRef.current && toggleFullscreen(rootRef.current)}
             >
               ⛶
@@ -175,7 +177,7 @@ export default function Pane({
           {isSplit && (
             <button
               className="icon-button"
-              title="Move this pane to its own tab"
+              title={t("Move this pane to its own tab")}
               onClick={() => detachPane(tabId, node.id)}
             >
               <DetachIcon />

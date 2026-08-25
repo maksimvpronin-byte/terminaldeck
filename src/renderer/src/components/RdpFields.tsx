@@ -1,4 +1,5 @@
 import type { RdpDefaults, RdpResolution, ResolvedRdp } from '../../../shared/types'
+import { useT } from '../i18n'
 
 interface Props {
   value: RdpDefaults
@@ -32,6 +33,8 @@ export default function RdpFields({
   inheritToggle,
   secret
 }: Props): JSX.Element {
+  const t = useT()
+
   return (
     <>
       {inheritToggle && (
@@ -46,21 +49,22 @@ export default function RdpFields({
       )}
 
       <p className="settings-note">
-        A gateway says where a machine lives rather than who you are on it, so it is usually
-        stated once on a group and left blank below. Blank reaches the host directly.
+        {t(
+          'A gateway says where a machine lives rather than who you are on it, so it is usually stated once on a group and left blank below. Blank reaches the host directly.'
+        )}
       </p>
 
       <div className="form-row">
         <label style={{ flex: 3 }}>
-          RD Gateway
+          {t('RD Gateway')}
           <input
             value={value.gatewayHost ?? ''}
-            placeholder={inheritedFrom('gatewayHost') || 'none — connect directly'}
+            placeholder={inheritedFrom('gatewayHost') || t('none — connect directly')}
             onChange={(e) => set('gatewayHost', e.target.value || undefined)}
           />
         </label>
         <label style={{ flex: 1 }}>
-          Port
+          {t('Port')}
           <input
             type="number"
             value={value.gatewayPort ?? ''}
@@ -74,20 +78,22 @@ export default function RdpFields({
         <>
           <div className="form-row">
             <label style={{ flex: 1 }}>
-              Gateway username
+              {t('Gateway username')}
               <input
                 value={value.gatewayUsername ?? ''}
-                placeholder={inheritedFrom('gatewayUsername') || "the host's own login"}
+                placeholder={inheritedFrom('gatewayUsername') || t("the host's own login")}
                 onChange={(e) => set('gatewayUsername', e.target.value || undefined)}
               />
             </label>
             <label style={{ flex: 1 }}>
-              Gateway password
+              {t('Gateway password')}
               <input
                 type="password"
                 value={secret.typed}
                 placeholder={
-                  secret.own && !secret.forget ? '(saved here)' : "(blank uses the host's own)"
+                  secret.own && !secret.forget
+                    ? t('(saved here)')
+                    : t("(blank uses the host's own)")
                 }
                 onChange={(e) => secret.onTyped(e.target.value)}
               />
@@ -97,10 +103,10 @@ export default function RdpFields({
           {secret.own && (
             <p className="settings-note">
               {secret.forget
-                ? 'On save the gateway password stored here is forgotten.'
-                : 'A gateway password is stored here, and the nearest value wins.'}{' '}
+                ? t('On save the gateway password stored here is forgotten.')
+                : t('A gateway password is stored here, and the nearest value wins.')}{' '}
               <button type="button" onClick={() => secret.onForget(!secret.forget)}>
-                {secret.forget ? 'Keep it' : 'Forget it'}
+                {secret.forget ? t('Keep it') : t('Forget it')}
               </button>
             </p>
           )}
@@ -111,29 +117,29 @@ export default function RdpFields({
               checked={effective.gatewayBypassLocal}
               onChange={(e) => set('gatewayBypassLocal', e.target.checked)}
             />
-            Reach private addresses directly, without the gateway
+            {t('Reach private addresses directly, without the gateway')}
           </label>
         </>
       )}
 
       <div className="form-row">
         <label style={{ flex: 1 }}>
-          Resolution
+          {t('Resolution')}
           <select
             value={value.resolution ?? ''}
             onChange={(e) => set('resolution', (e.target.value || undefined) as RdpResolution)}
           >
             <option value="">
-              Inherit ({inheritedFrom('resolution') ? effective.resolution : 'fit'})
+              {t('Inherit')} ({inheritedFrom('resolution') ? effective.resolution : 'fit'})
             </option>
-            <option value="fit">Fit the pane</option>
-            <option value="fixed">Fixed size</option>
+            <option value="fit">{t('Fit the pane')}</option>
+            <option value="fixed">{t('Fixed size')}</option>
           </select>
         </label>
         {effective.resolution === 'fixed' && (
           <>
             <label style={{ flex: 1 }}>
-              Width
+              {t('Width')}
               <input
                 type="number"
                 value={value.desktopWidth ?? ''}
@@ -144,7 +150,7 @@ export default function RdpFields({
               />
             </label>
             <label style={{ flex: 1 }}>
-              Height
+              {t('Height')}
               <input
                 type="number"
                 value={value.desktopHeight ?? ''}
@@ -159,27 +165,27 @@ export default function RdpFields({
       </div>
       <p className="settings-note">
         {effective.resolution === 'fixed'
-          ? 'The desktop keeps this size and is scaled into the pane.'
-          : 'The far end is asked to match the pane whenever it is resized, so every pixel stays its own.'}
+          ? t('The desktop keeps this size and is scaled into the pane.')
+          : t(
+              'The far end is asked to match the pane whenever it is resized, so every pixel stays its own.'
+            )}
       </p>
 
       <label>
-        Most pixels to ask for
+        {t('Most pixels to ask for')}
         <select
           value={String(effective.pixelBudget)}
           onChange={(e) => set('pixelBudget', Number(e.target.value))}
         >
-          <option value="1.5">Fewest — a slow link</option>
-          <option value="3.5">Balanced</option>
-          <option value="100">As many as the screen has</option>
+          <option value="1.5">{t('Fewest — a slow link')}</option>
+          <option value="3.5">{t('Balanced')}</option>
+          <option value="100">{t('As many as the screen has')}</option>
         </select>
       </label>
       <p className="settings-note">
-        The desktop follows the screen's own pixels rather than the pane's points, so it is drawn
-        sharp instead of being magnified to fit. On a display with one pixel per point — every
-        ordinary monitor — that is exactly the pane and this setting changes nothing. On a Retina
-        display it is four times the data, which is what the budget is for: past it the desktop is
-        asked for a size between the two rather than the largest one.
+        {t(
+          "The desktop follows the screen's own pixels rather than the pane's points, so it is drawn sharp instead of being magnified to fit. On a display with one pixel per point — every ordinary monitor — that is exactly the pane and this setting changes nothing. On a Retina display it is four times the data, which is what the budget is for: past it the desktop is asked for a size between the two rather than the largest one."
+        )}
       </p>
 
       <label className="checkbox-row" style={{ flexDirection: 'row' }}>
@@ -188,11 +194,12 @@ export default function RdpFields({
           checked={effective.commandAsControl}
           onChange={(e) => set('commandAsControl', e.target.checked)}
         />
-        Send ⌘ as Ctrl
+        {t('Send ⌘ as Ctrl')}
       </label>
       <p className="settings-note">
-        Copy and paste then land where they do on Windows. While the desktop has the keyboard this
-        app's own ⌘ shortcuts do not fire; ⌘Q and ⌘Tab still belong to macOS.
+        {t(
+          "Copy and paste then land where they do on Windows. While the desktop has the keyboard this app's own ⌘ shortcuts do not fire; ⌘Q and ⌘Tab still belong to macOS."
+        )}
       </p>
     </>
   )

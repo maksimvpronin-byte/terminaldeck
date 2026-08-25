@@ -208,6 +208,14 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
 - Port forwarding — local, remote, and dynamic (SOCKS5) — auto-started per session with a
   runtime control panel
 
+### Language
+
+- **English or Russian**, switched in Settings and applied without a restart. The English text
+  is what the translation is keyed by, so anything not yet translated appears in English rather
+  than as a placeholder. Translated so far: Settings, the shortcut list, the session tree, the
+  tab strip, the pane toolbar, the session dialog and the desktop session. Not yet: the file
+  browser, the inventory dialogs, and the smaller panels
+
 Press `⌘/` in the app for the full list of shortcuts and gestures.
 
 ## Status

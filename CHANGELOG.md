@@ -10,6 +10,14 @@ the other produces a version nobody can install, which is how 0.1.10 through
 
 ### Added
 
+- **A Russian interface**, chosen in Settings and applied at once. The English
+  text is the key, so a screen with no translation yet shows English rather than
+  machine names — a working screen, and visibly an untranslated one. Settings,
+  the shortcut and feature list, the session tree, the tab strip, the pane
+  toolbar, the session dialog and everything a desktop session shows are
+  translated; the file browser, the inventory dialogs and the smaller panels are
+  not yet.
+
 - **Desktop settings on a host, a group and an inventory override**: the RD
   Gateway to reach a machine through, the resolution, and whether ⌘ is sent as
   Ctrl. They inherit along the same chain the login does, so a shared gateway is

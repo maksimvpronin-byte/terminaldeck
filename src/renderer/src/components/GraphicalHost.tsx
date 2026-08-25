@@ -13,6 +13,7 @@ import type { RdpView } from '../../../shared/types'
 import { shadowable, type WinSession } from '../../../shared/winSessions'
 import ShadowView from './ShadowView'
 import { useCommandAsControl } from '../hooks/useCommandAsControl'
+import { useT } from '../i18n'
 
 type Phase =
   | { at: 'loading' }
@@ -119,6 +120,7 @@ export default function GraphicalHost({
   const [skipPrompt, setSkipPrompt] = useState(false)
   /** The session being watched in this pane, once one has been chosen. */
   const [joined, setJoined] = useState<{ session: WinSession; control: boolean } | null>(null)
+  const t = useT()
 
   /**
    * How big the desktop should be, in the far end's own pixels.
@@ -645,7 +647,7 @@ export default function GraphicalHost({
       <div className="graphical-host">
         <div className="graphical-overlay">
           <div className="graphical-notice">
-            <strong>Not a desktop</strong>
+            <strong>{t('Not a desktop')}</strong>
           </div>
         </div>
       </div>
@@ -674,8 +676,8 @@ export default function GraphicalHost({
           <span>
             {offer.length === 1 ? offer[0].name : `${offer.length} files`} copied over there
           </span>
-          <button onClick={() => void fetchOffered(transferRef.current!, offer)}>Save here…</button>
-          <button className="icon-button" title="Ignore" onClick={() => setOffer(null)}>
+          <button onClick={() => void fetchOffered(transferRef.current!, offer)}>{t('Save here…')}</button>
+          <button className="icon-button" title={t('Ignore')} onClick={() => setOffer(null)}>
             ✕
           </button>
         </div>
@@ -691,20 +693,20 @@ export default function GraphicalHost({
                 <strong>
                   {traits.label} — {host ? target : 'no host'}
                 </strong>
-                <p className="settings-note">Reading the login for this host.</p>
+                <p className="settings-note">{t('Reading the login for this host.')}</p>
               </>
             )}
 
             {phase.at === 'choosing' && (
               <>
-                <strong>{host ? target : 'no host'}</strong>
+                <strong>{host ? target : t('no host')}</strong>
                 <button className="primary" onClick={connectFresh}>
-                  New session
+                  {t('New session')}
                 </button>
 
                 <div className="session-pick-head">
-                  <span>Or join a session already open</span>
-                  {sessionsLoading && <span className="settings-note">looking…</span>}
+                  <span>{t('Or join a session already open')}</span>
+                  {sessionsLoading && <span className="settings-note">{t('looking…')}</span>}
                 </div>
 
                 {sessions.length > 0 && (
@@ -718,11 +720,11 @@ export default function GraphicalHost({
                             {s.name} · {s.state}
                           </span>
                         </span>
-                        <button title="Watch without touching" onClick={() => void shadow(s, false)}>
+                        <button title={t('Watch without touching')} onClick={() => void shadow(s, false)}>
                           Watch
                         </button>
                         <button
-                          title="Watch and take the keyboard and mouse"
+                          title={t('Watch and take the keyboard and mouse')}
                           onClick={() => void shadow(s, true)}
                         >
                           Control
@@ -734,7 +736,7 @@ export default function GraphicalHost({
 
                 {!sessionsLoading && sessions.length === 0 && (
                   <p className="settings-note">
-                    {sessionsProblem ?? 'Nobody is logged on to that host right now.'}
+                    {sessionsProblem ?? t('Nobody is logged on to that host right now.')}
                   </p>
                 )}
 
@@ -746,14 +748,17 @@ export default function GraphicalHost({
                         checked={skipPrompt}
                         onChange={(e) => setSkipPrompt(e.target.checked)}
                       />
-                      Join without asking the person there
+                      {t('Join without asking the person there')}
                     </label>
                     <p className="settings-note">
-                      A joined session opens in a window of its own — Windows draws it, not this
-                      app.{' '}
+                      {t(
+                        'A joined session opens in a window of its own — Windows draws it, not this app.'
+                      )}{' '}
                       {skipPrompt
-                        ? 'The host allows this only where its policy says so; where it does not, the connection is refused rather than falling back to asking.'
-                        : 'The person at the far end is asked to allow it.'}
+                        ? t(
+                            'The host allows this only where its policy says so; where it does not, the connection is refused rather than falling back to asking.'
+                          )
+                        : t('The person at the far end is asked to allow it.')}
                     </p>
                   </>
                 )}
@@ -762,34 +767,40 @@ export default function GraphicalHost({
 
             {phase.at === 'password' && (
               <>
-                <strong>Password for {username || 'this host'}</strong>
+                <strong>
+                  {t('Password for')} {username || t('this host')}
+                </strong>
                 <p className="settings-note">
-                  No password is saved for this host. Save one in its dialog to stop being asked.
+                  {t(
+                    'No password is saved for this host. Save one in its dialog to stop being asked.'
+                  )}
                 </p>
                 <input
                   autoFocus
                   type="password"
-                  placeholder="Password"
+                  placeholder={t('Password')}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && void connect(username, password)}
                 />
                 <button className="primary" onClick={() => void connect(username, password)}>
-                  Connect
+                  {t('Connect')}
                 </button>
               </>
             )}
 
             {phase.at === 'connecting' && (
               <>
-                <strong>Connecting to {target}</strong>
-                <p className="settings-note">Negotiating with the server.</p>
+                <strong>
+                  {t('Connecting to')} {target}
+                </strong>
+                <p className="settings-note">{t('Negotiating with the server.')}</p>
               </>
             )}
 
             {(phase.at === 'failed' || phase.at === 'closed') && (
               <>
-                <strong>{phase.at === 'failed' ? 'Could not connect' : 'Session ended'}</strong>
+                <strong>{phase.at === 'failed' ? t('Could not connect') : t('Session ended')}</strong>
                 <p className="settings-note">{phase.reason}</p>
                 <button
                   onClick={() => {
@@ -800,7 +811,7 @@ export default function GraphicalHost({
                     else setPhase({ at: 'password' })
                   }}
                 >
-                  Try again
+                  {t('Try again')}
                 </button>
               </>
             )}

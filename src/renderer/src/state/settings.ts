@@ -1,11 +1,14 @@
 import type { ITheme } from 'xterm'
 import type { CursorStyle, ResolvedAppearance } from '../../../shared/types'
+import { preferredLanguage, type Language } from '../i18n/language'
 
 /**
  * The application-wide defaults. The appearance half doubles as the bottom of
  * the per-group / per-host inheritance chain, so it satisfies ResolvedAppearance.
  */
 export interface TerminalSettings extends ResolvedAppearance {
+  /** What the interface is written in. See renderer/src/i18n. */
+  language: Language
   fontFamily: string
   fontSize: number
   scrollback: number
@@ -436,6 +439,8 @@ export const THEME_GROUPS: Array<{ label: string; names: string[] }> = [
 export const DEFAULT_THEME = 'TerminalDeck Dark'
 
 export const DEFAULT_SETTINGS: TerminalSettings = {
+  // What the operating system asks for, until someone says otherwise.
+  language: preferredLanguage(),
   fontFamily: 'Menlo, Consolas, monospace',
   fontSize: 13,
   scrollback: 10000,

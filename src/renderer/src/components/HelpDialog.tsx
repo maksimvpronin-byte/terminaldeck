@@ -1,5 +1,6 @@
 import ModalBackdrop from './ModalBackdrop'
 import { keyHint } from '../state/keys'
+import { useT } from '../i18n'
 
 interface Row {
   keys?: string
@@ -184,24 +185,28 @@ const SECTIONS: Section[] = [
 ]
 
 export default function HelpDialog({ onClose }: { onClose: () => void }): JSX.Element {
+  // The rows are written in English and translated as they are drawn, so the
+  // list above stays one readable table rather than a wall of lookup keys.
+  const t = useT()
+
   return (
     <ModalBackdrop onClose={onClose}>
       <div className="modal-card help-card">
-        <h2>Shortcuts and features</h2>
+        <h2>{t('Shortcuts and features')}</h2>
         <p className="settings-note">
-          On Windows and Linux read ⌘ as Ctrl.
+          {t('On Windows and Linux read ⌘ as Ctrl.')}
         </p>
 
         {SECTIONS.map((section) => (
           <div key={section.title}>
-            <h3 className="settings-heading">{section.title}</h3>
+            <h3 className="settings-heading">{t(section.title)}</h3>
             <div className="help-rows">
               {section.rows.map((row, i) => (
                 <div className="help-row" key={`${section.title}-${i}`}>
                   <span className="help-keys">
                     {row.keys ? <kbd>{keyHint(row.keys)}</kbd> : null}
                   </span>
-                  <span className="help-what">{row.what}</span>
+                  <span className="help-what">{t(row.what)}</span>
                 </div>
               ))}
             </div>
@@ -210,7 +215,7 @@ export default function HelpDialog({ onClose }: { onClose: () => void }): JSX.El
 
         <div className="modal-actions">
           <button className="primary" onClick={onClose}>
-            Done
+            {t('Done')}
           </button>
         </div>
       </div>

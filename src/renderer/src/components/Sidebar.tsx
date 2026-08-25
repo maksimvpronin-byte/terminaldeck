@@ -20,6 +20,7 @@ import CollectionDialog from './CollectionDialog'
 import SettingsDialog from './SettingsDialog'
 import ContextMenu, { type MenuItem } from './ContextMenu'
 import { keyHint } from '../state/keys'
+import { useT } from '../i18n'
 
 const ROOT_TARGET = '__root__'
 const COLLAPSED_KEY = 'terminaldeck.collapsedGroups'
@@ -40,6 +41,7 @@ export default function Sidebar({
   onOpenSnippets: () => void
   onOpenHelp: () => void
 }): JSX.Element {
+  const t = useT()
   const groups = useStore((s) => s.groups)
   const sessions = useStore((s) => s.sessions)
   const removeGroup = useStore((s) => s.removeGroup)
@@ -261,9 +263,9 @@ export default function Sidebar({
       ? selectedHostIds.filter((id) => sessions.some((x) => x.id === id))
       : [s.id]
     return [
-      { label: 'Connect', onSelect: () => connect(s) },
+      { label: t('Connect'), onSelect: () => connect(s) },
       {
-        label: 'Connect in split',
+        label: t('Connect in split'),
         disabled: !activeTab,
         onSelect: () => {
           if (!activeTab) return
@@ -279,7 +281,7 @@ export default function Sidebar({
         }
       },
       {
-        label: 'Duplicate',
+        label: t('Duplicate'),
         separated: true,
         onSelect: () => {
           const now = Date.now()
@@ -301,7 +303,7 @@ export default function Sidebar({
         onSelect: () => window.td.clipboard.write(addressOf(s))
       },
       {
-        label: targets.length > 1 ? `Delete ${targets.length} hosts…` : 'Delete…',
+        label: targets.length > 1 ? `Delete ${targets.length} hosts…` : t('Delete…'),
         danger: true,
         separated: true,
         onSelect: () => deleteSessions(targets)
@@ -345,15 +347,15 @@ export default function Sidebar({
           )
       },
       {
-        label: 'Edit group…',
+        label: t('Edit group…'),
         separated: true,
         disabled: !group,
         onSelect: () => group && setGroupDialog({ group, parentId: group.parentId })
       },
-      { label: 'New session here', onSelect: () => setEditingSession('new') },
-      { label: 'New subgroup…', onSelect: () => setGroupDialog({ parentId: groupId }) },
+      { label: t('New session here'), onSelect: () => setEditingSession('new') },
+      { label: t('New subgroup…'), onSelect: () => setGroupDialog({ parentId: groupId }) },
       {
-        label: 'Delete group…',
+        label: t('Delete group…'),
         danger: true,
         separated: true,
         onSelect: () => {
@@ -386,7 +388,7 @@ export default function Sidebar({
         onDrop={(e) => handleReorderDrop(e, s)}
         onClick={(e) => onSessionClick(e, s)}
         onDoubleClick={() => connect(s)}
-        title="Double-click to connect · drag to sort or to move between groups"
+        title={t("Double-click to connect · drag to sort or to move between groups")}
       >
         <span className="name">
           <span
@@ -395,9 +397,9 @@ export default function Sidebar({
             aria-hidden="true"
           />
           {s.name}
-          {connected.has(s.id) && <span className="live-dot" title="Connected" />}
+          {connected.has(s.id) && <span className="live-dot" title={t("Connected")} />}
           {s.groupId && s.inheritAuth === false && (
-            <span className="no-inherit" title="Does not inherit settings from its group">
+            <span className="no-inherit" title={t("Does not inherit settings from its group")}>
               ⊘
             </span>
           )}
@@ -453,7 +455,7 @@ export default function Sidebar({
               </span>
               <div className="actions">
                 <button
-                  title="New subgroup"
+                  title={t("New subgroup")}
                   onClick={(e) => {
                     e.stopPropagation()
                     setGroupDialog({ parentId: g.id })
@@ -492,7 +494,7 @@ export default function Sidebar({
       <div className="sidebar-header" style={{ borderTop: 'none' }}>
         <input
           style={{ flex: 1 }}
-          placeholder={tab === 'sessions' ? 'Filter hosts…' : 'Filter inventory…'}
+          placeholder={tab === 'sessions' ? t('Filter hosts…') : t('Filter inventory…')}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
@@ -507,7 +509,7 @@ export default function Sidebar({
           + Session
         </button>
         <button onClick={() => setGroupDialog({ parentId: null })}>+ Group</button>
-        <button title="Import from ~/.ssh/config" onClick={() => setShowImport(true)}>
+        <button title={t("Import from ~/.ssh/config")} onClick={() => setShowImport(true)}>
           ⇩
         </button>
       </div>
@@ -564,29 +566,29 @@ export default function Sidebar({
         <div className="selection-bar">
           <span className="count">{selectedHostIds.length} selected</span>
           <span style={{ flex: 1 }} />
-          <button className="icon-button" title="Clear" onClick={clearHostSelection}>
+          <button className="icon-button" title={t("Clear")} onClick={clearHostSelection}>
             ✕
           </button>
           {/* The four verbs cannot fit beside the count in a sidebar this narrow,
               so they take a row of their own and wrap within it. */}
           <div className="selection-actions">
             <button
-              title="Each in its own tab, in the current workspace"
+              title={t("Each in its own tab, in the current workspace")}
               onClick={() => openSelectedHosts('tabs')}
             >
               Open
             </button>
-            <button title="All tiled in one tab" onClick={() => openSelectedHosts('grid')}>
+            <button title={t("All tiled in one tab")} onClick={() => openSelectedHosts('grid')}>
               Tile
             </button>
             <button
-              title="A new workspace with a tab per host"
+              title={t("A new workspace with a tab per host")}
               onClick={() => openSelectedHosts('workspace')}
             >
               Workspace
             </button>
             <button
-              title="Save these hosts as a collection you can reopen later"
+              title={t("Save these hosts as a collection you can reopen later")}
               onClick={(e) => {
                 e.stopPropagation()
                 const picked = [...selectedHostIds]
@@ -602,7 +604,7 @@ export default function Sidebar({
                       }
                     })),
                     {
-                      label: 'New collection…',
+                      label: t('New collection…'),
                       separated: collections.length > 0,
                       onSelect: () => setCollecting(picked)
                     }
@@ -624,7 +626,7 @@ export default function Sidebar({
         <button className="icon-button" title={keyHint('Shortcuts and features (⌘/)')} onClick={onOpenHelp}>
           ?
         </button>
-        <button className="icon-button" title="Settings" onClick={() => setShowSettings(true)}>
+        <button className="icon-button" title={t("Settings")} onClick={() => setShowSettings(true)}>
           ⚙
         </button>
         <button className="icon-button" title={keyHint('Lock vault (⌘L)')} onClick={() => lockVault()}>

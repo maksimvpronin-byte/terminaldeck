@@ -21,6 +21,7 @@ import { useStore } from '../state/store'
 import { SESSION_COLOURS } from '../state/colours'
 import AppearanceFields from './AppearanceFields'
 import RdpFields from './RdpFields'
+import { useT } from '../i18n'
 import ModalBackdrop from './ModalBackdrop'
 
 interface Props {
@@ -61,6 +62,7 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
   const [gatewaySecret, setGatewaySecret] = useState('')
   const [forgetGatewaySecret, setForgetGatewaySecret] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const t = useT()
 
   function set<K extends keyof SessionProfile>(key: K, value: SessionProfile[K]): void {
     setProfile((p) => ({ ...p, [key]: value }))
@@ -132,11 +134,11 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
 
   async function submit(): Promise<void> {
     if (!profile.name.trim() || !profile.host.trim()) {
-      setError('Name and host are required')
+      setError(t('Name and host are required'))
       return
     }
     if (!effective.username.trim()) {
-      setError('Username is not set here and none is inherited from a group')
+      setError(t('Username is not set here and none is inherited from a group'))
       return
     }
     const tags = tagsInput
@@ -156,10 +158,10 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
 
   const secretHint =
     ownSecret && !forgetSecret
-      ? '(saved on this host — it overrides the group)'
+      ? t('(saved on this host — it overrides the group)')
       : inheritNote('secretRef')
         ? `(blank keeps the one ${inheritNote('secretRef')})`
-        : '(leave blank to keep existing)'
+        : t('(leave blank to keep existing)')
 
   /**
    * Each field is inherited on its own, so a key file and the passphrase used
@@ -200,16 +202,16 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
   return (
     <ModalBackdrop onClose={onClose}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <h2>{initial ? 'Edit session' : 'New session'}</h2>
+        <h2>{initial ? t('Edit session') : t('New session')}</h2>
 
         <label>
-          Name
+          {t('Name')}
           <input value={profile.name} onChange={(e) => set('name', e.target.value)} />
         </label>
 
         <div className="form-row">
           <label style={{ flex: 1 }}>
-            Protocol
+            {t('Protocol')}
             <select
               value={protocolOf(profile)}
               onChange={(e) => set('protocol', e.target.value as Protocol)}
@@ -222,11 +224,11 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
             </select>
           </label>
           <label style={{ flex: 3 }}>
-            Host
+            {t('Host')}
             <input value={profile.host} onChange={(e) => set('host', e.target.value)} />
           </label>
           <label style={{ flex: 1 }}>
-            Port
+            {t('Port')}
             <input
               type="number"
               value={profile.port ?? ''}
@@ -258,12 +260,12 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
                 chooseInheritance(e.target.checked)
               }}
             />
-            Inherit connection settings from the group
+            {t('Inherit connection settings from the group')}
           </label>
         )}
 
         <label>
-          Username
+          {t('Username')}
           <input
             value={profile.username ?? ''}
             placeholder={inheritNote('username') || 'required'}
@@ -272,7 +274,7 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
         </label>
 
         <label>
-          Auth method
+          {t('Auth method')}
           <select
             value={profile.authMethod ?? ''}
             onChange={(e) => {
@@ -280,16 +282,16 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
               chooseInheritance(e.target.value === '')
             }}
           >
-            <option value="">Inherit ({effective.authMethod})</option>
-            <option value="password">Password</option>
-            <option value="privateKey">Private key</option>
-            <option value="agent">SSH agent</option>
+            <option value="">{t('Inherit')} ({effective.authMethod})</option>
+            <option value="password">{t('Password')}</option>
+            <option value="privateKey">{t('Private key')}</option>
+            <option value="agent">{t('SSH agent')}</option>
           </select>
         </label>
 
         {effective.authMethod === 'password' && (
           <label>
-            Password {secretHint}
+            {t('Password')} {secretHint}
             <input type="password" value={secret} onChange={(e) => setSecret(e.target.value)} />
           </label>
         )}
@@ -341,12 +343,12 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
             checked={effective.followTerminalCwd}
             onChange={(e) => set('followTerminalCwd', e.target.checked)}
           />
-          SFTP panel follows the terminal&apos;s directory
+          {t('SFTP panel follows the terminal’s directory')}
         </label>
         <p className="settings-note">
-          Keeps the SFTP panel on the directory the shell is in. Types one setup line into the
-          shell on connect so it reports where it is; its echo is hidden. Off by default: it lets
-          the host move the file browser. The ⇉ button in the panel switches it at any time.
+          {t(
+            'Keeps the SFTP panel on the directory the shell is in. Types one setup line into the shell on connect so it reports where it is; its echo is hidden. Off by default: it lets the host move the file browser. The ⇉ button in the panel switches it at any time.'
+          )}
         </p>
 
         <label className="checkbox-row" style={{ flexDirection: 'row' }}>
@@ -355,11 +357,11 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
             checked={profile.logToFile}
             onChange={(e) => set('logToFile', e.target.checked)}
           />
-          Log session output to file
+          {t('Log session output to file')}
         </label>
 
         <label>
-          Jump host (ProxyJump)
+          {t('Jump host (ProxyJump)')}
           <select
             value={profile.jumpHostId ?? ''}
             onChange={(e) => set('jumpHostId', e.target.value || null)}
@@ -367,7 +369,7 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
             <option value="">
               {inheritNote('jumpHostId')
                 ? `Inherited (${sessions.find((s) => s.id === effective.jumpHostId)?.name ?? 'none'})`
-                : 'None'}
+                : t('None')}
             </option>
             {otherSessions.map((s) => (
               <option key={s.id} value={s.id}>
@@ -378,24 +380,24 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
         </label>
 
         <label>
-          On connect
+          {t('On connect')}
           <textarea
             rows={2}
             value={profile.onConnectCommand ?? ''}
-            placeholder={inheritNote('onConnectCommand') || 'e.g. sudo -i'}
+            placeholder={inheritNote('onConnectCommand') || t('e.g. sudo -i')}
             onChange={(e) => set('onConnectCommand', e.target.value)}
           />
         </label>
         <p className="settings-note">
-          Typed into the shell as soon as it is ready, so you see it run and{' '}
-          <code>cd</code> sticks. One command per line, run in order. It repeats on every
-          reconnect.
+          {t('Typed into the shell as soon as it is ready, so you see it run and')}{' '}
+          <code>cd</code>{' '}
+          {t('sticks. One command per line, run in order. It repeats on every reconnect.')}
         </p>
 
         <label>
-          Group
+          {t('Group')}
           <select value={profile.groupId ?? ''} onChange={(e) => set('groupId', e.target.value || null)}>
-            <option value="">(no group)</option>
+            <option value="">{t('(no group)')}</option>
             {groups.map((g) => (
               <option key={g.id} value={g.id}>
                 {groupPath(g.id, groups)}
@@ -405,12 +407,12 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
         </label>
 
         <label>
-          Colour
+          {t('Colour')}
           <div className="colour-row">
             <button
               type="button"
               className={`swatch none ${!profile.color ? 'selected' : ''}`}
-              title="No colour"
+              title={t('No colour')}
               onClick={() => set('color', undefined)}
             />
             {SESSION_COLOURS.map((c) => (
@@ -427,12 +429,12 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
         </label>
 
         <label>
-          Tags (comma separated)
+          {t('Tags (comma separated)')}
           <input value={tagsInput} onChange={(e) => setTagsInput(e.target.value)} />
         </label>
 
         <details className="settings-section">
-          <summary>Appearance</summary>
+          <summary>{t('Appearance')}</summary>
           <p className="settings-note">
             Applies to this host's terminals only. Anything left on “inherit” follows the group,
             and then Settings — so marking one production box red changes nothing else.
@@ -444,21 +446,21 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
             inherited={inheritedLook}
             inheritedFrom={appearanceFrom}
             inheritToggle={
-              profile.groupId ? { label: 'Inherit appearance from the group' } : undefined
+              profile.groupId ? { label: t('Inherit appearance from the group') } : undefined
             }
           />
         </details>
 
         {isRdp && (
           <details className="settings-section" open>
-            <summary>Desktop</summary>
+            <summary>{t('Desktop')}</summary>
             <RdpFields
               value={profile}
               set={setRdp}
               effective={desktop}
               inheritedFrom={rdpNote}
               inheritToggle={
-                profile.groupId ? { label: 'Inherit desktop settings from the group' } : undefined
+                profile.groupId ? { label: t('Inherit desktop settings from the group') } : undefined
               }
               secret={{
                 typed: gatewaySecret,
@@ -473,26 +475,26 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
 
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>Port forwards</span>
-            <button onClick={addForward}>+ Add</button>
+            <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>{t('Port forwards')}</span>
+            <button onClick={addForward}>{t('+ Add')}</button>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
             {profile.portForwards.map((r) => (
               <div className="pf-rule" key={r.id}>
                 <select value={r.type} onChange={(e) => updateForward(r.id, { type: e.target.value as PortForwardRule['type'] })}>
-                  <option value="local">Local</option>
-                  <option value="remote">Remote</option>
-                  <option value="dynamic">Dynamic (SOCKS)</option>
+                  <option value="local">{t('Local')}</option>
+                  <option value="remote">{t('Remote')}</option>
+                  <option value="dynamic">{t('Dynamic (SOCKS)')}</option>
                 </select>
                 <input
-                  placeholder="src host"
+                  placeholder={t('src host')}
                   value={r.srcHost}
                   onChange={(e) => updateForward(r.id, { srcHost: e.target.value })}
                   style={{ width: 90 }}
                 />
                 <input
                   type="number"
-                  placeholder="src port"
+                  placeholder={t('src port')}
                   value={r.srcPort}
                   onChange={(e) => updateForward(r.id, { srcPort: Number(e.target.value) })}
                   style={{ width: 70 }}
@@ -501,14 +503,14 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
                   <>
                     <span>→</span>
                     <input
-                      placeholder="dst host"
+                      placeholder={t('dst host')}
                       value={r.dstHost ?? ''}
                       onChange={(e) => updateForward(r.id, { dstHost: e.target.value })}
                       style={{ width: 90 }}
                     />
                     <input
                       type="number"
-                      placeholder="dst port"
+                      placeholder={t('dst port')}
                       value={r.dstPort ?? 0}
                       onChange={(e) => updateForward(r.id, { dstPort: Number(e.target.value) })}
                       style={{ width: 70 }}
@@ -524,9 +526,9 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
         {error && <span className="error-text">{error}</span>}
 
         <div className="modal-actions">
-          <button onClick={onClose}>Cancel</button>
+          <button onClick={onClose}>{t('Cancel')}</button>
           <button className="primary" onClick={submit}>
-            Save
+            {t('Save')}
           </button>
         </div>
       </div>

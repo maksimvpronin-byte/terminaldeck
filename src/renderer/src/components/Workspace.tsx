@@ -13,8 +13,10 @@ import SplitContainer from './SplitContainer'
 import ContextMenu, { type MenuItem } from './ContextMenu'
 import CollectionDialog from './CollectionDialog'
 import { CloseIcon } from './icons'
+import { useT } from '../i18n'
 
 export default function Workspace(): JSX.Element {
+  const t = useT()
   const workspaces = useStore((s) => s.workspaces)
   const activeWorkspaceId = useStore((s) => s.activeWorkspaceId)
   const setActiveWorkspace = useStore((s) => s.setActiveWorkspace)
@@ -90,7 +92,7 @@ export default function Workspace(): JSX.Element {
               className={`workspace-chip ${isActive ? 'active' : ''} ${
                 dropTarget === w.id ? 'drop' : ''
               }`}
-              title="Double-click to rename; right-click to save it; drop a tab here to move it"
+              title={t("Double-click to rename; right-click to save it; drop a tab here to move it")}
               onClick={() => setActiveWorkspace(w.id)}
               onDoubleClick={() => startRename(w.id, w.title)}
               onContextMenu={(e) => {
@@ -101,13 +103,13 @@ export default function Workspace(): JSX.Element {
                   y: e.clientY,
                   items: [
                     {
-                      label: 'Save as collection…',
+                      label: t('Save as collection…'),
                       disabled: sessionIdsOf(w).length === 0,
                       onSelect: () => setSaving(w.id)
                     },
-                    { label: 'Rename…', onSelect: () => startRename(w.id, w.title) },
+                    { label: t('Rename…'), onSelect: () => startRename(w.id, w.title) },
                     {
-                      label: 'Close workspace',
+                      label: t('Close workspace'),
                       danger: true,
                       separated: true,
                       onSelect: () => requestCloseWorkspace(w.id, w.title, w.tabs.length)
@@ -126,7 +128,7 @@ export default function Workspace(): JSX.Element {
             >
               {w.color && <span className="tab-colour" style={{ background: w.color }} />}
               {!isActive && workspaceHasActivity(w) && (
-                <span className="activity-dot" title="New output in this workspace" />
+                <span className="activity-dot" title={t("New output in this workspace")} />
               )}
               {renaming === w.id ? (
                 <input
@@ -147,7 +149,7 @@ export default function Workspace(): JSX.Element {
               <span className="workspace-count">{w.tabs.length}</span>
               <span
                 className="close"
-                title="Close this workspace and everything in it"
+                title={t("Close this workspace and everything in it")}
                 onClick={(e) => {
                   e.stopPropagation()
                   requestCloseWorkspace(w.id, w.title, w.tabs.length)
@@ -160,7 +162,7 @@ export default function Workspace(): JSX.Element {
         })}
         <button
           className="workspace-add"
-          title="New workspace"
+          title={t("New workspace")}
           onClick={() => openWorkspace()}
         >
           +
@@ -169,7 +171,7 @@ export default function Workspace(): JSX.Element {
         {allLeaves.length > 0 && (
           <button
             className={`broadcast-toggle ${broadcast ? 'on' : ''}`}
-            title="Mirror typing to every open pane, in every workspace"
+            title={t("Mirror typing to every open pane, in every workspace")}
             onClick={() => toggleBroadcast()}
           >
             ⇉ Broadcast
@@ -179,36 +181,36 @@ export default function Workspace(): JSX.Element {
 
       {current && current.tabs.length > 0 && (
         <div className="tab-bar">
-          {current.tabs.map((t) => (
+          {current.tabs.map((tab) => (
             <div
-              key={t.id}
-              className={`tab ${t.id === current.activeTabId ? 'active' : ''}`}
+              key={tab.id}
+              className={`tab ${tab.id === current.activeTabId ? 'active' : ''}`}
               draggable
-              title="Drag onto a pane to view side by side, or onto a workspace to move it"
+              title={t("Drag onto a pane to view side by side, or onto a workspace to move it")}
               onDragStart={(e) => {
-                e.dataTransfer.setData(DRAG_MIME, JSON.stringify({ kind: 'tab', id: t.id }))
+                e.dataTransfer.setData(DRAG_MIME, JSON.stringify({ kind: 'tab', id: tab.id }))
                 e.dataTransfer.effectAllowed = 'copyMove'
               }}
-              onClick={() => setActiveTab(t.id)}
+              onClick={() => setActiveTab(tab.id)}
             >
               {(() => {
-                const colour = collectLeaves(t.root).find((l) => l.color)?.color
+                const colour = collectLeaves(tab.root).find((l) => l.color)?.color
                 return colour ? (
                   <span className="tab-colour" style={{ background: colour }} />
                 ) : null
               })()}
-              {t.hasActivity && t.id !== current.activeTabId && (
-                <span className="activity-dot" title="New output since you last looked" />
+              {tab.hasActivity && tab.id !== current.activeTabId && (
+                <span className="activity-dot" title={t("New output since you last looked")} />
               )}
-              <span>{t.title}</span>
-              {broadcast && collectLeaves(t.root).some((l) => l.broadcastEnabled) && (
+              <span>{tab.title}</span>
+              {broadcast && collectLeaves(tab.root).some((l) => l.broadcastEnabled) && (
                 <span className="tab-badge">⇉</span>
               )}
               <span
                 className="close"
                 onClick={(e) => {
                   e.stopPropagation()
-                  closeTab(t.id)
+                  closeTab(tab.id)
                 }}
               >
                 ✕
@@ -237,7 +239,7 @@ export default function Workspace(): JSX.Element {
       {(!current || current.tabs.length === 0) && (
         <div className="empty-workspace">
           {workspaces.length === 0
-            ? 'Select a session on the left, or quick-connect above.'
+            ? t('Select a session on the left, or quick-connect above.')
             : `“${current?.title}” is empty — open a host on the left to fill it.`}
         </div>
       )}

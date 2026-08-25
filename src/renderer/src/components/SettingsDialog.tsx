@@ -5,11 +5,13 @@ import SecuritySettings from './SecuritySettings'
 import BackupSettings from './BackupSettings'
 import ModalBackdrop from './ModalBackdrop'
 import { keyHint } from '../state/keys'
+import { LANGUAGES, useT, type Language } from '../i18n'
 
 export default function SettingsDialog({ onClose }: { onClose: () => void }): JSX.Element {
   const settings = useStore((s) => s.settings)
   const updateSettings = useStore((s) => s.updateSettings)
   const preview = themeOf(settings)
+  const t = useT()
   const [tab, setTab] = useState<'terminal' | 'files' | 'security' | 'backup'>('terminal')
 
   async function pickEditor(): Promise<void> {
@@ -20,39 +22,57 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
   return (
     <ModalBackdrop onClose={onClose}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <h2>Settings</h2>
+        <h2>{t('Settings')}</h2>
+
+        <label>
+          {t('Language')}
+          <select
+            value={settings.language}
+            onChange={(e) => updateSettings({ language: e.target.value as Language })}
+          >
+            {LANGUAGES.map((language) => (
+              <option key={language.id} value={language.id}>
+                {language.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="settings-note">
+          {t('Applies at once, and to this window only — nothing is sent anywhere.')}
+        </p>
 
         <div className="settings-tabs">
           <button
             className={tab === 'terminal' ? 'active' : ''}
             onClick={() => setTab('terminal')}
           >
-            Terminal
+            {t('Terminal')}
           </button>
           <button className={tab === 'files' ? 'active' : ''} onClick={() => setTab('files')}>
-            Files
+            {t('Files')}
           </button>
           <button
             className={tab === 'security' ? 'active' : ''}
             onClick={() => setTab('security')}
           >
-            Security
+            {t('Security')}
           </button>
           <button className={tab === 'backup' ? 'active' : ''} onClick={() => setTab('backup')}>
-            Backup
+            {t('Backup')}
           </button>
         </div>
 
         {tab === 'files' && (
           <>
-            <h3 className="settings-heading">External editor</h3>
+            <h3 className="settings-heading">{t('External editor')}</h3>
             <p className="settings-note">
-              Used by “Edit locally” in the SFTP panel. Leave empty to hand the file to whatever
-              the system opens it with — on Windows that is often Notepad, or nothing at all.
+              {t(
+                'Used by “Edit locally” in the SFTP panel. Leave empty to hand the file to whatever the system opens it with — on Windows that is often Notepad, or nothing at all.'
+              )}
             </p>
             <div className="form-row">
               <label style={{ flex: 1 }}>
-                Command
+                {t('Command')}
                 <input
                   value={settings.externalEditor}
                   placeholder="e.g. code -w {file}"
@@ -60,13 +80,14 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
                 />
               </label>
               <button style={{ alignSelf: 'flex-end' }} onClick={pickEditor}>
-                Browse…
+                {t('Browse…')}
               </button>
             </div>
             <p className="settings-note">
-              <code>{'{file}'}</code> is replaced by the path; without it the path is appended.
-              Give the full path to the program — a windowed app does not inherit the PATH from
-              your shell, so a bare <code>code</code> or <code>subl</code> may not be found.
+              <code>{'{file}'}</code>{' '}
+              {t(
+                'is replaced by the path; without it the path is appended. Give the full path to the program — a windowed app does not inherit the PATH from your shell, so a bare code or subl may not be found.'
+              )}
             </p>
           </>
         )}
@@ -77,12 +98,13 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
         {tab === 'terminal' && (
           <>
         <p className="settings-note">
-          The defaults every terminal starts from. A group or a single host can override any of
-          this in its own dialog, under Appearance.
+          {t(
+            'The defaults every terminal starts from. A group or a single host can override any of this in its own dialog, under Appearance.'
+          )}
         </p>
 
         <label>
-          Font
+          {t('Font')}
           <select
             value={settings.fontFamily}
             onChange={(e) => updateSettings({ fontFamily: e.target.value })}
@@ -97,10 +119,10 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
 
         <div className="form-row">
           <label>
-            Font size
+            {t('Font size')}
             <div className="stepper">
               <button
-                title={keyHint('Smaller (⌘−)')}
+                title={keyHint(t('Smaller (⌘−)'))}
                 disabled={settings.fontSize <= 8}
                 onClick={() => updateSettings({ fontSize: settings.fontSize - 1 })}
               >
@@ -108,7 +130,7 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
               </button>
               <span className="stepper-value">{settings.fontSize}</span>
               <button
-                title={keyHint('Larger (⌘+)')}
+                title={keyHint(t('Larger (⌘+)'))}
                 disabled={settings.fontSize >= 32}
                 onClick={() => updateSettings({ fontSize: settings.fontSize + 1 })}
               >
@@ -117,7 +139,7 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
             </div>
           </label>
           <label>
-            Scrollback (lines)
+            {t('Scrollback (lines)')}
             <input
               type="number"
               min={100}
@@ -130,7 +152,7 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
         </div>
 
         <label>
-          Colour theme
+          {t('Colour theme')}
           <select
             value={settings.themeName}
             onChange={(e) => updateSettings({ themeName: e.target.value })}
@@ -166,16 +188,16 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
 
         <div className="form-row">
           <label>
-            Cursor style
+            {t('Cursor style')}
             <select
               value={settings.cursorStyle}
               onChange={(e) =>
                 updateSettings({ cursorStyle: e.target.value as typeof settings.cursorStyle })
               }
             >
-              <option value="block">Block</option>
-              <option value="underline">Underline</option>
-              <option value="bar">Bar</option>
+              <option value="block">{t('Block')}</option>
+              <option value="underline">{t('Underline')}</option>
+              <option value="bar">{t('Bar')}</option>
             </select>
           </label>
           <label className="checkbox-row" style={{ alignSelf: 'flex-end', paddingBottom: 6 }}>
@@ -184,7 +206,7 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
               checked={settings.cursorBlink}
               onChange={(e) => updateSettings({ cursorBlink: e.target.checked })}
             />
-            Blinking cursor
+            {t('Blinking cursor')}
           </label>
         </div>
 
@@ -194,19 +216,19 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
             checked={settings.copyOnSelect}
             onChange={(e) => updateSettings({ copyOnSelect: e.target.checked })}
           />
-          Copy to clipboard as soon as text is selected
+          {t('Copy to clipboard as soon as text is selected')}
         </label>
 
         <label>
-          Right-click in a terminal
+          {t('Right-click in a terminal')}
           <select
             value={settings.rightClick}
             onChange={(e) =>
               updateSettings({ rightClick: e.target.value as typeof settings.rightClick })
             }
           >
-            <option value="paste">Paste clipboard</option>
-            <option value="menu">Open context menu</option>
+            <option value="paste">{t('Paste clipboard')}</option>
+            <option value="menu">{t('Open context menu')}</option>
           </select>
         </label>
           </>
@@ -214,10 +236,10 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
 
         <div className="modal-actions">
           {tab === 'terminal' && (
-            <button onClick={() => updateSettings(DEFAULT_SETTINGS)}>Reset to defaults</button>
+            <button onClick={() => updateSettings(DEFAULT_SETTINGS)}>{t('Reset to defaults')}</button>
           )}
           <button className="primary" onClick={onClose}>
-            Done
+            {t('Done')}
           </button>
         </div>
       </div>
