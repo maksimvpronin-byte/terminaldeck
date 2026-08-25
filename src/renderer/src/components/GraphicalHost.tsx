@@ -227,6 +227,19 @@ export default function GraphicalHost({
     try {
       element = document.createElement('iron-remote-desktop')
       ;(element as unknown as { module: unknown }).module = Backend
+      /**
+       * A property, and only then an attribute — the same trap as `module`
+       * above.
+       *
+       * The client re-applies its scale mode every time the far end confirms a
+       * new desktop size, and it reads the mode from the *property* each time.
+       * Set as an attribute alone it reads as unset, matches none of the modes,
+       * and the canvas is left at its natural size: drawn a device pixel per
+       * desktop pixel, overflowing the pane and clipped rather than scaled.
+       * Which is invisible for exactly as long as the desktop and the pane are
+       * the same size.
+       */
+      ;(element as unknown as { scale: string }).scale = 'fit'
       element.setAttribute('scale', 'fit')
       element.className = 'graphical-canvas'
       element.addEventListener('ready', onReady)
@@ -631,19 +644,9 @@ export default function GraphicalHost({
       // session runs perfectly and paints where nobody can see it.
       interaction.setVisibility(true)
 
-      /**
-       * Fit the picture into the pane, asserted through the API rather than
-       * left to the attribute set when the element was made.
-       *
-       * The attribute is read once, while the desktop was still whatever size
-       * the client defaulted to — and when the two happen to match, a mode that
-       * never took has no visible effect. They stopped matching the moment the
-       * size started following the screen, and a canvas drawn at its natural
-       * size overflows the pane and is clipped instead of scaled.
-       *
-       * The literal is ScreenScale.Fit; the enum is declared in the client's
-       * types but not exported, so there is nothing to import.
-       */
+      // ScreenScale.Fit, stated once more now the session exists. The enum is
+      // declared in the client's types but not exported, so there is nothing to
+      // import; the property set on the element is what keeps it applied.
       interaction.setScale(1)
 
       // Copy and paste across the session boundary. Off until asked for, and

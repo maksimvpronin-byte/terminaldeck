@@ -23,6 +23,14 @@ the other produces a version nobody can install, which is how 0.1.10 through
   Ctrl. They inherit along the same chain the login does, so a shared gateway is
   stated once on the group. The gateway's own password is resolved in the main
   process and never crosses into the window.
+- **A desktop is scaled into its pane again.** The client re-applies its scale
+  mode every time the far end confirms a new size, and reads that mode from a
+  property — which this app set as an attribute, where it read as unset and
+  matched no mode at all. The canvas was left at its natural size: a device
+  pixel per desktop pixel, overflowing the pane and clipped rather than scaled,
+  which is invisible for exactly as long as the desktop and the pane are the
+  same size. They stopped being the same size when the size started following
+  the screen.
 - **A desktop can actually be resized now.** [MS-RDPEDISP] travels on a dynamic
   virtual channel that has to be asked for while the session is built, and it
   never was — so `resize` had nowhere to send its request and silently did
