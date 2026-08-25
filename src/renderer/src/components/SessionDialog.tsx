@@ -4,6 +4,7 @@ import type {
   AppearanceDefaults,
   AuthMethod,
   PortForwardRule,
+  RdpDefaults,
   SessionProfile
 } from '../../../shared/types'
 import { resolveAuth, inheritedFrom, sourceOf } from '../../../shared/authResolution'
@@ -15,9 +16,11 @@ import {
 } from '../../../shared/appearance'
 import { groupPath } from '../../../shared/groups'
 import { PROTOCOLS, protocolOf, traitsOf, type Protocol } from '../../../shared/protocols'
+import { resolveRdp, rdpInheritedFrom } from '../../../shared/rdpResolution'
 import { useStore } from '../state/store'
 import { SESSION_COLOURS } from '../state/colours'
 import AppearanceFields from './AppearanceFields'
+import RdpFields from './RdpFields'
 import ModalBackdrop from './ModalBackdrop'
 
 interface Props {
@@ -54,6 +57,9 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
   // is moved into, so dropping it has to be something the dialog can do.
   const [forgetSecret, setForgetSecret] = useState(false)
   const [tagsInput, setTagsInput] = useState(profile.tags.join(', '))
+  /** Typed for the gateway, when it wants a login other than the host's. */
+  const [gatewaySecret, setGatewaySecret] = useState('')
+  const [forgetGatewaySecret, setForgetGatewaySecret] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   function set<K extends keyof SessionProfile>(key: K, value: SessionProfile[K]): void {
@@ -61,6 +67,10 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
   }
 
   function setLook<K extends keyof AppearanceDefaults>(key: K, value: AppearanceDefaults[K]): void {
+    setProfile((p) => ({ ...p, [key]: value }))
+  }
+
+  function setRdp<K extends keyof RdpDefaults>(key: K, value: RdpDefaults[K]): void {
     setProfile((p) => ({ ...p, [key]: value }))
   }
 
@@ -83,6 +93,14 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
     return source ? `inherited from ${source.name}` : ''
   }
   const ownSecret = isSet(profile.secretRef)
+
+  const desktop = resolveRdp(pending, pending.groupId, groups)
+  const isRdp = protocolOf(profile) === 'rdp'
+  const rdpNote = (key: keyof RdpDefaults): string => {
+    const source = rdpInheritedFrom(pending, pending.groupId, groups, key)
+    return source ? `inherited from ${source.name}` : ''
+  }
+  const ownGatewaySecret = isSet(profile.gatewaySecretRef)
 
   const appearance = resolveAppearance(profile, profile.groupId, groups, settings)
   const inheritedLook = inheritedAppearance(profile, profile.groupId, groups, settings)
@@ -129,7 +147,8 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
     const typed = effective.authMethod === 'agent' ? '' : secret
     // A password typed in now beats the "forget" tick — it is the later answer.
     const secretToStore = typed || (forgetSecret ? null : undefined)
-    await upsertSession(toSave, secretToStore)
+    const gatewayToStore = gatewaySecret || (forgetGatewaySecret ? null : undefined)
+    await upsertSession(toSave, secretToStore, gatewayToStore)
     onClose()
   }
 
@@ -222,10 +241,10 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
         </div>
 
         {protocolOf(profile) !== 'ssh' && (
-          <p className="settings-note warning-note">
+          <p className="settings-note">
             {traitsOf(protocolOf(profile)).label} sessions open a desktop rather than a shell, so
-            the file browser, port forwarding, monitoring and broadcast do not apply to them. The
-            desktop itself is not carried yet — the proxy that speaks it is still to come.
+            the file browser, port forwarding, monitoring and broadcast do not apply to them. How
+            the desktop is reached and drawn is under <em>Desktop</em> below.
           </p>
         )}
 
@@ -429,6 +448,28 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
             }
           />
         </details>
+
+        {isRdp && (
+          <details className="settings-section" open>
+            <summary>Desktop</summary>
+            <RdpFields
+              value={profile}
+              set={setRdp}
+              effective={desktop}
+              inheritedFrom={rdpNote}
+              inheritToggle={
+                profile.groupId ? { label: 'Inherit desktop settings from the group' } : undefined
+              }
+              secret={{
+                typed: gatewaySecret,
+                onTyped: setGatewaySecret,
+                own: ownGatewaySecret,
+                forget: forgetGatewaySecret,
+                onForget: setForgetGatewaySecret
+              }}
+            />
+          </details>
+        )}
 
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

@@ -12,13 +12,19 @@ export default function SecuritySettings(): JSX.Element {
   const [pwError, setPwError] = useState<string | null>(null)
   const [pwDone, setPwDone] = useState(false)
   const [hosts, setHosts] = useState<TrustedHost[]>([])
+  const [certificates, setCertificates] = useState<TrustedHost[]>([])
 
   async function refreshHosts(): Promise<void> {
     setHosts(await window.td.knownHosts.list())
   }
 
+  async function refreshCertificates(): Promise<void> {
+    setCertificates(await window.td.knownCertificates.list())
+  }
+
   useEffect(() => {
     refreshHosts()
+    refreshCertificates()
   }, [])
 
   async function changePassword(): Promise<void> {
@@ -46,6 +52,11 @@ export default function SecuritySettings(): JSX.Element {
   async function forget(host: string): Promise<void> {
     await window.td.knownHosts.remove(host)
     refreshHosts()
+  }
+
+  async function forgetCertificate(host: string): Promise<void> {
+    await window.td.knownCertificates.remove(host)
+    refreshCertificates()
   }
 
   return (
@@ -100,6 +111,26 @@ export default function SecuritySettings(): JSX.Element {
               <div className="known-host-name">{h.host}</div>
               <div className="known-host-fp">{h.fingerprint}</div>
               <button onClick={() => forget(h.host)}>Forget</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <h3 className="settings-heading">Trusted certificates</h3>
+      <p className="settings-note">
+        Desktop sessions only, and only certificates this machine could not verify on its own —
+        a gateway or a host that issues its own. One signed by a public authority is checked
+        against the system and never listed here, so a routine reissue changes nothing.
+      </p>
+      {certificates.length === 0 ? (
+        <p className="settings-note">No certificates trusted by hand.</p>
+      ) : (
+        <div className="known-hosts-list">
+          {certificates.map((c) => (
+            <div className="known-host-row" key={c.host}>
+              <div className="known-host-name">{c.host}</div>
+              <div className="known-host-fp">{c.fingerprint}</div>
+              <button onClick={() => forgetCertificate(c.host)}>Forget</button>
             </div>
           ))}
         </div>

@@ -93,6 +93,46 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
   marked RDP in its own dialog and opens as a desktop; the login comes from the host or the
   group above it, like every other credential here, and a domain travels in the username as
   `DOMAIN\user`
+- **A Desktop section on the host, the group and an inventory override**: the RD Gateway to
+  reach the machine through, the resolution, and whether ⌘ is sent as Ctrl. It inherits along
+  the same chain the login does, so a gateway shared by a floor of machines is stated once on
+  the group and left blank on each host. Each field says what it would inherit and from where
+- **The gateway is spoken to directly** — [MS-TSGU], implemented here: an HTTPS request to
+  `/remoteDesktopGateway/`, an NTLMv2 sign-in carried in its headers, then a tunnel and a
+  channel to the one machine being reached. Nothing native and no external client; the RDP
+  exchange above it is unchanged and does not know it is in a tunnel
+- **Both transports**, tried in that order. A current gateway upgrades the connection to a
+  WebSocket and carries everything over it. An older one cannot, and gives no warning — the
+  sign-in succeeds and the connection is then dropped with nothing said — so a failure there is
+  not treated as final: the older transport follows, with a second connection, `RDG_OUT_DATA`
+  carrying what the gateway says and `RDG_IN_DATA` carrying what the client says, one HTTP
+  chunk per packet
+- The sign-in binds to the connection it arrives over — `tls-server-end-point`, computed from
+  the gateway's own certificate — because a gateway with Extended Protection turned on refuses
+  an unbound sign-in with the same "access denied" it gives a wrong password
+- Only **NTLM** is implemented. A gateway offering only Kerberos through SPNEGO says so plainly
+  rather than failing as a refused password
+- **Certificates are checked**, for the gateway and for the desktop host alike. One signed by an
+  authority the machine already trusts is accepted silently and nothing is remembered about it,
+  so a routine reissue changes nothing. Anything else asks once, with the fingerprint, and is
+  remembered under Settings → Security → Trusted certificates; a certificate that later changes
+  warns loudly rather than reconnecting. Refusing stops the session — it never falls back to
+  connecting anyway
+- The gateway takes the host's own login unless given one of its own, which is what
+  "use my connection credentials" means in every other client. Its password is resolved in the
+  main process and **never reaches the window** — unlike the host's own, which CredSSP forces
+  into the renderer
+- Resolution is either **fit**, where the desktop starts at the pane's size and the far end is
+  asked to follow it on every resize, so every pixel stays its own, or **fixed**, where the desktop keeps a stated size and
+  is scaled into the pane
+- **Use the screen's full resolution**, off by default. A pane 1400 points wide is 2800 pixels
+  on a Retina display; asking for 1400 gets a desktop the screen then magnifies — large and
+  soft — while asking for 2800 fills every pixel it has, so the picture is sharp and twice as
+  much desktop fits. It is four times the pixels to send and draw, which is the reason it is a
+  choice rather than the default, and the first thing to turn off on a slow link
+- **Send ⌘ as Ctrl**, per host and off by default. Copy and paste then land where they do on
+  Windows. While it is on and the desktop has the keyboard, this app's own ⌘ shortcuts do not
+  fire; ⌘Q and ⌘Tab still belong to macOS
 - **No native dependency and no external service.** The client is
   [IronRDP](https://github.com/Devolutions/IronRDP) compiled to WebAssembly, so the same build
   works on every platform. It insists on talking to a Devolutions Gateway, so the main process
@@ -175,6 +215,10 @@ paths have only ever been exercised by unit tests or by hand on a local stand-in
 
 **Written but not yet proven in real use**
 
+- **The RD Gateway.** One real gateway, one account, one machine behind it: a desktop opens and
+  works. That is one deployment and not a claim about gateways in general — the settings that
+  decide whether a sign-in is accepted live on the server, and this one's are not every one's.
+  When a session will not start, `TERMINALDECK_RDP_TRACE=1` reports each step it took
 - **Host-to-host copying.** The planner is unit-tested, but the transfer itself — two SFTP
   channels piped together — has never run against two real servers, only been reasoned about
 - Jump host / ProxyJump, including for inventory hosts

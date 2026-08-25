@@ -9,6 +9,9 @@ export const IPC = {
   // Trusted host keys
   knownHostsList: 'knownHosts:list',
   knownHostsRemove: 'knownHosts:remove',
+  /** TLS certificates trusted for a desktop session, and dropping one. */
+  knownCertificatesList: 'knownCertificates:list',
+  knownCertificatesRemove: 'knownCertificates:remove',
 
   // Session store (groups + saved connections, metadata only)
   storeLoad: 'store:load',
@@ -91,6 +94,24 @@ export const IPC = {
    * Scoped to a single session on purpose — see the handler.
    */
   rdpCredentials: 'rdp:credentials',
+  /**
+   * The desktop settings for one host — size, keyboard — resolved through the
+   * inheritance chain. The gateway is deliberately not among them: the window
+   * never learns where a session is routed, let alone the password it takes.
+   */
+  rdpSettings: 'rdp:settings',
+  /**
+   * Whether the step-by-step report is on. The window asks so the embedded
+   * client's own logging can follow the same switch — what it negotiates with
+   * a host is only visible from inside it.
+   */
+  rdpTracing: 'rdp:tracing',
+  /**
+   * Why the last attempt on one reserved address failed. The client's own
+   * report is "General failure" for almost everything, so the reason a person
+   * can act on only exists in the main process.
+   */
+  rdpFailure: 'rdp:failure',
   /** Who is logged on to a Windows host, for the shadow picker. */
   rdpListSessions: 'rdp:listSessions',
   /** Opens the Windows client on an existing session, in a window of its own. */

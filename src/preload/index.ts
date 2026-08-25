@@ -19,7 +19,8 @@ import type {
   ImportSummary,
   TransferPlan,
   TransferDecisions,
-  FileComparison
+  FileComparison,
+  RdpView
 } from '../shared/types'
 import type { RemoteStats } from '../shared/remoteStats'
 import type { WinSession } from '../shared/winSessions'
@@ -42,17 +43,34 @@ const api = {
       ipcRenderer.invoke(IPC.knownHostsList),
     remove: (host: string): Promise<void> => ipcRenderer.invoke(IPC.knownHostsRemove, host)
   },
+
+  /** Certificates trusted by hand, for a gateway or a host that issues its own. */
+  knownCertificates: {
+    list: (): Promise<Array<{ host: string; fingerprint: string }>> =>
+      ipcRenderer.invoke(IPC.knownCertificatesList),
+    remove: (host: string): Promise<void> =>
+      ipcRenderer.invoke(IPC.knownCertificatesRemove, host)
+  },
   store: {
     load: (): Promise<SessionStoreData> => ipcRenderer.invoke(IPC.storeLoad),
     /** `secret`: a string stores it, undefined keeps what is there, null forgets it. */
-    saveSession: (session: SessionProfile, secret?: string | null): Promise<SessionProfile> =>
-      ipcRenderer.invoke(IPC.storeSaveSession, session, secret),
+    saveSession: (
+      session: SessionProfile,
+      secret?: string | null,
+      /** The gateway's own password, when it does not share the host's login. */
+      gatewaySecret?: string | null
+    ): Promise<SessionProfile> =>
+      ipcRenderer.invoke(IPC.storeSaveSession, session, secret, gatewaySecret),
     deleteSession: (id: string): Promise<void> => ipcRenderer.invoke(IPC.storeDeleteSession, id),
     /** The full list of session ids, in the order the tree should show them. */
     reorderSessions: (orderedIds: string[]): Promise<void> =>
       ipcRenderer.invoke(IPC.storeReorderSessions, orderedIds),
-    saveGroup: (group: SessionGroup, secret?: string | null): Promise<SessionGroup> =>
-      ipcRenderer.invoke(IPC.storeSaveGroup, group, secret),
+    saveGroup: (
+      group: SessionGroup,
+      secret?: string | null,
+      gatewaySecret?: string | null
+    ): Promise<SessionGroup> =>
+      ipcRenderer.invoke(IPC.storeSaveGroup, group, secret, gatewaySecret),
     deleteGroup: (id: string): Promise<void> => ipcRenderer.invoke(IPC.storeDeleteGroup, id)
   },
   inventory: {
@@ -68,8 +86,12 @@ const api = {
       ipcRenderer.invoke(IPC.inventoryRemoveSource, id),
     sync: (id: string): Promise<InventoryTree> => ipcRenderer.invoke(IPC.inventorySync, id),
     syncAll: (): Promise<void> => ipcRenderer.invoke(IPC.inventorySyncAll),
-    saveOverride: (override: InventoryOverride, secret?: string | null): Promise<void> =>
-      ipcRenderer.invoke(IPC.inventorySaveOverride, override, secret),
+    saveOverride: (
+      override: InventoryOverride,
+      secret?: string | null,
+      gatewaySecret?: string | null
+    ): Promise<void> =>
+      ipcRenderer.invoke(IPC.inventorySaveOverride, override, secret, gatewaySecret),
     clearOverride: (nodeId: string): Promise<void> =>
       ipcRenderer.invoke(IPC.inventoryClearOverride, nodeId)
   },
@@ -137,8 +159,21 @@ const api = {
     }
   },
   rdp: {
-    /** A single-use ws:// address on the gateway that main stands up locally. */
-    reserve: (): Promise<string> => ipcRenderer.invoke(IPC.rdpReserve),
+    /**
+     * A single-use ws:// address on the gateway that main stands up locally.
+     * The host id decides what sits behind it — a direct dial or a gateway —
+     * which is settled in the main process and never reported back.
+     */
+    reserve: (sessionId?: string): Promise<string> =>
+      ipcRenderer.invoke(IPC.rdpReserve, sessionId),
+    /** Whether to turn the embedded client's own logging up to match. */
+    tracing: (): Promise<boolean> => ipcRenderer.invoke(IPC.rdpTracing),
+    /** What actually went wrong, when the client only says "General failure". */
+    failure: (proxyAddress: string): Promise<string | undefined> =>
+      ipcRenderer.invoke(IPC.rdpFailure, proxyAddress),
+    /** How this host's desktop should be drawn: size, and keyboard behaviour. */
+    settings: (sessionId: string): Promise<RdpView> =>
+      ipcRenderer.invoke(IPC.rdpSettings, sessionId),
     /** The stored login for one host; the password is empty when none is saved. */
     credentials: (sessionId: string): Promise<{ username: string; password: string }> =>
       ipcRenderer.invoke(IPC.rdpCredentials, sessionId),

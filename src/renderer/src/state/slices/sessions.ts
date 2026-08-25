@@ -12,8 +12,8 @@ export const createSessionsSlice: StateCreator<AppState, [], [], SessionsSlice> 
     set({ groups: data.groups, sessions: data.sessions })
   },
 
-  upsertSession: async (session, secret) => {
-    const saved = await window.td.store.saveSession(session, secret)
+  upsertSession: async (session, secret, gatewaySecret) => {
+    const saved = await window.td.store.saveSession(session, secret, gatewaySecret)
     set((s) => ({
       sessions: s.sessions.some((x) => x.id === saved.id)
         ? s.sessions.map((x) => (x.id === saved.id ? saved : x))
@@ -26,8 +26,8 @@ export const createSessionsSlice: StateCreator<AppState, [], [], SessionsSlice> 
     set((s) => ({ sessions: s.sessions.filter((x) => x.id !== id) }))
   },
 
-  upsertGroup: async (group, secret) => {
-    const saved = await window.td.store.saveGroup(group, secret)
+  upsertGroup: async (group, secret, gatewaySecret) => {
+    const saved = await window.td.store.saveGroup(group, secret, gatewaySecret)
     set((s) => ({
       groups: s.groups.some((x) => x.id === saved.id)
         ? s.groups.map((x) => (x.id === saved.id ? saved : x))

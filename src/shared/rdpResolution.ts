@@ -1,0 +1,98 @@
+import { inheritanceChain } from './inheritance'
+import { isSet } from './overrides'
+import type { RdpDefaults, ResolvedRdp, SessionGroup } from './types'
+
+/**
+ * What a desktop falls back to when nothing in the chain states anything.
+ *
+ * No gateway, because the app has always dialled hosts directly and a gateway
+ * that appeared by default would route traffic somewhere nobody asked for. The
+ * size is the one an unstated `.rdp` file ends up at, and only applies in
+ * `fixed` mode.
+ */
+export const RDP_FALLBACK: ResolvedRdp = {
+  gatewayPort: 443,
+  gatewayBypassLocal: false,
+  resolution: 'fit',
+  desktopWidth: 1920,
+  desktopHeight: 1080,
+  hiDpi: false,
+  commandAsControl: false
+}
+
+const optedOut = (level: RdpDefaults): boolean => level.inheritRdp === false
+
+export function rdpChain(
+  own: RdpDefaults,
+  groupId: string | null,
+  groups: SessionGroup[]
+): RdpDefaults[] {
+  return inheritanceChain(own, groupId, groups, optedOut)
+}
+
+function pick<K extends keyof RdpDefaults>(
+  chain: RdpDefaults[],
+  key: K
+): RdpDefaults[K] | undefined {
+  // Empty strings count as "not set", so a blank field in the UI inherits.
+  for (const level of chain) {
+    if (isSet(level[key])) return level[key]
+  }
+  return undefined
+}
+
+function firstDefined<K extends keyof RdpDefaults>(
+  chain: RdpDefaults[],
+  key: K
+): RdpDefaults[K] | undefined {
+  for (const level of chain) {
+    if (level[key] !== undefined) return level[key]
+  }
+  return undefined
+}
+
+export function resolveRdp(
+  own: RdpDefaults,
+  groupId: string | null,
+  groups: SessionGroup[]
+): ResolvedRdp {
+  const chain = rdpChain(own, groupId, groups)
+  /**
+   * The gateway login travels with the gateway that states it. Picking the two
+   * independently would let a host inherit one gateway's address and another's
+   * password — which fails as a wrong password, giving no hint that two levels
+   * were mixed.
+   */
+  const gatewayLevel = chain.find((level) => isSet(level.gatewayHost))
+  return {
+    gatewayHost: gatewayLevel?.gatewayHost,
+    gatewayPort: gatewayLevel?.gatewayPort ?? RDP_FALLBACK.gatewayPort,
+    gatewayUsername: gatewayLevel?.gatewayUsername,
+    gatewaySecretRef: gatewayLevel?.gatewaySecretRef,
+    gatewayBypassLocal: gatewayLevel?.gatewayBypassLocal ?? RDP_FALLBACK.gatewayBypassLocal,
+    resolution: pick(chain, 'resolution') ?? RDP_FALLBACK.resolution,
+    desktopWidth: pick(chain, 'desktopWidth') ?? RDP_FALLBACK.desktopWidth,
+    desktopHeight: pick(chain, 'desktopHeight') ?? RDP_FALLBACK.desktopHeight,
+    // Booleans can be legitimately false, so they take the first explicit value.
+    hiDpi: firstDefined(chain, 'hiDpi') ?? RDP_FALLBACK.hiDpi,
+    commandAsControl: firstDefined(chain, 'commandAsControl') ?? RDP_FALLBACK.commandAsControl
+  }
+}
+
+/**
+ * Where an effective value came from, so the dialog can show what a blank field
+ * will actually use. Undefined when the value is the host's own.
+ */
+export function rdpInheritedFrom(
+  own: RdpDefaults,
+  groupId: string | null,
+  groups: SessionGroup[],
+  key: keyof RdpDefaults
+): SessionGroup | undefined {
+  if (isSet(own[key])) return undefined
+  // Skip the item itself; everything after it in the chain is an ancestor group.
+  for (const level of rdpChain(own, groupId, groups).slice(1)) {
+    if (isSet(level[key])) return level as SessionGroup
+  }
+  return undefined
+}

@@ -10,6 +10,105 @@ the other produces a version nobody can install, which is how 0.1.10 through
 
 ### Added
 
+- **Desktop settings on a host, a group and an inventory override**: the RD
+  Gateway to reach a machine through, the resolution, and whether ⌘ is sent as
+  Ctrl. They inherit along the same chain the login does, so a shared gateway is
+  stated once on the group. The gateway's own password is resolved in the main
+  process and never crosses into the window.
+- **A desktop can actually be resized now.** [MS-RDPEDISP] travels on a dynamic
+  virtual channel that has to be asked for while the session is built, and it
+  never was — so `resize` had nowhere to send its request and silently did
+  nothing. Every session kept the size it started with and the pane stretched
+  that picture to fill itself, which looked like a desktop drawn too large and
+  slightly soft rather than like a missing feature. The session now also starts
+  at the right size, so the first frame is already correct.
+- **Use the screen's full resolution**, per host and off by default. Until now
+  a desktop was asked for as many pixels as the pane measures in CSS, which on a
+  Retina display is half of what the screen has — so the far end drew a small
+  desktop that the screen magnified, and everything looked oversized and soft.
+  With this on it draws every pixel the screen can show. Four times the data,
+  hence the choice.
+- **Fixed resolution** as an alternative to following the pane: the desktop
+  keeps a stated size and is scaled into the pane instead of resizing the far
+  end on every drag.
+- **⌘ as Ctrl**, per host and off by default, so copy and paste land where they
+  do on Windows. The client maps `KeyboardEvent.code` through a fixed table and
+  cannot be told to swap the two, so the events are rewritten before they reach
+  it — including the key release macOS withholds while ⌘ is held, which would
+  otherwise leave a key stuck down on the far side.
+- **Sessions are carried through the gateway** — [MS-TSGU] spoken here rather
+  than delegated to anything: the HTTPS request to `/remoteDesktopGateway/` and
+  its WebSocket upgrade, an NTLMv2 sign-in in the headers of that request, then
+  the handshake that opens a tunnel and a channel. What comes out is an ordinary
+  duplex stream, so the X.224 exchange and the TLS handshake above it are
+  untouched and do not know they are in a tunnel.
+- The gateway sign-in is **bound to the connection** with `tls-server-end-point`,
+  or a gateway with Extended Protection refuses it exactly as it refuses a wrong
+  password.
+- Every gateway request now carries an **`RDG-Correlation-Id`**, which the
+  reference client always sends and this one did not. It is what a gateway files
+  its own logging under, and a request without it is not the request a Windows
+  client makes.
+- A gateway that drops the connection after accepting the password is retried
+  with **each shape of authenticate message** — with and without the service
+  name, with the terminal-service form of it, and unsigned — in one run of about
+  a second. A search rather than a diagnosis, and a small one: Extended
+  Protection is a server setting with several positions and every one of them
+  refuses identically, with nothing visible from outside. If all of them are
+  dropped, the message says so, because at that point the setting is at the
+  other end.
+- The gateway sign-in now names **the service it is for** as well as the
+  connection it arrived over. Extended Protection has two halves — channel
+  binding and service binding — and a gateway that requires the second accepts
+  the message as well formed, checks the password, and only then refuses. Which
+  is why its absence is invisible for as long as the password is wrong.
+- A gateway that drops the connection on both transports is **retried over TLS
+  1.2**. Windows binds HTTP authentication to the connection it arrived on, and
+  its HTTP stack has never handled that reliably over TLS 1.3 — the failure it
+  produces has a shape, and this is it: everything works until the moment the
+  sign-in succeeds, which is when the connection becomes an authenticated one.
+  Only the gateway's TLS is capped, and only after both transports have failed.
+- **The older gateway transport**, for a gateway that cannot upgrade to a
+  WebSocket. Two connections sharing one connection id, every packet wrapped as
+  an HTTP chunk, and the short run of random bytes [MS-TSGU] has the gateway
+  send first dropped rather than read as a packet. The WebSocket transport is
+  still tried first and the fallback is automatic, because a gateway that lacks
+  it says nothing — it accepts the sign-in and then drops the connection.
+- A dropped gateway connection now **names the connection as well as the step**
+  — the older transport has two, and a reset that does not say which is as good
+  as silent. The older transport's failure also leads the report, because a
+  refused WebSocket upgrade is ordinary: Microsoft's own client fails it against
+  such a gateway and falls back without complaint.
+- A dropped gateway connection now **names the step it was waiting on** — the
+  challenge, or the answer to the sign-in — because `ECONNRESET` alone covers a
+  rejected message, a blocked account and a network in the way, and which
+  request it landed on is most of what separates them.
+- NTLM **checks its own primitives once** against the worked example in
+  [MS-NLMP] before signing in. MD4 and RC4 are implemented here and HMAC-MD5
+  comes from the runtime; a build where any of them differs produces messages a
+  gateway rejects without ever saying why, and a unit test proves nothing about
+  the runtime the app ships on.
+- A gateway sign-in that is **reset rather than answered** is diagnosed instead
+  of reported as `ECONNRESET`: the sign-in is retried once without the upgrade,
+  which separates "the credentials were refused" from "the gateway does not
+  speak the WebSocket transport". The two need completely different answers and
+  look identical otherwise.
+- **A failed desktop session says what went wrong.** The client reports almost
+  everything as "General failure", and reports "not enough bytes" when this
+  app's own proxy closed the socket — so the reason, which only ever exists in
+  the main process, is now kept and shown in the pane instead.
+- **TLS certificates are verified** for a desktop session — the gateway's and
+  the host's. Until now any certificate was accepted in silence. One the system
+  can verify is accepted and not stored, so a reissue is uneventful; anything
+  else asks once with its fingerprint, remembers the answer, and warns loudly if
+  it later changes. Refusing stops the session rather than falling back.
+- Trusted certificates are listed and revocable under Settings → Security, kept
+  apart from SSH host keys: the two have different lifetimes and revoking one
+  should not touch the other.
+- MD4 and RC4 are implemented here because NTLM needs both and OpenSSL 3 has
+  moved them into the legacy provider, where turning them on would turn on every
+  other withdrawn algorithm alongside them.
+
 - **RDP desktops in a pane.** A host can be marked RDP and opens as a desktop
   beside the terminals, using the login already stored on it or on its group.
 - A host now has a **protocol**, and a pane dispatches on it: the panels that
@@ -27,6 +126,10 @@ the other produces a version nobody can install, which is how 0.1.10 through
 
 ### Notes
 
+- None of the gateway path has met a real gateway yet. The pieces are tested —
+  NTLM against the worked example in [MS-NLMP] 4.2.4, the tunnel handshake
+  against a stand-in that answers each step and each refusal — but a first real
+  attempt should be expected to fail on something small.
 - The RDP client is IronRDP compiled to WebAssembly, and the main process
   impersonates a Devolutions Gateway on loopback to satisfy it. Nothing native
   is added and nothing external has to be installed, but the renderer bundle

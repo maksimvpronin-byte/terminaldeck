@@ -1,7 +1,10 @@
 import { createConnection, type Socket } from 'net'
 import { connect as tlsConnect, type TLSSocket } from 'tls'
+import type { Duplex } from 'stream'
 import { randomBytes } from 'crypto'
 import { WebSocketServer, type WebSocket } from 'ws'
+import { openThroughGateway } from './TsGateway'
+import { askAboutCertificate } from './certificateVerifier'
 import {
   RDCLEANPATH_VERSION,
   decodeRequest,
@@ -28,11 +31,39 @@ import {
  * per session: any local process could otherwise connect to it and reach hosts
  * through this machine.
  */
+/**
+ * Where a reserved session is routed, and with what.
+ *
+ * Held in the main process and keyed by the session's own path, so the window
+ * asks for an address and never learns the gateway behind it — least of all the
+ * password, which would otherwise have to cross into the renderer the way the
+ * host password already does for CredSSP.
+ */
+export interface RdpRoute {
+  gateway?: {
+    host: string
+    port: number
+    username: string
+    password: string
+    /** Reach a private address directly instead of through the gateway. */
+    bypassLocal: boolean
+  }
+}
+
 class RdpGateway {
   private server: WebSocketServer | null = null
   private port = 0
   /** Session paths that have been handed out and not yet used up. */
-  private expected = new Set<string>()
+  private expected = new Map<string, RdpRoute>()
+  /**
+   * Why each session failed, kept until the window asks.
+   *
+   * The client reports almost everything as "General failure", and when this
+   * side closes the socket it reports "not enough bytes" — the close reason
+   * never reaches the screen. Every reason worth reading is on this side, so it
+   * is held here and handed over on request.
+   */
+  private failures = new Map<string, string>()
 
   /** Starts the listener if it is not already up, and returns its port. */
   private async listen(): Promise<number> {
@@ -60,31 +91,34 @@ class RdpGateway {
    * The path is single-use: a token that stayed valid would let anything on
    * this machine reconnect through the proxy after the pane had gone.
    */
-  async reserve(): Promise<string> {
+  async reserve(route: RdpRoute = {}): Promise<string> {
     const port = await this.listen()
     const path = randomBytes(24).toString('hex')
-    this.expected.add(path)
+    this.expected.set(path, route)
     return `ws://127.0.0.1:${port}/${path}`
   }
 
   private accept(client: WebSocket, url: string): void {
     const path = url.replace(/^\/+/, '').split('?')[0]
-    if (!this.expected.delete(path)) {
+    const route = this.expected.get(path)
+    if (!route) {
       // Not one of ours, or a replay of one already spent.
       trace('refused a connection on an unknown or spent path')
       client.close(1008, 'Unknown session')
       return
     }
-    void this.run(client).catch((err: Error) => {
-      // The client reports most faults as a bare "General failure", so the
-      // reason has to be findable somewhere. A close reason is capped at 123
-      // bytes on the wire, which a certificate error easily exceeds.
+    this.expected.delete(path)
+    void this.run(client, route).catch((err: Error) => {
+      // A close reason is capped at 123 bytes on the wire, which a certificate
+      // error easily exceeds — and the client shows its own message rather than
+      // this one anyway. Kept whole here for the window to collect.
       trace(`session failed — ${err.message}`)
+      this.failures.set(path, err.message)
       client.close(1011, err.message.slice(0, 120))
     })
   }
 
-  private async run(client: WebSocket): Promise<void> {
+  private async run(client: WebSocket, route: RdpRoute): Promise<void> {
     const raw = await readPdu(client)
     const request = decodeRequest(raw)
     trace(`request: ${raw.length} bytes, destination ${request.destination ?? 'none'}`)
@@ -92,7 +126,7 @@ class RdpGateway {
     if (!request.x224ConnectionPdu) throw new Error('The client sent no X.224 connection PDU')
 
     const { host, port } = splitDestination(request.destination)
-    const server = await openTcp(host, port)
+    const server = await reach(host, port, route)
     trace(`connected to ${host}:${port}`)
 
     let secure: TLSSocket
@@ -101,7 +135,7 @@ class RdpGateway {
       const confirm = await readTpkt(server)
       trace(`X.224 confirm: ${confirm.length} bytes, ${describeNegotiation(confirm)}`)
 
-      secure = await startTls(server, host)
+      secure = await startTls(server, host, port)
       trace(`TLS up: ${secure.getProtocol() ?? 'unknown'}`)
 
       // The chain the client will bind CredSSP to. Its own TLS ended here, so
@@ -125,9 +159,22 @@ class RdpGateway {
     relay(client, secure)
   }
 
+  /**
+   * Why the session on this address failed, if it did. Taken rather than read:
+   * one failure belongs to one attempt, and a stale reason shown against a
+   * later one would be worse than none.
+   */
+  failureFor(proxyAddress: string): string | undefined {
+    const path = proxyAddress.split('/').pop() ?? ''
+    const reason = this.failures.get(path)
+    this.failures.delete(path)
+    return reason
+  }
+
   /** Nothing should outlive the window that asked for it. */
   stop(): void {
     this.expected.clear()
+    this.failures.clear()
     this.server?.close()
     this.server = null
     this.port = 0
@@ -232,6 +279,46 @@ function toBytes(data: Buffer | ArrayBuffer | Buffer[]): Uint8Array {
   return new Uint8Array(data)
 }
 
+/**
+ * Opens the stream the RDP exchange then runs over.
+ *
+ * The one place that decides *how* a host is reached. Everything above it —
+ * X.224, TLS, the certificate chain, RDCleanPath — is written against a duplex
+ * stream and does not care which of these produced it.
+ */
+async function reach(host: string, port: number, route: RdpRoute): Promise<Duplex> {
+  const gateway = route.gateway
+  if (!gateway) return openTcp(host, port)
+
+  if (gateway.bypassLocal && isPrivateAddress(host)) {
+    trace(`bypassing ${gateway.host} for the private address ${host}`)
+    return openTcp(host, port)
+  }
+
+  trace(`reaching ${host}:${port} through the gateway ${gateway.host}:${gateway.port}`)
+  return openThroughGateway(gateway, { host, port }, trace)
+}
+
+/**
+ * Whether an address is one the gateway is meant to be skipped for.
+ *
+ * Only literals are judged. A name is not resolved to find out: that would put
+ * a DNS lookup in front of every connection, and the answer a resolver gives
+ * this machine says nothing about which side of the gateway the host is on.
+ */
+function isPrivateAddress(host: string): boolean {
+  if (host === 'localhost') return true
+  if (!isIpLiteral(host)) return false
+  if (host.includes(':')) return host === '::1' || /^f[cd]/i.test(host)
+
+  const [a, b] = host.split('.').map(Number)
+  if (a === 10 || a === 127) return true
+  if (a === 192 && b === 168) return true
+  if (a === 172 && b >= 16 && b <= 31) return true
+  // Link-local, which is what a machine gives itself when nothing answers DHCP.
+  return a === 169 && b === 254
+}
+
 function openTcp(host: string, port: number): Promise<Socket> {
   return new Promise((resolve, reject) => {
     const socket = createConnection({ host, port })
@@ -252,7 +339,10 @@ function openTcp(host: string, port: number): Promise<Socket> {
  * Reads one TPKT-framed message: version, reserved, then a 16-bit length that
  * counts the header too. The X.224 connection confirm always arrives this way.
  */
-function readTpkt(socket: Socket): Promise<Uint8Array> {
+// Duplex rather than Socket throughout: the stream is a plain TCP connection
+// for a host reached directly and a tunnel through a gateway otherwise, and
+// nothing from here on needs to know which.
+function readTpkt(socket: Duplex): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
     let buffered = Buffer.alloc(0)
 
@@ -298,12 +388,19 @@ function readTpkt(socket: Socket): Promise<Uint8Array> {
  * chain is handed to the client instead, which is the point of reporting it —
  * trust is decided there, against what the user expects, rather than here.
  */
-function startTls(socket: Socket, host: string): Promise<TLSSocket> {
+function startTls(socket: Duplex, host: string, port: number): Promise<TLSSocket> {
   return new Promise((resolve, reject) => {
     // RFC 6066 forbids an IP address as the server name, and Node warns then
     // ignores it. Hosts are reached by address as often as by name here, so
     // send SNI only when there is a name to send.
     const servername = isIpLiteral(host) ? undefined : host
+    /**
+     * Connected without rejecting an unverified certificate, and asked about it
+     * afterwards. Node still checks the chain either way and reports the
+     * verdict, so this gives the same answer as refusing outright would — and
+     * leaves room for the one thing refusing cannot do, which is show the
+     * fingerprint to the person and let them say yes.
+     */
     const secure = tlsConnect({ socket, servername, rejectUnauthorized: false })
     const fail = (err: Error): void => {
       secure.destroy()
@@ -311,7 +408,29 @@ function startTls(socket: Socket, host: string): Promise<TLSSocket> {
     }
     secure.once('secureConnect', () => {
       secure.off('error', fail)
-      resolve(secure)
+      const certificate = secure.getPeerCertificate()
+      trace(
+        secure.authorized
+          ? `${host} presented a certificate this machine trusts`
+          : `${host} presented an unverified certificate — ${secure.authorizationError ?? 'no reason given'}`
+      )
+      askAboutCertificate({
+        host,
+        port,
+        der: certificate?.raw ?? Buffer.alloc(0),
+        authorized: secure.authorized,
+        problem: secure.authorizationError ? String(secure.authorizationError) : undefined,
+        what: 'the desktop host'
+      })
+        .then((trusted) => {
+          if (trusted) {
+            resolve(secure)
+            return
+          }
+          secure.destroy()
+          reject(new Error(`The certificate offered by ${host} was not trusted`))
+        })
+        .catch((err: Error) => fail(err))
     })
     secure.once('error', fail)
   })

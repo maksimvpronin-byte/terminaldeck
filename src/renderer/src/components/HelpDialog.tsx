@@ -84,7 +84,16 @@ const SECTIONS: Section[] = [
       { what: 'Drop files on the desktop, then paste there: dropping only offers them' },
       { what: 'Copy a file over there and a notice offers to save it here' },
       { what: 'The desktop takes the size of the pane, so dragging a split resizes it' },
-      { what: 'A joined session keeps its own size: Windows draws it, and will not scale it' }
+      { what: 'A joined session keeps its own size: Windows draws it, and will not scale it' },
+      { what: 'A host’s dialog holds a Desktop section: gateway, size, and the ⌘ key' },
+      { what: 'Set the gateway on the group and every RDP host in it goes through it' },
+      { what: 'Fixed resolution pins the far end and scales it into the pane instead' },
+      { what: '“Use the screen’s full resolution” stops a Retina display magnifying the desktop' },
+      { what: 'It is four times the pixels, so it is the first thing to turn off on a slow link' },
+      { keys: '⌘ as Ctrl', what: 'Optional, per host: ⌘C and ⌘V then work as they do on Windows' },
+      { what: 'While it is on, this app’s own ⌘ shortcuts do not fire over a focused desktop' },
+      { what: 'A certificate the machine cannot verify is asked about once, then remembered' },
+      { what: 'Settings → Security lists what was trusted by hand, and forgets it on request' }
     ]
   },
   {

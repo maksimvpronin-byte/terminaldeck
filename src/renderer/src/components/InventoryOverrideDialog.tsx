@@ -3,15 +3,19 @@ import type {
   AppearanceDefaults,
   AuthMethod,
   InventoryOverride,
+  RdpDefaults,
   SessionGroup,
   SessionProfile
 } from '../../../shared/types'
 import { resolveAuth } from '../../../shared/authResolution'
 import { applyOverride, isSet } from '../../../shared/overrides'
 import { appearanceSource, resolveAppearance } from '../../../shared/appearance'
+import { resolveRdp } from '../../../shared/rdpResolution'
+import { protocolOf } from '../../../shared/protocols'
 import { useStore } from '../state/store'
 import { SESSION_COLOURS } from '../state/colours'
 import AppearanceFields from './AppearanceFields'
+import RdpFields from './RdpFields'
 import ModalBackdrop from './ModalBackdrop'
 
 interface Props {
@@ -38,12 +42,18 @@ export default function InventoryOverrideDialog({ node, groups, onClose }: Props
   // A credential kept here wins over anything the inventory says, so dropping it
   // has to be possible without throwing the rest of the override away.
   const [forgetSecret, setForgetSecret] = useState(false)
+  const [gatewaySecret, setGatewaySecret] = useState('')
+  const [forgetGatewaySecret, setForgetGatewaySecret] = useState(false)
 
   function set<K extends keyof InventoryOverride>(key: K, value: InventoryOverride[K]): void {
     setOverride((o) => ({ ...o, [key]: value }))
   }
 
   function setLook<K extends keyof AppearanceDefaults>(key: K, value: AppearanceDefaults[K]): void {
+    setOverride((o) => ({ ...o, [key]: value }))
+  }
+
+  function setRdp<K extends keyof RdpDefaults>(key: K, value: RdpDefaults[K]): void {
     setOverride((o) => ({ ...o, [key]: value }))
   }
 
@@ -63,6 +73,17 @@ export default function InventoryOverrideDialog({ node, groups, onClose }: Props
     groups,
     settings
   )
+  const desktop = resolveRdp(merged, parentId, groups)
+  /**
+   * A repository can name a gateway, and an override can replace it. Which of
+   * the two is speaking has to be visible, or a host that ignores the gateway
+   * typed here looks broken rather than overridden.
+   */
+  const rdpFrom = (key: keyof RdpDefaults): string => {
+    const own: RdpDefaults = node
+    return isSet(own[key]) ? 'from the inventory' : ''
+  }
+
   const appearanceFrom = (key: keyof AppearanceDefaults): string => {
     const own: AppearanceDefaults = node
     if (isSet(own[key])) return 'the inventory'
@@ -90,7 +111,11 @@ export default function InventoryOverrideDialog({ node, groups, onClose }: Props
       return
     }
     // A password typed in now beats the "forget" tick — it is the later answer.
-    await saveInventoryOverride(toSave, secret || (forgetSecret ? null : undefined))
+    await saveInventoryOverride(
+      toSave,
+      secret || (forgetSecret ? null : undefined),
+      gatewaySecret || (forgetGatewaySecret ? null : undefined)
+    )
     onClose()
   }
 
@@ -278,6 +303,30 @@ export default function InventoryOverrideDialog({ node, groups, onClose }: Props
             inheritToggle={{ label: 'Inherit appearance from the inventory groups' }}
           />
         </details>
+
+        {isHost(node) && protocolOf(node) === 'rdp' && (
+          <details className="settings-section">
+            <summary>Desktop</summary>
+            <p className="settings-note">
+              Kept locally, so a sync never takes it away — including a gateway the repository
+              does not know about.
+            </p>
+            <RdpFields
+              value={override}
+              set={setRdp}
+              effective={desktop}
+              inheritedFrom={rdpFrom}
+              inheritToggle={{ label: 'Inherit desktop settings from the inventory groups' }}
+              secret={{
+                typed: gatewaySecret,
+                onTyped: setGatewaySecret,
+                own: isSet(override.gatewaySecretRef),
+                forget: forgetGatewaySecret,
+                onForget: setForgetGatewaySecret
+              }}
+            />
+          </details>
+        )}
 
         {isHost(node) && (
           <p className="settings-note">

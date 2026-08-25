@@ -59,8 +59,8 @@ export const createInventorySlice: StateCreator<AppState, [], [], InventorySlice
     await get().loadInventory()
   },
 
-  saveInventoryOverride: async (override, secret) => {
-    await window.td.inventory.saveOverride(override, secret)
+  saveInventoryOverride: async (override, secret, gatewaySecret) => {
+    await window.td.inventory.saveOverride(override, secret, gatewaySecret)
     await get().loadInventory()
   },
 

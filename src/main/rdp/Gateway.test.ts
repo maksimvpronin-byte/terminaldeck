@@ -1,8 +1,9 @@
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, beforeAll } from 'vitest'
 import { createServer as createTcpServer, type Server, type Socket } from 'net'
 import { TLSSocket, createSecureContext } from 'tls'
 import WebSocket from 'ws'
 import { rdpGateway } from './Gateway'
+import { setCertificateVerifier } from './certificateVerifier'
 import { TEST_CERT, TEST_KEY } from './testCert'
 import {
   RDCLEANPATH_VERSION,
@@ -10,6 +11,16 @@ import {
   encodeResponse,
   pduLength
 } from '../../shared/rdcleanpath'
+
+/**
+ * The stand-in host below signs its own certificate, so the trust question has
+ * an answer here rather than the refusal the main process would otherwise get
+ * before it installs the real one. Saying so out loud is the point: an
+ * unverifiable certificate is accepted only because this test says to.
+ */
+beforeAll(() => {
+  setCertificateVerifier(async () => true)
+})
 
 /**
  * A stand-in for an RDP host: answers the X.224 connection request, upgrades to
@@ -152,6 +163,42 @@ describe('the local gateway', () => {
     expect(answer.version).toBe(RDCLEANPATH_VERSION)
     // The X.224 confirm the fake server sent, passed straight back.
     expect([...answer.x224ConnectionPdu!]).toEqual([0x03, 0x00, 0x00, 0x06, 0x0e, 0xd0])
+  })
+
+  it('stops the session when the certificate is not trusted', async () => {
+    const server = await startFakeRdpServer()
+    servers.push(server)
+    const socket = await open(await rdpGateway.reserve())
+    sockets.push(socket)
+
+    // The person said no, or a build never installed a verifier at all: either
+    // way the session must stop rather than carry on over a certificate nobody
+    // vouched for.
+    setCertificateVerifier(async () => false)
+    const closed = new Promise<string>((resolve) =>
+      socket.once('close', (_code, reason) => resolve(reason.toString()))
+    )
+    socket.send(request(`127.0.0.1:${server.port}`))
+
+    expect(await closed).toMatch(/was not trusted/)
+    setCertificateVerifier(async () => true)
+  })
+
+  it('keeps the reason a session failed, for the window to collect', async () => {
+    const address = await rdpGateway.reserve()
+    const socket = await open(address)
+    sockets.push(socket)
+
+    const closed = new Promise((resolve) => socket.once('close', resolve))
+    // Nothing is listening on this port, so the dial fails with a reason the
+    // client would otherwise replace with "General failure".
+    socket.send(request('127.0.0.1:1'))
+    await closed
+
+    const reason = rdpGateway.failureFor(address)
+    expect(reason).toMatch(/127\.0\.0\.1:1/)
+    // Taken, not read: a reason belongs to the one attempt that produced it.
+    expect(rdpGateway.failureFor(address)).toBeUndefined()
   })
 
   it('carries the certificate the server actually presented', async () => {

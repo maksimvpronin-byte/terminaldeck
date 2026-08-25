@@ -2,14 +2,17 @@ import { useEffect, useRef, useState } from 'react'
 import '@devolutions/iron-remote-desktop'
 import {
   Backend,
+  displayControl,
   init as initRdp,
   RdpFileTransferProvider,
   type FileInfo
 } from '@devolutions/iron-remote-desktop-rdp'
 import type { UserInteraction } from '@devolutions/iron-remote-desktop'
 import { traitsOf, type Protocol } from '../../../shared/protocols'
+import type { RdpView } from '../../../shared/types'
 import { shadowable, type WinSession } from '../../../shared/winSessions'
 import ShadowView from './ShadowView'
+import { useCommandAsControl } from '../hooks/useCommandAsControl'
 
 type Phase =
   | { at: 'loading' }
@@ -34,8 +37,15 @@ interface ReadyDetail {
  * — leaving the JavaScript wrappers in the bundle and nothing underneath them.
  */
 let wasmReady: Promise<void> | null = null
-function loadRdp(): Promise<void> {
-  wasmReady ??= initRdp('warn')
+function loadRdp(verbose: boolean): Promise<void> {
+  /**
+   * The level is fixed by the first session in the window, because the module
+   * is instantiated once. `debug` is what says which codecs and channels were
+   * agreed with the host — the one question that cannot be answered from
+   * outside the client, and the one that decides whether a slow desktop is
+   * something this end can do anything about.
+   */
+  wasmReady ??= initRdp(verbose ? 'debug' : 'warn')
   return wasmReady
 }
 
@@ -84,8 +94,17 @@ export default function GraphicalHost({
    * being in a value the component renders from.
    */
   const lastUsed = useRef<{ user: string; secret: string } | null>(null)
+  /** The address this attempt reserved, so its failure can be looked up. */
+  const reserved = useRef<string | null>(null)
   /** What the host had saved, kept so the chooser can dial without asking. */
   const [storedPassword, setStoredPassword] = useState('')
+  /**
+   * How this host wants its desktop drawn, resolved through the same
+   * inheritance chain its login comes from. Held until it arrives rather than
+   * defaulted, because connecting at the wrong size and correcting afterwards
+   * costs the far end a resolution change on every session.
+   */
+  const [look, setLook] = useState<RdpView | null>(null)
   const [sessions, setSessions] = useState<WinSession[]>([])
   const [sessionsLoading, setSessionsLoading] = useState(true)
   const [sessionsProblem, setSessionsProblem] = useState<string | undefined>()
@@ -100,6 +119,35 @@ export default function GraphicalHost({
   const [skipPrompt, setSkipPrompt] = useState(false)
   /** The session being watched in this pane, once one has been chosen. */
   const [joined, setJoined] = useState<{ session: WinSession; control: boolean } | null>(null)
+
+  /**
+   * How big the desktop should be, in the far end's own pixels.
+   *
+   * A pinned size is stated as it is. Otherwise the pane decides — measured in
+   * CSS points, and multiplied by the screen's density when asked for: a pane
+   * 1400 points wide is 2800 pixels on a Retina display, and asking for 1400
+   * gets a desktop the screen then magnifies, large and soft. Returns nothing
+   * before the pane has a size, which is the case for one frame after a tab is
+   * created.
+   */
+  function desiredSize(): { width: number; height: number } | null {
+    if (look?.resolution === 'fixed') {
+      return { width: look.desktopWidth, height: look.desktopHeight }
+    }
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (!rect || rect.width < 1 || rect.height < 1) return null
+
+    const density = look?.hiDpi ? window.devicePixelRatio || 1 : 1
+    // [MS-RDPEDISP] takes 200 to 8192 pixels and refuses an odd width.
+    return {
+      width: Math.min(8192, Math.max(200, Math.round(rect.width * density))) & ~1,
+      height: Math.min(8192, Math.max(200, Math.round(rect.height * density)))
+    }
+  }
+
+  // Only while a desktop of our own is on screen: a shadowed session is a
+  // window Windows draws, and this app's shortcuts should keep working over it.
+  useCommandAsControl(containerRef, look?.commandAsControl === true && phase.at === 'connected')
 
   const traits = traitsOf(protocol)
   const target = `${host ?? ''}:${port ?? traits.port}`
@@ -354,17 +402,17 @@ export default function GraphicalHost({
   useEffect(() => {
     const container = containerRef.current
     if (!container || protocol !== 'rdp') return
+    // A host pinned to a size keeps it: the element scales that picture into
+    // whatever the pane is, which is the point of asking for a fixed one.
+    if (look?.resolution === 'fixed') return
 
     let pending: number | undefined
     const send = (): void => {
       const interaction = interactionRef.current
-      const rect = container.getBoundingClientRect()
-      if (!interaction || rect.width < 1 || rect.height < 1) return
-      // [MS-RDPEDISP] takes 200 to 8192 pixels and refuses an odd width.
-      const width = Math.min(8192, Math.max(200, Math.round(rect.width))) & ~1
-      const height = Math.min(8192, Math.max(200, Math.round(rect.height)))
+      const size = desiredSize()
+      if (!interaction || !size) return
       try {
-        interaction.resize(width, height)
+        interaction.resize(size.width, size.height)
       } catch {
         // The session went while this was in flight. The next one will fit.
       }
@@ -385,7 +433,7 @@ export default function GraphicalHost({
       observer.disconnect()
       window.clearTimeout(pending)
     }
-  }, [protocol, phase.at])
+  }, [protocol, phase.at, look?.resolution, look?.hiDpi])
 
   /**
    * Uses what the host already has. The login and password live on the host —
@@ -396,6 +444,16 @@ export default function GraphicalHost({
   useEffect(() => {
     if (protocol !== 'rdp' || !sessionId || !host) return
     let alive = true
+
+    window.td.rdp
+      .settings(sessionId)
+      .then((resolved) => {
+        if (alive) setLook(resolved)
+      })
+      .catch(() => {
+        // Nothing stated, or a host that has gone. The defaults below stand.
+        if (alive) setLook(null)
+      })
 
     window.td.rdp
       .credentials(sessionId)
@@ -451,12 +509,34 @@ export default function GraphicalHost({
 
     setPhase({ at: 'connecting' })
     try {
-      await loadRdp()
+      await loadRdp(await window.td.rdp.tracing().catch(() => false))
       // Reserved per attempt: the path is spent once used, so a retry after a
       // failure needs a fresh one.
-      const proxyAddress = await window.td.rdp.reserve()
-      const config = interaction
-        .configBuilder()
+      const proxyAddress = await window.td.rdp.reserve(sessionId)
+      reserved.current = proxyAddress
+      const builder = interaction.configBuilder()
+
+      /**
+       * Without this the desktop cannot be resized after it starts.
+       *
+       * [MS-RDPEDISP] travels on a dynamic virtual channel that has to be asked
+       * for while the session is being built; unasked for, `resize` has nowhere
+       * to send its request and silently does nothing. The session then keeps
+       * whatever size it was given at the start and the element stretches that
+       * picture to fill the pane — which looks like a desktop drawn too large
+       * and slightly soft, rather than like a feature that is missing.
+       */
+      builder.withExtension(displayControl(true))
+
+      /**
+       * The size to start at, so the first frame is already right.
+       *
+       * A resize after the fact costs a full redraw and a visible jump, and
+       * until one arrives the session is whatever the client defaulted to.
+       */
+      const startAt = desiredSize()
+      if (startAt) builder.withDesktopSize(startAt)
+      const config = builder
         .withDestination(target)
         .withProxyAddress(proxyAddress)
         // The real gateway checks this; ours knows the caller by its one-time
@@ -494,7 +574,16 @@ export default function GraphicalHost({
       const ended = await session.run()
       setPhase({ at: 'closed', reason: ended.reason() })
     } catch (err) {
-      setPhase({ at: 'failed', reason: describe(err) })
+      /**
+       * The client's own message is "General failure" for almost anything, and
+       * "not enough bytes" when this app's own proxy closed the socket — in
+       * both cases the reason lives in the main process. Asked for here rather
+       * than pushed, so it belongs to this attempt and no other.
+       */
+      const explained = reserved.current
+        ? await window.td.rdp.failure(reserved.current).catch(() => undefined)
+        : undefined
+      setPhase({ at: 'failed', reason: explained ?? describe(err) })
     }
   }
 

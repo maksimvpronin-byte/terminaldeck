@@ -1,5 +1,17 @@
 # IronRDP and the Remote Assistance channel
 
+> **Correction, 25 August 2026.** The claim below that the package "covers
+> clipboard, CredSSP, file transfer and other built-in capabilities — not
+> `RC_CTL` or `remdesk`" is right about *arbitrary* channels, but it was read
+> too broadly elsewhere in this project, as "the WebAssembly client has no
+> drive or audio support". It does. Pulling the embedded module apart shows
+> `ironrdp-rdpdr` and `ironrdp-rdpsnd` compiled into it, alongside
+> `ironrdp-cliprdr`, `ironrdp-dvc` and `ironrdp-displaycontrol`. What is genuinely
+> absent is `ironrdp-egfx` — the graphics pipeline, and with it H.264 — so the
+> client draws from bitmap updates and RemoteFX only. Whether the drive and
+> sound channels can be reached from JavaScript is a separate question from
+> whether they are there; they are there.
+
 ## Where the renderer stands
 
 `@devolutions/iron-remote-desktop-rdp@0.7.0` accepts ready-made extensions, but

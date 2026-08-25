@@ -2,6 +2,7 @@ import { app, shell, BrowserWindow, Menu, type MenuItemConstructorOptions } from
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { registerIpcHandlers } from './ipc/handlers'
+import { installCertificateVerifier } from './rdp/CertificateTrust'
 import { registerUpdater } from './updater'
 import { IPC } from '../shared/ipc-channels'
 
@@ -97,6 +98,10 @@ app.whenReady().then(() => {
   })
 
   registerIpcHandlers()
+  // Answers the desktop code's question about a TLS certificate. Installed
+  // rather than imported there: those modules are tested under plain Node,
+  // where importing Electron fails at load time.
+  installCertificateVerifier()
 
   createWindow()
 

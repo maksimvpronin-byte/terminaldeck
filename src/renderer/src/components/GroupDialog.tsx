@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { nanoid } from 'nanoid'
-import type { AppearanceDefaults, AuthMethod, SessionGroup } from '../../../shared/types'
+import type { AppearanceDefaults, AuthMethod, RdpDefaults, SessionGroup } from '../../../shared/types'
 import { resolveAuth, inheritedFrom } from '../../../shared/authResolution'
 import { isSet } from '../../../shared/overrides'
 import {
@@ -8,8 +8,10 @@ import {
   inheritedAppearance,
   resolveAppearance
 } from '../../../shared/appearance'
+import { resolveRdp, rdpInheritedFrom } from '../../../shared/rdpResolution'
 import { useStore } from '../state/store'
 import AppearanceFields from './AppearanceFields'
+import RdpFields from './RdpFields'
 import ModalBackdrop from './ModalBackdrop'
 
 interface Props {
@@ -29,6 +31,8 @@ export default function GroupDialog({ initial, parentId = null, onClose }: Props
   )
   const [secret, setSecret] = useState('')
   const [forgetSecret, setForgetSecret] = useState(false)
+  const [gatewaySecret, setGatewaySecret] = useState('')
+  const [forgetGatewaySecret, setForgetGatewaySecret] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   function set<K extends keyof SessionGroup>(key: K, value: SessionGroup[K]): void {
@@ -36,6 +40,10 @@ export default function GroupDialog({ initial, parentId = null, onClose }: Props
   }
 
   function setLook<K extends keyof AppearanceDefaults>(key: K, value: AppearanceDefaults[K]): void {
+    setGroup((g) => ({ ...g, [key]: value }))
+  }
+
+  function setRdp<K extends keyof RdpDefaults>(key: K, value: RdpDefaults[K]): void {
     setGroup((g) => ({ ...g, [key]: value }))
   }
 
@@ -58,6 +66,13 @@ export default function GroupDialog({ initial, parentId = null, onClose }: Props
   }
   const ownSecret = isSet(group.secretRef)
 
+  const desktop = resolveRdp(pending, pending.parentId, groups)
+  const rdpNote = (key: keyof RdpDefaults): string => {
+    const source = rdpInheritedFrom(pending, pending.parentId, groups, key)
+    return source ? `inherited from ${source.name}` : ''
+  }
+  const ownGatewaySecret = isSet(group.gatewaySecretRef)
+
   const appearance = resolveAppearance(group, group.parentId, groups, settings)
   const inheritedLook = inheritedAppearance(group, group.parentId, groups, settings)
   const appearanceFrom = (key: keyof AppearanceDefaults): string => {
@@ -76,7 +91,11 @@ export default function GroupDialog({ initial, parentId = null, onClose }: Props
       return
     }
     // A password typed in now beats the "forget" tick — it is the later answer.
-    await upsertGroup(group, secret || (forgetSecret ? null : undefined))
+    await upsertGroup(
+      group,
+      secret || (forgetSecret ? null : undefined),
+      gatewaySecret || (forgetGatewaySecret ? null : undefined)
+    )
     onClose()
   }
 
@@ -261,6 +280,30 @@ export default function GroupDialog({ initial, parentId = null, onClose }: Props
             inheritToggle={
               group.parentId ? { label: 'Inherit appearance from the parent group' } : undefined
             }
+          />
+        </details>
+
+        <details className="settings-section">
+          <summary>Desktop</summary>
+          <p className="settings-note">
+            Applies to the RDP hosts in this group. A gateway stated here reaches every one of
+            them, which is the point of putting it on a group rather than on each machine.
+          </p>
+          <RdpFields
+            value={group}
+            set={setRdp}
+            effective={desktop}
+            inheritedFrom={rdpNote}
+            inheritToggle={
+              group.parentId ? { label: 'Inherit desktop settings from the parent group' } : undefined
+            }
+            secret={{
+              typed: gatewaySecret,
+              onTyped: setGatewaySecret,
+              own: ownGatewaySecret,
+              forget: forgetGatewaySecret,
+              onForget: setForgetGatewaySecret
+            }}
           />
         </details>
 

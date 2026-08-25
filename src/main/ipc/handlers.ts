@@ -14,7 +14,7 @@ import { sftpManager } from '../ssh/SFTPManager'
 import { remoteEdit } from '../ssh/RemoteEdit'
 import { portForwardManager } from '../ssh/PortForwardManager'
 import { remoteMonitor } from '../ssh/RemoteMonitor'
-import { rdpGateway } from '../rdp/Gateway'
+import { rdpGateway, type RdpRoute } from '../rdp/Gateway'
 import { listSessions, shadowSession } from '../rdp/WinSessions'
 import {
   shadowHostBridge,
@@ -22,15 +22,18 @@ import {
   type ShadowRequest
 } from '../rdp/ShadowHostBridge'
 import { resolveAuth } from '../../shared/authResolution'
+import { resolveRdp } from '../../shared/rdpResolution'
 import { qualifyUser } from '../../shared/winSessions'
 import { protocolOf } from '../../shared/protocols'
 import { readSshConfigHosts } from '../ssh/sshConfig'
 import { knownHosts } from '../ssh/KnownHosts'
+import { trustedCertificates } from '../rdp/CertificateTrust'
 import { inventoryStore } from '../inventory/InventoryStore'
 import { isGitAvailable } from '../inventory/GitRepo'
 import type {
   SessionProfile,
   SessionGroup,
+  RdpView,
   QuickConnectParams,
   PortForwardRule,
   Snippet,
@@ -68,8 +71,38 @@ function reportTransfer(
  * reference behind would keep the old password in use.
  */
 function forgetSecret(item: { secretRef?: string }): void {
-  if (item.secretRef && vault.status().unlocked) vault.deleteSecret(item.secretRef)
-  item.secretRef = undefined
+  forgetSecretAt(item, 'secretRef')
+}
+
+/**
+ * The same, for whichever reference is named — a host holds two, its own login
+ * and the one its gateway wants, and both have to be droppable.
+ */
+function forgetSecretAt<K extends string>(
+  item: Partial<Record<K, string | undefined>>,
+  field: K
+): void {
+  const ref = item[field]
+  if (ref && vault.status().unlocked) vault.deleteSecret(ref)
+  item[field] = undefined
+}
+
+/**
+ * Stores a typed secret, mints a reference for it if there is none, or drops
+ * the stored one when the caller passes null. Undefined leaves it as it was,
+ * which is what saving a dialog nobody typed a password into means.
+ */
+function applySecret<K extends string>(
+  item: Partial<Record<K, string | undefined>>,
+  field: K,
+  secret: string | null | undefined
+): void {
+  if (secret === null) forgetSecretAt(item, field)
+  else if (secret !== undefined) {
+    const ref = item[field] ?? randomUUID()
+    item[field] = ref
+    vault.setSecret(ref, secret)
+  }
 }
 
 /**
@@ -98,6 +131,54 @@ function shadowCredentials(
   if (!auth.username || !password) return undefined
 
   return { username: qualifyUser(auth.username, host), password }
+}
+
+/**
+ * A host, wherever it is saved, and the groups its settings inherit along.
+ *
+ * Hand-made sessions and inventory hosts resolve identically, and every RDP
+ * handler needs both halves, so the lookup lives in one place.
+ */
+function findHost(
+  sessionId: string
+): { profile: SessionProfile; groups: SessionGroup[] } | undefined {
+  const profile =
+    sessionStore.getAll().sessions.find((s) => s.id === sessionId) ??
+    inventoryStore.findSession(sessionId)
+  if (!profile) return undefined
+  return { profile, groups: [...sessionStore.getAll().groups, ...inventoryStore.allGroups()] }
+}
+
+/**
+ * How one host is to be reached, gateway password included.
+ *
+ * Resolved here and kept here. The window is handed a loopback address and
+ * nothing else, so a gateway credential — unlike the host's own, which CredSSP
+ * forces into the renderer — never leaves the main process at all.
+ */
+function routeFor(sessionId: string | undefined): RdpRoute {
+  if (!sessionId) return {}
+  const found = findHost(sessionId)
+  if (!found) return {}
+
+  const rdp = resolveRdp(found.profile, found.profile.groupId, found.groups)
+  if (!rdp.gatewayHost) return {}
+
+  // A gateway with no login of its own is given the host's, which is what
+  // "use my connection credentials" means in every other client.
+  const auth = resolveAuth(found.profile, found.profile.groupId, found.groups)
+  const username = rdp.gatewayUsername || auth.username
+  const secretRef = rdp.gatewayUsername ? rdp.gatewaySecretRef : auth.secretRef
+
+  return {
+    gateway: {
+      host: rdp.gatewayHost,
+      port: rdp.gatewayPort,
+      username,
+      password: secretRef ? vault.getSecret(secretRef) ?? '' : '',
+      bypassLocal: rdp.gatewayBypassLocal
+    }
+  }
 }
 
 function describeRule(rule: PortForwardRule): string {
@@ -141,17 +222,20 @@ export function registerIpcHandlers(): void {
     Object.entries(knownHosts.all()).map(([host, fingerprint]) => ({ host, fingerprint }))
   )
   ipcMain.handle(IPC.knownHostsRemove, (_e, host: string) => knownHosts.removeByKey(host))
+  ipcMain.handle(IPC.knownCertificatesList, () =>
+    Object.entries(trustedCertificates.all()).map(([host, fingerprint]) => ({ host, fingerprint }))
+  )
+  ipcMain.handle(IPC.knownCertificatesRemove, (_e, host: string) =>
+    trustedCertificates.removeByKey(host)
+  )
 
   // --- Session store ---
   ipcMain.handle(IPC.storeLoad, () => sessionStore.getAll())
   ipcMain.handle(
     IPC.storeSaveSession,
-    (_e, session: SessionProfile, secret?: string | null) => {
-      if (secret === null) forgetSecret(session)
-      else if (secret !== undefined) {
-        session.secretRef = session.secretRef ?? randomUUID()
-        vault.setSecret(session.secretRef, secret)
-      }
+    (_e, session: SessionProfile, secret?: string | null, gatewaySecret?: string | null) => {
+      applySecret(session, 'secretRef', secret)
+      applySecret(session, 'gatewaySecretRef', gatewaySecret)
       return sessionStore.saveSession(session)
     }
   )
@@ -159,25 +243,31 @@ export function registerIpcHandlers(): void {
     // The credential goes with the host. Left behind it would sit in the vault
     // for good, since nothing points at it any more.
     const session = sessionStore.getAll().sessions.find((s) => s.id === id)
-    if (session) forgetSecret(session)
+    if (session) {
+      forgetSecret(session)
+      forgetSecretAt(session, 'gatewaySecretRef')
+    }
     sessionStore.deleteSession(id)
   })
   ipcMain.handle(IPC.storeReorderSessions, (_e, orderedIds: string[]) => {
     sessionStore.reorderSessions(orderedIds)
   })
-  ipcMain.handle(IPC.storeSaveGroup, (_e, group: SessionGroup, secret?: string | null) => {
-    if (secret === null) forgetSecret(group)
-    else if (secret !== undefined) {
-      group.secretRef = group.secretRef ?? randomUUID()
-      vault.setSecret(group.secretRef, secret)
+  ipcMain.handle(
+    IPC.storeSaveGroup,
+    (_e, group: SessionGroup, secret?: string | null, gatewaySecret?: string | null) => {
+      applySecret(group, 'secretRef', secret)
+      applySecret(group, 'gatewaySecretRef', gatewaySecret)
+      return sessionStore.saveGroup(group)
     }
-    return sessionStore.saveGroup(group)
-  })
+  )
   ipcMain.handle(IPC.storeDeleteGroup, (_e, id: string) => {
     // Only the group's own credential: hosts and subgroups are re-parented, not
     // deleted, and keep whatever they hold themselves.
     const group = sessionStore.getAll().groups.find((g) => g.id === id)
-    if (group) forgetSecret(group)
+    if (group) {
+      forgetSecret(group)
+      forgetSecretAt(group, 'gatewaySecretRef')
+    }
     return sessionStore.deleteGroup(id)
   })
 
@@ -205,18 +295,23 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.inventorySyncAll, () => inventoryStore.syncAll())
   ipcMain.handle(
     IPC.inventorySaveOverride,
-    (_e, override: InventoryOverride, secret?: string | null) => {
-      if (secret === null) forgetSecret(override)
-      else if (secret !== undefined) {
-        override.secretRef = override.secretRef ?? randomUUID()
-        vault.setSecret(override.secretRef, secret)
-      }
+    (
+      _e,
+      override: InventoryOverride,
+      secret?: string | null,
+      gatewaySecret?: string | null
+    ) => {
+      applySecret(override, 'secretRef', secret)
+      applySecret(override, 'gatewaySecretRef', gatewaySecret)
       return inventoryStore.saveOverride(override)
     }
   )
   ipcMain.handle(IPC.inventoryClearOverride, (_e, nodeId: string) => {
     const override = inventoryStore.overrides().find((o) => o.nodeId === nodeId)
-    if (override) forgetSecret(override)
+    if (override) {
+      forgetSecret(override)
+      forgetSecretAt(override, 'gatewaySecretRef')
+    }
     return inventoryStore.clearOverride(nodeId)
   })
 
@@ -406,7 +501,42 @@ export function registerIpcHandlers(): void {
   )
 
   // --- Graphical sessions ---
-  ipcMain.handle(IPC.rdpReserve, () => rdpGateway.reserve())
+  /**
+   * Reserves a single-use loopback address, and settles behind it how the
+   * session will actually be routed. Takes a host id rather than a route so the
+   * gateway and its password are resolved here; see routeFor.
+   */
+  ipcMain.handle(IPC.rdpReserve, (_e, sessionId?: string) =>
+    rdpGateway.reserve(routeFor(sessionId))
+  )
+
+  ipcMain.handle(
+    IPC.rdpTracing,
+    () => process.env.NODE_ENV === 'development' || process.env.TERMINALDECK_RDP_TRACE === '1'
+  )
+
+  ipcMain.handle(IPC.rdpFailure, (_e, proxyAddress: string) =>
+    rdpGateway.failureFor(proxyAddress)
+  )
+
+  /**
+   * The desktop settings for one host: how big it should be, and how the
+   * keyboard behaves. Everything the window legitimately needs to draw a
+   * session, and deliberately nothing about where that session is routed.
+   */
+  ipcMain.handle(IPC.rdpSettings, (_e, sessionId: string) => {
+    const found = findHost(sessionId)
+    if (!found) throw new Error('Unknown session')
+    const rdp = resolveRdp(found.profile, found.profile.groupId, found.groups)
+    const view: RdpView = {
+      resolution: rdp.resolution,
+      desktopWidth: rdp.desktopWidth,
+      desktopHeight: rdp.desktopHeight,
+      hiDpi: rdp.hiDpi,
+      commandAsControl: rdp.commandAsControl
+    }
+    return view
+  })
 
   /**
    * The login for one host, resolved through the same inheritance chain SSH

@@ -42,6 +42,96 @@ export interface AuthDefaults {
   followTerminalCwd?: boolean
 }
 
+/** How a desktop's resolution is decided. */
+export type RdpResolution = 'fit' | 'fixed'
+
+/**
+ * Settings that only mean anything for a desktop, inherited along the same walk
+ * as AuthDefaults — the host, then its group, then that group's parent. An
+ * absent field means "inherit".
+ *
+ * Separate from AuthDefaults and opted out of separately, for the same reason
+ * appearance is: a gateway describes *where a machine lives*, which a whole
+ * group shares, while a login describes who you are on it, which a host may
+ * well hold alone.
+ */
+export interface RdpDefaults {
+  /** Whether to fall back to the group for anything left unset. Defaults true. */
+  inheritRdp?: boolean
+  /**
+   * A Remote Desktop Gateway to reach the host through. Blank connects to the
+   * host directly, which is what every session did before this field existed.
+   */
+  gatewayHost?: string
+  gatewayPort?: number
+  /**
+   * The login presented to the gateway, which is regularly not the one used on
+   * the host itself. Blank means the host's own credentials are offered.
+   */
+  gatewayUsername?: string
+  /** Reference id into the vault for the gateway password. */
+  gatewaySecretRef?: string
+  /**
+   * Skip the gateway for a host that resolves to a private address, the way
+   * `gatewayusagemethod:4` does in an .rdp file. Off by default: silently not
+   * using a gateway that was configured is worse than failing to reach a host.
+   */
+  gatewayBypassLocal?: boolean
+  /**
+   * `fit` follows the pane and resizes the far end with it, which is what the
+   * app has always done. `fixed` pins the desktop to a stated size and scales
+   * the picture into the pane, for a host that resizes badly or a session that
+   * has to keep one geometry.
+   */
+  resolution?: RdpResolution
+  desktopWidth?: number
+  desktopHeight?: number
+  /**
+   * Ask for a desktop as many pixels as the screen physically has, rather than
+   * as many as the pane measures in CSS.
+   *
+   * On a Retina display the two differ by a factor of two in each direction. At
+   * CSS size the far end draws a small desktop that the screen then magnifies:
+   * everything looks large and soft. At device size it draws every pixel the
+   * screen can show — sharp, and with twice the desktop in the same space, so
+   * windows and text look their proper size.
+   *
+   * The cost is real: four times the pixels to encode, send and paint. On a
+   * slow link that is the difference between a session that keeps up and one
+   * that does not, which is why this is a choice and not a default.
+   */
+  hiDpi?: boolean
+  /**
+   * Send ⌘ as Ctrl, so the copy and paste muscle memory of the Mac lands as the
+   * Windows one. Off by default: while it is on, ⌘ combinations belong to the
+   * desktop and this app's own shortcuts do not fire over a focused session.
+   */
+  commandAsControl?: boolean
+}
+
+/**
+ * The part of a resolved desktop the window is told about: how to draw it, and
+ * nothing about how it is routed. See the `rdp:settings` handler.
+ */
+export type RdpView = Pick<
+  ResolvedRdp,
+  'resolution' | 'desktopWidth' | 'desktopHeight' | 'hiDpi' | 'commandAsControl'
+>
+
+/** An RdpDefaults chain collapsed into concrete values ready to connect with. */
+export interface ResolvedRdp {
+  gatewayHost?: string
+  gatewayPort: number
+  gatewayUsername?: string
+  gatewaySecretRef?: string
+  gatewayBypassLocal: boolean
+  resolution: RdpResolution
+  desktopWidth: number
+  desktopHeight: number
+  hiDpi: boolean
+  commandAsControl: boolean
+}
+
 export type CursorStyle = 'block' | 'underline' | 'bar'
 
 /**
@@ -78,7 +168,7 @@ export interface ResolvedAppearance {
   scrollback: number
 }
 
-export interface SessionGroup extends AuthDefaults, AppearanceDefaults {
+export interface SessionGroup extends AuthDefaults, AppearanceDefaults, RdpDefaults {
   id: string
   name: string
   parentId: string | null
@@ -95,7 +185,7 @@ export interface PortForwardRule {
   dstPort?: number
 }
 
-export interface SessionProfile extends AuthDefaults, AppearanceDefaults {
+export interface SessionProfile extends AuthDefaults, AppearanceDefaults, RdpDefaults {
   id: string
   name: string
   /**
@@ -129,7 +219,7 @@ export interface ResolvedAuth {
 }
 
 /** A git repository that machine inventories are read out of. */
-export interface InventorySource extends AuthDefaults, AppearanceDefaults {
+export interface InventorySource extends AuthDefaults, AppearanceDefaults, RdpDefaults {
   id: string
   name: string
   repoUrl: string
@@ -148,7 +238,7 @@ export interface InventorySource extends AuthDefaults, AppearanceDefaults {
 }
 
 /** Local changes layered over a host that came from a repository. */
-export interface InventoryOverride extends AuthDefaults, AppearanceDefaults {
+export interface InventoryOverride extends AuthDefaults, AppearanceDefaults, RdpDefaults {
   /** Derived id of the host or group it applies to, stable across syncs. */
   nodeId: string
   color?: string

@@ -67,9 +67,17 @@ export interface SessionsSlice {
   sessions: SessionProfile[]
   loadStore: () => Promise<void>
   /** `secret`: a string stores it, undefined keeps what is there, null forgets it. */
-  upsertSession: (session: SessionProfile, secret?: string | null) => Promise<void>
+  upsertSession: (
+    session: SessionProfile,
+    secret?: string | null,
+    gatewaySecret?: string | null
+  ) => Promise<void>
   removeSession: (id: string) => Promise<void>
-  upsertGroup: (group: SessionGroup, secret?: string | null) => Promise<void>
+  upsertGroup: (
+    group: SessionGroup,
+    secret?: string | null,
+    gatewaySecret?: string | null
+  ) => Promise<void>
   removeGroup: (id: string) => Promise<void>
   moveSession: (sessionId: string, groupId: string | null) => Promise<void>
   /**
@@ -99,7 +107,11 @@ export interface InventorySlice {
   syncInventory: (sourceId?: string) => Promise<void>
   saveInventorySource: (source: InventorySource) => Promise<void>
   removeInventorySource: (id: string) => Promise<void>
-  saveInventoryOverride: (override: InventoryOverride, secret?: string | null) => Promise<void>
+  saveInventoryOverride: (
+    override: InventoryOverride,
+    secret?: string | null,
+    gatewaySecret?: string | null
+  ) => Promise<void>
   clearInventoryOverride: (nodeId: string) => Promise<void>
 }
 
