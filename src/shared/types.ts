@@ -87,20 +87,18 @@ export interface RdpDefaults {
   desktopWidth?: number
   desktopHeight?: number
   /**
-   * Ask for a desktop as many pixels as the screen physically has, rather than
-   * as many as the pane measures in CSS.
+   * The most pixels to ask a desktop for, in megapixels.
    *
-   * On a Retina display the two differ by a factor of two in each direction. At
-   * CSS size the far end draws a small desktop that the screen then magnifies:
-   * everything looks large and soft. At device size it draws every pixel the
-   * screen can show — sharp, and with twice the desktop in the same space, so
-   * windows and text look their proper size.
+   * A pane is measured in CSS points, and a screen may have more pixels than
+   * that: two per point in each direction on a Retina display. Asking for the
+   * points gets a desktop the screen then magnifies — soft, and everything in
+   * it oversized. Asking for the pixels is sharp, and four times the data.
    *
-   * The cost is real: four times the pixels to encode, send and paint. On a
-   * slow link that is the difference between a session that keeps up and one
-   * that does not, which is why this is a choice and not a default.
+   * So the size follows the display up to this budget and no further, and never
+   * below the pane's own points — which is what a screen with one pixel per
+   * point has, and why nothing changes there whatever this is set to.
    */
-  hiDpi?: boolean
+  pixelBudget?: number
   /**
    * Send ⌘ as Ctrl, so the copy and paste muscle memory of the Mac lands as the
    * Windows one. Off by default: while it is on, ⌘ combinations belong to the
@@ -115,7 +113,7 @@ export interface RdpDefaults {
  */
 export type RdpView = Pick<
   ResolvedRdp,
-  'resolution' | 'desktopWidth' | 'desktopHeight' | 'hiDpi' | 'commandAsControl'
+  'resolution' | 'desktopWidth' | 'desktopHeight' | 'pixelBudget' | 'commandAsControl'
 >
 
 /** An RdpDefaults chain collapsed into concrete values ready to connect with. */
@@ -128,7 +126,7 @@ export interface ResolvedRdp {
   resolution: RdpResolution
   desktopWidth: number
   desktopHeight: number
-  hiDpi: boolean
+  pixelBudget: number
   commandAsControl: boolean
 }
 

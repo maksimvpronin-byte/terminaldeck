@@ -125,11 +125,13 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
 - Resolution is either **fit**, where the desktop starts at the pane's size and the far end is
   asked to follow it on every resize, so every pixel stays its own, or **fixed**, where the desktop keeps a stated size and
   is scaled into the pane
-- **Use the screen's full resolution**, off by default. A pane 1400 points wide is 2800 pixels
-  on a Retina display; asking for 1400 gets a desktop the screen then magnifies — large and
-  soft — while asking for 2800 fills every pixel it has, so the picture is sharp and twice as
-  much desktop fits. It is four times the pixels to send and draw, which is the reason it is a
-  choice rather than the default, and the first thing to turn off on a slow link
+- **The size follows the screen, not the pane.** A pane 1400 points wide is 2800 pixels on a
+  Retina display; asking for 1400 gets a desktop the screen then magnifies — soft, and
+  everything in it oversized. So the request follows the display, capped by a **pixel budget**
+  the host can set: past it the desktop is asked for a size between the two rather than the
+  largest one. On a screen with one pixel per point — every ordinary monitor — the two are the
+  same and the budget never applies. Moving the window to a screen of another density
+  re-negotiates the size, which a change of pane size alone would not
 - **Send ⌘ as Ctrl**, per host and off by default. Copy and paste then land where they do on
   Windows. While it is on and the desktop has the keyboard, this app's own ⌘ shortcuts do not
   fire; ⌘Q and ⌘Tab still belong to macOS

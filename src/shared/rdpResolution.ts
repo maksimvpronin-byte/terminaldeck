@@ -9,6 +9,11 @@ import type { RdpDefaults, ResolvedRdp, SessionGroup } from './types'
  * that appeared by default would route traffic somewhere nobody asked for. The
  * size is the one an unstated `.rdp` file ends up at, and only applies in
  * `fixed` mode.
+ *
+ * The pixel budget is generous enough that an ordinary screen is never capped
+ * by it — a 2560×1440 window is 3.7 megapixels only when every point is already
+ * a pixel, and there the budget cannot apply anyway — and tight enough that a
+ * Retina pane is sharpened rather than quadrupled.
  */
 export const RDP_FALLBACK: ResolvedRdp = {
   gatewayPort: 443,
@@ -16,7 +21,7 @@ export const RDP_FALLBACK: ResolvedRdp = {
   resolution: 'fit',
   desktopWidth: 1920,
   desktopHeight: 1080,
-  hiDpi: false,
+  pixelBudget: 3.5,
   commandAsControl: false
 }
 
@@ -74,7 +79,7 @@ export function resolveRdp(
     desktopWidth: pick(chain, 'desktopWidth') ?? RDP_FALLBACK.desktopWidth,
     desktopHeight: pick(chain, 'desktopHeight') ?? RDP_FALLBACK.desktopHeight,
     // Booleans can be legitimately false, so they take the first explicit value.
-    hiDpi: firstDefined(chain, 'hiDpi') ?? RDP_FALLBACK.hiDpi,
+    pixelBudget: pick(chain, 'pixelBudget') ?? RDP_FALLBACK.pixelBudget,
     commandAsControl: firstDefined(chain, 'commandAsControl') ?? RDP_FALLBACK.commandAsControl
   }
 }

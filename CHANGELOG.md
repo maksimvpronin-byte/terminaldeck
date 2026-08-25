@@ -22,12 +22,14 @@ the other produces a version nobody can install, which is how 0.1.10 through
   that picture to fill itself, which looked like a desktop drawn too large and
   slightly soft rather than like a missing feature. The session now also starts
   at the right size, so the first frame is already correct.
-- **Use the screen's full resolution**, per host and off by default. Until now
-  a desktop was asked for as many pixels as the pane measures in CSS, which on a
-  Retina display is half of what the screen has — so the far end drew a small
-  desktop that the screen magnified, and everything looked oversized and soft.
-  With this on it draws every pixel the screen can show. Four times the data,
-  hence the choice.
+- **A desktop's size follows the screen rather than the pane**, with a pixel
+  budget the host can set. A pane is measured in points and a Retina screen has
+  four pixels for each of them, so asking for the points produced a small
+  desktop that the screen magnified — soft, and everything in it oversized.
+  Past the budget the size lands between the two rather than at the largest,
+  and on a screen with one pixel per point nothing changes at all. Moving the
+  window to a display of another density re-negotiates the size, which a change
+  of pane size alone would not.
 - **Fixed resolution** as an alternative to following the pane: the desktop
   keeps a stated size and is scaled into the pane instead of resizing the far
   end on every drag.

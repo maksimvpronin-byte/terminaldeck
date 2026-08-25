@@ -59,10 +59,11 @@ describe('resolveRdp', () => {
     expect(resolved.desktopHeight).toBe(RDP_FALLBACK.desktopHeight)
   })
 
-  it('inherits the pixel density like any other boolean', () => {
-    const dense: SessionGroup[] = [{ id: 'r', name: 'Retina', parentId: null, hiDpi: true }]
-    expect(resolveRdp({}, 'r', dense).hiDpi).toBe(true)
-    expect(resolveRdp({ hiDpi: false }, 'r', dense).hiDpi).toBe(false)
+  it('inherits the pixel budget, and lets a host state its own', () => {
+    const capped: SessionGroup[] = [{ id: 'r', name: 'Slow link', parentId: null, pixelBudget: 1.5 }]
+    expect(resolveRdp({}, 'r', capped).pixelBudget).toBe(1.5)
+    expect(resolveRdp({ pixelBudget: 8 }, 'r', capped).pixelBudget).toBe(8)
+    expect(resolveRdp({}, null, capped).pixelBudget).toBe(RDP_FALLBACK.pixelBudget)
   })
 
   it('keeps an explicit false rather than treating it as unset', () => {

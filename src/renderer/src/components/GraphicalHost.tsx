@@ -137,11 +137,28 @@ export default function GraphicalHost({
     const rect = containerRef.current?.getBoundingClientRect()
     if (!rect || rect.width < 1 || rect.height < 1) return null
 
-    const density = look?.hiDpi ? window.devicePixelRatio || 1 : 1
+    /**
+     * As many pixels as the screen has, up to what the host is willing to send.
+     *
+     * The pane is measured in CSS points; a screen may have more pixels than
+     * that. Asking for the points gets a desktop the screen magnifies — soft,
+     * and everything in it oversized — so the request follows the display
+     * instead. Where that would exceed the budget the factor is reduced rather
+     * than abandoned: a desktop somewhat larger than the pane still beats one
+     * magnified to fit it.
+     *
+     * The factor is never below 1, so a screen with one pixel per point — every
+     * ordinary monitor — asks for exactly the pane, whatever the budget says.
+     */
+    const density = window.devicePixelRatio || 1
+    const budget = (look?.pixelBudget ?? 3.5) * 1_000_000
+    const full = rect.width * density * rect.height * density
+    const factor = full <= budget ? density : Math.max(1, density * Math.sqrt(budget / full))
+
     // [MS-RDPEDISP] takes 200 to 8192 pixels and refuses an odd width.
     return {
-      width: Math.min(8192, Math.max(200, Math.round(rect.width * density))) & ~1,
-      height: Math.min(8192, Math.max(200, Math.round(rect.height * density)))
+      width: Math.min(8192, Math.max(200, Math.round(rect.width * factor))) & ~1,
+      height: Math.min(8192, Math.max(200, Math.round(rect.height * factor)))
     }
   }
 
@@ -429,11 +446,31 @@ export default function GraphicalHost({
     // moved since, which is the common case.
     if (phase.at === 'connected') send()
 
+    /**
+     * Dragging the window to a screen of a different density changes how many
+     * pixels the pane is worth without changing how many points it measures, so
+     * nothing above notices. Left alone, the desktop keeps the size the old
+     * screen asked for: too few pixels on the way to a sharper display, too
+     * many on the way back.
+     */
+    let watchDensity: MediaQueryList | null = null
+    const onDensity = (): void => {
+      watch()
+      send()
+    }
+    const watch = (): void => {
+      watchDensity?.removeEventListener('change', onDensity)
+      watchDensity = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`)
+      watchDensity.addEventListener('change', onDensity)
+    }
+    watch()
+
     return () => {
       observer.disconnect()
+      watchDensity?.removeEventListener('change', onDensity)
       window.clearTimeout(pending)
     }
-  }, [protocol, phase.at, look?.resolution, look?.hiDpi])
+  }, [protocol, phase.at, look?.resolution, look?.pixelBudget])
 
   /**
    * Uses what the host already has. The login and password live on the host —

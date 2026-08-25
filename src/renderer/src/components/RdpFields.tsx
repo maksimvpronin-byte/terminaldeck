@@ -163,19 +163,23 @@ export default function RdpFields({
           : 'The far end is asked to match the pane whenever it is resized, so every pixel stays its own.'}
       </p>
 
-      <label className="checkbox-row" style={{ flexDirection: 'row' }}>
-        <input
-          type="checkbox"
-          checked={effective.hiDpi}
-          onChange={(e) => set('hiDpi', e.target.checked)}
-        />
-        Use the screen's full resolution
+      <label>
+        Most pixels to ask for
+        <select
+          value={String(effective.pixelBudget)}
+          onChange={(e) => set('pixelBudget', Number(e.target.value))}
+        >
+          <option value="1.5">Fewest — a slow link</option>
+          <option value="3.5">Balanced</option>
+          <option value="100">As many as the screen has</option>
+        </select>
       </label>
       <p className="settings-note">
-        On a Retina display this asks the far end for twice as many pixels in each direction, so
-        the desktop is sharp and twice as much of it fits — windows and text stop looking
-        oversized. It is four times the pixels to send and draw, so on a slow link it is the
-        first thing to turn off.
+        The desktop follows the screen's own pixels rather than the pane's points, so it is drawn
+        sharp instead of being magnified to fit. On a display with one pixel per point — every
+        ordinary monitor — that is exactly the pane and this setting changes nothing. On a Retina
+        display it is four times the data, which is what the budget is for: past it the desktop is
+        asked for a size between the two rather than the largest one.
       </p>
 
       <label className="checkbox-row" style={{ flexDirection: 'row' }}>
