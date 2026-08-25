@@ -110,6 +110,44 @@ export default function GraphicalHost({
   const [asked, setAsked] = useState<string>('')
 
   /**
+   * Fits the picture once the canvas is the size that was asked for.
+   *
+   * Fitting is done against the desktop size the client last had confirmed, and
+   * a request is answered by the server a round trip later — so fitting at the
+   * moment of asking scales the new canvas by the old dimensions, and the
+   * picture comes out the right height and the wrong width. Waiting for the
+   * canvas to become what was asked for is the one signal available from here
+   * that the size has landed.
+   */
+  function fitWhenSettled(interaction: UserInteraction, width: number): void {
+    const started = Date.now()
+    const tick = (): void => {
+      const canvas = canvasElement()
+      // Given up on after two seconds: a server may refuse a size outright, and
+      // a poll that never ends would outlive the session it belongs to.
+      if (!canvas || canvas.width === width || Date.now() - started > 2000) {
+        try {
+          interaction.setScale(1)
+        } catch {
+          // The session went while this was waiting.
+        }
+        return
+      }
+      window.setTimeout(tick, 100)
+    }
+    window.setTimeout(tick, 100)
+  }
+
+  /** The client's canvas, wherever it keeps it. */
+  function canvasElement(): HTMLCanvasElement | null {
+    const element = containerRef.current?.querySelector('iron-remote-desktop') as HTMLElement | null
+    return (
+      (element?.shadowRoot?.querySelector('canvas') as HTMLCanvasElement | null) ??
+      (element?.querySelector('canvas') as HTMLCanvasElement | null)
+    )
+  }
+
+  /**
    * What the picture is actually made of, measured rather than assumed.
    *
    * Three plausible explanations for a desktop drawn too large were each ruled
@@ -123,9 +161,7 @@ export default function GraphicalHost({
   function measure(): string {
     const container = containerRef.current
     const element = container?.querySelector('iron-remote-desktop') as HTMLElement | null
-    const canvas =
-      (element?.shadowRoot?.querySelector('canvas') as HTMLCanvasElement | null) ??
-      (element?.querySelector('canvas') as HTMLCanvasElement | null)
+    const canvas = canvasElement()
     if (!container) return ''
 
     const box = (e: Element | null): string => {
@@ -502,6 +538,8 @@ export default function GraphicalHost({
          * exported, so there is nothing to import.
          */
         interaction.setScale(1)
+        // …and once more when the far end has actually delivered that size.
+        fitWhenSettled(interaction, size.width)
         // Kept truthful as the pane moves: a number frozen at connect describes
         // a session that no longer exists.
         // Replaced rather than added to: this describes the session as it is
