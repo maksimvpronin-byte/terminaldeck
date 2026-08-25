@@ -317,4 +317,6 @@ export const ru: Record<string, string> = {
   "src port": "порт источника",
   "dst host": "адрес назначения",
   "dst port": "порт назначения",
+  "fixed": "фиксировано",
+  "size not reported": "размер не сообщён",
 }

@@ -97,6 +97,17 @@ export default function GraphicalHost({
   const lastUsed = useRef<{ user: string; secret: string } | null>(null)
   /** The address this attempt reserved, so its failure can be looked up. */
   const reserved = useRef<string | null>(null)
+  /**
+   * The size last asked of the far end, shown while connecting and after a
+   * failure.
+   *
+   * Whether a desktop is drawn at the screen's pixels or the pane's points is
+   * the difference between a sharp picture and a magnified one, and from the
+   * outside the two are told apart only by squinting. Printing the number turns
+   * that into something anyone can read off — and says at a glance whether a
+   * host is still pinned to a fixed size.
+   */
+  const [asked, setAsked] = useState<string>('')
   /** What the host had saved, kept so the chooser can dial without asking. */
   const [storedPassword, setStoredPassword] = useState('')
   /**
@@ -432,6 +443,9 @@ export default function GraphicalHost({
       if (!interaction || !size) return
       try {
         interaction.resize(size.width, size.height)
+        // Kept truthful as the pane moves: a number frozen at connect describes
+        // a session that no longer exists.
+        setAsked(`${size.width}×${size.height} · ×${window.devicePixelRatio}`)
       } catch {
         // The session went while this was in flight. The next one will fit.
       }
@@ -574,7 +588,13 @@ export default function GraphicalHost({
        * until one arrives the session is whatever the client defaulted to.
        */
       const startAt = desiredSize()
-      if (startAt) builder.withDesktopSize(startAt)
+      if (startAt) {
+        builder.withDesktopSize(startAt)
+        setAsked(
+          `${startAt.width}×${startAt.height}` +
+            (look?.resolution === 'fixed' ? ` (${t('fixed')})` : ` · ×${window.devicePixelRatio}`)
+        )
+      }
       const config = builder
         .withDestination(target)
         .withProxyAddress(proxyAddress)
@@ -590,11 +610,41 @@ export default function GraphicalHost({
 
       const session = await interaction.connect(config)
 
+      /**
+       * What the far end actually agreed to, beside what was asked for.
+       *
+       * A server is free to refuse a size and keep its own, and when it does
+       * the picture is scaled to fit the pane and looks magnified — which from
+       * the outside is indistinguishable from asking for the wrong size. The
+       * two numbers together say which of the two happened, and they are put on
+       * the pane's tooltip so the answer is a hover away rather than a rebuild.
+       */
+      const got = session.initialDesktopSize
+      setAsked(
+        (previous) =>
+          `${previous} → ${got ? `${got.width}×${got.height}` : t('size not reported')}`
+      )
+
       // The component keeps its screen hidden and translated off-view until
       // told otherwise — its own `run` sets this back to false when the session
       // ends, so nothing but the caller ever turns it on. Without it the
       // session runs perfectly and paints where nobody can see it.
       interaction.setVisibility(true)
+
+      /**
+       * Fit the picture into the pane, asserted through the API rather than
+       * left to the attribute set when the element was made.
+       *
+       * The attribute is read once, while the desktop was still whatever size
+       * the client defaulted to — and when the two happen to match, a mode that
+       * never took has no visible effect. They stopped matching the moment the
+       * size started following the screen, and a canvas drawn at its natural
+       * size overflows the pane and is clipped instead of scaled.
+       *
+       * The literal is ScreenScale.Fit; the enum is declared in the client's
+       * types but not exported, so there is nothing to import.
+       */
+      interaction.setScale(1)
 
       // Copy and paste across the session boundary. Off until asked for, and
       // asked for here rather than in the builder because it is a property of
@@ -655,7 +705,7 @@ export default function GraphicalHost({
   }
 
   return (
-    <div className="graphical-host">
+    <div className="graphical-host" title={asked}>
       {/* The client's element is put here by the effect above, and stays for
           every phase: it owns its canvas and the WebAssembly behind it, so
           remounting would throw both away mid-session. React must not manage
@@ -794,7 +844,9 @@ export default function GraphicalHost({
                 <strong>
                   {t('Connecting to')} {target}
                 </strong>
-                <p className="settings-note">{t('Negotiating with the server.')}</p>
+                <p className="settings-note">
+                  {t('Negotiating with the server.')} {asked}
+                </p>
               </>
             )}
 
