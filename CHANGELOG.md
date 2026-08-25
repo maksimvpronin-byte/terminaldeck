@@ -23,6 +23,13 @@ the other produces a version nobody can install, which is how 0.1.10 through
   Ctrl. They inherit along the same chain the login does, so a shared gateway is
   stated once on the group. The gateway's own password is resolved in the main
   process and never crosses into the window.
+- **A desktop pane may now be smaller than the desktop in it.** A flex item
+  defaults to `min-height: auto` and refuses to shrink below its content, and
+  the content here is a canvas the size of the far end's desktop — so the box
+  grew to the canvas rather than the pane, the client measured that box when
+  scaling the picture to fit, concluded it already fitted, and the pane clipped
+  it instead. The width had been given `min-width: 0` long ago; the height had
+  not, and it did not matter until a desktop stopped being the size of its pane.
 - **A desktop is scaled into its pane again.** The client re-applies its scale
   mode every time the far end confirms a new size, and reads that mode from a
   property — which this app set as an attribute, where it read as unset and
