@@ -1,10 +1,14 @@
 import { resolve } from 'path'
-import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
+import { defineConfig } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
+    // What `externalizeDepsPlugin` used to do, before electron-vite 5 deprecated
+    // it in favour of this option. Said out loud rather than left to the default,
+    // because bundling a dependency instead of externalizing it is how ssh2's
+    // native crypto stops loading in a packaged build.
+    build: { externalizeDeps: true },
     resolve: {
       alias: {
         '@main': resolve('src/main')
@@ -12,7 +16,7 @@ export default defineConfig({
     }
   },
   preload: {
-    plugins: [externalizeDepsPlugin()]
+    build: { externalizeDeps: true }
   },
   renderer: {
     root: 'src/renderer',
