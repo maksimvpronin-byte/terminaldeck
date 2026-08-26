@@ -12,6 +12,14 @@ files:
   - package.json
 asarUnpack:
   - '**/node_modules/ssh2/**'
+# Nothing this app ships is compiled. ssh2's only native dependency is
+# `cpu-features`, which it marks optional and loads in a try/catch — it picks a
+# cipher by what the CPU can do, and without it ssh2 picks one by itself, which
+# is what every run in development already does. Left on, electron-builder hands
+# every module in the tree to node-gyp, which downloads Electron's headers to
+# build one that was never needed: a release then cannot be built without the
+# network, and a slow network fails it outright.
+npmRebuild: false
 mac:
   icon: resources/icon.png
   target:
@@ -25,7 +33,9 @@ mac:
   gatekeeperAssess: false
   entitlements: resources/entitlements.mac.plist
   entitlementsInherit: resources/entitlements.mac.plist
-  # Set to true once APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID exist.
+  # From electron-builder 26 the Apple environment variables switch notarization
+  # on by themselves, and `false` is the one value that overrides them. Delete
+  # this line once APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID exist.
   notarize: false
 win:
   icon: resources/icon.png
