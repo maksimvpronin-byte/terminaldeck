@@ -533,6 +533,8 @@ export function registerIpcHandlers(): void {
       desktopWidth: rdp.desktopWidth,
       desktopHeight: rdp.desktopHeight,
       pixelBudget: rdp.pixelBudget,
+      magnification: rdp.magnification,
+      sendDensity: rdp.sendDensity,
       commandAsControl: rdp.commandAsControl
     }
     return view

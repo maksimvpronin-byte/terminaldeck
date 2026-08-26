@@ -21,6 +21,28 @@ describe('resolveRdp', () => {
     expect(resolveRdp({}, null, groups)).toEqual(RDP_FALLBACK)
   })
 
+  it('follows the display when nothing states a magnification', () => {
+    expect(resolveRdp({}, 'work', groups).magnification).toBe(0)
+  })
+
+  it('inherits a pinned magnification, and lets a host state its own under it', () => {
+    const scaled: SessionGroup[] = [
+      { id: 'hidpi', name: 'HiDPI', parentId: null, magnification: 150 }
+    ]
+    expect(resolveRdp({}, 'hidpi', scaled).magnification).toBe(150)
+    // Zero is a value here — "follow the display" — not a blank to be inherited.
+    expect(resolveRdp({ magnification: 0 }, 'hidpi', scaled).magnification).toBe(0)
+    expect(resolveRdp({ magnification: 100 }, 'hidpi', scaled).magnification).toBe(100)
+  })
+
+  it('says nothing about density unless a level asks for it', () => {
+    expect(resolveRdp({}, 'work', groups).sendDensity).toBe(false)
+    const told: SessionGroup[] = [{ id: 'macs', name: 'Macs', parentId: null, sendDensity: true }]
+    expect(resolveRdp({}, 'macs', told).sendDensity).toBe(true)
+    // False is a value, not a blank: a host under such a group can opt back out.
+    expect(resolveRdp({ sendDensity: false }, 'macs', told).sendDensity).toBe(false)
+  })
+
   it('inherits a gateway from the group', () => {
     expect(resolveRdp({}, 'work', groups).gatewayHost).toBe('rdg.example.com')
   })

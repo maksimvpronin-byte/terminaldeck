@@ -22,6 +22,11 @@ export const RDP_FALLBACK: ResolvedRdp = {
   desktopWidth: 1920,
   desktopHeight: 1080,
   pixelBudget: 3.5,
+  // Follow whatever display the window is on, which draws a desktop the size an
+  // ordinary monitor would give it whatever the density is.
+  magnification: 0,
+  // The far end lays itself out as it always has unless a host asks otherwise.
+  sendDensity: false,
   commandAsControl: false
 }
 
@@ -78,8 +83,12 @@ export function resolveRdp(
     resolution: pick(chain, 'resolution') ?? RDP_FALLBACK.resolution,
     desktopWidth: pick(chain, 'desktopWidth') ?? RDP_FALLBACK.desktopWidth,
     desktopHeight: pick(chain, 'desktopHeight') ?? RDP_FALLBACK.desktopHeight,
-    // Booleans can be legitimately false, so they take the first explicit value.
     pixelBudget: pick(chain, 'pixelBudget') ?? RDP_FALLBACK.pixelBudget,
+    // Zero is a stated value here — "follow the display" — so this reads the
+    // first level that says anything at all, blank included.
+    magnification: pick(chain, 'magnification') ?? RDP_FALLBACK.magnification,
+    // Booleans can be legitimately false, so they take the first explicit value.
+    sendDensity: firstDefined(chain, 'sendDensity') ?? RDP_FALLBACK.sendDensity,
     commandAsControl: firstDefined(chain, 'commandAsControl') ?? RDP_FALLBACK.commandAsControl
   }
 }

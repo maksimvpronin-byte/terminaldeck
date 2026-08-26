@@ -23,6 +23,42 @@ the other produces a version nobody can install, which is how 0.1.10 through
   Ctrl. They inherit along the same chain the login does, so a shared gateway is
   stated once on the group. The gateway's own password is resolved in the main
   process and never crosses into the window.
+- **A desktop is drawn the size an ordinary monitor would give it.** Asking a
+  Retina pane for the screen's own pixels made the picture sharp and half-size,
+  because Windows lays out a 20-pixel menu the same way whether a pixel is a
+  millimetre across or half of one. The size asked for is now divided by a
+  magnification — by default the display's own density, so a Retina pane asks
+  for exactly its points and draws every pixel as four, and an ordinary monitor
+  asks for what it always did. The far end's own DPI is deliberately left alone:
+  it is a setting of that machine, and a session someone else is logged on to
+  would be resized under them. A host, a group or an inventory override can pin
+  the percentage, 100% being every pixel the screen has.
+- **A host may tell its session how dense this display is**, off by default.
+  Magnifying the picture here gets the size right and costs sharpness, because
+  a quarter of the pixels are being stretched over the pane; telling the far end
+  instead has Windows lay itself out larger into every pixel the screen has,
+  which is the same size drawn sharp — and, with the pixel budget at everything
+  the screen has, a desktop drawn pixel for pixel. What travels is the factor
+  actually asked for rather than the display's density, so a budget that cuts
+  the request cuts the density with it and the desktop is the size of the pane
+  either way. Off by default because it is the far end being asked to lay itself
+  out differently: it is agreed per connection rather than written into the
+  machine, and only a session of this app's own is ever told — a joined session
+  is never resized at all. Windows 8.1 and Server 2012 R2 and later act on it.
+- **No frame around a full-screen desktop, and no letterbox around the
+  picture.** Two lines were left over the edges: the active pane's border, which
+  says which pane has the keyboard and has nothing to say when there is one, and
+  which — `box-sizing` being `border-box` — also took a point off each side, so
+  the desktop was asked for two points less than the display in each direction.
+  And an odd height, which a server is free to round itself, leaving a desktop a
+  pixel taller than the pane and a bar along two edges. The height is now asked
+  for even, the way the protocol already requires of the width.
+- **The pane toolbar steps out of the way in full screen**, sliding back on a
+  brush of the top edge. It was taking a strip about thirty points tall off the
+  screen, and a desktop is asked for the size of its pane — so full screen asked
+  for a size no monitor has, the one case where the picture cannot land pixel
+  for pixel however the density is negotiated. F11 and holding Escape still
+  leave without going near the edge.
 - The picture is fitted **once the far end has delivered the size**, not at the
   moment it is asked for. Fitting is done against the last confirmed desktop
   size, so fitting at the moment of asking scales a new canvas by the old
@@ -153,6 +189,82 @@ the other produces a version nobody can install, which is how 0.1.10 through
   a shipped build. It is on by default in development. The client reports nearly
   every fault as "General failure", so this is usually the only way to see where
   a session actually stopped.
+
+### Security
+
+- **Every dependency with an open advisory raised past it.** A Trivy scan of
+  `package-lock.json` on 2026-08-25 found 50 — 2 critical, 21 high, 27 medium —
+  and none of them is a flaw in this app's own code, so all 50 are answered by an
+  upgrade:
+
+  - **Electron 33 → 43** accounts for 27 of them. 43 is the newest major that
+    needs no change here: Electron 44 removes the `clipboard` module from the
+    renderer and preload processes, which is where this app reads and writes the
+    clipboard, and moving that behind IPC is a change to make on its own rather
+    than folded into a security bump.
+  - **electron-builder 24 → 26** answers the two advisories against
+    `app-builder-lib` and `builder-util-runtime` directly, and pulls `tar` from
+    6.2.1 to 7.5.x, which is where the other twelve go — including one of the two
+    criticals.
+  - **electron-vite 2 → 5** with **Vite 5 → 7** replaces esbuild 0.21 and brings
+    `postcss`'s own copy of `nanoid` past the flaw in 3.3.17. Vite is now named in
+    `devDependencies`, because electron-vite 5 declares it a peer instead of
+    depending on it.
+  - **vitest 2 → 3** answers the second critical.
+  - **ws 8.18.0 → 8.21.3** answers the only two that a running installation could
+    meet rather than a build machine: `ws` carries the loopback WebSocket the RDP
+    client talks to.
+  - `extract-zip@2.0.1` was reported with no fixed version to move to. It arrived
+    under Electron, which stopped depending on it in 42, so it leaves with the
+    upgrade rather than being answered by one.
+
+- **Node 22.12 is the floor now**, and `engines` says so. Electron 43, Vite 7 and
+  electron-vite 5 each refuse to run on anything older; CI already builds on Node
+  22.
+
+- **`npm run dev` and `npm start` fetch the Electron binary before they start.**
+  From Electron 42 the binary is no longer installed by a `postinstall` script —
+  npm supply-chain hardening the Electron team did upstream — and is fetched on
+  demand instead, by `require('electron')`. electron-vite does not go through
+  that: it reads `node_modules/electron/path.txt` itself and fails with "Electron
+  uninstall" when nothing has written one yet. So both scripts now run
+  `install-electron` first, which is the old `postinstall` code, kept as a command
+  for exactly this. It exits immediately once the binary is in place, so it costs
+  a process on every run after the first.
+
+  Only these two scripts need it. `electron-vite build` never looks for a binary,
+  and electron-builder downloads its own copy for the platform it is packaging —
+  which is why nothing about the release workflow changes.
+
+### Changed
+
+- `electron.vite.config.ts` states `build.externalizeDeps` where it used to list
+  `externalizeDepsPlugin()`. electron-vite 5 deprecated the plugin in favour of
+  the option; the behaviour is the same, and leaving native dependencies external
+  is what keeps ssh2's crypto loadable in a packaged build.
+
+- **`@electron-toolkit/tsconfig` 1 → 2**, which is the same base config with
+  `moduleResolution` moved from `node` to `bundler`. Packages that describe their
+  types through an `exports` map — `@vitejs/plugin-react` 5 among them — are
+  invisible to the older setting, so `electron.vite.config.ts` stopped
+  type-checking without it.
+
+- **A packaged build no longer rebuilds native modules**, because it ships none.
+  `npmRebuild: false`: ssh2's only compiled dependency is `cpu-features`, which
+  it marks optional and loads in a try/catch — it picks a cipher by what the CPU
+  can do, and without it ssh2 picks one itself, which is what every run in
+  development already did. Left on, electron-builder handed the whole tree to
+  node-gyp, which downloads Electron's headers to build a module nothing asked
+  for: `npm run build:mac` then failed outright on a slow network, and could not
+  run at all without one.
+
+- **`mac.notarize` means the opposite of what it used to.** In electron-builder 26
+  the Apple environment variables are what switch notarization on, and the option
+  is only read to turn it off: `false` skips the step, and every other value
+  leaves it to the environment. `electron-builder.yml` still says `false`, which
+  is still the behaviour this repository wants with no certificate in use, but
+  turning notarization on is now a matter of deleting that line rather than
+  setting it to `true`.
 
 ### Notes
 

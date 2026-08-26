@@ -125,13 +125,38 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
 - Resolution is either **fit**, where the desktop starts at the pane's size and the far end is
   asked to follow it on every resize, so every pixel stays its own, or **fixed**, where the desktop keeps a stated size and
   is scaled into the pane
-- **The size follows the screen, not the pane.** A pane 1400 points wide is 2800 pixels on a
-  Retina display; asking for 1400 gets a desktop the screen then magnifies — soft, and
-  everything in it oversized. So the request follows the display, capped by a **pixel budget**
-  the host can set: past it the desktop is asked for a size between the two rather than the
-  largest one. On a screen with one pixel per point — every ordinary monitor — the two are the
-  same and the budget never applies. Moving the window to a screen of another density
+- **The size is counted in the screen's pixels, not the pane's points.** A pane 1400 points
+  wide is 2800 pixels on a Retina display, and which of the two the far end is asked for
+  decides whether the picture is drawn pixel for pixel or magnified into place. The request is
+  the screen's pixels divided by the magnification below, and capped by a **pixel budget** the
+  host can set: past it the desktop is asked for a smaller size still rather than the one that
+  was wanted. On a screen with one pixel per point — every ordinary monitor — the pane is the
+  request whatever either is set to. Moving the window to a screen of another density
   re-negotiates the size, which a change of pane size alone would not
+- **A desktop is drawn the size an ordinary monitor would give it.** Pixels and size are
+  different questions: Windows lays out a 20-pixel menu the same way whether a pixel is a
+  millimetre across or half of one, so a desktop asked for a Retina display's own pixels comes
+  out sharp *and* half the size it should be. The far end could be told the density instead,
+  and is not — its DPI is a setting of that machine, and a session someone else is logged on to
+  would be resized under them. So the picture is **magnified here**: by default by the
+  display's own density, which asks a Retina pane for exactly its points and draws every pixel
+  as four. On an ordinary monitor that is a factor of 1 and nothing changes. A host, a group or
+  an inventory override can pin the percentage instead — 100% asks for every pixel the screen
+  has and is as sharp as the display gets, at the size that made this setting necessary
+- **Or the session can be told the density**, per host and off by default. Then the far end
+  lays its own interface out larger and the picture is not stretched at all — the same size at
+  full sharpness, which is what a native client does and the only way to get it. What is sent
+  is the factor actually asked for rather than the display's, so the pixel budget decides
+  sharpness and never size. Off by default because it is still the far end being asked to lay
+  itself out differently: DPI is agreed per connection rather than written into the machine,
+  and only a session of this app's own is ever told — a joined session belongs to whoever is
+  logged on to it and is never resized at all. Windows 8.1 and Server 2012 R2 and later act on
+  it ([MS-RDPEDISP]); anything older ignores it and the magnification above is what is left
+- **Full screen gives the whole display to the desktop.** The pane toolbar slides out of the
+  way there and comes back on a brush of the top edge, so the size asked for is the display's
+  own rather than the display less a toolbar — which matters beyond the room it frees, since a
+  size no monitor has is the one that cannot land pixel for pixel. F11 enters and leaves, and
+  holding Escape leaves; while there, Alt+Tab reaches the far side
 - **Send ⌘ as Ctrl**, per host and off by default. Copy and paste then land where they do on
   Windows. While it is on and the desktop has the keyboard, this app's own ⌘ shortcuts do not
   fire; ⌘Q and ⌘Tab still belong to macOS
@@ -259,13 +284,17 @@ paths have only ever been exercised by unit tests or by hand on a local stand-in
 
 ## Development
 
+Node 22.12 or newer — Electron 43, Vite 7 and electron-vite 5 all refuse to run on less.
+
 ```bash
 npm install
 npm run dev
 ```
 
-This opens the app with hot reload. On first launch you'll be asked to create a master password
-for the local credential vault (stored in the OS user-data directory, never sent anywhere).
+This opens the app with hot reload. The first `npm run dev` also downloads the Electron binary —
+`npm install` no longer does, since Electron 42 dropped its `postinstall` script — so expect that
+one to take a couple of minutes. On first launch you'll be asked to create a master password for
+the local credential vault (stored in the OS user-data directory, never sent anywhere).
 
 Syncing an inventory needs `git` on `PATH`; the Inventory tab says so if it is missing.
 
@@ -361,8 +390,10 @@ produce an unsigned build):
 | `APPLE_TEAM_ID` | Apple Developer team ID |
 
 A Developer ID certificate requires a paid Apple Developer account. Once the Apple secrets exist,
-flip `mac.notarize` to `true` in [electron-builder.yml](electron-builder.yml) — it is `false` by
-default so unsigned builds don't fail at the notarization step.
+delete the `mac.notarize: false` line in [electron-builder.yml](electron-builder.yml). From
+electron-builder 26 the Apple environment variables are what turn notarization on, and that line is
+the one thing that overrides them — it is there so that a build with no secrets doesn't fail at the
+notarization step.
 
 Entitlements live in [resources/entitlements.mac.plist](resources/entitlements.mac.plist) and are
 required under the hardened runtime: Electron needs the JIT entitlements, and the app needs

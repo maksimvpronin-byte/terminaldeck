@@ -100,6 +100,45 @@ export interface RdpDefaults {
    */
   pixelBudget?: number
   /**
+   * How much larger than its own pixels a desktop is drawn here, as a
+   * percentage. Zero follows this display, which is what an unset value
+   * resolves to.
+   *
+   * Pixels and size are different questions, and the budget above only answers
+   * the first. A desktop asked for a Retina display's own pixels is sharp and
+   * half the size it should be: Windows lays out a 20-pixel menu bar the same
+   * way whether those pixels are a millimetre across or half of one. Asking for
+   * fewer pixels and drawing each one larger is the answer this end can give on
+   * its own — the far end's own DPI belongs to whoever is logged on to it, and
+   * a session joined by someone else would be resized under them.
+   *
+   * So this divides the request rather than travelling anywhere: at 200% on a
+   * Retina display the desktop is the pane's own points and every pixel of it
+   * is drawn as four, which is the size an ordinary monitor gives and a softer
+   * picture than the pixels underneath could hold.
+   */
+  magnification?: number
+  /**
+   * Tell the session how dense this display is, so the far end draws its own
+   * interface larger instead of the picture being magnified here.
+   *
+   * Off by default, and deliberately: DPI is negotiated per connection rather
+   * than written into the machine, but it is still the far end being asked to
+   * lay itself out differently, and that is a decision to take per host rather
+   * than one to inherit by accident. Only a session of this app's own is ever
+   * told — a joined session belongs to whoever is logged on to it and is never
+   * resized at all.
+   *
+   * What is sent is the factor actually asked for, not the display's density:
+   * where the pixel budget cuts the request, the density is cut with it, so the
+   * desktop is the size of the pane either way and the budget decides sharpness
+   * alone. Travels as the DesktopScaleFactor of [MS-RDPEDISP]; a server older
+   * than Windows 8.1, or a session that cannot change DPI, ignores it and the
+   * desktop stays as it was. Applies in `fit` only — a pinned size is left
+   * exactly as it is asked for.
+   */
+  sendDensity?: boolean
+  /**
    * Send ⌘ as Ctrl, so the copy and paste muscle memory of the Mac lands as the
    * Windows one. Off by default: while it is on, ⌘ combinations belong to the
    * desktop and this app's own shortcuts do not fire over a focused session.
@@ -113,7 +152,13 @@ export interface RdpDefaults {
  */
 export type RdpView = Pick<
   ResolvedRdp,
-  'resolution' | 'desktopWidth' | 'desktopHeight' | 'pixelBudget' | 'commandAsControl'
+  | 'resolution'
+  | 'desktopWidth'
+  | 'desktopHeight'
+  | 'pixelBudget'
+  | 'magnification'
+  | 'sendDensity'
+  | 'commandAsControl'
 >
 
 /** An RdpDefaults chain collapsed into concrete values ready to connect with. */
@@ -127,6 +172,10 @@ export interface ResolvedRdp {
   desktopWidth: number
   desktopHeight: number
   pixelBudget: number
+  /** How much larger the picture is drawn here; 0 follows the display it is on. */
+  magnification: number
+  /** Whether the far end is told this display's density instead. */
+  sendDensity: boolean
   commandAsControl: boolean
 }
 

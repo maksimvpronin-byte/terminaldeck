@@ -210,35 +210,71 @@ export default function GraphicalHost({
    * before the pane has a size, which is the case for one frame after a tab is
    * created.
    */
-  function desiredSize(): { width: number; height: number } | null {
+  function desiredSize(): { width: number; height: number; factor: number } | null {
     if (look?.resolution === 'fixed') {
-      return { width: look.desktopWidth, height: look.desktopHeight }
+      // A pinned desktop is asked for exactly as it is stated, and nothing is
+      // said about its density: the size is the whole of what was decided.
+      return { width: look.desktopWidth, height: look.desktopHeight, factor: 1 }
     }
     const rect = containerRef.current?.getBoundingClientRect()
     if (!rect || rect.width < 1 || rect.height < 1) return null
 
     /**
-     * As many pixels as the screen has, up to what the host is willing to send.
+     * As many pixels as the screen has, divided by how much larger than its own
+     * pixels the picture is to be drawn, and capped by what the host is willing
+     * to send.
      *
      * The pane is measured in CSS points; a screen may have more pixels than
-     * that. Asking for the points gets a desktop the screen magnifies — soft,
-     * and everything in it oversized — so the request follows the display
-     * instead. Where that would exceed the budget the factor is reduced rather
-     * than abandoned: a desktop somewhat larger than the pane still beats one
-     * magnified to fit it.
+     * that. Asking for the pixels draws every one of them itself and is as
+     * sharp as the display gets — and on a Retina display it is also half the
+     * size an ordinary monitor gives, because Windows lays out a 20-pixel menu
+     * the same way whether a pixel is a millimetre across or half of one. The
+     * far end can be told the density instead, and by default is not: it is that
+     * machine being asked to lay itself out differently, which is a decision to
+     * take per host. So unless a host asks for it the size is what this end
+     * changes — fewer pixels, each drawn larger — and the far end is asked for
+     * a size and nothing else, the way dragging the window of any desktop
+     * client asks for one.
      *
-     * The factor is never below 1, so a screen with one pixel per point — every
-     * ordinary monitor — asks for exactly the pane, whatever the budget says.
+     * Unstated, the magnification is the display's own density: a Retina pane
+     * asks for exactly its points and draws each pixel as four, which is the
+     * size an ordinary monitor gives. On a screen with one pixel per point that
+     * is a factor of 1 — exactly the pane, as it has always been.
+     *
+     * A host that tells the far end its density magnifies nothing here: it asks
+     * for every pixel it can and has Windows lay itself out into them, which is
+     * the same size drawn sharp rather than stretched. The factor is returned
+     * for that — it is what the density will be stated as, so the two can never
+     * disagree about how large the desktop is meant to look.
+     *
+     * Where the request would exceed the budget the factor is reduced further;
+     * it is never raised to meet it, since asking for more pixels than were
+     * wanted is what the magnification was set to avoid.
      */
     const density = window.devicePixelRatio || 1
+    const stated = look?.magnification
+    const magnify = look?.sendDensity
+      ? 1
+      : Math.min(4, Math.max(1, stated ? stated / 100 : density))
     const budget = (look?.pixelBudget ?? 3.5) * 1_000_000
-    const full = rect.width * density * rect.height * density
-    const factor = full <= budget ? density : Math.max(1, density * Math.sqrt(budget / full))
+    const wanted = density / magnify
+    const full = rect.width * wanted * rect.height * wanted
+    const factor = full <= budget ? wanted : wanted * Math.sqrt(budget / full)
 
-    // [MS-RDPEDISP] takes 200 to 8192 pixels and refuses an odd width.
+    /**
+     * [MS-RDPEDISP] takes 200 to 8192 pixels and refuses an odd width.
+     *
+     * The height is rounded down to even as well, which the protocol does not
+     * ask for: a server is free to round an odd one itself, and a desktop one
+     * pixel taller than the pane is fitted into it with a bar along two edges —
+     * a letterbox thin enough to read as a frame rather than as a size that was
+     * not honoured. Giving up a pixel here costs nothing and asks for a size no
+     * server has to adjust.
+     */
     return {
       width: Math.min(8192, Math.max(200, Math.round(rect.width * factor))) & ~1,
-      height: Math.min(8192, Math.max(200, Math.round(rect.height * factor)))
+      height: Math.min(8192, Math.max(200, Math.round(rect.height * factor))) & ~1,
+      factor
     }
   }
 
@@ -522,7 +558,18 @@ export default function GraphicalHost({
       const size = desiredSize()
       if (!interaction || !size) return
       try {
-        interaction.resize(size.width, size.height)
+        /**
+         * The density goes with the size, or nothing goes at all.
+         *
+         * [MS-RDPEDISP] carries it as DesktopScaleFactor, between 100 and 500;
+         * omitted, the field is left at zero, which the far end is required to
+         * ignore — so a host that has not asked for this changes nothing about
+         * the session it connects to.
+         */
+        const density = look?.sendDensity
+          ? Math.min(500, Math.max(100, Math.round(size.factor * 100)))
+          : undefined
+        interaction.resize(size.width, size.height, density)
         /**
          * Fit again, immediately, because asking for a size undoes it.
          *
@@ -544,7 +591,9 @@ export default function GraphicalHost({
         // a session that no longer exists.
         // Replaced rather than added to: this describes the session as it is
         // now, and a line that grew with every drag said nothing at the end.
-        const stated = `${size.width}×${size.height} · ×${window.devicePixelRatio}`
+        const stated =
+          `${size.width}×${size.height} · ×${window.devicePixelRatio}` +
+          (density ? ` · ${density}%` : '')
         setAsked(stated)
         window.setTimeout(() => setAsked(`${stated} — ${measure()}`), 400)
       } catch {
@@ -587,7 +636,14 @@ export default function GraphicalHost({
       watchDensity?.removeEventListener('change', onDensity)
       window.clearTimeout(pending)
     }
-  }, [protocol, phase.at, look?.resolution, look?.pixelBudget])
+  }, [
+    protocol,
+    phase.at,
+    look?.resolution,
+    look?.pixelBudget,
+    look?.magnification,
+    look?.sendDensity
+  ])
 
   /**
    * Uses what the host already has. The login and password live on the host —
@@ -976,9 +1032,11 @@ export default function GraphicalHost({
 /**
  * What goes full screen: the pane, not the picture inside it.
  *
- * So the toolbar comes along and the way back out stays visible — and so the
- * button there and the F11 here mean the same thing, rather than each claiming
- * the screen for a different element.
+ * So the button there and the F11 here mean the same thing, rather than each
+ * claiming the screen for a different element. The toolbar comes along but
+ * stops taking a strip of the screen — see `.pane:fullscreen` in styles.css,
+ * where it slides out of the way and back on a brush of the top edge, so the
+ * desktop is asked for the size of the display itself.
  */
 /** The one method of the element this component needs and its types omit. */
 interface FileTransferHost {
