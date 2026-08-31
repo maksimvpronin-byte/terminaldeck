@@ -1,12 +1,28 @@
 /* eslint-disable no-console -- The console is the thing under test. */
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import { captureClientLog, type ClientLogCapture } from './rdpLog'
 
 /** Restored after each test, or a failure would leave the console swallowed. */
 let running: ClientLogCapture | null = null
+
+/**
+ * The real console is stubbed for the length of each test.
+ *
+ * Past its limit the capture hands the console back, on purpose — so anything
+ * logged after that really does print, and a test that logs a hundred lines to
+ * prove the limit works prints ninety-seven of them into the run. Stubbing
+ * first means what the capture saves and restores is the stub.
+ */
+beforeEach(() => {
+  for (const method of ['debug', 'info', 'log', 'warn', 'error'] as const) {
+    vi.spyOn(console, method).mockImplementation(() => {})
+  }
+})
+
 afterEach(() => {
   running?.stop()
   running = null
+  vi.restoreAllMocks()
 })
 
 describe('catching the desktop client’s log', () => {
@@ -60,6 +76,7 @@ describe('catching the desktop client’s log', () => {
   })
 
   it('gives the console back, so nothing is swallowed afterwards', () => {
+    // Whatever was in place when the capture started — here the stub above.
     const before = console.info
     const capture = captureClientLog(2)
 
