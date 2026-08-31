@@ -3,24 +3,43 @@ import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from 
 import type { SftpEntry, TransferDecisions, TransferPlan } from '../../../shared/types'
 import { parentOf, segmentsOf } from '../../../shared/remotePath'
 import { formatChanged, formatPermissions, kindOf } from '../../../shared/permissions'
+import { formatSize } from '../../../shared/fileSize'
 import SftpTree from './SftpTree'
 import ModalBackdrop from './ModalBackdrop'
 import ContextMenu, { type MenuItem } from './ContextMenu'
 import TransferConflictDialog from './TransferConflictDialog'
 import DiffDialog from './DiffDialog'
 import { useStore } from '../state/store'
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  const units = ['KB', 'MB', 'GB', 'TB']
-  let val = bytes / 1024
-  let i = 0
-  while (val >= 1024 && i < units.length - 1) {
-    val /= 1024
-    i++
-  }
-  return `${val.toFixed(1)} ${units[i]}`
-}
+import {
+  SFTP_DRAG,
+  acceptsDrop,
+  beginDrag,
+  draggedNow,
+  endDrag,
+  type SftpDragPayload
+} from '../state/sftpDrag'
+import { useT } from '../i18n'
+import {
+  COLUMNS,
+  MAX_COL,
+  PANEL_MAX,
+  PANEL_MIN,
+  TREE_MAX,
+  TREE_MIN,
+  col,
+  clamp,
+  loadColumns,
+  loadPanelWidth,
+  loadTreeOpen,
+  loadTreeWidth,
+  minRowWidth,
+  minWidthOf,
+  saveColumns,
+  savePanelWidth,
+  saveTreeOpen,
+  saveTreeWidth,
+  type ColumnWidths
+} from '../state/sftpLayout'
 
 interface Transfer {
   path: string
@@ -35,135 +54,8 @@ interface MenuState {
   entries: SftpEntry[]
 }
 
-/** Rows dragged out of an SFTP panel, as opposed to files from the desktop. */
-const SFTP_DRAG = 'application/x-td-sftp'
-
-interface SftpDragPayload {
-  connectionId: string
-  paths: string[]
-}
-
-/**
- * What is currently being dragged out of some panel, for as long as it lasts.
- *
- * `dataTransfer` refuses to hand over its payload during `dragover` — only the
- * list of types is readable then — so without this a panel could not tell rows
- * from another host apart from the ones being dragged out of itself until the
- * drop had already happened, which is too late to decline it.
- */
-let activeDrag: SftpDragPayload | null = null
-
-const WIDTH_KEY = 'sftp.panelWidth'
-const TREE_KEY = 'sftp.treeOpen'
-const TREE_WIDTH_KEY = 'sftp.treeWidth'
-const COLS_KEY = 'sftp.columnWidths'
-/** Narrow enough to still show a name; wide enough for every column. */
-const MIN_WIDTH = 260
-const MAX_WIDTH = 1400
-/**
- * Wide enough to hold `DEFAULT_COLUMNS` without scrolling sideways, with room
- * left for the vertical scrollbar — which any listing longer than the panel
- * puts there, and which would otherwise squeeze the last column back out.
- */
-const DEFAULT_WIDTH = 680
-const MIN_TREE = 120
-const MIN_COL = 44
-/** Generous enough for a long name or a full path, short of silly. */
-const MAX_COL = 600
-
-interface ColumnWidths {
-  name: number
-  size: number
-  changed: number
-  perms: number
-  owner: number
-  group: number
-}
-
-/**
- * Chosen to add up — with the gaps and padding — to just under `DEFAULT_WIDTH`,
- * so a panel nobody has resized shows all six columns instead of opening on a
- * horizontal scrollbar with the last one already cut in half.
- */
-const DEFAULT_COLUMNS: ColumnWidths = {
-  name: 200,
-  size: 62,
-  changed: 124,
-  perms: 76,
-  owner: 64,
-  group: 64
-}
-
-/** Header order, which is also row order — the two are drawn from this list. */
-const COLUMNS: [keyof ColumnWidths, string][] = [
-  ['name', 'Name'],
-  ['size', 'Size'],
-  ['changed', 'Changed'],
-  ['perms', 'Rights'],
-  ['owner', 'Owner'],
-  ['group', 'Group']
-]
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value))
-}
-
-function loadNumber(key: string, fallback: number, min: number, max: number): number {
-  const stored = Number(localStorage.getItem(key))
-  if (!Number.isFinite(stored) || stored <= 0) return fallback
-  return clamp(stored, min, max)
-}
-
-function loadColumns(): ColumnWidths {
-  try {
-    const raw = localStorage.getItem(COLS_KEY)
-    if (!raw) return DEFAULT_COLUMNS
-    const stored = JSON.parse(raw) as Partial<ColumnWidths>
-    const out = { ...DEFAULT_COLUMNS }
-    for (const key of Object.keys(DEFAULT_COLUMNS) as (keyof ColumnWidths)[]) {
-      const value = Number(stored[key])
-      // A layout saved before the name was resizable simply has no entry for it,
-      // and keeps the default.
-      if (Number.isFinite(value) && value > 0) out[key] = clamp(value, minWidthOf(key), MAX_COL)
-    }
-    return out
-  } catch {
-    // A layout is not worth failing over; fall back to the stock widths.
-    return DEFAULT_COLUMNS
-  }
-}
-
-/** A fixed column: never grows, never shrinks, so the header stays over its rows. */
-function col(width: number): { flex: string; width: number } {
-  return { flex: `0 0 ${width}px`, width }
-}
-
-/** Must match the row's `gap` and horizontal `padding`. */
-const ROW_GAP = 10
-const ROW_PADDING = 16
-/** A name column narrower than this shows nothing useful, so dragging stops here. */
-const NAME_MIN = 90
-
-/** The floor a given column may be dragged down to. */
-function minWidthOf(key: keyof ColumnWidths): number {
-  return key === 'name' ? NAME_MIN : MIN_COL
-}
-
-/**
- * How wide a row has to be for every column to fit.
- *
- * Rows cannot be sized by their content: a long filename would widen that row's
- * name cell and shove the columns after it out of line with every other row. So
- * every column, the name included, is exactly as wide as it was dragged to be,
- * and the listing scrolls sideways when the panel cannot hold them all.
- */
-function minRowWidth(columns: ColumnWidths): number {
-  const widths = Object.values(columns)
-  const gaps = ROW_GAP * (widths.length - 1)
-  return widths.reduce((sum, w) => sum + w, 0) + gaps + ROW_PADDING
-}
-
 export default function SftpPanel({ connectionId }: { connectionId?: string }): JSX.Element {
+  const t = useT()
   const externalEditor = useStore((s) => s.settings.externalEditor)
   const [path, setPath] = useState('.')
   /** What is in the path box, which may differ from `path` while being edited. */
@@ -199,11 +91,9 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
    * connection, switched right where the directory is being looked at.
    */
   const [following, setFollowing] = useState(false)
-  const [treeOpen, setTreeOpen] = useState(() => localStorage.getItem(TREE_KEY) !== 'false')
-  const [width, setWidth] = useState(() =>
-    loadNumber(WIDTH_KEY, DEFAULT_WIDTH, MIN_WIDTH, MAX_WIDTH)
-  )
-  const [treeWidth, setTreeWidth] = useState(() => loadNumber(TREE_WIDTH_KEY, 190, MIN_TREE, 600))
+  const [treeOpen, setTreeOpen] = useState(loadTreeOpen)
+  const [width, setWidth] = useState(loadPanelWidth)
+  const [treeWidth, setTreeWidth] = useState(loadTreeWidth)
   const [columns, setColumns] = useState<ColumnWidths>(loadColumns)
   const rowWidth = minRowWidth(columns)
   const lastClickedRef = useRef<string | null>(null)
@@ -257,16 +147,13 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
       minWidthOf(key),
       MAX_COL,
       (next) => setColumns((cur) => ({ ...cur, [key]: next })),
-      (final) => {
-        const next = { ...columns, [key]: final }
-        localStorage.setItem(COLS_KEY, JSON.stringify(next))
-      }
+      (final) => saveColumns({ ...columns, [key]: final })
     )
   }
 
   function toggleTree(): void {
     setTreeOpen((open) => {
-      localStorage.setItem(TREE_KEY, String(!open))
+      saveTreeOpen(!open)
       return !open
     })
   }
@@ -289,6 +176,10 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
       if (pathRef.current === cwd) return
       load(cwd)
     })
+    // `load` is redeclared every render and is left out on purpose: listing it
+    // would drop and re-add this subscription on every keystroke in the panel.
+    // The one value it needs to be current about is the path, which it reads
+    // from a ref rather than from the closure.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectionId])
 
@@ -386,6 +277,9 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
       .realpath(connectionId, '.')
       .then((resolved) => load(resolved))
       .catch(() => load('.'))
+    // Once per connection, which is what `[connectionId]` says. `load` is left
+    // out for the same reason as above; listing it would send the panel back to
+    // the home directory on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectionId])
 
@@ -397,6 +291,10 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
     if (busy) return
     const id = setInterval(() => refresh(true), 5000)
     return () => clearInterval(id)
+    // Everything `refresh` reads that can change — the connection and the path —
+    // is listed, so the timer is rebuilt when they do. `refresh` itself is not:
+    // a new identity every render would restart the five-second clock on every
+    // render, which is a poll that never fires.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectionId, path, transfer, renaming, newFolder, menu])
 
@@ -569,8 +467,8 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
     // Dragging a row outside the selection takes that row alone, matching what
     // right-clicking one does.
     const targets = selected.has(entry.path) ? selectedEntries() : [entry]
-    activeDrag = { connectionId, paths: targets.map((t) => t.path) }
-    e.dataTransfer.setData(SFTP_DRAG, JSON.stringify(activeDrag))
+    const payload = beginDrag({ connectionId, paths: targets.map((entry) => entry.path) })
+    e.dataTransfer.setData(SFTP_DRAG, JSON.stringify(payload))
     e.dataTransfer.effectAllowed = 'copy'
   }
 
@@ -580,9 +478,7 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
    * dropping a file back onto its own host would be a copy onto itself.
    */
   function acceptsDrag(e: ReactDragEvent): boolean {
-    if (!connectionId) return false
-    if (e.dataTransfer.types.includes('Files')) return true
-    return e.dataTransfer.types.includes(SFTP_DRAG) && activeDrag?.connectionId !== connectionId
+    return acceptsDrop(e.dataTransfer.types, draggedNow()?.connectionId, connectionId)
   }
 
   /** Marks a folder row as where the drop would land, instead of the listing. */
@@ -672,22 +568,22 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
     const only = targets.length === 1 ? targets[0] : undefined
 
     if (only?.isDirectory) {
-      items.push({ label: 'Open', onSelect: () => load(only.path) })
-      items.push({ label: 'Download folder…', onSelect: () => download(only) })
+      items.push({ label: t('Open'), onSelect: () => load(only.path) })
+      items.push({ label: t('Download folder…'), onSelect: () => download(only) })
     }
     if (only && !only.isDirectory) {
-      items.push({ label: 'Edit locally', onSelect: () => edit(only) })
-      items.push({ label: 'Download', onSelect: () => download(only) })
+      items.push({ label: t('Edit locally'), onSelect: () => edit(only) })
+      items.push({ label: t('Download'), onSelect: () => download(only) })
     }
     if (only) {
       items.push({
-        label: 'Rename…',
+        label: t('Rename…'),
         onSelect: () => setRenaming({ entry: only, value: only.name })
       })
     }
     if (only && !only.isDirectory) {
       items.push({
-        label: 'Compare with a local file…',
+        label: t('Compare with a local file…'),
         onSelect: async () => {
           const local = await window.td.dialogs.pickOpenPath()
           if (local) setComparing({ remote: only.path, local })
@@ -696,20 +592,21 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
     }
     if (targets.length > 0) {
       items.push({
-        label: `Delete${targets.length > 1 ? ` ${targets.length} items` : ''}`,
+        label:
+          targets.length > 1 ? t('Delete {count} items', { count: targets.length }) : t('Delete'),
         danger: true,
         onSelect: () => setPendingDelete(targets)
       })
     }
 
     items.push({
-      label: 'New folder…',
+      label: t('New folder…'),
       separated: targets.length > 0,
       onSelect: () => setNewFolder('')
     })
-    items.push({ label: 'Upload file…', onSelect: upload })
-    items.push({ label: 'Upload folder…', onSelect: uploadFolder })
-    items.push({ label: 'Refresh', onSelect: () => refresh() })
+    items.push({ label: t('Upload file…'), onSelect: upload })
+    items.push({ label: t('Upload folder…'), onSelect: uploadFolder })
+    items.push({ label: t('Refresh'), onSelect: () => refresh() })
     return items
   }
 
@@ -740,23 +637,23 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
     >
       <div
         className="sftp-resize"
-        title="Drag to resize the panel"
+        title={t('Drag to resize the panel')}
         onMouseDown={(e) =>
-          startDrag(e, width, -1, MIN_WIDTH, MAX_WIDTH, setWidth, (final) =>
-            localStorage.setItem(WIDTH_KEY, String(final))
+          startDrag(e, width, -1, PANEL_MIN, PANEL_MAX, setWidth, (final) =>
+            savePanelWidth(final)
           )
         }
       />
       <div className="sftp-path" onClick={(e) => e.stopPropagation()}>
         <button
           className={treeOpen ? 'active' : ''}
-          title={treeOpen ? 'Hide the folder tree' : 'Show the folder tree'}
+          title={treeOpen ? t('Hide the folder tree') : t('Show the folder tree')}
           onClick={toggleTree}
         >
           ⊞
         </button>
         <button
-          title="Up one level"
+          title={t('Up one level')}
           disabled={path === '/' || path === '.'}
           onClick={() => load(parentOf(path))}
         >
@@ -781,14 +678,14 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
           disabled={!connectionId}
           title={
             following
-              ? 'Following the terminal’s directory — click to stop'
-              : 'Follow the terminal’s directory (sends a setup line to the shell)'
+              ? t('Following the terminal’s directory — click to stop')
+              : t('Follow the terminal’s directory (sends a setup line to the shell)')
           }
           onClick={toggleFollow}
         >
           ⇉
         </button>
-        <button title="Refresh" onClick={() => refresh()}>
+        <button title={t('Refresh')} onClick={() => refresh()}>
           ⟳
         </button>
       </div>
@@ -816,10 +713,10 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
             </div>
             <div
               className="sftp-split"
-              title="Drag to resize the tree"
+              title={t('Drag to resize the tree')}
               onMouseDown={(e) =>
-                startDrag(e, treeWidth, 1, MIN_TREE, 600, setTreeWidth, (final) =>
-                  localStorage.setItem(TREE_WIDTH_KEY, String(final))
+                startDrag(e, treeWidth, 1, TREE_MIN, TREE_MAX, setTreeWidth, (final) =>
+                  saveTreeWidth(final)
                 )
               }
             />
@@ -829,10 +726,10 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
           <div className="sftp-head" style={{ minWidth: rowWidth }}>
             {COLUMNS.map(([key, label]) => (
               <span key={key} className={`head-cell ${key}`} style={col(columns[key])}>
-                {label}
+                {t(label)}
                 <span
                   className="col-grip"
-                  title={`Drag to resize ${label}`}
+                  title={t('Drag to resize {column}', { column: t(label) })}
                   onMouseDown={(e) => resizeColumn(key, e)}
                 />
               </span>
@@ -859,7 +756,7 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
               draggable={!renaming}
               onDragStart={(ev) => onRowDragStart(ev, e)}
               onDragEnd={() => {
-                activeDrag = null
+                endDrag()
                 setDragging(false)
                 setDropDir(null)
               }}
@@ -869,8 +766,8 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
               onDoubleClick={() => (e.isDirectory ? load(e.path) : download(e))}
               title={
                 e.isDirectory
-                  ? 'Double-click to open, or drag onto another host’s panel to copy'
-                  : 'Double-click to download, or drag onto another host’s panel to copy'
+                  ? t('Double-click to open, or drag onto another host’s panel to copy')
+                  : t('Double-click to download, or drag onto another host’s panel to copy')
               }
             >
               {renaming?.entry.path === e.path ? (
@@ -891,7 +788,10 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
                   <span className={`name kind-${kindOf(e)}`} style={col(columns.name)} title={e.name}>
                     {e.isDirectory ? '📁' : '📄'} {e.name}
                     {editing.has(e.path) && (
-                      <span className="no-inherit" title="Open in a local editor; saves upload">
+                      <span
+                        className="no-inherit"
+                        title={t('Open in a local editor; saves upload')}
+                      >
                         ✎
                       </span>
                     )}
@@ -905,7 +805,7 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
                   <span
                     className={`perms kind-${kindOf(e)}`}
                     style={col(columns.perms)}
-                    title={`Mode ${e.permissions}`}
+                    title={t('Mode {mode}', { mode: e.permissions })}
                   >
                     {formatPermissions(e.permissions)}
                   </span>
@@ -924,7 +824,7 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
               <input
                 autoFocus
                 className="rename-input"
-                placeholder="New folder name"
+                placeholder={t('New folder name')}
                 value={newFolder}
                 onClick={(ev) => ev.stopPropagation()}
                 onChange={(ev) => setNewFolder(ev.target.value)}
@@ -965,7 +865,7 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
         />
       )}
 
-      {saved && <div className="sftp-saved">Uploaded {saved}</div>}
+      {saved && <div className="sftp-saved">{t('Uploaded {name}', { name: saved })}</div>}
 
       {transfer && (
         <div className="sftp-progress">
@@ -986,7 +886,7 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
 
       <div style={{ padding: 6, borderTop: '1px solid var(--border)' }}>
         <button onClick={upload} style={{ width: '100%' }}>
-          Upload file…
+          {t('Upload file…')}
         </button>
       </div>
 
@@ -1002,9 +902,15 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
       {pendingDelete && (
         <ModalBackdrop onClose={() => setPendingDelete(null)}>
           <div className="modal-card" style={{ width: 380 }} onClick={(e) => e.stopPropagation()}>
-            <h2>Delete {pendingDelete.length > 1 ? `${pendingDelete.length} items` : 'item'}?</h2>
+            <h2>
+              {pendingDelete.length > 1
+                ? t('Delete {count} items?', { count: pendingDelete.length })
+                : t('Delete item?')}
+            </h2>
             <p>
-              This permanently removes the following from the remote host — it cannot be undone:
+              {t(
+                'This permanently removes the following from the remote host — it cannot be undone:'
+              )}
             </p>
             <div className="delete-list">
               {pendingDelete.map((e) => (
@@ -1014,9 +920,9 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
               ))}
             </div>
             <div className="modal-actions">
-              <button onClick={() => setPendingDelete(null)}>Cancel</button>
+              <button onClick={() => setPendingDelete(null)}>{t('Cancel')}</button>
               <button className="danger" onClick={() => doDelete(pendingDelete)}>
-                Delete
+                {t('Delete')}
               </button>
             </div>
           </div>
