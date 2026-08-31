@@ -3,8 +3,10 @@ import { nanoid } from 'nanoid'
 import type { SessionProfile, SshConfigHost } from '../../../shared/types'
 import { useStore } from '../state/store'
 import ModalBackdrop from './ModalBackdrop'
+import { useT } from '../i18n'
 
 export default function ImportSshConfigDialog({ onClose }: { onClose: () => void }): JSX.Element {
+  const t = useT()
   const sessions = useStore((s) => s.sessions)
   const upsertSession = useStore((s) => s.upsertSession)
 
@@ -23,6 +25,9 @@ export default function ImportSshConfigDialog({ onClose }: { onClose: () => void
         setPicked(new Set(list.filter((h) => !existing.has(h.alias)).map((h) => h.alias)))
       })
       .catch((err) => setError((err as Error).message))
+    // Reads ~/.ssh/config once, when the dialog opens, and pre-selects against
+    // the sessions as they stand at that moment. Re-running on every change to
+    // `sessions` would undo the ticks the user has just made.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -82,18 +87,19 @@ export default function ImportSshConfigDialog({ onClose }: { onClose: () => void
   return (
     <ModalBackdrop onClose={onClose}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <h2>Import from ~/.ssh/config</h2>
+        <h2>{t('Import from ~/.ssh/config')}</h2>
 
-        {hosts === null && <p>Reading ~/.ssh/config…</p>}
+        {hosts === null && <p>{t('Reading ~/.ssh/config…')}</p>}
         {hosts !== null && hosts.length === 0 && (
-          <p>No usable Host entries found in ~/.ssh/config.</p>
+          <p>{t('No usable Host entries found in ~/.ssh/config.')}</p>
         )}
 
         {hosts !== null && hosts.length > 0 && (
           <>
             <p>
-              Selected hosts become TerminalDeck sessions. Passwords aren’t stored in ssh config, so
-              key-based entries use their IdentityFile and the rest fall back to the SSH agent.
+              {t(
+                'Selected hosts become TerminalDeck sessions. Passwords aren’t stored in ssh config, so key-based entries use their IdentityFile and the rest fall back to the SSH agent.'
+              )}
             </p>
             <div className="import-list">
               {hosts.map((h) => (
@@ -119,13 +125,13 @@ export default function ImportSshConfigDialog({ onClose }: { onClose: () => void
         {error && <span className="error-text">{error}</span>}
 
         <div className="modal-actions">
-          <button onClick={onClose}>Cancel</button>
+          <button onClick={onClose}>{t('Cancel')}</button>
           <button
             className="primary"
             onClick={doImport}
             disabled={busy || picked.size === 0}
           >
-            Import {picked.size > 0 ? `(${picked.size})` : ''}
+            {t('Import')} {picked.size > 0 ? `(${picked.size})` : ''}
           </button>
         </div>
       </div>

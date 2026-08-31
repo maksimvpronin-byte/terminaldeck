@@ -5,6 +5,7 @@ import type { Snippet } from '../../../shared/types'
 import { useStore, allRoots } from '../state/store'
 import { collectBroadcastTargets } from '../state/paneTree'
 import ModalBackdrop from './ModalBackdrop'
+import { useT } from '../i18n'
 
 function blank(): Snippet {
   const now = Date.now()
@@ -12,6 +13,7 @@ function blank(): Snippet {
 }
 
 export default function SnippetPalette({ onClose }: { onClose: () => void }): JSX.Element {
+  const t = useT()
   const snippets = useStore((s) => s.snippets)
   const upsertSnippet = useStore((s) => s.upsertSnippet)
   const removeSnippet = useStore((s) => s.removeSnippet)
@@ -66,7 +68,7 @@ export default function SnippetPalette({ onClose }: { onClose: () => void }): JS
     if (!editing || !editing.name.trim() || !editing.command.trim()) return
     const tags = tagsInput
       .split(',')
-      .map((t) => t.trim())
+      .map((tag) => tag.trim())
       .filter(Boolean)
     await upsertSnippet({ ...editing, tags, updatedAt: Date.now() })
     setEditing(null)
@@ -77,9 +79,9 @@ export default function SnippetPalette({ onClose }: { onClose: () => void }): JS
     return (
       <ModalBackdrop onClose={() => setEditing(null)}>
         <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-          <h2>{snippets.some((s) => s.id === editing.id) ? 'Edit snippet' : 'New snippet'}</h2>
+          <h2>{snippets.some((s) => s.id === editing.id) ? t('Edit snippet') : t('New snippet')}</h2>
           <label>
-            Name
+            {t('Name')}
             <input
               autoFocus
               value={editing.name}
@@ -87,7 +89,7 @@ export default function SnippetPalette({ onClose }: { onClose: () => void }): JS
             />
           </label>
           <label>
-            Command
+            {t('Command')}
             <textarea
               rows={4}
               value={editing.command}
@@ -95,17 +97,17 @@ export default function SnippetPalette({ onClose }: { onClose: () => void }): JS
             />
           </label>
           <label>
-            Tags (comma separated)
+            {t('Tags (comma separated)')}
             <input value={tagsInput} onChange={(e) => setTagsInput(e.target.value)} />
           </label>
           <div className="modal-actions">
-            <button onClick={() => setEditing(null)}>Cancel</button>
+            <button onClick={() => setEditing(null)}>{t('Cancel')}</button>
             <button
               className="primary"
               onClick={saveEditing}
               disabled={!editing.name.trim() || !editing.command.trim()}
             >
-              Save
+              {t('Save')}
             </button>
           </div>
         </div>
@@ -119,7 +121,7 @@ export default function SnippetPalette({ onClose }: { onClose: () => void }): JS
         <input
           autoFocus
           className="palette-input"
-          placeholder="Search snippets…"
+          placeholder={t('Search snippets…')}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={onKeyDown}
@@ -127,14 +129,16 @@ export default function SnippetPalette({ onClose }: { onClose: () => void }): JS
 
         <div className={`palette-target ${broadcast ? 'broadcasting' : ''}`}>
           {broadcast
-            ? `Broadcast is on — runs in ${targetCount} terminal${targetCount === 1 ? '' : 's'}`
-            : 'Runs in the focused terminal'}
+            ? t('Broadcast is on — terminals it runs in: {count}', { count: targetCount })
+            : t('Runs in the focused terminal')}
         </div>
 
         <div className="palette-list">
           {matches.length === 0 && (
             <div className="palette-empty">
-              {snippets.length === 0 ? 'No snippets yet.' : `Nothing matches “${query}”.`}
+              {snippets.length === 0
+                ? t('No snippets yet.')
+                : t('Nothing matches “{query}”.', { query })}
             </div>
           )}
           {matches.map((s, i) => (
@@ -149,9 +153,9 @@ export default function SnippetPalette({ onClose }: { onClose: () => void }): JS
                 <span className="palette-command">{s.command}</span>
               </div>
               <div className="palette-row-actions">
-                {s.tags.map((t) => (
-                  <span className="palette-tag" key={t}>
-                    {t}
+                {s.tags.map((tag) => (
+                  <span className="palette-tag" key={tag}>
+                    {tag}
                   </span>
                 ))}
                 <button
@@ -161,7 +165,7 @@ export default function SnippetPalette({ onClose }: { onClose: () => void }): JS
                     setTagsInput(s.tags.join(', '))
                   }}
                 >
-                  Edit
+                  {t('Edit')}
                 </button>
                 <button
                   className="danger"
@@ -178,14 +182,14 @@ export default function SnippetPalette({ onClose }: { onClose: () => void }): JS
         </div>
 
         <div className="palette-footer">
-          <span>⏎ run · ⇧⏎ paste without running · ↑↓ move · esc close</span>
+          <span>{t('⏎ run · ⇧⏎ paste without running · ↑↓ move · esc close')}</span>
           <button
             onClick={() => {
               setEditing(blank())
               setTagsInput('')
             }}
           >
-            + New snippet
+            + {t('New snippet')}
           </button>
         </div>
       </div>

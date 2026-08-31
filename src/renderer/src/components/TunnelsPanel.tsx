@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { nanoid } from 'nanoid'
 import type { PortForwardRule } from '../../../shared/types'
 import { useStore } from '../state/store'
+import { useT } from '../i18n'
 
 export function describeRule(rule: PortForwardRule): string {
   const src = `${rule.srcHost}:${rule.srcPort}`
@@ -27,6 +28,7 @@ interface Props {
 }
 
 export default function TunnelsPanel({ connectionId, sessionId }: Props): JSX.Element {
+  const t = useT()
   const sessions = useStore((s) => s.sessions)
   const profile = sessionId ? sessions.find((s) => s.id === sessionId) : undefined
 
@@ -76,11 +78,11 @@ export default function TunnelsPanel({ connectionId, sessionId }: Props): JSX.El
 
   return (
     <div className="side-panel">
-      <div className="side-panel-title">Tunnels</div>
+      <div className="side-panel-title">{t('Tunnels')}</div>
       <div className="side-panel-list">
         {rules.length === 0 && (
           <div className="side-panel-empty">
-            No forwarding rules. Rules saved on a session start automatically when it connects.
+            {t('No forwarding rules. Rules saved on a session start automatically when it connects.')}
           </div>
         )}
         {rules.map((r) => {
@@ -92,7 +94,7 @@ export default function TunnelsPanel({ connectionId, sessionId }: Props): JSX.El
                 {describeRule(r)}
               </span>
               <button onClick={() => toggle(r)} disabled={!connectionId}>
-                {running ? 'Stop' : 'Start'}
+                {running ? t('Stop') : t('Start')}
               </button>
             </div>
           )
@@ -111,21 +113,21 @@ export default function TunnelsPanel({ connectionId, sessionId }: Props): JSX.El
             value={draft.type}
             onChange={(e) => setDraft({ ...draft, type: e.target.value as PortForwardRule['type'] })}
           >
-            <option value="local">Local</option>
-            <option value="remote">Remote</option>
-            <option value="dynamic">Dynamic (SOCKS)</option>
+            <option value="local">{t('Local')}</option>
+            <option value="remote">{t('Remote')}</option>
+            <option value="dynamic">{t('Dynamic (SOCKS)')}</option>
           </select>
           <div className="form-row">
             <input
               value={draft.srcHost}
               onChange={(e) => setDraft({ ...draft, srcHost: e.target.value })}
-              placeholder="bind host"
+              placeholder={t('bind host')}
             />
             <input
               type="number"
               value={draft.srcPort}
               onChange={(e) => setDraft({ ...draft, srcPort: Number(e.target.value) })}
-              placeholder="port"
+              placeholder={t('port')}
             />
           </div>
           {draft.type !== 'dynamic' && (
@@ -133,27 +135,27 @@ export default function TunnelsPanel({ connectionId, sessionId }: Props): JSX.El
               <input
                 value={draft.dstHost ?? ''}
                 onChange={(e) => setDraft({ ...draft, dstHost: e.target.value })}
-                placeholder="target host"
+                placeholder={t('target host')}
               />
               <input
                 type="number"
                 value={draft.dstPort ?? 0}
                 onChange={(e) => setDraft({ ...draft, dstPort: Number(e.target.value) })}
-                placeholder="port"
+                placeholder={t('port')}
               />
             </div>
           )}
           <div className="modal-actions">
-            <button onClick={() => setDraft(null)}>Cancel</button>
+            <button onClick={() => setDraft(null)}>{t('Cancel')}</button>
             <button className="primary" onClick={addDraft}>
-              Add
+              {t('Add')}
             </button>
           </div>
         </div>
       ) : (
         <div style={{ padding: 6, borderTop: '1px solid var(--border)' }}>
           <button style={{ width: '100%' }} onClick={() => setDraft(blankRule())}>
-            + Ad-hoc tunnel
+            + {t('Ad-hoc tunnel')}
           </button>
         </div>
       )}

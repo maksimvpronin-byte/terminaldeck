@@ -3,6 +3,7 @@ import type { HostCollection } from '../../../shared/types'
 import { useStore, collectConnectedSessionIds, allRoots } from '../state/store'
 import { colorOf, findHost } from '../state/hosts'
 import ContextMenu, { type MenuItem } from './ContextMenu'
+import { useT } from '../i18n'
 import CollectionDialog from './CollectionDialog'
 
 const COLLAPSED_KEY = 'terminaldeck.collapsedCollections'
@@ -17,6 +18,7 @@ function loadCollapsed(): Set<string> {
 }
 
 export default function CollectionsPanel({ query }: { query: string }): JSX.Element {
+  const t = useT()
   const collections = useStore((s) => s.collections)
   const loadCollections = useStore((s) => s.loadCollections)
   const removeCollection = useStore((s) => s.removeCollection)
@@ -83,12 +85,12 @@ export default function CollectionsPanel({ query }: { query: string }): JSX.Elem
     const live = collection.hostIds.filter((id) => findHost(useStore.getState(), id)).length
     return [
       {
-        label: `Open in a new workspace (${live})`,
+        label: t('Open in a new workspace ({count})', { count: live }),
         disabled: live === 0,
         onSelect: () => openCollection(collection.id)
       },
       {
-        label: 'Open tiled in one tab',
+        label: t('Open tiled in one tab'),
         disabled: live === 0,
         onSelect: () => {
           const items = collection.hostIds
@@ -103,19 +105,19 @@ export default function CollectionsPanel({ query }: { query: string }): JSX.Elem
           openMany(items, 'grid')
         }
       },
-      { label: 'Edit…', separated: true, onSelect: () => setEditing(collection) },
+      { label: t('Edit…'), separated: true, onSelect: () => setEditing(collection) },
       {
-        label: 'Move up',
+        label: t('Move up'),
         disabled: collections.indexOf(collection) === 0,
         onSelect: () => moveCollection(collection.id, -1)
       },
       {
-        label: 'Move down',
+        label: t('Move down'),
         disabled: collections.indexOf(collection) === collections.length - 1,
         onSelect: () => moveCollection(collection.id, 1)
       },
       {
-        label: 'Delete collection',
+        label: t('Delete collection'),
         danger: true,
         separated: true,
         onSelect: () => removeCollection(collection.id)
@@ -135,10 +137,10 @@ export default function CollectionsPanel({ query }: { query: string }): JSX.Elem
     <>
       <div className="tree-group">
         <div className="tree-group-title collections-heading">
-          <span>Collections</span>
+          <span>{t('Collections')}</span>
           <button
             className="icon-button"
-            title="New collection"
+            title={t('New collection')}
             onClick={() => setEditing('new')}
           >
             +
@@ -147,8 +149,9 @@ export default function CollectionsPanel({ query }: { query: string }): JSX.Elem
 
         {collections.length === 0 && (
           <div style={{ padding: '4px 12px 8px', color: 'var(--text-dim)', fontSize: 11, lineHeight: 1.5 }}>
-            Your own sets of hosts, across any groups. Tick hosts above and press
-            <strong> Collect</strong>, or right-click a workspace and save it here.
+            {t('Your own sets of hosts, across any groups. Tick hosts above and press')}
+            <strong> {t('Collect')}</strong>
+            {t(', or right-click a workspace and save it here.')}
           </div>
         )}
 
@@ -168,7 +171,7 @@ export default function CollectionsPanel({ query }: { query: string }): JSX.Elem
                   e.stopPropagation()
                   setMenu({ x: e.clientX, y: e.clientY, items: collectionMenu(collection) })
                 }}
-                title="Double-click to open the whole set in a new workspace"
+                title={t('Double-click to open the whole set in a new workspace')}
               >
                 <span className="tree-group-title name">
                   <span className="chevron">{isCollapsed ? '▸' : '▾'}</span>
@@ -181,20 +184,20 @@ export default function CollectionsPanel({ query }: { query: string }): JSX.Elem
                 </span>
                 <div className="actions">
                   <button
-                    title="Open every host in a new workspace"
+                    title={t('Open every host in a new workspace')}
                     onClick={(e) => {
                       e.stopPropagation()
                       openCollection(collection.id)
                     }}
                   >
-                    Open
+                    {t('Open')}
                   </button>
                 </div>
               </div>
 
               <div className="inventory-meta" style={{ paddingLeft: 34 }}>
-                {members.length} host{members.length === 1 ? '' : 's'}
-                {missing > 0 ? ` · ${missing} missing` : ''}
+                {t('Hosts: {count}', { count: members.length })}
+                {missing > 0 ? t(' · {count} missing', { count: missing }) : ''}
               </div>
 
               {!isCollapsed &&
@@ -203,7 +206,7 @@ export default function CollectionsPanel({ query }: { query: string }): JSX.Elem
                     key={m.id}
                     className="tree-item"
                     style={{ paddingLeft: 28 }}
-                    title={m.missing ? undefined : 'Double-click to connect'}
+                    title={m.missing ? undefined : t('Double-click to connect')}
                     onDoubleClick={() => {
                       if (!m.missing) {
                         // Opened from here, so this set lends its look.
@@ -223,7 +226,7 @@ export default function CollectionsPanel({ query }: { query: string }): JSX.Elem
                         y: e.clientY,
                         items: [
                           {
-                            label: 'Remove from collection',
+                            label: t('Remove from collection'),
                             danger: true,
                             onSelect: () => removeFromCollection(collection.id, m.id)
                           }
@@ -239,7 +242,7 @@ export default function CollectionsPanel({ query }: { query: string }): JSX.Elem
                       />
                       {m.missing ? (
                         <span style={{ color: 'var(--text-dim)' }}>
-                          {m.name} — no longer exists
+                          {t('{name} — no longer exists', { name: m.name })}
                         </span>
                       ) : (
                         m.name

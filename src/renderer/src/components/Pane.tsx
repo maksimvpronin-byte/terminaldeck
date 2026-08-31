@@ -207,7 +207,7 @@ export default function Pane({
               const state = useStore.getState()
               // A terminal excluded from broadcast keeps its own input to itself.
               if (!state.broadcast || !node.broadcastEnabled) return [own]
-              const all = allTabs(state).flatMap((t) => collectBroadcastTargets(t.root))
+              const all = allTabs(state).flatMap((tab) => collectBroadcastTargets(tab.root))
               return all.length > 0 ? all : [own]
             }}
           />

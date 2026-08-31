@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import type { ImportSummary } from '../../../shared/types'
 import { useStore } from '../state/store'
+import { useT } from '../i18n'
 
 export default function BackupSettings(): JSX.Element {
+  const t = useT()
   const loadStore = useStore((s) => s.loadStore)
   const loadSnippets = useStore((s) => s.loadSnippets)
   const loadInventory = useStore((s) => s.loadInventory)
@@ -22,7 +24,7 @@ export default function BackupSettings(): JSX.Element {
     // Longer than the vault's own minimum: this file can be copied off the
     // machine and attacked offline for as long as someone cares to.
     if (includeSecrets && exportPassword.length < 12) {
-      setError('Use at least 12 characters — this file can be attacked offline')
+      setError(t('Use at least 12 characters — this file can be attacked offline'))
       return
     }
     try {
@@ -31,7 +33,7 @@ export default function BackupSettings(): JSX.Element {
         includeSecrets ? exportPassword : undefined
       )
       if (path) {
-        setDone(`Exported to ${path}`)
+        setDone(t('Exported to {path}', { path }))
         setExportPassword('')
       }
     } catch (err) {
@@ -49,11 +51,22 @@ export default function BackupSettings(): JSX.Element {
       if (!summary) return
       await Promise.all([loadStore(), loadSnippets(), loadInventory(), loadCollections()])
       setImportPassword('')
+      // One sentence rather than five fragments: the numbers land where each
+      // language puts them, and a plural rule that differs is one entry to fix.
       setDone(
-        `Imported ${summary.sessions} sessions, ${summary.groups} groups, ` +
-          `${summary.snippets} snippets, ${summary.collections} collections, ` +
-          `${summary.inventorySources} repositories` +
-          (summary.secrets > 0 ? `, ${summary.secrets} credentials` : '')
+        t(
+          'Imported {sessions} sessions, {groups} groups, {snippets} snippets, {collections} collections, {repositories} repositories',
+          {
+            sessions: summary.sessions,
+            groups: summary.groups,
+            snippets: summary.snippets,
+            collections: summary.collections,
+            repositories: summary.inventorySources
+          }
+        ) +
+          (summary.secrets > 0
+            ? t(', and {secrets} credentials', { secrets: summary.secrets })
+            : '')
       )
     } catch (err) {
       setError((err as Error).message)
@@ -62,10 +75,11 @@ export default function BackupSettings(): JSX.Element {
 
   return (
     <>
-      <h3 className="settings-heading">Export</h3>
+      <h3 className="settings-heading">{t('Export')}</h3>
       <p className="settings-note">
-        Writes sessions, groups, snippets and inventory sources to one file. Terminal appearance
-        and trusted host keys stay on this machine.
+        {t(
+          'Writes sessions, groups, snippets and inventory sources to one file. Terminal appearance and trusted host keys stay on this machine.'
+        )}
       </p>
 
       <label className="checkbox-row" style={{ flexDirection: 'row' }}>
@@ -74,13 +88,13 @@ export default function BackupSettings(): JSX.Element {
           checked={includeSecrets}
           onChange={(e) => setIncludeSecrets(e.target.checked)}
         />
-        Include saved credentials
+        {t('Include saved credentials')}
       </label>
 
       {includeSecrets && (
         <>
           <label>
-            Password for the exported credentials
+            {t('Password for the exported credentials')}
             <input
               type="password"
               value={exportPassword}
@@ -88,32 +102,32 @@ export default function BackupSettings(): JSX.Element {
             />
           </label>
           <p className="settings-note">
-            Credentials are re-encrypted with AES-256-GCM under this password — the same scheme
-            the vault uses — and never written in the clear. A separate password is used so the
-            file can travel without handing over your master password.
+            {t(
+              'Credentials are re-encrypted with AES-256-GCM under this password — the same scheme the vault uses — and never written in the clear. A separate password is used so the file can travel without handing over your master password.'
+            )}
           </p>
           <p className="settings-note">
-            Treat the file as a secret all the same. Unlike the vault it leaves this machine and
-            the account protecting it, and can be attacked offline for as long as someone likes,
-            so use a long password and delete the file once the move is done. Lose the password
-            and those credentials are unrecoverable.
+            {t(
+              'Treat the file as a secret all the same. Unlike the vault it leaves this machine and the account protecting it, and can be attacked offline for as long as someone likes, so use a long password and delete the file once the move is done. Lose the password and those credentials are unrecoverable.'
+            )}
           </p>
         </>
       )}
 
       <div>
         <button className="primary" onClick={doExport}>
-          Export…
+          {t('Export…')}
         </button>
       </div>
 
-      <h3 className="settings-heading">Import</h3>
+      <h3 className="settings-heading">{t('Import')}</h3>
       <p className="settings-note">
-        Entries are matched by id: an existing one is replaced, a new one is added, and nothing
-        already here is deleted.
+        {t(
+          'Entries are matched by id: an existing one is replaced, a new one is added, and nothing already here is deleted.'
+        )}
       </p>
       <label>
-        Password, if the file contains credentials
+        {t('Password, if the file contains credentials')}
         <input
           type="password"
           value={importPassword}
@@ -121,7 +135,7 @@ export default function BackupSettings(): JSX.Element {
         />
       </label>
       <div>
-        <button onClick={doImport}>Import…</button>
+        <button onClick={doImport}>{t('Import…')}</button>
       </div>
 
       {error && <span className="error-text">{error}</span>}

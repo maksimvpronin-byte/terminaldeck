@@ -12,6 +12,11 @@ interface State {
 /**
  * Turns a renderer crash into something readable.
  *
+ * Deliberately not translated. The phrase book is read through the store, and
+ * this screen exists for the case where something in that tree has just thrown
+ * — asking the crashed application to look up its own error message is how a
+ * crash screen becomes a blank one.
+ *
  * Without this, any exception thrown during render unmounts the whole tree and
  * leaves the window painted in the Electron background colour — a black screen
  * with nothing to act on, and no way to tell a crash apart from a hang. The

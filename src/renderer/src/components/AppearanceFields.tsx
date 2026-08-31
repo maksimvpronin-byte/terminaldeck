@@ -1,5 +1,6 @@
 import type { AppearanceDefaults, CursorStyle, ResolvedAppearance } from '../../../shared/types'
 import { FONT_CHOICES, THEME_GROUPS, themeByName } from '../state/settings'
+import { useT } from '../i18n'
 
 interface Props {
   value: AppearanceDefaults
@@ -29,6 +30,7 @@ export default function AppearanceFields({
   inheritedFrom,
   inheritToggle
 }: Props): JSX.Element {
+  const t = useT()
   const preview = themeByName(effective.themeName).terminal
   // Names the value an "Inherit" option would actually give, and where from.
   const via = (key: keyof AppearanceDefaults, shown: string): string =>
@@ -48,12 +50,12 @@ export default function AppearanceFields({
       )}
 
       <label>
-        Font
+        {t('Font')}
         <select
           value={value.fontFamily ?? ''}
           onChange={(e) => set('fontFamily', e.target.value || undefined)}
         >
-          <option value="">Inherit ({via('fontFamily', fontLabel(inherited.fontFamily))})</option>
+          <option value="">{t('Inherit')} ({via('fontFamily', fontLabel(inherited.fontFamily))})</option>
           {FONT_CHOICES.map((f) => (
             <option key={f} value={f}>
               {fontLabel(f)}
@@ -64,7 +66,7 @@ export default function AppearanceFields({
 
       <div className="form-row">
         <label>
-          Font size
+          {t('Font size')}
           <input
             type="number"
             min={8}
@@ -75,7 +77,7 @@ export default function AppearanceFields({
           />
         </label>
         <label>
-          Scrollback (lines)
+          {t('Scrollback (lines)')}
           <input
             type="number"
             min={100}
@@ -94,7 +96,7 @@ export default function AppearanceFields({
           value={value.themeName ?? ''}
           onChange={(e) => set('themeName', e.target.value || undefined)}
         >
-          <option value="">Inherit ({via('themeName', inherited.themeName)})</option>
+          <option value="">{t('Inherit')} ({via('themeName', inherited.themeName)})</option>
           {THEME_GROUPS.map((group) => (
             <optgroup key={group.label} label={group.label}>
               {group.names.map((name) => (
@@ -126,19 +128,19 @@ export default function AppearanceFields({
 
       <div className="form-row">
         <label>
-          Cursor style
+          {t('Cursor style')}
           <select
             value={value.cursorStyle ?? ''}
             onChange={(e) => set('cursorStyle', (e.target.value || undefined) as CursorStyle)}
           >
-            <option value="">Inherit ({via('cursorStyle', inherited.cursorStyle)})</option>
-            <option value="block">Block</option>
-            <option value="underline">Underline</option>
-            <option value="bar">Bar</option>
+            <option value="">{t('Inherit')} ({via('cursorStyle', inherited.cursorStyle)})</option>
+            <option value="block">{t('Block')}</option>
+            <option value="underline">{t('Underline')}</option>
+            <option value="bar">{t('Bar')}</option>
           </select>
         </label>
         <label>
-          Cursor blink
+          {t('Cursor blink')}
           {/* Three states, so a checkbox will not do: off is a real choice that
               has to outrank an inherited on. */}
           <select
@@ -150,8 +152,8 @@ export default function AppearanceFields({
             <option value="">
               Inherit ({via('cursorBlink', inherited.cursorBlink ? 'blinking' : 'steady')})
             </option>
-            <option value="on">Blinking</option>
-            <option value="off">Steady</option>
+            <option value="on">{t('Blinking')}</option>
+            <option value="off">{t('Steady')}</option>
           </select>
         </label>
       </div>

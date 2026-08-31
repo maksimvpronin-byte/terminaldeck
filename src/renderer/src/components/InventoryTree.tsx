@@ -12,6 +12,7 @@ import {
 import InventorySourceDialog from './InventorySourceDialog'
 import InventoryOverrideDialog from './InventoryOverrideDialog'
 import ContextMenu, { type MenuItem } from './ContextMenu'
+import { useT, type Translate } from '../i18n'
 import { RefreshIcon } from './icons'
 
 const COLLAPSED_KEY = 'terminaldeck.collapsedInventory'
@@ -25,16 +26,20 @@ function loadCollapsed(): Set<string> {
   }
 }
 
-function ago(ts?: number): string {
-  if (!ts) return 'never synced'
+/** Outside the component, so the phrase book is handed in rather than hooked. */
+function ago(t: Translate, ts?: number): string {
+  if (!ts) return t('never synced')
   const mins = Math.round((Date.now() - ts) / 60000)
-  if (mins < 1) return 'synced just now'
-  if (mins < 60) return `synced ${mins}m ago`
+  if (mins < 1) return t('synced just now')
+  if (mins < 60) return t('synced {count}m ago', { count: mins })
   const hours = Math.round(mins / 60)
-  return hours < 24 ? `synced ${hours}h ago` : `synced ${Math.round(hours / 24)}d ago`
+  return hours < 24
+    ? t('synced {count}h ago', { count: hours })
+    : t('synced {count}d ago', { count: Math.round(hours / 24) })
 }
 
 export default function InventoryTree({ query }: { query: string }): JSX.Element {
+  const t = useT()
   const sources = useStore((s) => s.inventorySources)
   const trees = useStore((s) => s.inventoryTrees)
   const overrides = useStore((s) => s.inventoryOverrides)
@@ -85,7 +90,7 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
 
   // Groups carry overrides too, so a whole Ansible group can be pointed at a
   // different bastion or user without touching the repository.
-  const allGroups: SessionGroup[] = trees.flatMap((t) => t.groups).map(withOverride)
+  const allGroups: SessionGroup[] = trees.flatMap((tree) => tree.groups).map(withOverride)
 
   /**
    * Hosts a group names. A host in several groups appears under each of them —
@@ -95,9 +100,9 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
    */
   function hostsOf(groupId: string): SessionProfile[] {
     return trees
-      .flatMap((t) =>
-        t.sessions.filter((h) => {
-          const claims = t.memberships?.[h.id]
+      .flatMap((tree) =>
+        tree.sessions.filter((h) => {
+          const claims = tree.memberships?.[h.id]
           return claims ? claims.includes(groupId) : h.groupId === groupId
         })
       )
@@ -121,13 +126,15 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
 
   /** What the last sync actually produced for a source, shown next to the revision. */
   function countsFor(sourceId: string): string {
-    const tree = trees.find((t) => t.sourceId === sourceId)
-    if (!tree) return 'not synced yet'
+    const tree = trees.find((candidate) => candidate.sourceId === sourceId)
+    if (!tree) return t('not synced yet')
     const hosts = tree.sessions.length
     // The source itself is always one group, so it does not count as content.
     const groups = Math.max(0, tree.groups.length - 1)
-    if (hosts === 0) return 'no hosts found'
-    return `${hosts} host${hosts === 1 ? '' : 's'}, ${groups} group${groups === 1 ? '' : 's'}`
+    if (hosts === 0) return t('no hosts found')
+    // Counted as "hosts: 3, groups: 1" rather than "3 hosts": one entry then
+    // serves every number, in a language that declines the noun three ways.
+    return t('hosts: {hosts}, groups: {groups}', { hosts, groups })
   }
 
   function connect(host: SessionProfile, colour?: string): void {
@@ -140,9 +147,9 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
     const auth = resolveAuth(host, host.groupId, allGroups)
     const overridden = overrides.some((o) => o.nodeId === host.id)
     return [
-      { label: 'Connect', onSelect: () => connect(host, colour) },
+      { label: t('Connect'), onSelect: () => connect(host, colour) },
       {
-        label: 'Connect in split',
+        label: t('Connect in split'),
         disabled: !activeTab,
         onSelect: () =>
           activeTab &&
@@ -157,18 +164,20 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
           )
       },
       {
-        label: `Copy ${auth.username ? `${auth.username}@` : ''}${host.host}`,
+        label: t('Copy {address}', {
+          address: `${auth.username ? `${auth.username}@` : ''}${host.host}`
+        }),
         separated: true,
         onSelect: () =>
           window.td.clipboard.write(`${auth.username ? `${auth.username}@` : ''}${host.host}`)
       },
       {
-        label: overridden ? 'Local settings…' : 'Override locally…',
+        label: overridden ? t('Local settings…') : t('Override locally…'),
         separated: true,
         onSelect: () => setOverriding(host)
       },
       {
-        label: 'Clear local override',
+        label: t('Clear local override'),
         disabled: !overridden,
         onSelect: () => clearInventoryOverride(host.id)
       }
@@ -220,12 +229,12 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
           )
       },
       {
-        label: overridden ? 'Local settings…' : 'Override locally…',
+        label: overridden ? t('Local settings…') : t('Override locally…'),
         separated: true,
         onSelect: () => setOverriding(group)
       },
       {
-        label: 'Clear local settings',
+        label: t('Clear local settings'),
         disabled: !overridden,
         onSelect: () => clearInventoryOverride(group.id)
       }
@@ -249,10 +258,10 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
             source.name
           )
       },
-      { label: 'Sync now', separated: true, onSelect: () => syncInventory(source.id) },
-      { label: 'Edit…', onSelect: () => setEditing(source) },
+      { label: t('Sync now'), separated: true, onSelect: () => syncInventory(source.id) },
+      { label: t('Edit…'), onSelect: () => setEditing(source) },
       {
-        label: 'Remove source',
+        label: t('Remove source'),
         danger: true,
         separated: true,
         onSelect: () => removeInventorySource(source.id)
@@ -281,7 +290,7 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
               <span className="tree-group-title name">
                 <span className="chevron">{isCollapsed ? '▸' : '▾'}</span> 📁 {g.name}
                 {overrides.some((o) => o.nodeId === g.id) && (
-                  <span className="no-inherit" title="Has local settings">
+                  <span className="no-inherit" title={t('Has local settings')}>
                     ✎
                   </span>
                 )}
@@ -334,7 +343,7 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
         style={{ paddingLeft }}
         onClick={(e) => onHostClick(e, host)}
         onDoubleClick={() => connect(host, dotColour)}
-        title="Double-click to connect"
+        title={t('Double-click to connect')}
         onContextMenu={(e) => {
           e.preventDefault()
           e.stopPropagation()
@@ -348,19 +357,23 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
             aria-hidden="true"
           />
           {host.name}
-          {connected.has(host.id) && <span className="live-dot" title="Connected" />}
+          {connected.has(host.id) && <span className="live-dot" title={t('Connected')} />}
           {membershipCount(host.id) > 1 && (
             <span
               className="no-inherit"
-              title={`In ${membershipCount(host.id)} groups — the same host, shown under each. Its connection settings come from ${
-                allGroups.find((g) => g.id === host.groupId)?.name ?? 'its group'
-              }.`}
+              title={t(
+                'In {count} groups — the same host, shown under each. Its connection settings come from {group}.',
+                {
+                  count: membershipCount(host.id),
+                  group: allGroups.find((g) => g.id === host.groupId)?.name ?? t('its group')
+                }
+              )}
             >
               ×{membershipCount(host.id)}
             </span>
           )}
           {overrides.some((o) => o.nodeId === host.id) && (
-            <span className="no-inherit" title="Has a local override">
+            <span className="no-inherit" title={t('Has a local override')}>
               ✎
             </span>
           )}
@@ -374,11 +387,11 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
     <>
       <div className="sidebar-header" style={{ borderTop: 'none' }}>
         <button className="primary" style={{ flex: 1 }} onClick={() => setEditing('new')}>
-          + Repository
+          + {t('Repository')}
         </button>
         <button
           className="icon-button"
-          title="Sync all sources"
+          title={t('Sync all sources')}
           disabled={sources.length === 0 || syncing.length > 0}
           onClick={() => syncInventory()}
         >
@@ -389,13 +402,13 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
       <div className="sidebar-tree">
         {!gitAvailable && (
           <div className="inventory-warning">
-            git was not found on this machine. Install it (or add it to PATH) to sync inventories.
+            {t('git was not found on this machine. Install it (or add it to PATH) to sync inventories.')}
           </div>
         )}
 
         {sources.length === 0 && (
           <div style={{ padding: 12, color: 'var(--text-dim)', fontSize: 12, lineHeight: 1.5 }}>
-            No repositories yet. Add one to pull an Ansible inventory and get its hosts here.
+            {t('No repositories yet. Add one to pull an Ansible inventory and get its hosts here.')}
           </div>
         )}
 
@@ -426,7 +439,7 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
                 <div className="actions">
                   <button
                     className="icon-button"
-                    title="Sync now"
+                    title={t('Sync now')}
                     disabled={busy}
                     onClick={(e) => {
                       e.stopPropagation()
@@ -443,8 +456,8 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
                   identical from the outside: a sync that reports success and
                   leaves the hosts exactly as they were. */}
               <div className="inventory-meta" style={{ paddingLeft: 26 }}>
-                {busy ? 'syncing…' : ago(source.lastSyncedAt)}
-                {` · ${source.branch || 'default branch'}`}
+                {busy ? t('syncing…') : ago(t, source.lastSyncedAt)}
+                {` · ${source.branch || t('default branch')}`}
                 {source.lastRevision ? ` · ${source.lastRevision}` : ''}
                 {!busy && ` · ${countsFor(source.id)}`}
               </div>
@@ -452,10 +465,9 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
                 <div
                   className="inventory-meta"
                   style={{ paddingLeft: 26 }}
-                  title={source.lastFiles.join('\n') || 'none'}
+                  title={source.lastFiles.join('\n') || t('none')}
                 >
-                  read {source.lastFiles.length} file
-                  {source.lastFiles.length === 1 ? '' : 's'}
+                  {t('read {count} files', { count: source.lastFiles.length })}
                   {source.lastFiles.length > 0 ? `: ${source.lastFiles.join(', ')}` : ''}
                 </div>
               )}

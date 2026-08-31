@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import type { AuthPromptRequest } from '../../../shared/types'
 import ModalBackdrop from './ModalBackdrop'
+import { useT } from '../i18n'
 
 /**
  * Serves credential requests raised by the SSH layer mid-handshake: a password
  * that isn't in the vault, or a keyboard-interactive challenge such as a 2FA code.
  */
 export default function AuthPromptDialog(): JSX.Element | null {
+  const t = useT()
   const [request, setRequest] = useState<AuthPromptRequest | null>(null)
   const [answers, setAnswers] = useState<string[]>([])
 
@@ -54,9 +56,9 @@ export default function AuthPromptDialog(): JSX.Element | null {
         ))}
 
         <div className="modal-actions">
-          <button onClick={() => respond(null)}>Cancel</button>
+          <button onClick={() => respond(null)}>{t('Cancel')}</button>
           <button className="primary" onClick={() => respond(answers)}>
-            Continue
+            {t('Continue')}
           </button>
         </div>
       </div>

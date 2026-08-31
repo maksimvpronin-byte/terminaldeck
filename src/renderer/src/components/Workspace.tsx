@@ -42,7 +42,7 @@ export default function Workspace(): JSX.Element {
   const view = { workspaces, activeWorkspaceId }
   const current = selectActiveWorkspace(view)
   const everyTab = selectAllTabs(view)
-  const allLeaves = everyTab.flatMap((t) => collectLeaves(t.root))
+  const allLeaves = everyTab.flatMap((tab) => collectLeaves(tab.root))
   const includedCount = allLeaves.filter((l) => l.broadcastEnabled).length
 
   function startRename(id: string, title: string): void {
@@ -250,13 +250,13 @@ export default function Workspace(): JSX.Element {
           dragged to another workspace without its terminal being torn down. */}
       {/* Tab ids are unique across workspaces, so matching the current
           workspace's active tab picks exactly one panel to show. */}
-      {everyTab.map((t) => (
+      {everyTab.map((tab) => (
         <div
-          key={t.id}
+          key={tab.id}
           className="tab-panel"
-          style={{ display: current?.activeTabId === t.id ? 'flex' : 'none' }}
+          style={{ display: current?.activeTabId === tab.id ? 'flex' : 'none' }}
         >
-          <SplitContainer tabId={t.id} node={t.root} />
+          <SplitContainer tabId={tab.id} node={tab.root} />
         </div>
       ))}
 

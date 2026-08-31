@@ -21,8 +21,28 @@ export const LANGUAGES: Array<{ id: Language; name: string }> = [
  */
 const DICTIONARIES: Record<Language, Record<string, string>> = { en: {}, ru }
 
-export function translate(language: Language, text: string): string {
-  return DICTIONARIES[language]?.[text] ?? text
+/**
+ * `values` fill `{name}` placeholders after the phrase is looked up.
+ *
+ * Without them a sentence carrying a number or a version has to be assembled
+ * from translated fragments, and the fragments only reassemble correctly in the
+ * language they were split in: "Version 1.2 is available" and "Доступна версия
+ * 1.2" do not put the number in the same place. The whole sentence is the key,
+ * and the translation decides where the value goes.
+ *
+ * A placeholder with no value is left as it is rather than blanked, so a
+ * mismatch shows up as `{version}` on screen instead of a hole.
+ */
+export function translate(
+  language: Language,
+  text: string,
+  values?: Record<string, string | number>
+): string {
+  const phrase = DICTIONARIES[language]?.[text] ?? text
+  if (!values) return phrase
+  return phrase.replace(/\{(\w+)\}/g, (placeholder, name: string) =>
+    name in values ? String(values[name]) : placeholder
+  )
 }
 
 /**

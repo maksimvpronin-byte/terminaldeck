@@ -10,7 +10,9 @@ export type { Language } from './language'
  * A hook rather than a bare function, so changing the language redraws what is
  * on screen instead of waiting for the next reason to render.
  */
-export function useT(): (text: string) => string {
+export type Translate = (text: string, values?: Record<string, string | number>) => string
+
+export function useT(): Translate {
   const language = useStore((s) => s.settings.language)
-  return (text: string) => translate(language, text)
+  return (text, values) => translate(language, text, values)
 }

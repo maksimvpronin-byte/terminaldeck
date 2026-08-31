@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { WinSession } from '../../../shared/winSessions'
+import { useT } from '../i18n'
 
 /**
  * A shadow session, shown in the pane.
@@ -34,6 +35,7 @@ export default function ShadowView({
   visible: boolean
   onClose: () => void
 }): JSX.Element {
+  const t = useT()
   const areaRef = useRef<HTMLDivElement | null>(null)
   const idRef = useRef<string | null>(null)
   const [phase, setPhase] = useState<'starting' | 'showing' | 'failed' | 'ended'>('starting')
@@ -76,6 +78,10 @@ export default function ShadowView({
       if (idRef.current) void window.td.rdp.shadowStop(idRef.current)
       idRef.current = null
     }
+    // `place` is redeclared on every render and is deliberately absent: this
+    // effect starts and stops a shadow session on the host, and re-running it
+    // for a new function identity would tear down a live viewer. What `place`
+    // reads are refs, so the closure cannot go stale in a way that matters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [host, session.id, control, noPrompt])
 
@@ -114,7 +120,6 @@ export default function ShadowView({
       window.removeEventListener('resize', place)
       clearInterval(tick)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -122,7 +127,6 @@ export default function ShadowView({
     if (!id) return
     window.td.rdp.shadowVisible(id, visible)
     if (visible) place()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, phase])
 
   return (
@@ -142,7 +146,7 @@ export default function ShadowView({
                     ? 'Waiting for the host to allow it.'
                     : 'Waiting for the person there to allow it.'}
                 </p>
-                <button onClick={onClose}>Cancel</button>
+                <button onClick={onClose}>{t('Cancel')}</button>
               </>
             )}
 
@@ -150,7 +154,7 @@ export default function ShadowView({
               <>
                 <strong>{phase === 'failed' ? 'Could not join' : 'The session ended'}</strong>
                 {reason && <p className="settings-note">{reason}</p>}
-                <button onClick={onClose}>Back</button>
+                <button onClick={onClose}>{t('Back')}</button>
               </>
             )}
           </div>

@@ -7,6 +7,7 @@ import { groupPath } from '../../../shared/groups'
 import { useStore } from '../state/store'
 import type { OpenMode, PaneTarget } from '../state/store'
 import ModalBackdrop from './ModalBackdrop'
+import { useT } from '../i18n'
 
 interface Entry {
   id: string
@@ -19,6 +20,7 @@ interface Entry {
 }
 
 export default function HostPalette({ onClose }: { onClose: () => void }): JSX.Element {
+  const t = useT()
   const sessions = useStore((s) => s.sessions)
   const groups = useStore((s) => s.groups)
   const trees = useStore((s) => s.inventoryTrees)
@@ -46,7 +48,7 @@ export default function HostPalette({ onClose }: { onClose: () => void }): JSX.E
       })
     }
 
-    const invGroups = trees.flatMap((t) => t.groups)
+    const invGroups = trees.flatMap((tree) => tree.groups)
     for (const tree of trees) {
       for (const raw of tree.sessions) {
         const host: SessionProfile = applyOverride(
@@ -141,7 +143,7 @@ export default function HostPalette({ onClose }: { onClose: () => void }): JSX.E
         <input
           autoFocus
           className="palette-input"
-          placeholder="Go to host…"
+          placeholder={t('Go to host…')}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={onKeyDown}
@@ -149,14 +151,18 @@ export default function HostPalette({ onClose }: { onClose: () => void }): JSX.E
 
         <div className="palette-target">
           {picked.size > 0
-            ? `${picked.size} selected — ⏎ tabs, ⇧⏎ tiled in one, ⌥⏎ a new workspace`
-            : 'Tab marks a host for opening several at once'}
+            ? t('Selected: {count} — ⏎ tabs, ⇧⏎ tiled in one, ⌥⏎ a new workspace', {
+                count: picked.size
+              })
+            : t('Tab marks a host for opening several at once')}
         </div>
 
         <div className="palette-list" ref={listRef}>
           {matches.length === 0 && (
             <div className="palette-empty">
-              {entries.length === 0 ? 'No hosts yet.' : `Nothing matches “${query}”.`}
+              {entries.length === 0
+                ? t('No hosts yet.')
+                : t('Nothing matches “{query}”.', { query })}
             </div>
           )}
           {matches.map((e, i) => (

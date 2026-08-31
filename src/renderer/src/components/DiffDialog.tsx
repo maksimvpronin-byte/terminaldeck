@@ -2,14 +2,26 @@ import { useEffect, useMemo, useState } from 'react'
 import type { FileComparison } from '../../../shared/types'
 import { collapseUnchanged, diffLines } from '../../../shared/diff'
 import ModalBackdrop from './ModalBackdrop'
+import { useT, type Translate } from '../i18n'
 
 /** Beyond this the view stops drawing: no one reads a 20,000-row diff. */
 const MAX_ROWS = 4000
 
-const BLOCKED: Record<string, string> = {
-  binary: 'This is not a text file, so there is nothing to compare line by line.',
-  'too-large': 'One of the two is past the 2 MB comparison limit.',
-  missing: 'One of the two is no longer there.'
+/**
+ * Why there is nothing to show, in words.
+ *
+ * A function of literal phrases rather than a table looked up by key: the
+ * phrase book's coverage test reads the source for `t('…')`, and a key assembled
+ * at runtime is invisible to it — which is how a phrase goes untranslated with
+ * nothing to say so.
+ */
+function blockedBecause(t: Translate, reason: string): string {
+  if (reason === 'binary') {
+    return t('This is not a text file, so there is nothing to compare line by line.')
+  }
+  if (reason === 'too-large') return t('One of the two is past the 2 MB comparison limit.')
+  if (reason === 'missing') return t('One of the two is no longer there.')
+  return t('Cannot be compared.')
 }
 
 interface Props {
@@ -25,6 +37,7 @@ export default function DiffDialog({
   localPath,
   onClose
 }: Props): JSX.Element {
+  const t = useT()
   const [comparison, setComparison] = useState<FileComparison | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -48,38 +61,43 @@ export default function DiffDialog({
   return (
     <ModalBackdrop onClose={onClose}>
       <div className="modal-card diff-card">
-        <h2>Compare</h2>
+        <h2>{t('Compare')}</h2>
         <p className="settings-note">
-          <strong>−</strong> what is on the host now · <strong>+</strong> what would replace it
+          <strong>−</strong> {t('what is on the host now')} · <strong>+</strong>{' '}
+          {t('what would replace it')}
           <br />
           {remotePath} ↔ {localPath}
         </p>
 
         {error && <span className="error-text">{error}</span>}
-        {!comparison && !error && <p className="settings-note">Reading both sides…</p>}
+        {!comparison && !error && <p className="settings-note">{t('Reading both sides…')}</p>}
 
         {comparison?.blocked && (
-          <p className="settings-note">{BLOCKED[comparison.blocked] ?? 'Cannot be compared.'}</p>
+          <p className="settings-note">{blockedBecause(t, comparison.blocked)}</p>
         )}
 
         {diff && diff.onlyLineEndings && (
           <p className="settings-note">
-            The text is identical — only the line endings differ (CRLF against LF). Nothing else
-            has changed.
+            {t(
+              'The text is identical — only the line endings differ (CRLF against LF). Nothing else has changed.'
+            )}
           </p>
         )}
 
         {diff && !diff.onlyLineEndings && (
           <>
             <p className="settings-note">
-              {diff.added} added, {diff.removed} removed
-              {diff.coarse && ' — too large to align precisely, so it is shown as replaced'}
+              {t('added: {added}, removed: {removed}', {
+                added: diff.added,
+                removed: diff.removed
+              })}
+              {diff.coarse && t(' — too large to align precisely, so it is shown as replaced')}
             </p>
             <div className="diff-view">
               {shown.map((row, i) =>
                 row.kind === 'gap' ? (
                   <div className="diff-gap" key={`gap-${i}`}>
-                    … {row.hidden} unchanged line{row.hidden === 1 ? '' : 's'}
+                    … {t('unchanged lines: {count}', { count: row.hidden })}
                   </div>
                 ) : (
                   <div className={`diff-line ${row.line.kind}`} key={`l-${i}`}>
@@ -98,7 +116,7 @@ export default function DiffDialog({
               )}
               {rows.length > MAX_ROWS && (
                 <div className="diff-gap">
-                  … {rows.length - MAX_ROWS} more rows not drawn
+                  … {t('{count} more rows not drawn', { count: rows.length - MAX_ROWS })}
                 </div>
               )}
             </div>
@@ -106,12 +124,12 @@ export default function DiffDialog({
         )}
 
         {diff && diff.added === 0 && diff.removed === 0 && !diff.onlyLineEndings && (
-          <p className="settings-note">The two files are identical.</p>
+          <p className="settings-note">{t('The two files are identical.')}</p>
         )}
 
         <div className="modal-actions">
           <button className="primary" onClick={onClose}>
-            Close
+            {t('Close')}
           </button>
         </div>
       </div>

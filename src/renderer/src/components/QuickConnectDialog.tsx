@@ -2,8 +2,10 @@ import { useState } from 'react'
 import type { AuthMethod, QuickConnectParams } from '../../../shared/types'
 import { useStore } from '../state/store'
 import ModalBackdrop from './ModalBackdrop'
+import { useT } from '../i18n'
 
 export default function QuickConnectDialog({ onClose }: { onClose: () => void }): JSX.Element {
+  const t = useT()
   const openTab = useStore((s) => s.openTab)
   const [host, setHost] = useState('')
   const [port, setPort] = useState(22)
@@ -21,7 +23,7 @@ export default function QuickConnectDialog({ onClose }: { onClose: () => void })
 
   function connect(): void {
     if (!host.trim() || !username.trim()) {
-      setError('Host and username are required')
+      setError(t('Host and username are required'))
       return
     }
     const params: QuickConnectParams = {
@@ -40,32 +42,32 @@ export default function QuickConnectDialog({ onClose }: { onClose: () => void })
   return (
     <ModalBackdrop onClose={onClose}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <h2>Quick connect</h2>
+        <h2>{t('Quick connect')}</h2>
         <div className="form-row">
           <label style={{ flex: 3 }}>
-            Host
+            {t('Host')}
             <input value={host} autoFocus onChange={(e) => setHost(e.target.value)} />
           </label>
           <label style={{ flex: 1 }}>
-            Port
+            {t('Port')}
             <input type="number" value={port} onChange={(e) => setPort(Number(e.target.value))} />
           </label>
         </div>
         <label>
-          Username
+          {t('Username')}
           <input value={username} onChange={(e) => setUsername(e.target.value)} />
         </label>
         <label>
-          Auth method
+          {t('Auth method')}
           <select value={authMethod} onChange={(e) => setAuthMethod(e.target.value as AuthMethod)}>
-            <option value="password">Password</option>
-            <option value="privateKey">Private key</option>
-            <option value="agent">SSH agent</option>
+            <option value="password">{t('Password')}</option>
+            <option value="privateKey">{t('Private key')}</option>
+            <option value="agent">{t('SSH agent')}</option>
           </select>
         </label>
         {authMethod === 'password' && (
           <label>
-            Password
+            {t('Password')}
             <input
               type="password"
               value={password}
@@ -78,24 +80,24 @@ export default function QuickConnectDialog({ onClose }: { onClose: () => void })
           <>
             <div className="form-row">
               <label style={{ flex: 1 }}>
-                Private key file
-                <input readOnly value={privateKeyPath} placeholder="No file selected" />
+                {t('Private key file')}
+                <input readOnly value={privateKeyPath} placeholder={t('No file selected')} />
               </label>
               <button style={{ alignSelf: 'flex-end' }} onClick={pickKey}>
-                Browse…
+                {t('Browse…')}
               </button>
             </div>
             <label>
-              Passphrase
+              {t('Passphrase')}
               <input type="password" value={passphrase} onChange={(e) => setPassphrase(e.target.value)} />
             </label>
           </>
         )}
         {error && <span className="error-text">{error}</span>}
         <div className="modal-actions">
-          <button onClick={onClose}>Cancel</button>
+          <button onClick={onClose}>{t('Cancel')}</button>
           <button className="primary" onClick={connect}>
-            Connect
+            {t('Connect')}
           </button>
         </div>
       </div>
