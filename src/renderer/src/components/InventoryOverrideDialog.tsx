@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import type {
   AppearanceDefaults,
-  AuthMethod,
+  AuthDefaults,
   InventoryOverride,
   RdpDefaults,
   SessionGroup,
   SessionProfile
 } from '../../../shared/types'
 import { resolveAuth } from '../../../shared/authResolution'
+import { authFieldsState, secretToSave } from '../../../shared/authFields'
 import { applyOverride, isSet } from '../../../shared/overrides'
 import { appearanceSource, resolveAppearance } from '../../../shared/appearance'
 import { resolveRdp } from '../../../shared/rdpResolution'
@@ -15,8 +16,10 @@ import { protocolOf } from '../../../shared/protocols'
 import { useStore } from '../state/store'
 import { SESSION_COLOURS } from '../state/colours'
 import AppearanceFields from './AppearanceFields'
+import AuthFields, { type AuthWords } from './AuthFields'
 import RdpFields from './RdpFields'
 import ModalBackdrop from './ModalBackdrop'
+import { useT } from '../i18n'
 
 interface Props {
   /** The host or Ansible group the local settings apply to. */
@@ -36,6 +39,7 @@ export default function InventoryOverrideDialog({ node, groups, onClose }: Props
   const clearInventoryOverride = useStore((s) => s.clearInventoryOverride)
   const sessions = useStore((s) => s.sessions)
   const settings = useStore((s) => s.settings)
+  const t = useT()
 
   const [override, setOverride] = useState<InventoryOverride>(existing ?? { nodeId: node.id })
   const [secret, setSecret] = useState('')
@@ -57,15 +61,31 @@ export default function InventoryOverrideDialog({ node, groups, onClose }: Props
     setOverride((o) => ({ ...o, [key]: value }))
   }
 
+  function setAuth<K extends keyof AuthDefaults>(key: K, value: AuthDefaults[K]): void {
+    setOverride((o) => ({ ...o, [key]: value }))
+  }
+
   // A group inherits from its parent; a host from the group it sits in.
   const parentId = isHost(node) ? node.groupId : node.parentId
   // What the repository alone would give this node, ignoring the override.
   const fromRepo = resolveAuth(node, parentId, groups)
-  const effective = resolveAuth({ ...node, ...override }, parentId, groups)
 
-  // Appearance layers the same way: the override, then what the repository and
-  // its groups say, then the application-wide settings.
+  /**
+   * The override, then what the repository and its groups say, then the
+   * application-wide settings — one merge, used for the connection settings and
+   * the appearance alike.
+   *
+   * Through `applyOverride`, which is also how the main process layers it when
+   * it connects. The connection settings used a plain spread until now, which
+   * wrote a cleared field's `undefined` over the repository's value instead of
+   * falling back to it: a field set back to "from the inventory" showed the
+   * group's setting for a connection that would use the repository's.
+   */
   const merged = applyOverride(node, override)
+  // The same layering, through the shared rules the other two dialogs use: the
+  // override on top, the inventory host beneath it, then the groups.
+  const auth = authFieldsState({ own: override, beneath: node, parentId, groups, forgetSecret })
+  const effective = auth.effective
   const appearance = resolveAppearance(merged, parentId, groups, settings)
   const inheritedLook = resolveAppearance(
     { ...node, inheritAppearance: merged.inheritAppearance },
@@ -96,6 +116,22 @@ export default function InventoryOverrideDialog({ node, groups, onClose }: Props
     if (path) set('privateKeyPath', path)
   }
 
+  /**
+   * A credential here is local to this one host: the inventory is read-only and
+   * never carries one, so there is nothing above to hand it back to except the
+   * groups.
+   */
+  const authWords: AuthWords = {
+    inherit: t('From the inventory'),
+    secretHint: auth.ownSecret && !forgetSecret
+      ? '(saved here, and it overrides the inventory)'
+      : '(leave blank to keep the current one)',
+    self: 'this host',
+    held: 'This password is kept locally for this host alone, so nothing set on a group above it is used.',
+    forget: 'On save this password is forgotten, and the host is asked for one on connect.',
+    keyPath: fromRepo.privateKeyPath ?? 'No file selected'
+  }
+
   async function submit(): Promise<void> {
     const toSave: InventoryOverride = forgetSecret ? { ...override, secretRef: undefined } : override
     const hasContent =
@@ -110,10 +146,9 @@ export default function InventoryOverrideDialog({ node, groups, onClose }: Props
       onClose()
       return
     }
-    // A password typed in now beats the "forget" tick — it is the later answer.
     await saveInventoryOverride(
       toSave,
-      secret || (forgetSecret ? null : undefined),
+      secretToSave(auth.shownMethod, forgetSecret, secret),
       gatewaySecret || (forgetGatewaySecret ? null : undefined)
     )
     onClose()
@@ -157,60 +192,17 @@ export default function InventoryOverrideDialog({ node, groups, onClose }: Props
           </label>
         </div>
 
-        <label>
-          Auth method
-          <select
-            value={override.authMethod ?? ''}
-            onChange={(e) => {
-              set('authMethod', (e.target.value || undefined) as AuthMethod)
-              // Handing the method back to the inventory hands the credential
-              // back with it, rather than leaving a local password in the way.
-              if (isSet(override.secretRef)) setForgetSecret(e.target.value === '')
-            }}
-          >
-            <option value="">From the inventory ({fromRepo.authMethod})</option>
-            <option value="password">Password</option>
-            <option value="privateKey">Private key</option>
-            <option value="agent">SSH agent</option>
-          </select>
-        </label>
-
-        {effective.authMethod === 'password' && (
-          <label>
-            Password{' '}
-            {isSet(override.secretRef) && !forgetSecret
-              ? '(saved here, and it overrides the inventory)'
-              : '(leave blank to keep the current one)'}
-            <input type="password" value={secret} onChange={(e) => setSecret(e.target.value)} />
-          </label>
-        )}
-
-        {isSet(override.secretRef) && effective.authMethod !== 'agent' && (
-          <p className="settings-note">
-            {forgetSecret
-              ? 'On save this password is forgotten, and the host is asked for one on connect.'
-              : 'This password is kept locally for this host alone, so nothing set on a group above it is used.'}{' '}
-            <button type="button" onClick={() => setForgetSecret(!forgetSecret)}>
-              {forgetSecret ? 'Keep it' : 'Forget it'}
-            </button>
-          </p>
-        )}
-
-        {effective.authMethod === 'privateKey' && (
-          <div className="form-row">
-            <label style={{ flex: 1 }}>
-              Private key file
-              <input
-                readOnly
-                value={override.privateKeyPath ?? ''}
-                placeholder={fromRepo.privateKeyPath ?? 'No file selected'}
-              />
-            </label>
-            <button style={{ alignSelf: 'flex-end' }} onClick={pickKey}>
-              Browse…
-            </button>
-          </div>
-        )}
+        <AuthFields
+          value={override}
+          set={setAuth}
+          state={auth}
+          secret={secret}
+          onSecret={setSecret}
+          forgetSecret={forgetSecret}
+          onForgetSecret={setForgetSecret}
+          onPickKey={pickKey}
+          words={authWords}
+        />
 
         <label>
           Jump host (ProxyJump)

@@ -2,12 +2,12 @@ import { useState } from 'react'
 import { nanoid } from 'nanoid'
 import type {
   AppearanceDefaults,
-  AuthMethod,
+  AuthDefaults,
   PortForwardRule,
   RdpDefaults,
   SessionProfile
 } from '../../../shared/types'
-import { resolveAuth, inheritedFrom, sourceOf } from '../../../shared/authResolution'
+import { authFieldsState, secretToSave } from '../../../shared/authFields'
 import { isSet } from '../../../shared/overrides'
 import {
   appearanceSource,
@@ -20,6 +20,7 @@ import { resolveRdp, rdpInheritedFrom } from '../../../shared/rdpResolution'
 import { useStore } from '../state/store'
 import { SESSION_COLOURS } from '../state/colours'
 import AppearanceFields from './AppearanceFields'
+import AuthFields, { type AuthWords } from './AuthFields'
 import RdpFields from './RdpFields'
 import { useT } from '../i18n'
 import ModalBackdrop from './ModalBackdrop'
@@ -77,24 +78,28 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
   }
 
   /**
-   * Choosing "inherit" means inheriting the credential too, so the host's own is
-   * dropped in the same move — leaving it behind is what makes a group password
-   * look ignored. Choosing a method again keeps it, and the note below says
-   * which way it currently stands, so neither is silent.
+   * Handing the credential settings back to the group hands the host's own
+   * password back with it — leaving it behind is what makes a group password
+   * look ignored. The method dropdown does the same thing from inside
+   * AuthFields; this is the tickbox above it.
    */
   function chooseInheritance(inherit: boolean): void {
-    if (ownSecret) setForgetSecret(inherit)
+    if (auth.ownSecret) setForgetSecret(inherit)
+  }
+
+  function setAuth<K extends keyof AuthDefaults>(key: K, value: AuthDefaults[K]): void {
+    setProfile((p) => ({ ...p, [key]: value }))
   }
 
   // What this session ends up with once inheritance is applied. Pending changes
   // count, so ticking "forget" immediately shows what it would inherit instead.
   const pending: SessionProfile = forgetSecret ? { ...profile, secretRef: undefined } : profile
-  const effective = resolveAuth(pending, pending.groupId, groups)
-  const inheritNote = (key: Parameters<typeof inheritedFrom>[3]): string => {
-    const source = inheritedFrom(pending, pending.groupId, groups, key)
+  const auth = authFieldsState({ own: profile, parentId: profile.groupId, groups, forgetSecret })
+  const effective = auth.effective
+  const inheritNote = (key: keyof AuthDefaults): string => {
+    const source = auth.inheritedFrom(key)
     return source ? `inherited from ${source.name}` : ''
   }
-  const ownSecret = isSet(profile.secretRef)
 
   const desktop = resolveRdp(pending, pending.groupId, groups)
   const isRdp = protocolOf(profile) === 'rdp'
@@ -103,6 +108,7 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
     return source ? `inherited from ${source.name}` : ''
   }
   const ownGatewaySecret = isSet(profile.gatewaySecretRef)
+  const ownSecret = auth.ownSecret
 
   const appearance = resolveAppearance(profile, profile.groupId, groups, settings)
   const inheritedLook = inheritedAppearance(profile, profile.groupId, groups, settings)
@@ -143,12 +149,10 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
     }
     const tags = tagsInput
       .split(',')
-      .map((t) => t.trim())
+      .map((tag) => tag.trim())
       .filter(Boolean)
     const toSave: SessionProfile = { ...profile, tags, updatedAt: Date.now() }
-    const typed = effective.authMethod === 'agent' ? '' : secret
-    // A password typed in now beats the "forget" tick — it is the later answer.
-    const secretToStore = typed || (forgetSecret ? null : undefined)
+    const secretToStore = secretToSave(auth.shownMethod, forgetSecret, secret)
     const gatewayToStore = gatewaySecret || (forgetGatewaySecret ? null : undefined)
     await upsertSession(toSave, secretToStore, gatewayToStore)
     onClose()
@@ -164,40 +168,23 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
         : t('(leave blank to keep existing)')
 
   /**
-   * Each field is inherited on its own, so a key file and the passphrase used
-   * with it can end up coming from different places — a passphrase left over
-   * from password auth, say, silently applied to a group's key.
-   */
-  const keyFrom = sourceOf(pending, pending.groupId, groups, 'privateKeyPath')
-  const passphraseFrom = sourceOf(pending, pending.groupId, groups, 'secretRef')
-  const levelName = (level: 'self' | { name: string }): string =>
-    level === 'self' ? 'this host' : level.name
-  const splitCredential =
-    effective.authMethod === 'privateKey' && keyFrom && passphraseFrom && keyFrom !== passphraseFrom
-
-  /**
    * Only a credential the host holds itself can be dropped here; an inherited one
    * belongs to the group that states it. Saying so matters: without it a wrong
    * group password looks like it was used when the host's own one was.
    */
-  const ownSecretNote = ownSecret ? (
-    <p className="settings-note">
-      {forgetSecret
-        ? `On save this host forgets its own ${
-            effective.authMethod === 'privateKey' ? 'passphrase' : 'password'
-          } and uses ${
-            inheritNote('secretRef')
-              ? `the one ${inheritNote('secretRef')}`
-              : 'whatever it is asked for on connect'
-          }.`
-        : `This host has a ${
-            effective.authMethod === 'privateKey' ? 'passphrase' : 'password'
-          } of its own, and the nearest value wins: moving it into a group leaves the group's unused.`}{' '}
-      <button type="button" onClick={() => setForgetSecret(!forgetSecret)}>
-        {forgetSecret ? 'Keep it' : 'Forget it'}
-      </button>
-    </p>
-  ) : null
+  const credential = auth.shownMethod === 'privateKey' ? 'passphrase' : 'password'
+  const authWords: AuthWords = {
+    inherit: t('Inherit'),
+    secretHint,
+    self: 'this host',
+    held: `This host has a ${credential} of its own, and the nearest value wins: moving it into a group leaves the group's unused.`,
+    forget: `On save this host forgets its own ${credential} and uses ${
+      inheritNote('secretRef')
+        ? `the one ${inheritNote('secretRef')}`
+        : 'whatever it is asked for on connect'
+    }.`,
+    keyPath: inheritNote('privateKeyPath') || 'No file selected'
+  }
 
   return (
     <ModalBackdrop onClose={onClose}>
@@ -273,60 +260,17 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
           />
         </label>
 
-        <label>
-          {t('Auth method')}
-          <select
-            value={profile.authMethod ?? ''}
-            onChange={(e) => {
-              set('authMethod', (e.target.value || undefined) as AuthMethod)
-              chooseInheritance(e.target.value === '')
-            }}
-          >
-            <option value="">{t('Inherit')} ({effective.authMethod})</option>
-            <option value="password">{t('Password')}</option>
-            <option value="privateKey">{t('Private key')}</option>
-            <option value="agent">{t('SSH agent')}</option>
-          </select>
-        </label>
-
-        {effective.authMethod === 'password' && (
-          <label>
-            {t('Password')} {secretHint}
-            <input type="password" value={secret} onChange={(e) => setSecret(e.target.value)} />
-          </label>
-        )}
-
-        {effective.authMethod === 'privateKey' && (
-          <>
-            <div className="form-row">
-              <label style={{ flex: 1 }}>
-                Private key file
-                <input
-                  readOnly
-                  value={profile.privateKeyPath ?? ''}
-                  placeholder={inheritNote('privateKeyPath') || 'No file selected'}
-                />
-              </label>
-              <button style={{ alignSelf: 'flex-end' }} onClick={pickKey}>
-                Browse…
-              </button>
-            </div>
-            <label>
-              Passphrase {secretHint}
-              <input type="password" value={secret} onChange={(e) => setSecret(e.target.value)} />
-            </label>
-          </>
-        )}
-
-        {splitCredential && keyFrom && passphraseFrom && (
-          <p className="settings-note warning-note">
-            The key file comes from {levelName(keyFrom)} and the passphrase from{' '}
-            {levelName(passphraseFrom)}. A passphrase saved for a different key will not open this
-            one.
-          </p>
-        )}
-
-        {effective.authMethod !== 'agent' && ownSecretNote}
+        <AuthFields
+          value={profile}
+          set={setAuth}
+          state={auth}
+          secret={secret}
+          onSecret={setSecret}
+          forgetSecret={forgetSecret}
+          onForgetSecret={setForgetSecret}
+          onPickKey={pickKey}
+          words={authWords}
+        />
 
         <label className="checkbox-row" style={{ flexDirection: 'row' }}>
           <input

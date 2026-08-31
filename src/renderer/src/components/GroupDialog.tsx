@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { nanoid } from 'nanoid'
-import type { AppearanceDefaults, AuthMethod, RdpDefaults, SessionGroup } from '../../../shared/types'
-import { resolveAuth, inheritedFrom } from '../../../shared/authResolution'
+import type { AppearanceDefaults, AuthDefaults, RdpDefaults, SessionGroup } from '../../../shared/types'
+import { authFieldsState, secretToSave } from '../../../shared/authFields'
 import { isSet } from '../../../shared/overrides'
 import {
   appearanceSource,
@@ -11,8 +11,10 @@ import {
 import { resolveRdp, rdpInheritedFrom } from '../../../shared/rdpResolution'
 import { useStore } from '../state/store'
 import AppearanceFields from './AppearanceFields'
+import AuthFields, { type AuthWords } from './AuthFields'
 import RdpFields from './RdpFields'
 import ModalBackdrop from './ModalBackdrop'
+import { useT } from '../i18n'
 
 interface Props {
   /** Existing group to edit, or the parent id for a new one. */
@@ -25,6 +27,7 @@ export default function GroupDialog({ initial, parentId = null, onClose }: Props
   const groups = useStore((s) => s.groups)
   const settings = useStore((s) => s.settings)
   const upsertGroup = useStore((s) => s.upsertGroup)
+  const t = useT()
 
   const [group, setGroup] = useState<SessionGroup>(
     initial ?? { id: nanoid(), name: '', parentId }
@@ -49,22 +52,27 @@ export default function GroupDialog({ initial, parentId = null, onClose }: Props
 
   /**
    * "Inherit" covers the credential as well: the group's own is dropped in the
-   * same move, so it stops shadowing the parent's. Picking a method again keeps
-   * it, and the note below says which way it stands.
+   * same move, so it stops shadowing the parent's. The method dropdown does the
+   * same from inside AuthFields; this is the tickbox above it.
    */
   function chooseInheritance(inherit: boolean): void {
-    if (ownSecret) setForgetSecret(inherit)
+    if (auth.ownSecret) setForgetSecret(inherit)
+  }
+
+  function setAuth<K extends keyof AuthDefaults>(key: K, value: AuthDefaults[K]): void {
+    setGroup((g) => ({ ...g, [key]: value }))
   }
 
   // What this group would use if it defines nothing itself. A pending "forget"
   // counts, so the note can say what the group falls back to.
   const pending: SessionGroup = forgetSecret ? { ...group, secretRef: undefined } : group
-  const effective = resolveAuth(pending, pending.parentId, groups)
-  const from = (key: Parameters<typeof inheritedFrom>[3]): string => {
-    const source = inheritedFrom(pending, pending.parentId, groups, key)
+  const auth = authFieldsState({ own: group, parentId: group.parentId, groups, forgetSecret })
+  const effective = auth.effective
+  const from = (key: keyof AuthDefaults): string => {
+    const source = auth.inheritedFrom(key)
     return source ? `inherited from ${source.name}` : ''
   }
-  const ownSecret = isSet(group.secretRef)
+  const ownSecret = auth.ownSecret
 
   const desktop = resolveRdp(pending, pending.parentId, groups)
   const rdpNote = (key: keyof RdpDefaults): string => {
@@ -90,10 +98,9 @@ export default function GroupDialog({ initial, parentId = null, onClose }: Props
       setError('Name is required')
       return
     }
-    // A password typed in now beats the "forget" tick — it is the later answer.
     await upsertGroup(
       group,
-      secret || (forgetSecret ? null : undefined),
+      secretToSave(auth.shownMethod, forgetSecret, secret),
       gatewaySecret || (forgetGatewaySecret ? null : undefined)
     )
     onClose()
@@ -107,18 +114,16 @@ export default function GroupDialog({ initial, parentId = null, onClose }: Props
         : '(leave blank to keep or inherit)'
 
   /** Lets a group hand the credential back to its parent, or drop a wrong one. */
-  const ownSecretNote = ownSecret ? (
-    <p className="settings-note">
-      {forgetSecret
-        ? `On save this group forgets its own, and uses ${
-            from('secretRef') ? `the one ${from('secretRef')}` : 'whatever each host is asked for'
-          }.`
-        : 'Hosts inside use this unless they hold one of their own — a host that does keeps using it.'}{' '}
-      <button type="button" onClick={() => setForgetSecret(!forgetSecret)}>
-        {forgetSecret ? 'Keep it' : 'Forget it'}
-      </button>
-    </p>
-  ) : null
+  const authWords: AuthWords = {
+    inherit: t('Inherit'),
+    secretHint,
+    self: 'this group',
+    held: 'Hosts inside use this unless they hold one of their own — a host that does keeps using it.',
+    forget: `On save this group forgets its own, and uses ${
+      from('secretRef') ? `the one ${from('secretRef')}` : 'whatever each host is asked for'
+    }.`,
+    keyPath: from('privateKeyPath') || 'not set'
+  }
 
   // A group cannot become its own descendant.
   const candidateParents = groups.filter((g) => {
@@ -196,52 +201,17 @@ export default function GroupDialog({ initial, parentId = null, onClose }: Props
           </label>
         </div>
 
-        <label>
-          Auth method
-          <select
-            value={group.authMethod ?? ''}
-            onChange={(e) => {
-              set('authMethod', (e.target.value || undefined) as AuthMethod)
-              chooseInheritance(e.target.value === '')
-            }}
-          >
-            <option value="">Inherit ({effective.authMethod})</option>
-            <option value="password">Password</option>
-            <option value="privateKey">Private key</option>
-            <option value="agent">SSH agent</option>
-          </select>
-        </label>
-
-        {(group.authMethod ?? effective.authMethod) === 'password' && (
-          <label>
-            Password {secretHint}
-            <input type="password" value={secret} onChange={(e) => setSecret(e.target.value)} />
-          </label>
-        )}
-
-        {(group.authMethod ?? effective.authMethod) === 'privateKey' && (
-          <>
-            <div className="form-row">
-              <label style={{ flex: 1 }}>
-                Private key file
-                <input
-                  readOnly
-                  value={group.privateKeyPath ?? ''}
-                  placeholder={from('privateKeyPath') || 'not set'}
-                />
-              </label>
-              <button style={{ alignSelf: 'flex-end' }} onClick={pickKey}>
-                Browse…
-              </button>
-            </div>
-            <label>
-              Passphrase {secretHint}
-              <input type="password" value={secret} onChange={(e) => setSecret(e.target.value)} />
-            </label>
-          </>
-        )}
-
-        {(group.authMethod ?? effective.authMethod) !== 'agent' && ownSecretNote}
+        <AuthFields
+          value={group}
+          set={setAuth}
+          state={auth}
+          secret={secret}
+          onSecret={setSecret}
+          forgetSecret={forgetSecret}
+          onForgetSecret={setForgetSecret}
+          onPickKey={pickKey}
+          words={authWords}
+        />
 
         <label>
           On connect
