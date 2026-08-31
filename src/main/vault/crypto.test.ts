@@ -1,9 +1,13 @@
-import { describe, it, expect } from 'vitest'
-import { deriveKey, newSalt, encrypt, decrypt } from './crypto'
+import { describe, it, expect, beforeAll } from 'vitest'
+import { deriveKey, newSalt, encrypt, decrypt, wipe } from './crypto'
 
 describe('vault crypto', () => {
   const salt = newSalt()
-  const key = deriveKey('correct horse battery staple', salt)
+  let key: Buffer
+
+  beforeAll(async () => {
+    key = await deriveKey('correct horse battery staple', salt)
+  })
 
   it('round-trips a secret', () => {
     const payload = encrypt(key, 'hunter2')
@@ -15,21 +19,21 @@ describe('vault crypto', () => {
     expect(decrypt(key, encrypt(key, secret))).toBe(secret)
   })
 
-  it('derives the same key from the same password and salt', () => {
-    expect(deriveKey('correct horse battery staple', salt).equals(key)).toBe(true)
+  it('derives the same key from the same password and salt', async () => {
+    expect((await deriveKey('correct horse battery staple', salt)).equals(key)).toBe(true)
   })
 
-  it('derives a different key for a different password', () => {
-    expect(deriveKey('wrong password', salt).equals(key)).toBe(false)
+  it('derives a different key for a different password', async () => {
+    expect((await deriveKey('wrong password', salt)).equals(key)).toBe(false)
   })
 
-  it('derives a different key for a different salt', () => {
-    expect(deriveKey('correct horse battery staple', newSalt()).equals(key)).toBe(false)
+  it('derives a different key for a different salt', async () => {
+    expect((await deriveKey('correct horse battery staple', newSalt())).equals(key)).toBe(false)
   })
 
-  it('fails to decrypt with the wrong key', () => {
+  it('fails to decrypt with the wrong key', async () => {
     const payload = encrypt(key, 'hunter2')
-    const wrong = deriveKey('wrong password', salt)
+    const wrong = await deriveKey('wrong password', salt)
     expect(() => decrypt(wrong, payload)).toThrow()
   })
 
@@ -56,5 +60,14 @@ describe('vault crypto', () => {
 
   it('generates distinct salts', () => {
     expect(newSalt()).not.toBe(newSalt())
+  })
+
+  it('leaves nothing behind when a key is wiped', async () => {
+    const doomed = await deriveKey('correct horse battery staple', salt)
+    expect(doomed.some((byte) => byte !== 0)).toBe(true)
+
+    wipe(doomed)
+
+    expect(doomed.every((byte) => byte === 0)).toBe(true)
   })
 })

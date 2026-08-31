@@ -1,6 +1,6 @@
 import { dialog, type BrowserWindow } from 'electron'
 import { readFileSync, writeFileSync } from 'fs'
-import { deriveKey, newSalt, encrypt, decrypt, type EncryptedPayload } from '../vault/crypto'
+import { deriveKey, newSalt, encrypt, decrypt, wipe, type EncryptedPayload } from '../vault/crypto'
 import { vault } from '../vault/Vault'
 import { sessionStore } from './SessionStore'
 import { snippetStore } from './SnippetStore'
@@ -76,8 +76,10 @@ export async function exportToFile(
     )
 
     const salt = newSalt()
-    const key = deriveKey(password, salt)
+    const key = await deriveKey(password, salt)
     backup.secrets = { salt, payload: encrypt(key, JSON.stringify(referenced)) }
+    // This key exists for one encryption and has no business outliving it.
+    wipe(key)
   }
 
   const res = await dialog.showSaveDialog(win, {
@@ -122,11 +124,16 @@ export async function importFromFile(
   if (parsed.secrets) {
     if (!password) throw new Error('This export contains credentials and needs its password')
     let secrets: Record<string, string>
+    // Derived outside the try: deriving cannot fail for a wrong password, and
+    // reporting an out-of-memory as "wrong password" would send someone hunting
+    // for a password that was right all along.
+    const key = await deriveKey(password, parsed.secrets.salt)
     try {
-      const key = deriveKey(password, parsed.secrets.salt)
       secrets = JSON.parse(decrypt(key, parsed.secrets.payload)) as Record<string, string>
     } catch {
       throw new Error('Wrong password for the credentials in this export')
+    } finally {
+      wipe(key)
     }
     for (const [ref, value] of Object.entries(secrets)) {
       vault.setSecret(ref, value)
