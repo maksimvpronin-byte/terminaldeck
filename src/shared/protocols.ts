@@ -4,8 +4,13 @@
  * Until now every host was an SSH host and the pane could assume a terminal.
  * A graphical session has no shell, so the panels bolted to the terminal —
  * file browser, port forwards, monitoring, broadcast — are not merely unused
- * there, they are meaningless. This table is what stops the toolbar offering
- * them, and it is the single place to extend when a protocol is added.
+ * there, they are meaningless. Nor are the settings behind them: a key file, a
+ * jump host, a command typed into a shell, a terminal font. This table is what
+ * stops the toolbar and the host dialog offering them, and it is the single
+ * place to extend when a protocol is added.
+ *
+ * A *group* is not asked, and must not be: protocol is not inherited, and one
+ * group happily holds a Linux box and a Windows one. Only a host knows.
  */
 
 export type Protocol = 'ssh' | 'rdp'
@@ -43,6 +48,21 @@ export interface ProtocolTraits {
   monitor: boolean
   /** Typing into several sessions at once, which only means anything for a shell. */
   broadcast: boolean
+  /**
+   * Private keys and an SSH agent, rather than a password and nothing else.
+   *
+   * RDP authenticates with a password — through CredSSP, but a password — and
+   * has no notion of either. Offering them on a Windows host is offering a
+   * choice that cannot be honoured.
+   */
+  keyAuth: boolean
+  /**
+   * Reached through another saved session, the way `ProxyJump` does it.
+   *
+   * A desktop goes through an RD Gateway instead, which is its own setting
+   * under Desktop; `jumpHostId` is never read on that path.
+   */
+  jumpHost: boolean
 }
 
 const TRAITS: Record<Protocol, ProtocolTraits> = {
@@ -53,7 +73,9 @@ const TRAITS: Record<Protocol, ProtocolTraits> = {
     files: true,
     tunnels: true,
     monitor: true,
-    broadcast: true
+    broadcast: true,
+    keyAuth: true,
+    jumpHost: true
   },
   rdp: {
     label: 'RDP',
@@ -64,7 +86,9 @@ const TRAITS: Record<Protocol, ProtocolTraits> = {
     files: false,
     tunnels: false,
     monitor: false,
-    broadcast: false
+    broadcast: false,
+    keyAuth: false,
+    jumpHost: false
   }
 }
 

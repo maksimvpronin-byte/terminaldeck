@@ -103,6 +103,13 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
 
   const desktop = resolveRdp(pending, pending.groupId, groups)
   const isRdp = protocolOf(profile) === 'rdp'
+  /**
+   * What this host can actually use. A shell's settings — a key file, a jump
+   * host, a command typed on connect, a terminal font, a tunnel — are not
+   * merely unused on a desktop, they cannot be honoured, and a dialog that
+   * offers them is a dialog that lies.
+   */
+  const traits = traitsOf(protocolOf(profile))
   const rdpNote = (key: keyof RdpDefaults): string => {
     const source = rdpInheritedFrom(pending, pending.groupId, groups, key)
     return source ? `inherited from ${source.name}` : ''
@@ -269,74 +276,89 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
           forgetSecret={forgetSecret}
           onForgetSecret={setForgetSecret}
           onPickKey={pickKey}
+          methods={traits.keyAuth ? undefined : ['password']}
           words={authWords}
         />
 
-        <label className="checkbox-row" style={{ flexDirection: 'row' }}>
-          <input
-            type="checkbox"
-            checked={effective.agentForward}
-            onChange={(e) => set('agentForward', e.target.checked)}
-          />
-          Forward SSH agent to remote host
-        </label>
+        {traits.keyAuth && (
+          <label className="checkbox-row" style={{ flexDirection: 'row' }}>
+            <input
+              type="checkbox"
+              checked={effective.agentForward}
+              onChange={(e) => set('agentForward', e.target.checked)}
+            />
+            {t('Forward SSH agent to remote host')}
+          </label>
+        )}
 
-        <label className="checkbox-row" style={{ flexDirection: 'row' }}>
-          <input
-            type="checkbox"
-            checked={effective.followTerminalCwd}
-            onChange={(e) => set('followTerminalCwd', e.target.checked)}
-          />
-          {t('SFTP panel follows the terminal’s directory')}
-        </label>
-        <p className="settings-note">
-          {t(
-            'Keeps the SFTP panel on the directory the shell is in. Types one setup line into the shell on connect so it reports where it is; its echo is hidden. Off by default: it lets the host move the file browser. The ⇉ button in the panel switches it at any time.'
-          )}
-        </p>
+        {traits.files && (
+          <>
+            <label className="checkbox-row" style={{ flexDirection: 'row' }}>
+              <input
+                type="checkbox"
+                checked={effective.followTerminalCwd}
+                onChange={(e) => set('followTerminalCwd', e.target.checked)}
+              />
+              {t('SFTP panel follows the terminal’s directory')}
+            </label>
+            <p className="settings-note">
+              {t(
+                'Keeps the SFTP panel on the directory the shell is in. Types one setup line into the shell on connect so it reports where it is; its echo is hidden. Off by default: it lets the host move the file browser. The ⇉ button in the panel switches it at any time.'
+              )}
+            </p>
+          </>
+        )}
 
-        <label className="checkbox-row" style={{ flexDirection: 'row' }}>
-          <input
-            type="checkbox"
-            checked={profile.logToFile}
-            onChange={(e) => set('logToFile', e.target.checked)}
-          />
-          {t('Log session output to file')}
-        </label>
+        {traits.textual && (
+          <label className="checkbox-row" style={{ flexDirection: 'row' }}>
+            <input
+              type="checkbox"
+              checked={profile.logToFile}
+              onChange={(e) => set('logToFile', e.target.checked)}
+            />
+            {t('Log session output to file')}
+          </label>
+        )}
 
-        <label>
-          {t('Jump host (ProxyJump)')}
-          <select
-            value={profile.jumpHostId ?? ''}
-            onChange={(e) => set('jumpHostId', e.target.value || null)}
-          >
-            <option value="">
-              {inheritNote('jumpHostId')
-                ? `Inherited (${sessions.find((s) => s.id === effective.jumpHostId)?.name ?? 'none'})`
-                : t('None')}
-            </option>
-            {otherSessions.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
+        {traits.jumpHost && (
+          <label>
+            {t('Jump host (ProxyJump)')}
+            <select
+              value={profile.jumpHostId ?? ''}
+              onChange={(e) => set('jumpHostId', e.target.value || null)}
+            >
+              <option value="">
+                {inheritNote('jumpHostId')
+                  ? `Inherited (${sessions.find((s) => s.id === effective.jumpHostId)?.name ?? 'none'})`
+                  : t('None')}
               </option>
-            ))}
-          </select>
-        </label>
+              {otherSessions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
 
-        <label>
-          {t('On connect')}
-          <textarea
-            rows={2}
-            value={profile.onConnectCommand ?? ''}
-            placeholder={inheritNote('onConnectCommand') || t('e.g. sudo -i')}
-            onChange={(e) => set('onConnectCommand', e.target.value)}
-          />
-        </label>
-        <p className="settings-note">
-          {t('Typed into the shell as soon as it is ready, so you see it run and')}{' '}
-          <code>cd</code>{' '}
-          {t('sticks. One command per line, run in order. It repeats on every reconnect.')}
-        </p>
+        {traits.textual && (
+          <>
+            <label>
+              {t('On connect')}
+              <textarea
+                rows={2}
+                value={profile.onConnectCommand ?? ''}
+                placeholder={inheritNote('onConnectCommand') || t('e.g. sudo -i')}
+                onChange={(e) => set('onConnectCommand', e.target.value)}
+              />
+            </label>
+            <p className="settings-note">
+              {t('Typed into the shell as soon as it is ready, so you see it run and')}{' '}
+              <code>cd</code>{' '}
+              {t('sticks. One command per line, run in order. It repeats on every reconnect.')}
+            </p>
+          </>
+        )}
 
         <label>
           {t('Group')}
@@ -377,23 +399,26 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
           <input value={tagsInput} onChange={(e) => setTagsInput(e.target.value)} />
         </label>
 
-        <details className="settings-section">
-          <summary>{t('Appearance')}</summary>
-          <p className="settings-note">
-            Applies to this host's terminals only. Anything left on “inherit” follows the group,
-            and then Settings — so marking one production box red changes nothing else.
-          </p>
-          <AppearanceFields
-            value={profile}
-            set={setLook}
-            effective={appearance}
-            inherited={inheritedLook}
-            inheritedFrom={appearanceFrom}
-            inheritToggle={
-              profile.groupId ? { label: t('Inherit appearance from the group') } : undefined
-            }
-          />
-        </details>
+        {traits.textual && (
+          <details className="settings-section">
+            <summary>{t('Appearance')}</summary>
+            <p className="settings-note">
+              {t(
+                'Applies to this host’s terminals only. Anything left on “inherit” follows the group, and then Settings — so marking one production box red changes nothing else.'
+              )}
+            </p>
+            <AppearanceFields
+              value={profile}
+              set={setLook}
+              effective={appearance}
+              inherited={inheritedLook}
+              inheritedFrom={appearanceFrom}
+              inheritToggle={
+                profile.groupId ? { label: t('Inherit appearance from the group') } : undefined
+              }
+            />
+          </details>
+        )}
 
         {isRdp && (
           <details className="settings-section" open>
@@ -417,55 +442,58 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
           </details>
         )}
 
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>{t('Port forwards')}</span>
-            <button onClick={addForward}>{t('+ Add')}</button>
+        {/* A desktop has no tunnels: the far end is reached, not proxied. */}
+        {traits.tunnels && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>{t('Port forwards')}</span>
+              <button onClick={addForward}>{t('+ Add')}</button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
+              {profile.portForwards.map((r) => (
+                <div className="pf-rule" key={r.id}>
+                  <select value={r.type} onChange={(e) => updateForward(r.id, { type: e.target.value as PortForwardRule['type'] })}>
+                    <option value="local">{t('Local')}</option>
+                    <option value="remote">{t('Remote')}</option>
+                    <option value="dynamic">{t('Dynamic (SOCKS)')}</option>
+                  </select>
+                  <input
+                    placeholder={t('src host')}
+                    value={r.srcHost}
+                    onChange={(e) => updateForward(r.id, { srcHost: e.target.value })}
+                    style={{ width: 90 }}
+                  />
+                  <input
+                    type="number"
+                    placeholder={t('src port')}
+                    value={r.srcPort}
+                    onChange={(e) => updateForward(r.id, { srcPort: Number(e.target.value) })}
+                    style={{ width: 70 }}
+                  />
+                  {r.type !== 'dynamic' && (
+                    <>
+                      <span>→</span>
+                      <input
+                        placeholder={t('dst host')}
+                        value={r.dstHost ?? ''}
+                        onChange={(e) => updateForward(r.id, { dstHost: e.target.value })}
+                        style={{ width: 90 }}
+                      />
+                      <input
+                        type="number"
+                        placeholder={t('dst port')}
+                        value={r.dstPort ?? 0}
+                        onChange={(e) => updateForward(r.id, { dstPort: Number(e.target.value) })}
+                        style={{ width: 70 }}
+                      />
+                    </>
+                  )}
+                  <button onClick={() => removeForward(r.id)}>✕</button>
+                </div>
+              ))}
+            </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
-            {profile.portForwards.map((r) => (
-              <div className="pf-rule" key={r.id}>
-                <select value={r.type} onChange={(e) => updateForward(r.id, { type: e.target.value as PortForwardRule['type'] })}>
-                  <option value="local">{t('Local')}</option>
-                  <option value="remote">{t('Remote')}</option>
-                  <option value="dynamic">{t('Dynamic (SOCKS)')}</option>
-                </select>
-                <input
-                  placeholder={t('src host')}
-                  value={r.srcHost}
-                  onChange={(e) => updateForward(r.id, { srcHost: e.target.value })}
-                  style={{ width: 90 }}
-                />
-                <input
-                  type="number"
-                  placeholder={t('src port')}
-                  value={r.srcPort}
-                  onChange={(e) => updateForward(r.id, { srcPort: Number(e.target.value) })}
-                  style={{ width: 70 }}
-                />
-                {r.type !== 'dynamic' && (
-                  <>
-                    <span>→</span>
-                    <input
-                      placeholder={t('dst host')}
-                      value={r.dstHost ?? ''}
-                      onChange={(e) => updateForward(r.id, { dstHost: e.target.value })}
-                      style={{ width: 90 }}
-                    />
-                    <input
-                      type="number"
-                      placeholder={t('dst port')}
-                      value={r.dstPort ?? 0}
-                      onChange={(e) => updateForward(r.id, { dstPort: Number(e.target.value) })}
-                      style={{ width: 70 }}
-                    />
-                  </>
-                )}
-                <button onClick={() => removeForward(r.id)}>✕</button>
-              </div>
-            ))}
-          </div>
-        </div>
+        )}
 
         {error && <span className="error-text">{error}</span>}
 

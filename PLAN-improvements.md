@@ -690,6 +690,13 @@ status lines the app writes into the terminal itself — `Connecting...`,
 lists are deliberately empty, and dragging the phrase book into those closures to
 translate four words is a worse trade than leaving them.
 
+**What the coverage test does not check.** It reads the source for `t('…')` and
+requires an entry for each — so it catches a phrase the book has not got, and
+says nothing at all about a paragraph written straight into the markup that
+never asks. "Every screen is translated" was claimed here on the strength of it
+and was not quite true: the group dialog, the first-run prompt and one menu item
+still hold English text. The test measures what it measures.
+
 **A lookup table is not a phrase.** `REFUSAL[c.reason]` and `BLOCKED[…]` were
 tables of English strings, passed to `t()` by key at runtime — which the coverage
 test cannot see, because it reads the source for `t('…')`. So both became small

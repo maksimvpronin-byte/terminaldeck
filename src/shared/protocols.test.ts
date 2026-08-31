@@ -32,7 +32,14 @@ describe('protocolOf', () => {
 describe('traitsOf', () => {
   it('gives SSH the shell-bound panels', () => {
     const ssh = traitsOf('ssh')
-    expect(ssh).toMatchObject({ textual: true, files: true, tunnels: true, monitor: true })
+    expect(ssh).toMatchObject({
+      textual: true,
+      files: true,
+      tunnels: true,
+      monitor: true,
+      keyAuth: true,
+      jumpHost: true
+    })
   })
 
   it('withholds every shell-bound panel from a desktop', () => {
@@ -44,6 +51,10 @@ describe('traitsOf', () => {
     expect(traits.tunnels).toBe(false)
     expect(traits.monitor).toBe(false)
     expect(traits.broadcast).toBe(false)
+    // A password, through CredSSP, and nothing else: no key file, no agent.
+    expect(traits.keyAuth).toBe(false)
+    // A desktop is reached through an RD Gateway, which is its own setting.
+    expect(traits.jumpHost).toBe(false)
   })
 
   it('states the usual port for each', () => {

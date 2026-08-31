@@ -249,9 +249,11 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
   so the gap is always the screens nobody has been through yet rather than a line someone missed.
   Translated so far: Settings including its security and backup tabs, the shortcut list, the
   session tree, the tab strip, the pane toolbar, the host, group and inventory-override dialogs,
-  Every screen is translated: 554 phrases, and a test fails on one the book has not got. What
-  is deliberately left in English is the crash screen, which must not depend on the store it is
-  reporting the failure of, and the status lines the app writes into the terminal itself
+  575 phrases, and a test fails on one the book has not got — though what it checks is that every
+  phrase *asked for* has an entry, not that every line of text asks. A paragraph written straight
+  into the markup is invisible to it, and a few remain: the group dialog, the first-run prompt and
+  one menu item. What is deliberately left in English is the crash screen, which must not depend on
+  the store it is reporting the failure of, and the status lines the app writes into the terminal
 
 Press `⌘/` in the app for the full list of shortcuts and gestures.
 

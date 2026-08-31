@@ -1,6 +1,6 @@
 import type { AuthDefaults, AuthMethod } from '../../../shared/types'
 import type { AuthFieldsState, CredentialSource } from '../../../shared/authFields'
-import { useT } from '../i18n'
+import { useT, type Translate } from '../i18n'
 
 /**
  * The words that differ between the three places this is used. The controls do
@@ -35,7 +35,29 @@ interface Props {
   onForgetSecret: (forget: boolean) => void
   /** Opens a file picker and keeps the path; the caller owns both. */
   onPickKey: () => void
+  /**
+   * The methods this item may actually use, in the order to offer them.
+   *
+   * A host knows what it speaks, and RDP authenticates with a password and
+   * nothing else — a key file or an agent there is a choice that cannot be
+   * honoured. A group is not asked and gets all three: protocol is not
+   * inherited, and one group holds Linux and Windows boxes alike.
+   */
+  methods?: AuthMethod[]
   words: AuthWords
+}
+
+const ALL_METHODS: AuthMethod[] = ['password', 'privateKey', 'agent']
+
+/**
+ * Literal phrases in a function rather than a table looked up by key: the
+ * phrase book's coverage test reads the source for `t('…')`, and a key
+ * assembled at runtime is invisible to it.
+ */
+function methodLabel(t: Translate, method: AuthMethod): string {
+  if (method === 'password') return t('Password')
+  if (method === 'privateKey') return t('Private key')
+  return t('SSH agent')
 }
 
 /**
@@ -56,6 +78,7 @@ export default function AuthFields({
   forgetSecret,
   onForgetSecret,
   onPickKey,
+  methods = ALL_METHODS,
   words
 }: Props): JSX.Element {
   const t = useT()
@@ -76,6 +99,19 @@ export default function AuthFields({
   const nameOf = (source: CredentialSource): string =>
     source === 'self' ? words.self : (source?.name ?? '')
 
+  /**
+   * What is offered, plus whatever is already set if that is not among them.
+   *
+   * A host saved as RDP while it was still SSH can hold `privateKey`. Dropping
+   * the option would leave the select showing nothing at all and change the
+   * stored value the moment anyone touched it, which is a poor way to learn
+   * that a setting was quietly wrong.
+   */
+  const offered =
+    value.authMethod && !methods.includes(value.authMethod)
+      ? [...methods, value.authMethod]
+      : methods
+
   return (
     <>
       <label>
@@ -84,9 +120,11 @@ export default function AuthFields({
           <option value="">
             {words.inherit} ({inheritedMethod})
           </option>
-          <option value="password">{t('Password')}</option>
-          <option value="privateKey">{t('Private key')}</option>
-          <option value="agent">{t('SSH agent')}</option>
+          {offered.map((method) => (
+            <option key={method} value={method}>
+              {methodLabel(t, method)}
+            </option>
+          ))}
         </select>
       </label>
 
