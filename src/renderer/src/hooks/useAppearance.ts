@@ -41,6 +41,10 @@ export function useAppearance(
       ? state.collections.find((c) => c.id === viaCollectionId)
       : undefined
     return resolveAppearance(found.host, found.host.groupId, found.groups, settings, collection)
+    // The store slices are listed as triggers rather than read directly: the
+    // body takes a snapshot with getState(), which is not reactive, so the
+    // subscriptions above are what make this recompute. The rule sees them as
+    // unused dependencies; removing them would freeze the look at mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target, viaCollectionId, settings, sessions, groups, trees, overrides, collections])
 }

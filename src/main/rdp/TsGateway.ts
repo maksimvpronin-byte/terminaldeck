@@ -597,21 +597,17 @@ async function signIn(
   )
   wire.send(reply)
 
-  let upgraded
-  try {
-    upgraded = await wire.response(
-      `the answer to the sign-in on ${what}`,
-      how.drainFinalBody !== false
-    )
-  } catch (err) {
-    /**
-     * A reset here has two causes with one symptom: the sign-in was rejected,
-     * or it was accepted and this gateway does not do WebSocket at all. No
-     * guess is needed any more — the caller tries the older transport next,
-     * which answers the question by working or by failing the same way.
-     */
-    throw err
-  }
+  /**
+   * A reset here has two causes with one symptom: the sign-in was rejected, or
+   * it was accepted and this gateway does not do WebSocket at all. No guess is
+   * needed any more — the failure is left to travel up as it is, and the caller
+   * tries the older transport next, which answers the question by working or by
+   * failing the same way.
+   */
+  const upgraded = await wire.response(
+    `the answer to the sign-in on ${what}`,
+    how.drainFinalBody !== false
+  )
 
   trace(`the gateway answered ${upgraded.status}`)
   if (upgraded.status === 401) {

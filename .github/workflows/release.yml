@@ -56,6 +56,13 @@ jobs:
       - name: Type-check
         run: npm run typecheck
 
+      # Checks runs these on every push, so a tagged commit has usually been
+      # through them already. Repeated here because this is the workflow that
+      # publishes: a release should not be built from a tree whose tests fail,
+      # whichever route the tag took.
+      - name: Tests
+        run: npm test
+
       # A missing secret expands to an empty string rather than being unset, and
       # electron-builder reads an empty CSC_LINK as a certificate path — failing
       # with "not a file". So the signing variables are only exported when set.

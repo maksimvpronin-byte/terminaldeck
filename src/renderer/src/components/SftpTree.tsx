@@ -69,6 +69,10 @@ export default function SftpTree({
     for (const dir of ancestors) {
       if (!children.has(dir) && !loading.has(dir)) fetchChildren(dir)
     }
+    // `children` and `loading` are consulted but deliberately not listed: this
+    // effect is what fills them, so listing them would re-run it on every
+    // fetch that completes. A stale read costs one redundant fetch, which the
+    // loading set then swallows; listing them costs a loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path, connectionId])
 

@@ -1,0 +1,58 @@
+name: Checks
+
+# The release workflow only runs on a `v*` tag, so until this existed the first
+# compile of a commit happened after the tag was already pushed — and the tests
+# never ran at all unless someone remembered to type `npm test`. That matters
+# here more than usual: the Windows paths (WinSessions, ntlm, md4, TsGateway,
+# ShadowHostBridge, the named-pipe agent) are developed on a Mac and never
+# execute there, so their tests are the only thing that can say they still work.
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# A quick series of pushes should leave one run to read, not a queue of them.
+# Keyed on the branch rather than the ref, so a pull request from a branch in
+# this repository does not run the same commit twice alongside its push.
+concurrency:
+  group: checks-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Cheap: Electron 42 dropped its postinstall, so no 100 MB binary is
+      # fetched here. That download happens under `npm run dev`, via
+      # install-electron, and this job never runs the app.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npm run typecheck
+
+      # Errors fail the job; `exhaustive-deps` is still a warning and does not,
+      # which is why this step could be added the day the first run was read
+      # rather than waiting for the rule to be promoted. `format:check` stays
+      # out until the tree has been through Prettier once.
+      - name: Lint
+        run: npm run lint
+
+      # One runner, not the release matrix: the tests are pure Node modules with
+      # no platform branches. A three-OS matrix belongs here the day a platform
+      # difference actually bites, not before.
+      - name: Tests
+        run: npm test

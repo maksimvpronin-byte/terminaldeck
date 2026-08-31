@@ -3,6 +3,10 @@
   "include": ["electron.vite.config.*", "src/main/**/*", "src/preload/**/*", "src/shared/**/*"],
   "compilerOptions": {
     "composite": true,
+    // The @electron-toolkit base sets strict: true but relaxes this one; with
+    // no explicit `any` anywhere in the source there is nothing to gain from
+    // the exception and a whole class of untyped callback parameter to lose.
+    "noImplicitAny": true,
     "types": ["electron-vite/node"]
   }
 }

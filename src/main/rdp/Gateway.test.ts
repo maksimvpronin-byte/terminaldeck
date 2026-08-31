@@ -98,7 +98,8 @@ function firstPdu(socket: WebSocket): Promise<Uint8Array> {
     socket.once('message', (data: Buffer) => {
       const bytes = new Uint8Array(data)
       const length = pduLength(bytes)
-      length === null ? reject(new Error('not a PDU')) : resolve(bytes.subarray(0, length))
+      if (length === null) reject(new Error('not a PDU'))
+      else resolve(bytes.subarray(0, length))
     })
     socket.once('close', (code, reason) =>
       reject(new Error(`closed ${code} ${reason.toString()}`))

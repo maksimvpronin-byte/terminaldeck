@@ -84,8 +84,14 @@ export function scanOsc7(chunk: string): Osc7Scan {
  * Sent as a single line so the echo on connect is one line rather than a screen
  * of function definitions. It prepends rather than replaces `PROMPT_COMMAND`,
  * so an existing prompt setup keeps working.
+ *
+ * Every dollar in it belongs to the remote shell, not to JavaScript. The one in
+ * `\${PROMPT_COMMAND:+` is escaped only because a template literal would
+ * otherwise interpolate it; the others take no backslash and must not be given
+ * one for symmetry, since an escape JavaScript does not need is an escape a
+ * reader has to think about twice.
  */
 export const OSC7_SHELL_SETUP =
   `__td7(){ printf '\\033]7;file://%s%s\\033\\\\' "\${HOSTNAME:-}" "$PWD"; }; ` +
   `if [ -n "$ZSH_VERSION" ]; then autoload -Uz add-zsh-hook 2>/dev/null && add-zsh-hook precmd __td7; ` +
-  `elif [ -n "$BASH_VERSION" ]; then PROMPT_COMMAND="__td7\${PROMPT_COMMAND:+;\$PROMPT_COMMAND}"; fi; __td7`
+  `elif [ -n "$BASH_VERSION" ]; then PROMPT_COMMAND="__td7\${PROMPT_COMMAND:+;$PROMPT_COMMAND}"; fi; __td7`

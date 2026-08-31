@@ -8,6 +8,8 @@
   ],
   "compilerOptions": {
     "composite": true,
+    // See tsconfig.node.json — the toolkit base leaves this off under strict.
+    "noImplicitAny": true,
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
