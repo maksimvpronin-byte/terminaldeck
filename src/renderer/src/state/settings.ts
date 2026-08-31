@@ -1,4 +1,4 @@
-import type { ITheme } from 'xterm'
+import type { ITheme } from '@xterm/xterm'
 import type { CursorStyle, ResolvedAppearance } from '../../../shared/types'
 import { preferredLanguage, type Language } from '../i18n/language'
 

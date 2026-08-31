@@ -126,11 +126,19 @@ const api = {
       ipcRenderer.invoke(IPC.sshDisconnect, connectionId),
     write: (connectionId: string, data: string): void =>
       ipcRenderer.send(IPC.sshWrite, connectionId, data),
+    /**
+     * Says that `bytes` of output have reached the terminal. Sent for every
+     * chunk: it is what releases a connection the main process paused because
+     * the renderer had fallen behind.
+     */
+    ack: (connectionId: string, bytes: number): void =>
+      ipcRenderer.send(IPC.sshAck, connectionId, bytes),
     resize: (connectionId: string, cols: number, rows: number): void =>
       ipcRenderer.send(IPC.sshResize, connectionId, cols, rows),
-    onData: (connectionId: string, cb: (base64: string) => void): (() => void) => {
+    /** Raw bytes, exactly as the host sent them. */
+    onData: (connectionId: string, cb: (data: Uint8Array) => void): (() => void) => {
       const channel = `${IPC.sshData}:${connectionId}`
-      const listener = (_e: unknown, data: string): void => cb(data)
+      const listener = (_e: unknown, data: Uint8Array): void => cb(data)
       ipcRenderer.on(channel, listener)
       return () => ipcRenderer.removeListener(channel, listener)
     },

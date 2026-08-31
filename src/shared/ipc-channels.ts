@@ -51,6 +51,8 @@ export const IPC = {
   sshQuickConnect: 'ssh:quickConnect',
   sshDisconnect: 'ssh:disconnect',
   sshWrite: 'ssh:write',
+  /** The renderer reporting output written to the terminal, so reading can resume. */
+  sshAck: 'ssh:ack',
   sshResize: 'ssh:resize',
   // events pushed from main -> renderer, suffixed with connectionId at runtime
   sshData: 'ssh:data',

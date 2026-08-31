@@ -21,6 +21,14 @@ interface LiveConnection {
   clients: Client[] // chain of clients, last one is the target
   stream: ClientChannel
   logStream?: WriteStream
+  /** Output held back for the next flush, and how much of it there is. */
+  outbox: Buffer[]
+  outboxBytes: number
+  flushTimer?: NodeJS.Timeout
+  /** Sent to the renderer and not yet reported as written to the terminal. */
+  inFlight: number
+  /** Whether the far end has been told to stop talking for a moment. */
+  paused: boolean
   /**
    * Whether this connection's directory is being tracked. Held per connection
    * rather than read from the profile each time, so it can be switched from the
@@ -32,6 +40,30 @@ interface LiveConnection {
 }
 
 const OPENSSH_PIPE = '\\\\.\\pipe\\openssh-ssh-agent'
+
+/**
+ * How long output is allowed to sit before it is handed to the renderer.
+ *
+ * A busy shell emits dozens of small chunks a second, and one IPC message each
+ * costs more than the bytes do. Eight milliseconds is under half a frame, so a
+ * keystroke echo still arrives on the next paint, while `cat` on a large file
+ * becomes a handful of large writes instead of thousands of small ones.
+ */
+const FLUSH_INTERVAL_MS = 8
+
+/** Enough held up already: send it now rather than waiting out the interval. */
+const FLUSH_BYTES = 64 * 1024
+
+/**
+ * How far the renderer may fall behind before the host is asked to pause.
+ *
+ * Without this, output the terminal cannot keep up with simply accumulates —
+ * `cat /dev/urandom` grows the renderer's queue until something gives. Pausing
+ * the stream propagates through SSH's own window as backpressure, so the far
+ * end stops sending rather than this end stopping reading.
+ */
+const HIGH_WATER = 1024 * 1024
+const LOW_WATER = 256 * 1024
 
 /**
  * Locates an SSH agent. An explicit SSH_AUTH_SOCK always wins. On Windows the
@@ -178,6 +210,70 @@ class SSHManager {
     win.webContents.send(`${channel}:${connectionId}`, payload)
   }
 
+  /** Holds output for a few milliseconds so a burst travels as one message. */
+  private queueOutput(win: BrowserWindow, conn: LiveConnection, data: Buffer): void {
+    conn.outbox.push(data)
+    conn.outboxBytes += data.length
+    if (conn.outboxBytes >= FLUSH_BYTES) {
+      this.flushOutput(win, conn)
+      return
+    }
+    if (!conn.flushTimer) {
+      conn.flushTimer = setTimeout(() => this.flushOutput(win, conn), FLUSH_INTERVAL_MS)
+    }
+  }
+
+  /**
+   * Hands everything held to the renderer as one message.
+   *
+   * The bytes travel as a `Buffer`, which arrives the other side as a
+   * `Uint8Array` and goes straight into `term.write`. They used to be base64: a
+   * third more bytes across the boundary, and a per-byte `charCodeAt` loop in
+   * the renderer to undo it.
+   */
+  private flushOutput(win: BrowserWindow, conn: LiveConnection): void {
+    if (conn.flushTimer) {
+      clearTimeout(conn.flushTimer)
+      conn.flushTimer = undefined
+    }
+    if (conn.outboxBytes === 0) return
+
+    const payload =
+      conn.outbox.length === 1 ? conn.outbox[0] : Buffer.concat(conn.outbox, conn.outboxBytes)
+    conn.outbox = []
+    conn.outboxBytes = 0
+
+    conn.inFlight += payload.length
+    this.send(win, conn.id, IPC.sshData, payload)
+
+    if (!conn.paused && conn.inFlight >= HIGH_WATER) {
+      conn.paused = true
+      // Both halves: stderr is a readable of its own on the same channel, and a
+      // build pouring warnings out of it floods just as well as stdout does.
+      conn.stream.pause()
+      conn.stream.stderr.pause()
+    }
+  }
+
+  /**
+   * The renderer reporting that a chunk has reached the terminal.
+   *
+   * This is the only thing that lets a paused connection start again, so it has
+   * to be sent for every chunk received — see TerminalHost. A pane that stops
+   * acknowledging is one that is being torn down, and the connection goes with
+   * it.
+   */
+  acknowledge(connectionId: string, bytes: number): void {
+    const conn = this.connections.get(connectionId)
+    if (!conn) return
+    conn.inFlight = Math.max(0, conn.inFlight - bytes)
+    if (conn.paused && conn.inFlight <= LOW_WATER) {
+      conn.paused = false
+      conn.stream.resume()
+      conn.stream.stderr.resume()
+    }
+  }
+
   async connectProfile(
     win: BrowserWindow,
     profile: SessionProfile,
@@ -268,7 +364,11 @@ class SSHManager {
           clients: chain,
           stream,
           logStream,
-          followCwd: auth?.followTerminalCwd === true
+          followCwd: auth?.followTerminalCwd === true,
+          outbox: [],
+          outboxBytes: 0,
+          inFlight: 0,
+          paused: false
         }
         this.connections.set(connectionId, connection)
 
@@ -283,7 +383,7 @@ class SSHManager {
           const data = suppressor && !suppressor.done ? suppressor.push(raw) : raw
 
           if (data.length > 0) {
-            this.send(win, connectionId, IPC.sshData, data.toString('base64'))
+            this.queueOutput(win, connection, data)
             logStream?.write(data)
           }
           if (!connection.followCwd) return
@@ -295,9 +395,13 @@ class SSHManager {
           }
         })
         stream.stderr.on('data', (data: Buffer) => {
-          this.send(win, connectionId, IPC.sshData, data.toString('base64'))
+          this.queueOutput(win, connection, data)
         })
         stream.on('close', () => {
+          // Whatever is still held back is the last thing the host said — an
+          // error message, usually. Flushed before the status, so a connection
+          // that ends inside a flush interval does not take it with it.
+          this.flushOutput(win, connection)
           this.send(win, connectionId, IPC.sshStatus, 'closed')
           this.teardown(connectionId)
         })
@@ -340,9 +444,7 @@ class SSHManager {
       const held = conn.echoSuppressor?.done === false ? conn.echoSuppressor.flush() : undefined
       if (held && held.length > 0) {
         const win = BrowserWindow.getAllWindows()[0]
-        if (win && !win.isDestroyed()) {
-          win.webContents.send(`${IPC.sshData}:${conn.id}`, held.toString('base64'))
-        }
+        if (win && !win.isDestroyed()) this.queueOutput(win, conn, held)
       }
     }, 2000)
   }
@@ -436,6 +538,7 @@ class SSHManager {
   private teardown(connectionId: string): void {
     const conn = this.connections.get(connectionId)
     if (!conn) return
+    if (conn.flushTimer) clearTimeout(conn.flushTimer)
     conn.logStream?.end()
     try {
       conn.stream.close()

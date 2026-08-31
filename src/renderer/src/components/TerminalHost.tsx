@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Terminal } from 'xterm'
-import { FitAddon } from 'xterm-addon-fit'
-import { SearchAddon } from 'xterm-addon-search'
-import 'xterm/css/xterm.css'
+import { Terminal } from '@xterm/xterm'
+import { FitAddon } from '@xterm/addon-fit'
+import { SearchAddon } from '@xterm/addon-search'
+import { WebglAddon } from '@xterm/addon-webgl'
+import '@xterm/xterm/css/xterm.css'
 import type { PaneTarget } from '../state/store'
 import { useStore } from '../state/store'
 import { themeOf } from '../state/settings'
 import { useAppearance } from '../hooks/useAppearance'
 import ContextMenu, { type MenuItem } from './ContextMenu'
+import { useT } from '../i18n'
 
 interface Props {
   target: PaneTarget
@@ -25,8 +27,30 @@ interface Props {
   resolveWriteTargets: (ownConnectionId: string) => string[]
 }
 
-function writeBase64(term: Terminal, b64: string): void {
-  term.write(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)))
+/**
+ * Draws through the GPU instead of the DOM.
+ *
+ * xterm's default renderer builds an element per cell, which is the slowest
+ * path it offers and shows on anything that scrolls — a build log, `tail -f`,
+ * a full-screen editor redrawing itself.
+ *
+ * Must come after `term.open`: the addon needs a canvas to attach to, and
+ * throws without one. Failure is not worth reporting to anyone — a machine
+ * with no working WebGL keeps the renderer it has always had, which is exactly
+ * what shipped before this.
+ */
+function enableGpuRenderer(term: Terminal): void {
+  try {
+    const webgl = new WebglAddon()
+    // A context can be lost on waking from sleep, on a driver reset, or on the
+    // window being dragged to a display driven by another GPU. The addon does
+    // not recover by itself; disposing it puts the DOM renderer back, which
+    // draws rather than leaving a dead canvas on screen.
+    webgl.onContextLoss(() => webgl.dispose())
+    term.loadAddon(webgl)
+  } catch {
+    /* no WebGL here; the DOM renderer stays */
+  }
 }
 
 export default function TerminalHost({
@@ -40,6 +64,7 @@ export default function TerminalHost({
   onOutput,
   resolveWriteTargets
 }: Props): JSX.Element {
+  const t = useT()
   const hostRef = useRef<HTMLDivElement | null>(null)
   const termRef = useRef<Terminal | null>(null)
   const fitRef = useRef<FitAddon | null>(null)
@@ -79,8 +104,12 @@ export default function TerminalHost({
     const term = termRef.current
     if (!term) return
     unsubscribeRef.current.push(
-      window.td.ssh.onData(cid, (b64) => {
-        writeBase64(term, b64)
+      window.td.ssh.onData(cid, (data) => {
+        // The acknowledgement is not bookkeeping: the main process pauses the
+        // connection when too much output is outstanding, and this is what
+        // starts it again. xterm calls back once the chunk has been parsed,
+        // which is the moment this end is genuinely ready for more.
+        term.write(data, () => window.td.ssh.ack(cid, data.length))
         onOutputRef.current?.()
       }),
       window.td.ssh.onStatus(cid, (status) => {
@@ -146,6 +175,7 @@ export default function TerminalHost({
     term.loadAddon(fit)
     term.loadAddon(search)
     term.open(hostRef.current)
+    enableGpuRenderer(term)
     if (hostRef.current.clientWidth > 0 && hostRef.current.clientHeight > 0) fit.fit()
     termRef.current = term
     fitRef.current = fit
@@ -196,12 +226,23 @@ export default function TerminalHost({
     resizeObserver.observe(hostRef.current)
 
     return () => {
+      // Bumping the counter is the whole point of this cleanup: it is what tells
+      // a connect still in flight from this mount to discard the session it gets
+      // back. The rule is warning about refs that hold a DOM node, where reading
+      // a stale one in cleanup is a bug; this one holds a number that is meant
+      // to change, and reading it here is not part of what happens.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       generationRef.current++
       detachListeners()
       resizeObserver.disconnect()
       term.dispose()
       if (connIdRef.current) window.td.ssh.disconnect(connIdRef.current)
     }
+    // Builds the terminal once and tears it down once. Every value it reads is
+    // either a ref or wanted only as it stood at mount; the ones that must
+    // follow later changes — the appearance, the active pane, the font size —
+    // have effects of their own below. Listing them here would dispose the
+    // terminal and drop the connection to change a colour.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -244,11 +285,11 @@ export default function TerminalHost({
     const term = termRef.current
     const selection = term?.getSelection() ?? ''
     return [
-      { label: 'Copy', disabled: selection === '', onSelect: copySelection },
-      { label: 'Paste', onSelect: paste },
-      { label: 'Select all', separated: true, onSelect: () => term?.selectAll() },
-      { label: 'Find…', onSelect: () => setSearchOpen(true) },
-      { label: 'Clear', separated: true, onSelect: () => term?.clear() }
+      { label: t('Copy'), disabled: selection === '', onSelect: copySelection },
+      { label: t('Paste'), onSelect: paste },
+      { label: t('Select all'), separated: true, onSelect: () => term?.selectAll() },
+      { label: t('Find…'), onSelect: () => setSearchOpen(true) },
+      { label: t('Clear'), separated: true, onSelect: () => term?.clear() }
     ]
   }
 
@@ -265,7 +306,7 @@ export default function TerminalHost({
           <input
             autoFocus
             value={needle}
-            placeholder="Find…"
+            placeholder={t('Find…')}
             onChange={(e) => {
               setNeedle(e.target.value)
               searchRef.current?.findNext(e.target.value, { incremental: true })
@@ -278,13 +319,13 @@ export default function TerminalHost({
               }
             }}
           />
-          <button title="Previous (⇧⏎)" onClick={() => searchRef.current?.findPrevious(needle)}>
+          <button title={t('Previous (⇧⏎)')} onClick={() => searchRef.current?.findPrevious(needle)}>
             ↑
           </button>
-          <button title="Next (⏎)" onClick={() => searchRef.current?.findNext(needle)}>
+          <button title={t('Next (⏎)')} onClick={() => searchRef.current?.findNext(needle)}>
             ↓
           </button>
-          <button title="Close (Esc)" onClick={closeSearch}>
+          <button title={t('Close (Esc)')} onClick={closeSearch}>
             ✕
           </button>
         </div>

@@ -10,6 +10,7 @@ import {
 import type { UserInteraction } from '@devolutions/iron-remote-desktop'
 import { traitsOf, type Protocol } from '../../../shared/protocols'
 import type { RdpView } from '../../../shared/types'
+import { desktopSizeFor, type DesktopSize } from '../../../shared/desktopSize'
 import { shadowable, type WinSession } from '../../../shared/winSessions'
 import ShadowView from './ShadowView'
 import { useCommandAsControl } from '../hooks/useCommandAsControl'
@@ -203,79 +204,15 @@ export default function GraphicalHost({
   /**
    * How big the desktop should be, in the far end's own pixels.
    *
-   * A pinned size is stated as it is. Otherwise the pane decides — measured in
-   * CSS points, and multiplied by the screen's density when asked for: a pane
-   * 1400 points wide is 2800 pixels on a Retina display, and asking for 1400
-   * gets a desktop the screen then magnifies, large and soft. Returns nothing
-   * before the pane has a size, which is the case for one frame after a tab is
-   * created.
+   * The arithmetic — the density, the magnification, the host's pixel budget
+   * and what [MS-RDPEDISP] will accept — lives in shared/desktopSize.ts, where
+   * it is tested. What is left here is the two things it cannot know: how large
+   * the pane is at this moment, and how dense the display it is on happens to
+   * be.
    */
-  function desiredSize(): { width: number; height: number; factor: number } | null {
-    if (look?.resolution === 'fixed') {
-      // A pinned desktop is asked for exactly as it is stated, and nothing is
-      // said about its density: the size is the whole of what was decided.
-      return { width: look.desktopWidth, height: look.desktopHeight, factor: 1 }
-    }
+  function desiredSize(): DesktopSize | null {
     const rect = containerRef.current?.getBoundingClientRect()
-    if (!rect || rect.width < 1 || rect.height < 1) return null
-
-    /**
-     * As many pixels as the screen has, divided by how much larger than its own
-     * pixels the picture is to be drawn, and capped by what the host is willing
-     * to send.
-     *
-     * The pane is measured in CSS points; a screen may have more pixels than
-     * that. Asking for the pixels draws every one of them itself and is as
-     * sharp as the display gets — and on a Retina display it is also half the
-     * size an ordinary monitor gives, because Windows lays out a 20-pixel menu
-     * the same way whether a pixel is a millimetre across or half of one. The
-     * far end can be told the density instead, and by default is not: it is that
-     * machine being asked to lay itself out differently, which is a decision to
-     * take per host. So unless a host asks for it the size is what this end
-     * changes — fewer pixels, each drawn larger — and the far end is asked for
-     * a size and nothing else, the way dragging the window of any desktop
-     * client asks for one.
-     *
-     * Unstated, the magnification is the display's own density: a Retina pane
-     * asks for exactly its points and draws each pixel as four, which is the
-     * size an ordinary monitor gives. On a screen with one pixel per point that
-     * is a factor of 1 — exactly the pane, as it has always been.
-     *
-     * A host that tells the far end its density magnifies nothing here: it asks
-     * for every pixel it can and has Windows lay itself out into them, which is
-     * the same size drawn sharp rather than stretched. The factor is returned
-     * for that — it is what the density will be stated as, so the two can never
-     * disagree about how large the desktop is meant to look.
-     *
-     * Where the request would exceed the budget the factor is reduced further;
-     * it is never raised to meet it, since asking for more pixels than were
-     * wanted is what the magnification was set to avoid.
-     */
-    const density = window.devicePixelRatio || 1
-    const stated = look?.magnification
-    const magnify = look?.sendDensity
-      ? 1
-      : Math.min(4, Math.max(1, stated ? stated / 100 : density))
-    const budget = (look?.pixelBudget ?? 3.5) * 1_000_000
-    const wanted = density / magnify
-    const full = rect.width * wanted * rect.height * wanted
-    const factor = full <= budget ? wanted : wanted * Math.sqrt(budget / full)
-
-    /**
-     * [MS-RDPEDISP] takes 200 to 8192 pixels and refuses an odd width.
-     *
-     * The height is rounded down to even as well, which the protocol does not
-     * ask for: a server is free to round an odd one itself, and a desktop one
-     * pixel taller than the pane is fitted into it with a bar along two edges —
-     * a letterbox thin enough to read as a frame rather than as a size that was
-     * not honoured. Giving up a pixel here costs nothing and asks for a size no
-     * server has to adjust.
-     */
-    return {
-      width: Math.min(8192, Math.max(200, Math.round(rect.width * factor))) & ~1,
-      height: Math.min(8192, Math.max(200, Math.round(rect.height * factor))) & ~1,
-      factor
-    }
+    return desktopSizeFor(look, rect ?? null, window.devicePixelRatio)
   }
 
   // Only while a desktop of our own is on screen: a shadowed session is a
@@ -636,10 +573,25 @@ export default function GraphicalHost({
       watchDensity?.removeEventListener('change', onDensity)
       window.clearTimeout(pending)
     }
+    /**
+     * `desiredSize`, `fitWhenSettled` and `measure` are declared in the body, so
+     * they are new objects on every render; listing them would tear down the
+     * observer and the density watch on every render rather than when the size
+     * they compute actually changes. Everything reactive those three read is
+     * enumerated here instead — the rest of what they touch is refs.
+     *
+     * `desktopWidth` and `desktopHeight` are part of that and were missing:
+     * editing the resolution of a pinned session left the observer asking for
+     * the size the session was opened with, until something else on this list
+     * happened to change.
+     */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     protocol,
     phase.at,
     look?.resolution,
+    look?.desktopWidth,
+    look?.desktopHeight,
     look?.pixelBudget,
     look?.magnification,
     look?.sendDensity
@@ -697,7 +649,6 @@ export default function GraphicalHost({
     return () => {
       alive = false
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [protocol, sessionId, host, target])
 
   /** A new desktop of our own, in this pane. */
