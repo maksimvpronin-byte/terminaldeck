@@ -108,6 +108,8 @@ export const IPC = {
    * a host is only visible from inside it.
    */
   rdpTracing: 'rdp:tracing',
+  /** The first lines of the desktop client's own log, written where they can be read. */
+  rdpSaveLog: 'rdp:saveLog',
   /**
    * Why the last attempt on one reserved address failed. The client's own
    * report is "General failure" for almost everything, so the reason a person

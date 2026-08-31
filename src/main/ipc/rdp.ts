@@ -1,4 +1,7 @@
-import { ipcMain } from 'electron'
+import { app, ipcMain } from 'electron'
+import { join } from 'path'
+import { existsSync, mkdirSync } from 'fs'
+import { writeFile } from 'fs/promises'
 import { IPC } from '../../shared/ipc-channels'
 import { resolveAuth } from '../../shared/authResolution'
 import { protocolOf } from '../../shared/protocols'
@@ -102,10 +105,40 @@ export function registerRdpHandlers(): void {
     rdpGateway.reserve(routeFor(sessionId))
   )
 
-  ipcMain.handle(
-    IPC.rdpTracing,
-    () => process.env.NODE_ENV === 'development' || process.env.TERMINALDECK_RDP_TRACE === '1'
-  )
+  /**
+   * What level the desktop client should log at, or nothing to leave it quiet.
+   *
+   * Asked for by hand only. It used to be on for every `npm run dev`, and that
+   * is not a safe default: the client logs several lines per frame, the console
+   * holds each one with its arguments, and a live desktop took the renderer to
+   * four gigabytes and an out-of-memory crash inside a minute. What it says
+   * about codecs and channels is worth having, in the seconds it takes to read
+   * it — not for the length of a working session.
+   *
+   * `=1` means `debug`, which is everything. Any other value is handed over as
+   * it stands, in case the client understands a filter — 0.11 did not, and went
+   * silent when given one, so narrowing the question means a short session
+   * rather than a narrow filter.
+   */
+  ipcMain.handle(IPC.rdpTracing, () => {
+    const asked = process.env.TERMINALDECK_RDP_TRACE
+    if (!asked) return null
+    return asked === '1' ? 'debug' : asked
+  })
+
+  /**
+   * Keeps what the client said, out of the window that cannot hold it.
+   *
+   * The renderer catches the first lines and drops the rest; this puts them
+   * beside the session logs, where a path can be pasted into an issue.
+   */
+  ipcMain.handle(IPC.rdpSaveLog, async (_e, lines: string[]) => {
+    const dir = join(app.getPath('userData'), 'logs')
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+    const target = join(dir, `rdp-${new Date().toISOString().replace(/[:.]/g, '-')}.log`)
+    await writeFile(target, lines.join('\n'), 'utf8')
+    return target
+  })
 
   ipcMain.handle(IPC.rdpFailure, (_e, proxyAddress: string) =>
     rdpGateway.failureFor(proxyAddress)

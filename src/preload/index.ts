@@ -175,7 +175,10 @@ const api = {
     reserve: (sessionId?: string): Promise<string> =>
       ipcRenderer.invoke(IPC.rdpReserve, sessionId),
     /** Whether to turn the embedded client's own logging up to match. */
-    tracing: (): Promise<boolean> => ipcRenderer.invoke(IPC.rdpTracing),
+    /** The log level the desktop client was asked for, or null to stay quiet. */
+    tracing: (): Promise<string | null> => ipcRenderer.invoke(IPC.rdpTracing),
+    /** Writes the caught client log beside the session logs; answers with the path. */
+    saveLog: (lines: string[]): Promise<string> => ipcRenderer.invoke(IPC.rdpSaveLog, lines),
     /** What actually went wrong, when the client only says "General failure". */
     failure: (proxyAddress: string): Promise<string | undefined> =>
       ipcRenderer.invoke(IPC.rdpFailure, proxyAddress),

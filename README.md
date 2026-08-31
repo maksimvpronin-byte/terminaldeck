@@ -187,7 +187,15 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
 - When a session will not start, set `TERMINALDECK_RDP_TRACE=1` and the local gateway reports
   each step it took — whether the host answered, what it agreed to during protocol negotiation,
   whether TLS came up. The client reports nearly every fault as "General failure", so this is
-  usually the only way to see where it actually stopped
+  usually the only way to see where it actually stopped. The same flag puts the desktop client
+  itself into `debug`, which is what names the codecs and channels it agreed on. That log is **not**
+  printed: at `debug` the client writes several lines per frame, and a console holding every one of
+  them took the window to four gigabytes and an out-of-memory crash inside forty seconds. So the
+  first 800 lines — everything said while the session is being built, which is where the answers
+  are — are written to `logs/rdp-<time>.log` in the user-data directory, the rest are dropped, and
+  the console is given back with one line saying where the file is. Any value other than `1` is
+  handed to the client as its log filter, for a version that supports one; 0.11 logged nothing at
+  all when given `info,ironrdp_connector=debug`
 
 ### Files and networking
 

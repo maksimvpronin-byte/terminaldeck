@@ -15,6 +15,7 @@ import { shadowable, type WinSession } from '../../../shared/winSessions'
 import ShadowView from './ShadowView'
 import { useCommandAsControl } from '../hooks/useCommandAsControl'
 import { useT } from '../i18n'
+import { captureClientLog } from '../rdpLog'
 
 type Phase =
   | { at: 'loading' }
@@ -39,16 +40,48 @@ interface ReadyDetail {
  * — leaving the JavaScript wrappers in the bundle and nothing underneath them.
  */
 let wasmReady: Promise<void> | null = null
-function loadRdp(verbose: boolean): Promise<void> {
+/**
+ * How many lines of the client's log are worth keeping.
+ *
+ * Everything that answers a question — the protocols, the channels, the codecs
+ * — is said while the session is being built. After that it is several lines
+ * per frame, for as long as the desktop is open.
+ */
+const CLIENT_LOG_LINES = 800
+
+function loadRdp(level: string | null): Promise<void> {
   /**
    * The level is fixed by the first session in the window, because the module
    * is instantiated once. `debug` is what says which codecs and channels were
    * agreed with the host — the one question that cannot be answered from
    * outside the client, and the one that decides whether a slow desktop is
-   * something this end can do anything about.
+   * something this end can do anything about. It is also several lines a frame,
+   * so it is asked for by hand; see the handler for `rdpTracing`.
    */
-  wasmReady ??= initRdp(verbose ? 'debug' : 'warn')
+  wasmReady ??= startRdp(level)
   return wasmReady
+}
+
+function startRdp(level: string | null): Promise<void> {
+  if (level) {
+    /**
+     * Caught rather than printed. The console holds every message it is given,
+     * and this one arrives faster than a window can hold it — twice it took the
+     * renderer to four gigabytes before anyone could read what they had turned
+     * it on for. The first lines go to a file instead, and the console is given
+     * back at that point, so the one line that does reach it is where to look.
+     */
+    captureClientLog(CLIENT_LOG_LINES, (lines) => {
+      window.td.rdp
+        .saveLog(lines)
+        // Deliberately the one thing printed: the console is back by now, and
+        // where the log went is the only line anyone needs to read from it.
+        // eslint-disable-next-line no-console
+        .then((path) => console.info(`Desktop client log (${lines.length} lines): ${path}`))
+        .catch(() => console.warn('Could not write the desktop client log'))
+    })
+  }
+  return initRdp(level ?? 'warn')
 }
 
 /**
@@ -490,10 +523,37 @@ export default function GraphicalHost({
     if (look?.resolution === 'fixed') return
 
     let pending: number | undefined
+    let insisting: number | undefined
+    /**
+     * Until when a size that has not landed is worth sending again.
+     *
+     * The display control channel is opened by the *server*, and it arrives a
+     * second or two after the session does — measured at 2.1s on one host. A
+     * size sent before it exists is dropped, and the client says so only at
+     * debug level: "Could not encode a resize: Display Control Virtual Channel
+     * is not available". Nothing asked again, so the desktop kept the size the
+     * connection was built with and everything after that was the pane scaling
+     * a picture of the wrong size — which is most of what "blurry" means here.
+     */
+    let insistUntil = 0
+
     const send = (): void => {
       const interaction = interactionRef.current
       const size = desiredSize()
       if (!interaction || !size) return
+      /**
+       * Nothing to say to a session that has not started.
+       *
+       * The client's element hands over its interaction object as soon as it is
+       * in the document, seconds before the connection is made — and the pane
+       * changing from nothing to its real size sets the observer off in that
+       * window. The request was dropped at the far side with "failed to send
+       * resize event, receiver is closed", which is a warning for a thing that
+       * was never going to work and noise in front of the ones that matter. The
+       * size is sent again on `connected` regardless: this effect lists
+       * `phase.at`.
+       */
+      if (phase.at !== 'connected') return
       try {
         /**
          * The density goes with the size, or nothing goes at all.
@@ -524,6 +584,19 @@ export default function GraphicalHost({
         interaction.setScale(1)
         // …and once more when the far end has actually delivered that size.
         fitWhenSettled(interaction, size.width)
+        /**
+         * Ask again while the canvas is still the wrong size. Whichever of the
+         * two happens — the channel appears, or the far end simply took a
+         * moment — the answer is the same: say it again until the picture is
+         * the size that was asked for, then stop.
+         */
+        window.clearTimeout(insisting)
+        insisting = window.setTimeout(() => {
+          const canvas = canvasElement()
+          if (canvas?.width === size.width) return
+          if (Date.now() > insistUntil) return
+          send()
+        }, 700)
         // Kept truthful as the pane moves: a number frozen at connect describes
         // a session that no longer exists.
         // Replaced rather than added to: this describes the session as it is
@@ -547,7 +620,10 @@ export default function GraphicalHost({
     observer.observe(container)
     // The observer says nothing when a session arrives into a pane that has not
     // moved since, which is the common case.
-    if (phase.at === 'connected') send()
+    if (phase.at === 'connected') {
+      insistUntil = Date.now() + 10_000
+      send()
+    }
 
     /**
      * Dragging the window to a screen of a different density changes how many
@@ -572,6 +648,7 @@ export default function GraphicalHost({
       observer.disconnect()
       watchDensity?.removeEventListener('change', onDensity)
       window.clearTimeout(pending)
+      window.clearTimeout(insisting)
     }
     /**
      * `desiredSize`, `fitWhenSettled` and `measure` are declared in the body, so
@@ -670,7 +747,7 @@ export default function GraphicalHost({
 
     setPhase({ at: 'connecting' })
     try {
-      await loadRdp(await window.td.rdp.tracing().catch(() => false))
+      await loadRdp(await window.td.rdp.tracing().catch(() => null))
       // Reserved per attempt: the path is spent once used, so a retry after a
       // failure needs a fresh one.
       const proxyAddress = await window.td.rdp.reserve(sessionId)
