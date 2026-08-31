@@ -237,9 +237,13 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
 
 - **English or Russian**, switched in Settings and applied without a restart. The English text
   is what the translation is keyed by, so anything not yet translated appears in English rather
-  than as a placeholder. Translated so far: Settings, the shortcut list, the session tree, the
-  tab strip, the pane toolbar, the session dialog and the desktop session. Not yet: the file
-  browser, the inventory dialogs, and the smaller panels
+  than as a placeholder — and a test fails if a phrase is asked for that the book does not have,
+  so the gap is always the screens nobody has been through yet rather than a line someone missed.
+  Translated so far: Settings including its security and backup tabs, the shortcut list, the
+  session tree, the tab strip, the pane toolbar, the host, group and inventory-override dialogs,
+  Every screen is translated: 554 phrases, and a test fails on one the book has not got. What
+  is deliberately left in English is the crash screen, which must not depend on the store it is
+  reporting the failure of, and the status lines the app writes into the terminal itself
 
 Press `⌘/` in the app for the full list of shortcuts and gestures.
 
@@ -313,6 +317,43 @@ host sends back — the `/proc` monitoring probe, `OSC 7` directory reports and 
 their echo, permission bits — and the hand-sorting order, since all of these fail by quietly
 producing a plausible wrong answer rather than by throwing.
 
+Three of them cover what would lose data rather than merely misbehave, against a temporary
+directory with no Electron and no host involved: rotating the master password carries every secret
+across and a wrong one changes nothing; an export survives being imported on a machine whose vault
+has a different master password, and each way of refusing a bad import leaves the existing stores
+untouched; and a transfer writes what the conflict dialog allowed, skips what it did not, and — on
+a host-to-host copy the source refuses to open — never creates the file on the far end.
+
+Both commands also run on GitHub for every push and pull request
+(`.github/workflows/ci.yml`), and again before a release is built, so a failure shows up next to
+the commit that caused it rather than at tagging time. Much of what the tests cover — the Windows
+session, gateway and NTLM code in particular — never executes on a Mac, which is where the app is
+usually developed, so running them by hand is easy to skip and expensive to have skipped.
+
+## Linting and formatting
+
+```bash
+npm run lint            # eslint, flat config in eslint.config.mjs
+npm run format          # prettier --write
+npm run format:check    # what it would change, without changing it
+```
+
+The rule set is small and was chosen from what the source already assumed: the fourteen
+`eslint-disable` comments written here before any linter existed name `react-hooks/exhaustive-deps`
+and `no-console`, so those are the rules that run, plus unused variables and the hook-order check.
+The first run found three errors and one real stale-closure bug, and reported three of the eleven
+`exhaustive-deps` suppressions as suppressing nothing at all. The eight that survived were then
+read one by one and each given a sentence saying why it is there, so `exhaustive-deps` is now an
+error — as is a suppression that has stopped suppressing anything, which is how those three came to
+sit unnoticed.
+
+Prettier is configured to the style the code was already written in — single quotes, no semicolons,
+100 columns, no trailing commas — so a format pass should be close to a no-op. Markdown is left
+alone deliberately; the prose here is wrapped by hand.
+
+`npm run lint` runs in CI; `format:check` does not, since the tree has not been through Prettier
+once yet and a check that starts out red teaches everyone to ignore it.
+
 ## Building installers
 
 Each command compiles the app and packages it; artifacts land in `dist/`.
@@ -368,7 +409,8 @@ git tag "v$(node -p "require('./package.json').version")"
 git push --follow-tags
 ```
 
-The workflow checks the tag against `package.json` before building and fails on a mismatch.
+The workflow checks the tag against `package.json` before building and fails on a mismatch, then
+type-checks and runs the tests before anything is packaged.
 Record what changed in [CHANGELOG.md](CHANGELOG.md) as part of the release commit.
 
 ## Code signing and notarization
