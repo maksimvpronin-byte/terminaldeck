@@ -493,7 +493,17 @@ open dist/mac-arm64/TerminalDeck.app
 ## Releasing
 
 Pushing a `v*` tag runs `.github/workflows/release.yml`, which builds macOS, Windows and Linux
-artifacts and publishes them to a GitHub release. The in-app updater reads that release.
+artifacts and drafts a GitHub release from them. It is a **draft**: electron-builder leaves it
+unpublished, and the in-app updater ignores drafts, so nothing is offered to anybody until
+somebody looks at what was built and presses Publish.
+
+Each runner compiles the desktop client for itself before packaging — that is the slow part,
+half an hour the first time, and it is cached on the FreeRDP version so later runs skip it. The
+shim is rebuilt every time regardless, because it is seconds and it is ours.
+
+macOS ships Apple Silicon only and Windows x64 only, because the client is built by the runner
+that packages it and those are the architectures the runners are. Adding the other two means a
+second job apiece, each building its own client.
 
 **The tag is what ships, not the version in `package.json`.** Editing the version by hand
 changes what the app reports about itself and nothing else: no build runs, no release appears,

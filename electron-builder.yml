@@ -36,11 +36,18 @@ mac:
       to: freerdp/lib
       filter:
         - '*.dylib'
+  # Apple Silicon only, for as long as the desktop client is built by the runner
+  # that packages it. `macos-latest` is arm64, so an x64 package would either
+  # carry an arm64 client or fail on a path that does not exist — and the first
+  # of those is the sort of thing that ships and then does not run.
+  #
+  # Restoring Intel means a second macOS job on an x64 runner, each building its
+  # own client and packaging its own architecture.
   target:
     - target: dmg
-      arch: [x64, arm64]
+      arch: [arm64]
     - target: zip
-      arch: [x64, arm64]
+      arch: [arm64]
   category: public.app-category.developer-tools
   # Required for a hardened-runtime app that loads native modules (ssh2's crypto).
   hardenedRuntime: true
@@ -67,11 +74,13 @@ win:
       filter:
         - 'td-rdp.exe'
         - '*.dll'
+  # x64 only, for the reason the macOS block gives: `windows-latest` is x64, and
+  # the client it builds is the client that travels.
   target:
     - target: nsis
-      arch: [x64, arm64]
+      arch: [x64]
     - target: portable
-      arch: [x64, arm64]
+      arch: [x64]
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true

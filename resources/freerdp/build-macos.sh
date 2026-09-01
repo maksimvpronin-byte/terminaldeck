@@ -61,7 +61,13 @@ fi
 # sdl2_ttf and sdl2_image are for the SDL client's own dialogs, not for RDP —
 # they are here only because that client is what makes the build verifiable.
 # Turn WITH_CLIENT_SDL off below and they stop being needed.
-for lib in openssl@3 openh264 opus sdl2 sdl2_ttf sdl2_image; do
+# The SDL client is what makes a build verifiable by hand, and is never shipped.
+# `FREERDP_SDL=0` leaves it out, which is what CI wants: three Homebrew packages
+# and a few minutes of compiling, for a program no release contains.
+sdl_client="${FREERDP_SDL:-1}"
+libs="openssl@3 openh264 opus"
+[ "$sdl_client" = "1" ] && libs="$libs sdl2 sdl2_ttf sdl2_image"
+for lib in $libs; do
   brew --prefix "$lib" >/dev/null 2>&1 || die "missing: $lib — brew install $lib"
 done
 
@@ -135,8 +141,9 @@ cmake -S "$src" -B "$src/build" -G Ninja \
   -DWITH_PROXY=OFF \
   -DWITH_SAMPLE=OFF \
   \
-  `# The SDL client is the thing that proves the build works end to end.` \
-  -DWITH_CLIENT_SDL=ON \
+  `# The SDL client is the thing that proves the build works end to end, and` \
+  `# the one thing here a release never contains — see FREERDP_SDL above.` \
+  -DWITH_CLIENT_SDL=$([ "$sdl_client" = "1" ] && echo ON || echo OFF) \
   \
   `# Needs xsltproc otherwise, and nothing here reads a man page.` \
   -DWITH_MANPAGES=OFF
