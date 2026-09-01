@@ -131,14 +131,14 @@ export default function Pane({
           )}
           <button
             className="icon-button"
-            title={keyHint('Split right (⌘D)')}
+            title={keyHint(t('Split right (⌘D)'))}
             onClick={() => splitPane(tabId, node.id, 'row')}
           >
             <SplitRightIcon />
           </button>
           <button
             className="icon-button"
-            title={keyHint('Split down (⌘⇧D)')}
+            title={keyHint(t('Split down (⌘⇧D)'))}
             onClick={() => splitPane(tabId, node.id, 'col')}
           >
             <SplitDownIcon />
@@ -147,12 +147,12 @@ export default function Pane({
               desktop session will never have one to offer them. */}
           {traits.files && (
             <button title={t("Toggle SFTP browser")} onClick={() => toggleSftp(tabId, node.id)}>
-              SFTP
+              {t('SFTP')}
             </button>
           )}
           {traits.tunnels && (
             <button title={t("Toggle port forwarding")} onClick={() => toggleTunnels(tabId, node.id)}>
-              Tunnels
+              {t('Tunnels')}
             </button>
           )}
           {traits.monitor && (
@@ -162,7 +162,7 @@ export default function Pane({
               title={t("Toggle remote monitoring")}
               onClick={() => toggleMonitor(tabId, node.id)}
             >
-              Monitor
+              {t('Monitor')}
             </button>
           )}
           {/* Only a desktop has anything to gain: full screen is where a remote
@@ -188,7 +188,7 @@ export default function Pane({
           )}
           <button
             className="icon-button"
-            title={keyHint('Close pane (⌘W)')}
+            title={keyHint(t('Close pane (⌘W)'))}
             onClick={() => closePane(tabId, node.id)}
           >
             <CloseIcon />

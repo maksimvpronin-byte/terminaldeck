@@ -95,7 +95,6 @@ export const ru: Record<string, string> = {
   "It inherits too, so a whole group can start with sudo -i": "Это тоже наследуется, поэтому вся группа может начинать с sudo -i",
   "Colour a host or group to tell production apart at a glance": "Пометьте хост или группу цветом, чтобы отличать продакшн с одного взгляда",
   "A green dot marks a host that already has a terminal open": "Зелёная точка отмечает хост, у которого уже открыт терминал",
-  "Lock the vault; it also locks itself after 15 minutes idle": "Заблокировать хранилище; оно и само блокируется после 15 минут простоя",
   "Settings → Backup moves everything to another machine, credentials optional": "Настройки → «Резервная копия» переносят всё на другую машину, пароли по желанию",
   "Snippet palette: ⏎ runs, ⇧⏎ drops it on the prompt unrun": "Палитра сниппетов: ⏎ выполняет, ⇧⏎ кладёт в строку не запуская",
   "Broadcast mirrors your typing into every terminal you tick": "Трансляция повторяет ваш ввод во всех отмеченных терминалах",
@@ -244,8 +243,6 @@ export const ru: Record<string, string> = {
   "Fewest — a slow link": "Меньше всего — медленный канал",
   "Balanced": "Сбалансированно",
   "As many as the screen has": "Столько, сколько у экрана",
-  "Rest at the top edge for a moment to bring it back; brushing past does not":
-    "Задержитесь у верхней кромки, и он вернётся; от беглого касания — нет",
   "Counted in the screen's own pixels, so a Retina pane can ask for up to four times the data. On an ordinary monitor nothing here changes anything.":
     "Считается в собственных пикселях экрана, поэтому панель Retina может запросить вчетверо больше данных. На обычном мониторе тут ничего ни на что не влияет.",
   "How the desktop is made the right size":
@@ -277,22 +274,12 @@ export const ru: Record<string, string> = {
   "Reading the login for this host.": "Читаю логин для этого хоста.",
   "Or join a session already open": "Или присоединиться к уже открытой сессии",
   "Nobody is logged on to that host right now.": "Сейчас на этом хосте никого нет.",
-  "Could not ask the host who is logged on": "Не удалось спросить хост, кто в системе",
   "The person at the far end is asked to allow it.": "У человека на той стороне спросят разрешения.",
   "Watch without touching": "Наблюдать, не вмешиваясь",
   "Watch and take the keyboard and mouse": "Наблюдать и забрать клавиатуру с мышью",
-  "Save here…": "Сохранить здесь…",
-  "Ignore": "Пропустить",
   "Password": "Пароль",
   "Cancel": "Отмена",
   "Save": "Сохранить",
-  "General failure": "Общая ошибка",
-  "Logon failure": "Ошибка входа",
-  "Access denied": "Доступ запрещён",
-  "Wrong password": "Неверный пароль",
-  "Negotiation failed": "Согласование не удалось",
-  "Could not reach the host": "Не удалось достучаться до хоста",
-  "The gateway rejected the request": "Шлюз отклонил запрос",
   "no host": "нет хоста",
   "New session": "Новая сессия",
   "looking…": "ищу…",
@@ -344,8 +331,6 @@ export const ru: Record<string, string> = {
   "src port": "порт источника",
   "dst host": "адрес назначения",
   "dst port": "порт назначения",
-  "fixed": "фиксировано",
-  "size not reported": "размер не сообщён",
 
   // Update banner
   "Version {version} is available.": "Доступна версия {version}.",
@@ -365,6 +350,15 @@ export const ru: Record<string, string> = {
   // Security settings
   "Goes to the shell, never to this app: Ctrl+C interrupts, Ctrl+D ends the session, Ctrl+K, Ctrl+W and Ctrl+L do what readline says":
     "Уходит в оболочку, а не в приложение: Ctrl+C прерывает, Ctrl+D завершает сессию, Ctrl+K, Ctrl+W и Ctrl+L делают то, что положено readline",
+  "Lock the vault; it also locks itself after the delay set in Settings → Security":
+    "Заблокировать хранилище; оно и само блокируется через срок, заданный в Настройки → Безопасность",
+  "Push the pointer against the very top of the screen and hold it to bring the toolbar back":
+    "Упритесь указателем в самый верх экрана и подержите — панель вернётся",
+  "SFTP": "SFTP",
+  "Monitor": "Монитор",
+  "No saved sessions yet. Click \"+ Session\" to add one.":
+    "Сохранённых сессий пока нет. Нажмите «+ Session», чтобы добавить.",
+  "Move to top level": "Вынести на верхний уровень",
   "Locking": "Блокировка",
   "Lock after this long untouched": "Блокировать после бездействия",
   "Never — stay unlocked": "Никогда — оставаться разблокированным",

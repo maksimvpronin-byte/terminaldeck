@@ -484,10 +484,10 @@ export default function Sidebar({
 
       <div className="sidebar-tabs">
         <button className={tab === 'sessions' ? 'active' : ''} onClick={() => setTab('sessions')}>
-          Sessions
+          {t('Sessions')}
         </button>
         <button className={tab === 'inventory' ? 'active' : ''} onClick={() => setTab('inventory')}>
-          Inventory
+          {t('Inventory')}
         </button>
       </div>
 
@@ -515,7 +515,7 @@ export default function Sidebar({
       </div>
       <div className="sidebar-header" style={{ borderTop: 'none' }}>
         <button style={{ flex: 1 }} onClick={() => setShowQuickConnect(true)}>
-          Quick connect…
+          {t('Quick connect…')}
         </button>
       </div>
       <div className="sidebar-tree">
@@ -523,14 +523,14 @@ export default function Sidebar({
 
         {rootSessions.length > 0 && (
           <div className="tree-group">
-            <div className="tree-group-title">Sessions</div>
+            <div className="tree-group-title">{t('Sessions')}</div>
             {rootSessions.map((s) => renderSession(s, 8))}
           </div>
         )}
 
         {groups.length === 0 && sessions.length === 0 && (
           <div style={{ padding: 12, color: 'var(--text-dim)', fontSize: 12 }}>
-            No saved sessions yet. Click "+ Session" to add one.
+            {t('No saved sessions yet. Click "+ Session" to add one.')}
           </div>
         )}
         {needle !== '' && visible.length === 0 && (
@@ -548,7 +548,7 @@ export default function Sidebar({
             onDragLeave={() => setDropTarget(null)}
             onDrop={(e) => handleDrop(e, null)}
           >
-            Move to top level
+            {t('Move to top level')}
           </div>
         )}
 
@@ -619,17 +619,17 @@ export default function Sidebar({
       )}
 
       <div className="sidebar-footer">
-        <button title={keyHint('Snippets (⌘K)')} onClick={onOpenSnippets}>
-          Snippets
+        <button title={keyHint(t('Snippets (⌘K)'))} onClick={onOpenSnippets}>
+          {t('Snippets')}
         </button>
         <span style={{ flex: 1 }} />
-        <button className="icon-button" title={keyHint('Shortcuts and features (⌘/)')} onClick={onOpenHelp}>
+        <button className="icon-button" title={keyHint(t('Shortcuts and features (⌘/)'))} onClick={onOpenHelp}>
           ?
         </button>
         <button className="icon-button" title={t("Settings")} onClick={() => setShowSettings(true)}>
           ⚙
         </button>
-        <button className="icon-button" title={keyHint('Lock vault (⌘L)')} onClick={() => lockVault()}>
+        <button className="icon-button" title={keyHint(t('Lock vault (⌘L)'))} onClick={() => lockVault()}>
           🔒
         </button>
       </div>

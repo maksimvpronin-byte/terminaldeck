@@ -222,19 +222,29 @@ class FreeRdpBridge {
   private receive(id: string, session: Session, type: number, payload: Buffer): void {
     if (type === RECORD.frame) {
       const frame = readFrame(payload)
-      // A frame that does not describe itself correctly is dropped rather than
-      // drawn: the renderer would fault on it, and the next one repairs the
-      // screen anyway.
-      if (!frame) return
-      if (!session.window.isDestroyed()) {
-        session.window.webContents.send(`${IPC.desktopFrame}:${id}`, {
-          x: frame.x,
-          y: frame.y,
-          width: frame.width,
-          height: frame.height,
-          pixels: frame.pixels
-        })
+      /**
+       * A frame that cannot be delivered is acknowledged anyway.
+       *
+       * The client holds at most one frame in flight and waits for the
+       * acknowledgement before sending the next, which is what keeps a slow
+       * renderer from growing a queue. The other side of that bargain is that
+       * every frame must be answered: dropping one silently — because it did
+       * not describe itself correctly, or because the window has gone — stops
+       * the picture for good rather than for a moment. The renderer already
+       * acknowledges a frame its canvas refused; this is the same rule, in the
+       * one place it was missing.
+       */
+      if (!frame || session.window.isDestroyed()) {
+        this.write(id, { a: 'ack' })
+        return
       }
+      session.window.webContents.send(`${IPC.desktopFrame}:${id}`, {
+        x: frame.x,
+        y: frame.y,
+        width: frame.width,
+        height: frame.height,
+        pixels: frame.pixels
+      })
       return
     }
 

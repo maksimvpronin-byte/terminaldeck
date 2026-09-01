@@ -30,11 +30,46 @@ function codeOnly(text: string): string {
  */
 function keysAskedFor(): Map<string, string[]> {
   const found = new Map<string, string[]>()
+  const add = (key: string, file: string): void => {
+    found.set(key, [...(found.get(key) ?? []), file.slice(RENDERER.length + 1)])
+  }
+
   for (const file of sourceFiles(RENDERER)) {
     const text = codeOnly(readFileSync(file, 'utf8'))
+
+    /**
+     * Both quote styles, and the second one is not a nicety.
+     *
+     * This read single quotes only, which sounds harmless until you notice
+     * *which* strings get written with double quotes: the ones containing an
+     * apostrophe. "the host's own login" and "Counted in the screen's own
+     * pixels" were invisible to this test for exactly that reason, and so was
+     * every other string in the four files that happen to be formatted with
+     * double quotes — sixty-two of them.
+     */
     for (const match of text.matchAll(/(?<![\w.$])t\(\s*'((?:[^'\\]|\\.)*)'/g)) {
-      const key = match[1].replace(/\\'/g, "'")
-      found.set(key, [...(found.get(key) ?? []), file.slice(RENDERER.length + 1)])
+      add(match[1].replace(/\\'/g, "'"), file)
+    }
+    for (const match of text.matchAll(/(?<![\w.$])t\(\s*"((?:[^"\\]|\\.)*)"/g)) {
+      add(match[1].replace(/\\"/g, '"'), file)
+    }
+
+    /**
+     * The help dialog, which asks for its phrases through a variable.
+     *
+     * It holds its rows as data and renders them with `t(row.what)`, so the key
+     * is never written next to the call and nothing above can see it. That is
+     * a hundred and thirty-three phrases — by some way the largest single
+     * screen in the application — and two of them had gone untranslated
+     * without this test having anything to say about it.
+     */
+    if (file.endsWith('HelpDialog.tsx')) {
+      for (const match of text.matchAll(/(?:what|title):\s*'((?:[^'\\]|\\.)*)'/g)) {
+        add(match[1].replace(/\\'/g, "'"), file)
+      }
+      for (const match of text.matchAll(/(?:what|title):\s*"((?:[^"\\]|\\.)*)"/g)) {
+        add(match[1].replace(/\\"/g, '"'), file)
+      }
     }
   }
   return found
@@ -51,6 +86,25 @@ describe('the Russian phrase book', () => {
       .map(([key, files]) => `${files[0]}: ${key}`)
 
     expect(missing).toEqual([])
+  })
+
+  /**
+   * The other direction, which nothing was watching.
+   *
+   * Thirteen entries outlived the desktop client they were written for — its
+   * error kinds, its file-transfer offer, two labels from a pane that no longer
+   * exists — and sat in the phrase book looking like work that had been done.
+   *
+   * If this fires for a phrase the interface really does use, the interface is
+   * asking for it in a way `keysAskedFor` cannot see: a key built at runtime,
+   * or a new screen that keeps its text as data the way the help dialog does.
+   * Teach the reader about it rather than deleting the entry.
+   */
+  it('has nothing left over that the interface no longer asks for', () => {
+    const asked = new Set(keysAskedFor().keys())
+    const stale = Object.keys(ru).filter((key) => !asked.has(key))
+
+    expect(stale).toEqual([])
   })
 
   it('carries the same placeholders across into the translation', () => {

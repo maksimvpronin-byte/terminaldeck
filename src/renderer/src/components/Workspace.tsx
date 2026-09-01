@@ -174,7 +174,7 @@ export default function Workspace(): JSX.Element {
             title={t("Mirror typing to every open pane, in every workspace")}
             onClick={() => toggleBroadcast()}
           >
-            ⇉ Broadcast
+            ⇉ {t('Broadcast')}
           </button>
         )}
       </div>
@@ -230,8 +230,8 @@ export default function Workspace(): JSX.Element {
             terminals. Use the ⇉ checkbox in a pane to include or exclude it.
           </span>
           <span className="banner-actions">
-            <button onClick={() => setAllPanesBroadcast(true)}>All</button>
-            <button onClick={() => setAllPanesBroadcast(false)}>None</button>
+            <button onClick={() => setAllPanesBroadcast(true)}>{t('All')}</button>
+            <button onClick={() => setAllPanesBroadcast(false)}>{t('None')}</button>
           </span>
         </div>
       )}

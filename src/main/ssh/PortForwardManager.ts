@@ -127,10 +127,22 @@ class PortForwardManager {
       client.forwardIn(rule.srcHost, rule.srcPort, (err) => (err ? reject(err) : resolve()))
     })
     const onTcpConnection = (
-      _info: { destIP: string; destPort: number },
+      info: { destIP: string; destPort: number },
       accept: () => NodeJS.ReadWriteStream,
       reject: () => void
     ): void => {
+      /**
+       * Only connections for this rule's port.
+       *
+       * `tcp connection` is emitted on the connection, not on the forward, so
+       * every rule's handler hears about every rule's traffic. Ignoring which
+       * port it arrived on meant two remote forwards over one host each
+       * accepted the other's connections — both handlers ran, both called
+       * `accept`, and whichever won sent the caller to the wrong place. With
+       * one rule it looked perfectly correct, which is why it survived.
+       */
+      if (info.destPort !== rule.srcPort) return
+
       const socket = net.connect(rule.dstPort ?? 0, rule.dstHost ?? '127.0.0.1')
       socket.on('error', () => reject())
       socket.on('connect', () => {

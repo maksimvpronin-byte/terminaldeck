@@ -18,6 +18,20 @@ the other produces a version nobody can install, which is how 0.1.10 through
 
 ### Fixed
 
+- **Whole screens were untranslated without the phrase-book test noticing.** It
+  read only `t('…')` written with single quotes, which is precisely the wrong
+  half: a string containing an apostrophe has to be written with double quotes,
+  so `the host's own login` and its like were invisible to the one test meant to
+  catch them — sixty-two calls across four files. It also could not see the help
+  dialog, which keeps its hundred and thirty-three phrases as data and renders
+  them through a variable. Both are read now, and a third test watches the other
+  direction: thirteen entries had outlived the desktop client they were written
+  for.
+- **The sidebar and pane toolbar were partly in English** whatever the language —
+  Sessions, Inventory, Quick connect…, Snippets, SFTP, Monitor, Broadcast, and
+  every tooltip built through `keyHint`, which rewrote ⌘ for other platforms but
+  never asked for a translation. The phrase book had Russian for several of them
+  already, waiting for a call that was never made.
 - **The reconnect button did not always take the click.** The panel that offers
   it is laid over the terminal and said nothing about its own place in the
   stack, so which of it and xterm's own positioned layers ended up on top was
@@ -76,8 +90,8 @@ accumulated since 0.4.0.
   machine names — a working screen, and visibly an untranslated one. Settings,
   the shortcut and feature list, the session tree, the tab strip, the pane
   toolbar, the session dialog and everything a desktop session shows are
-  translated; the file browser, the inventory dialogs and the smaller panels are
-  not yet.
+  translated; the file browser, the group and inventory dialogs and the smaller
+  panels are not yet.
 
 - **Desktop settings on a host, a group and an inventory override**: the RD
   Gateway to reach a machine through, the resolution, and whether ⌘ is sent as
