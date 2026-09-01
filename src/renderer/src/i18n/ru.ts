@@ -55,7 +55,6 @@ export const ru: Record<string, string> = {
   "Font size up, down, and back to default": "Размер шрифта больше, меньше и обратно к исходному",
   "Zoom moves the global size, or the host’s own if it has one set": "Масштаб меняет общий размер — или размер хоста, если у него задан свой",
   "Copy the selection, and paste": "Копировать выделенное и вставить",
-  "Left alone as SIGINT, so a hung command can still be stopped": "Оставлено как SIGINT, чтобы зависшую команду можно было прервать",
   "Selecting text copies it straight away; right-click pastes": "Выделение сразу копирует текст, правый клик вставляет",
   "Both of those are switchable in Settings if you prefer a menu": "Оба поведения переключаются в настройках, если вам привычнее меню",
   "Ctrl+Alt+Del on the far side; this machine keeps the real one": "Ctrl+Alt+Del на той стороне; настоящее сочетание остаётся этой машине",
@@ -165,6 +164,7 @@ export const ru: Record<string, string> = {
   "Shortcuts and features": "Сочетания клавиш и возможности",
   "On Windows and Linux read ⌘ as Ctrl.": "В Windows и Linux читайте ⌘ как Ctrl.",
   "Connect": "Подключиться",
+  "Reconnect": "Переподключиться",
   "Connect in split": "Подключиться в разделении",
   "Duplicate": "Дублировать",
   "Delete…": "Удалить…",
@@ -363,6 +363,15 @@ export const ru: Record<string, string> = {
   "No file selected": "Файл не выбран",
 
   // Security settings
+  "Goes to the shell, never to this app: Ctrl+C interrupts, Ctrl+D ends the session, Ctrl+K, Ctrl+W and Ctrl+L do what readline says":
+    "Уходит в оболочку, а не в приложение: Ctrl+C прерывает, Ctrl+D завершает сессию, Ctrl+K, Ctrl+W и Ctrl+L делают то, что положено readline",
+  "Locking": "Блокировка",
+  "Lock after this long untouched": "Блокировать после бездействия",
+  "Never — stay unlocked": "Никогда — оставаться разблокированным",
+  "minutes": "мин",
+  "hours": "ч",
+  "Untouched means no typing, no pointer and no scrolling anywhere in the window, a terminal included. Locking closes nothing: sessions stay open and keep running, and the vault stops answering for stored passwords until the master password is given again.":
+    "Бездействие — это отсутствие набора, движения мыши и прокрутки во всём окне, включая терминал. Блокировка ничего не закрывает: сессии остаются открытыми и продолжают работать, а хранилище перестаёт выдавать сохранённые пароли, пока не введён мастер-пароль.",
   "Master password": "Мастер-пароль",
   "Every stored secret is re-encrypted under the new password. Nothing is lost, and the password itself is never written to disk.": "Все хранимые секреты перешифровываются под новый пароль. Ничего не теряется, а сам пароль никогда не пишется на диск.",
   "Current password": "Текущий пароль",

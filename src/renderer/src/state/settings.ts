@@ -24,6 +24,17 @@ export interface TerminalSettings extends ResolvedAppearance {
    * OS default. `{file}` is replaced by the path, or it is appended if absent.
    */
   externalEditor: string
+  /**
+   * How long the application may sit untouched before the vault locks, in
+   * minutes. Zero never locks it.
+   *
+   * Untouched means no key, no pointer movement, no click and no scroll —
+   * anywhere in the window, including inside a terminal. It was fifteen minutes
+   * and not adjustable, which is too eager for someone reading a long build log
+   * on a machine nobody else can reach, and far too patient for a laptop in an
+   * open office.
+   */
+  lockAfterMinutes: number
 }
 
 /** Chrome colours, mapped onto the CSS custom properties in styles.css. */
@@ -449,7 +460,9 @@ export const DEFAULT_SETTINGS: TerminalSettings = {
   themeName: DEFAULT_THEME,
   copyOnSelect: true,
   rightClick: 'paste',
-  externalEditor: ''
+  externalEditor: '',
+  // What it always was, now that it can be something else.
+  lockAfterMinutes: 15
 }
 
 export const FONT_CHOICES = [

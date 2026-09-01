@@ -2,8 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useStore, activeTab, activeWorkspace, type PaneNode } from '../state/store'
 import { findHost, type FoundHost } from '../state/hosts'
 import { DEFAULT_SETTINGS } from '../state/settings'
-
-const IDLE_LOCK_MS = 15 * 60 * 1000
+import { IS_MAC } from '../state/keys'
 
 function clampFontSize(size: number): number {
   return Math.min(32, Math.max(8, size))
@@ -27,7 +26,17 @@ export function useShortcuts(actions: {
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent): void {
-      const mod = e.metaKey || e.ctrlKey
+      /**
+       * ⌘ on a Mac, and only ⌘.
+       *
+       * This used to accept Ctrl as well, which meant every shortcut below was
+       * also bound to a key the shell needs: Ctrl+D ends a session, Ctrl+K
+       * kills to the end of the line, Ctrl+W deletes a word, Ctrl+L clears the
+       * screen, Ctrl+P walks back through history. All of them were being
+       * caught here and turned into split, snippets, lock and so on, and the
+       * keystroke never reached the far end.
+       */
+      const mod = IS_MAC ? e.metaKey : e.ctrlKey
       if (!mod) return
 
       const state = useStore.getState()
@@ -168,18 +177,34 @@ export function useZoom(): void {
   }, [])
 }
 
-/** Locks the vault after a stretch of no keyboard or pointer activity. */
+/**
+ * Locks the vault after a stretch of no keyboard or pointer activity.
+ *
+ * How long is a setting, because the right answer is a property of the room
+ * rather than of the application: fifteen minutes is impatient for someone
+ * reading a build log on a machine nobody else can reach, and generous for a
+ * laptop on a desk in an open office. Zero turns it off, which is a decision
+ * someone is entitled to make and is stated in the dialog as such.
+ */
 export function useIdleLock(): void {
+  const minutes = useStore((s) => s.settings.lockAfterMinutes)
+
   useEffect(() => {
+    if (!minutes || minutes <= 0) return
     let timer: ReturnType<typeof setTimeout>
 
     function reset(): void {
       clearTimeout(timer)
-      timer = setTimeout(() => {
-        if (!useStore.getState().vaultLocked) useStore.getState().lockVault()
-      }, IDLE_LOCK_MS)
+      timer = setTimeout(
+        () => {
+          if (!useStore.getState().vaultLocked) useStore.getState().lockVault()
+        },
+        minutes * 60 * 1000
+      )
     }
 
+    // Captured, so activity inside a terminal counts: xterm stops these from
+    // bubbling, and a session someone is typing into is not an idle one.
     const events: Array<keyof WindowEventMap> = ['keydown', 'mousemove', 'mousedown', 'wheel']
     for (const evt of events) window.addEventListener(evt, reset, true)
     reset()
@@ -188,7 +213,7 @@ export function useIdleLock(): void {
       clearTimeout(timer)
       for (const evt of events) window.removeEventListener(evt, reset, true)
     }
-  }, [])
+  }, [minutes])
 }
 
 type LeafNode = Extract<PaneNode, { type: 'leaf' }>

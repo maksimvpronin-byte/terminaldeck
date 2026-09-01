@@ -6,6 +6,45 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.5.1
+
+### Added
+
+- **The idle lock delay is a setting**, in Settings → Security: never, or from a
+  minute to two hours, fifteen as before. The right answer is a property of the
+  room rather than of the application — fifteen minutes is impatient for someone
+  reading a build log on a machine nobody else can reach, and generous for a
+  laptop on a desk in an open office.
+
+### Fixed
+
+- **The reconnect button did not always take the click.** The panel that offers
+  it is laid over the terminal and said nothing about its own place in the
+  stack, so which of it and xterm's own positioned layers ended up on top was
+  left to chance. Its label was also the one string in the interface that was
+  never translated.
+- **A private key could not be found in the dialog asking for one.** Every SSH
+  key lives in a directory whose name begins with a dot — `~/.ssh` for the ones
+  people make, `~/.colima` and friends for the ones tools make — and a macOS
+  open panel hides those. The panel now starts in `~/.ssh` and shows hidden
+  files.
+- **Ctrl belongs to the shell again on macOS.** Shortcuts were bound to ⌘ *or*
+  Ctrl, which quietly took nearly every readline key with them: Ctrl+D ends a
+  session, Ctrl+K kills to the end of the line, Ctrl+W deletes a word, Ctrl+L
+  clears the screen and Ctrl+P walks back through history — and each one was
+  being turned into split, snippets, lock or a tab switch instead of reaching
+  the far end. The application's modifier on a Mac is ⌘ and nothing else.
+
+  The terminal had a second helping of the same fault: Ctrl+F opened the
+  scrollback search, which is readline's "one character forward". Search is ⌘F
+  on a Mac now.
+
+  The same conflict stands on Windows and Linux, where Ctrl is the only
+  modifier an application can reasonably claim. Moving those bindings is a
+  separate decision with no free answer — Ctrl+Shift collides with the shift
+  variants this app already uses, and Ctrl+Alt is AltGr on half the layouts in
+  Europe — so they are left as they are rather than changed untested.
+
 ## 0.5.0
 
 The desktop pane was rebuilt on a different client. Everything else here had

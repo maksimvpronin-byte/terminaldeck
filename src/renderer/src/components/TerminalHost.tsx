@@ -9,6 +9,7 @@ import { useStore } from '../state/store'
 import { themeOf } from '../state/settings'
 import { useAppearance } from '../hooks/useAppearance'
 import ContextMenu, { type MenuItem } from './ContextMenu'
+import { IS_MAC } from '../state/keys'
 import { useT } from '../i18n'
 
 interface Props {
@@ -188,7 +189,16 @@ export default function TerminalHost({
       if (!mod) return true
       const key = e.key.toLowerCase()
 
-      if (key === 'f') {
+      /**
+       * Search opens on ⌘F, and on a Mac only on ⌘F.
+       *
+       * Ctrl+F is a readline binding — one character forward, the other half of
+       * Ctrl+B — and taking it here meant it never reached the shell. Elsewhere
+       * Ctrl+F stays, because there is no ⌘ and it is the only way to open
+       * search at all; that is the same unresolved trade the other shortcuts
+       * are in, and it is written down in the README rather than guessed at.
+       */
+      if (key === 'f' && (IS_MAC ? e.metaKey : true)) {
         setSearchOpen(true)
         return false
       }
@@ -353,7 +363,7 @@ export default function TerminalHost({
       {closed && (
         <div className="terminal-reconnect">
           <button className="primary" onClick={() => connect(generationRef.current)}>
-            {restored && !connIdRef.current ? 'Connect' : 'Reconnect'}
+            {restored && !connIdRef.current ? t('Connect') : t('Reconnect')}
           </button>
         </div>
       )}

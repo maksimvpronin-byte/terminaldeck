@@ -1,5 +1,6 @@
 import { app, dialog, ipcMain, shell } from 'electron'
 import { basename, join } from 'path'
+import { homedir } from 'os'
 import { existsSync, mkdirSync } from 'fs'
 import { writeFile } from 'fs/promises'
 import { IPC } from '../../shared/ipc-channels'
@@ -19,9 +20,23 @@ export function registerAppHandlers(): void {
 
 
   // --- Dialogs ---
+  /**
+   * Picks a private key, starting where private keys actually live.
+   *
+   * Both halves matter and both were missing. Every SSH key is in a directory
+   * whose name begins with a dot — `~/.ssh` for the ones people make, and
+   * `~/.colima`, `~/.lima`, `~/.vagrant.d` for the ones tools make — and a
+   * macOS open panel hides those by default. So the file being asked for was
+   * invisible in the dialog asking for it, and the way through was a keyboard
+   * shortcut nobody has a reason to know.
+   */
   ipcMain.handle(IPC.dialogPickPrivateKey, async () => {
+    const ssh = join(homedir(), '.ssh')
     const res = await dialog.showOpenDialog(focusedWin(), {
-      properties: ['openFile'],
+      properties: ['openFile', 'showHiddenFiles'],
+      // Only when it exists: a defaultPath that does not opens the panel
+      // somewhere arbitrary rather than at the home directory.
+      defaultPath: existsSync(ssh) ? ssh : homedir(),
       title: 'Select private key'
     })
     return res.canceled ? undefined : res.filePaths[0]

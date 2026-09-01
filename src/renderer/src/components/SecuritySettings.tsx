@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useStore } from '../state/store'
 import { useT } from '../i18n'
 
 interface TrustedHost {
@@ -6,8 +7,20 @@ interface TrustedHost {
   fingerprint: string
 }
 
+/**
+ * How long the application may sit untouched before it locks itself, in
+ * minutes. Zero never locks.
+ *
+ * A short list rather than a number box: the useful answers are few, and a
+ * field that accepts 7 also accepts 0.5 and 100000, each of which is a way to
+ * turn the lock off without meaning to.
+ */
+const LOCK_DELAYS = [0, 1, 5, 15, 30, 60, 120]
+
 export default function SecuritySettings(): JSX.Element {
   const t = useT()
+  const lockAfterMinutes = useStore((s) => s.settings.lockAfterMinutes)
+  const updateSettings = useStore((s) => s.updateSettings)
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -63,6 +76,30 @@ export default function SecuritySettings(): JSX.Element {
 
   return (
     <>
+      <h3 className="settings-heading">{t('Locking')}</h3>
+      <label>
+        {t('Lock after this long untouched')}
+        <select
+          value={String(lockAfterMinutes)}
+          onChange={(e) => updateSettings({ lockAfterMinutes: Number(e.target.value) })}
+        >
+          {LOCK_DELAYS.map((minutes) => (
+            <option key={minutes} value={minutes}>
+              {minutes === 0
+                ? t('Never — stay unlocked')
+                : minutes < 60
+                  ? `${minutes} ${t('minutes')}`
+                  : `${minutes / 60} ${t('hours')}`}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="settings-note">
+        {t(
+          'Untouched means no typing, no pointer and no scrolling anywhere in the window, a terminal included. Locking closes nothing: sessions stay open and keep running, and the vault stops answering for stored passwords until the master password is given again.'
+        )}
+      </p>
+
       <h3 className="settings-heading">{t('Master password')}</h3>
       <p className="settings-note">
         {t(

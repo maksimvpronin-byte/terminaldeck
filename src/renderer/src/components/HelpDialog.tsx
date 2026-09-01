@@ -70,7 +70,7 @@ const SECTIONS: Section[] = [
       { keys: '⌘+ / ⌘− / ⌘0', what: 'Font size up, down, and back to default' },
       { what: 'Zoom moves the global size, or the host’s own if it has one set' },
       { keys: '⌘C / ⌘V', what: 'Copy the selection, and paste' },
-      { keys: 'Ctrl+C', what: 'Left alone as SIGINT, so a hung command can still be stopped' },
+      { keys: 'Ctrl+anything', what: 'Goes to the shell, never to this app: Ctrl+C interrupts, Ctrl+D ends the session, Ctrl+K, Ctrl+W and Ctrl+L do what readline says' },
       { what: 'Selecting text copies it straight away; right-click pastes' },
       { what: 'Both of those are switchable in Settings if you prefer a menu' }
     ]
@@ -135,7 +135,7 @@ const SECTIONS: Section[] = [
       { what: 'It inherits too, so a whole group can start with sudo -i' },
       { what: 'Colour a host or group to tell production apart at a glance' },
       { what: 'A green dot marks a host that already has a terminal open' },
-      { keys: '⌘L', what: 'Lock the vault; it also locks itself after 15 minutes idle' },
+      { keys: '⌘L', what: 'Lock the vault; it also locks itself after the delay set in Settings → Security' },
       { what: 'Settings → Backup moves everything to another machine, credentials optional' }
     ]
   },

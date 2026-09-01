@@ -28,7 +28,9 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
 ### Credentials
 
 - Encrypted local vault (AES-256-GCM, master password via scrypt), with a lock button, `⌘L`,
-  and a 15-minute idle auto-lock; the master password can be rotated without losing secrets.
+  and an idle auto-lock whose delay is set in Settings → Security — fifteen minutes by default,
+  and able to be turned off, since the right answer depends on the room rather than on the
+  application; the master password can be rotated without losing secrets.
   Deleting a host, a group, a repository or a local override takes its stored credential with it,
   rather than leaving it in the vault
 - **Inheritance**: a session leaves fields unset to take them from its group, a group from its

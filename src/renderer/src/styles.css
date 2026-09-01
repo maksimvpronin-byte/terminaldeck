@@ -801,6 +801,12 @@ label {
   align-items: center;
   justify-content: center;
   background: rgba(23, 24, 28, 0.72);
+  /* Above the terminal, stated rather than left to document order. xterm keeps
+     its own positioned layers — the screen, the canvases the WebGL renderer
+     draws into, the helper textarea — and a sibling laid over them with no
+     z-index of its own is a sibling whose button may or may not receive the
+     click, depending on which of them ends up on top. */
+  z-index: 4;
 }
 /* --- remote monitoring strip --- */
 .monitor-bar {
