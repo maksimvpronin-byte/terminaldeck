@@ -60,6 +60,19 @@ this also adds.
   reading a build log on a machine nobody else can reach, and generous for a
   laptop on a desk in an open office.
 
+### Notes
+
+- **A release can be built again.** Packaging began refusing to continue without
+  the desktop client, which is right — a release without it has a desktop pane
+  that cannot open — and nothing built one on the runners, so a tag produced a
+  Linux artifact and two failures. Each runner compiles it for itself now, cached
+  on the FreeRDP version so only the first run pays the half hour.
+
+  macOS ships Apple Silicon only and Windows x64 only while that holds: the
+  client is built by the runner that packages it, and those are what the runners
+  are. The other two architectures need a second job apiece.
+
+
 ### Fixed
 
 - **A shadow viewer could outlive the application.** `ShadowHost.exe` holds an
