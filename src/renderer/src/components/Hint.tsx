@@ -21,7 +21,23 @@ import { createPortal } from 'react-dom'
  * inside something that scrolls is a tooltip clipped by it — which is fine
  * until the control that needs explaining is the last one in the list.
  */
-export default function Hint({ children }: { children: ReactNode }): JSX.Element {
+export default function Hint({
+  label,
+  children
+}: {
+  /**
+   * The caption this belongs to, when it has one.
+   *
+   * A `label` here lays its children out in a column — the caption, then the
+   * control — so a mark dropped in beside the caption became a row of its own
+   * with a lonely question mark on it. Given the caption, this renders both on
+   * one line and the column sees a single child. Left out, the mark is just the
+   * mark: a checkbox row, a heading and a summary are all laid out along the
+   * line already.
+   */
+  label?: ReactNode
+  children: ReactNode
+}): JSX.Element {
   const buttonRef = useRef<HTMLButtonElement | null>(null)
   const bubbleRef = useRef<HTMLDivElement | null>(null)
   const [open, setOpen] = useState(false)
@@ -47,7 +63,7 @@ export default function Hint({ children }: { children: ReactNode }): JSX.Element
     setAt({ left, top })
   }, [open])
 
-  return (
+  const mark = (
     <>
       <button
         ref={buttonRef}
@@ -81,5 +97,14 @@ export default function Hint({ children }: { children: ReactNode }): JSX.Element
           document.body
         )}
     </>
+  )
+
+  return label === undefined ? (
+    mark
+  ) : (
+    <span className="hint-label">
+      {label}
+      {mark}
+    </span>
   )
 }

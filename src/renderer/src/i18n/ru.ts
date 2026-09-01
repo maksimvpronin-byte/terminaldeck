@@ -250,6 +250,10 @@ export const ru: Record<string, string> = {
   // Genitive: it sits inside "the key file comes from …" and nowhere else.
   'this host': 'этого хоста',
   'No file selected': 'Файл не выбран',
+  'Saved on this host': 'Сохранён на этом хосте',
+  'Will be forgotten on save': 'Будет забыт при сохранении',
+  '{protocol} sessions open a desktop rather than a shell, so the file browser, port forwarding, monitoring and broadcast do not apply to them. How the desktop is reached and drawn is under Desktop below.':
+    'Сессии {protocol} открывают рабочий стол, а не оболочку, поэтому файловый браузер, проброс портов, мониторинг и трансляция к ним не относятся. Как рабочий стол достигается и рисуется — ниже, в разделе «Рабочий стол».',
   "Inherit": "Наследовать",
   "Fit the pane": "По размеру панели",
   "Fixed size": "Фиксированный размер",

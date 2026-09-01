@@ -83,8 +83,7 @@ export default function SecuritySettings(): JSX.Element {
     <>
       <h3 className="settings-heading">{t('Locking')}</h3>
       <label>
-        {t('Lock after this long untouched')}
-        <Hint>
+        <Hint label={t('Lock after this long untouched')}>
           {t(
             'Untouched means no typing, no pointer and no scrolling anywhere in the window, a terminal included. Locking closes nothing: sessions stay open and keep running, and the vault stops answering for stored passwords until the master password is given again.'
           )}
@@ -106,8 +105,7 @@ export default function SecuritySettings(): JSX.Element {
       </label>
 
       <h3 className="settings-heading">
-        {t('Master password')}
-        <Hint>
+        <Hint label={t('Master password')}>
           {t(
             'Every stored secret is re-encrypted under the new password. Nothing is lost, and the password itself is never written to disk.'
           )}
@@ -136,8 +134,7 @@ export default function SecuritySettings(): JSX.Element {
       </div>
 
       <h3 className="settings-heading">
-        {t('Session logs')}
-        <Hint>
+        <Hint label={t('Session logs')}>
           {t(
             'Sessions with “Log session output to file” enabled write here. The transcript contains everything the terminal showed, so treat it as sensitive.'
           )}
@@ -148,8 +145,7 @@ export default function SecuritySettings(): JSX.Element {
       </div>
 
       <h3 className="settings-heading">
-        {t('Trusted host keys')}
-        <Hint>
+        <Hint label={t('Trusted host keys')}>
           {t(
             'Removing an entry makes TerminalDeck ask again on the next connection. Do that when a server was legitimately rebuilt and its key changed.'
           )}
@@ -170,8 +166,7 @@ export default function SecuritySettings(): JSX.Element {
       )}
 
       <h3 className="settings-heading">
-        {t('Trusted certificates')}
-        <Hint>
+        <Hint label={t('Trusted certificates')}>
           {t(
             'Desktop sessions only, and only certificates this machine could not verify on its own — a gateway or a host that issues its own. One signed by a public authority is checked against the system and never listed here, so a routine reissue changes nothing.'
           )}

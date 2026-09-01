@@ -323,8 +323,7 @@ export default function InventoryOverrideDialog({ node, groups, onClose }: Props
         {isHost(node) && protocolOf(node) === 'rdp' && (
           <details className="settings-section">
             <summary>
-              {t('Desktop')}
-              <Hint>
+              <Hint label={t('Desktop')}>
                 {t(
                 'Kept locally, so a sync never takes it away — including a gateway the repository does not know about.'
               )}

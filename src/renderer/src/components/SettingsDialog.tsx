@@ -26,8 +26,7 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
         <h2>{t('Settings')}</h2>
 
         <label>
-          {t('Language')}
-          <Hint>
+          <Hint label={t('Language')}>
             {t('Applies at once, and to this window only — nothing is sent anywhere.')}
           </Hint>
           <select
@@ -68,8 +67,7 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
             <h3 className="settings-heading">{t('External editor')}</h3>
             <div className="form-row">
               <label style={{ flex: 1 }}>
-                {t('Command')}
-                <Hint>
+                <Hint label={t('Command')}>
                   {t(
                     'Used by “Edit locally” in the SFTP panel. Leave empty to hand the file to whatever the system opens it with — on Windows that is often Notepad, or nothing at all.'
                   )}

@@ -138,8 +138,7 @@ export default function CollectionDialog({
 
         <details className="settings-section">
           <summary>
-            {t('Appearance')}
-            <Hint>
+            <Hint label={t('Appearance')}>
               {t(
                 "Worn by every host in this set. A host that has settings of its own keeps them; a host that does not takes these instead of its group's."
               )}

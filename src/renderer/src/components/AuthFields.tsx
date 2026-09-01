@@ -1,6 +1,7 @@
 import type { AuthDefaults, AuthMethod } from '../../../shared/types'
 import type { AuthFieldsState, CredentialSource } from '../../../shared/authFields'
 import { useT, type Translate } from '../i18n'
+import Hint from './Hint'
 
 /**
  * The words that differ between the three places this is used. The controls do
@@ -162,9 +163,13 @@ export default function AuthFields({
         </p>
       )}
 
+      {/* State and an action, so only the explanation goes under the mark. The
+          sentence says which way this currently stands, and the button changes
+          it — neither is something to go looking for behind a hover. */}
       {shownMethod !== 'agent' && ownSecret && (
         <p className="settings-note">
-          {forgetSecret ? words.forget : words.held}{' '}
+          {forgetSecret ? t('Will be forgotten on save') : t('Saved on this host')}
+          <Hint>{forgetSecret ? words.forget : words.held}</Hint>{' '}
           <button type="button" onClick={() => onForgetSecret(!forgetSecret)}>
             {forgetSecret ? t('Keep it') : t('Forget it')}
           </button>

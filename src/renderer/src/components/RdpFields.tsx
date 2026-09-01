@@ -1,44 +1,48 @@
-import type {
-  RdpDefaults,
-  RdpResolution,
-  ResolvedRdp,
-} from "../../../shared/types";
-import Hint from "./Hint";
-import { useT } from "../i18n";
+import type { RdpDefaults, RdpResolution, ResolvedRdp } from '../../../shared/types'
+import Hint from './Hint'
+import { useT } from '../i18n'
 
 interface Props {
-  value: RdpDefaults;
-  set: <K extends keyof RdpDefaults>(key: K, value: RdpDefaults[K]) => void;
+  value: RdpDefaults
+  set: <K extends keyof RdpDefaults>(key: K, value: RdpDefaults[K]) => void
   /** What this item ends up connecting with once its own values are applied. */
-  effective: ResolvedRdp;
+  effective: ResolvedRdp
   /** Where a blank field's value comes from, e.g. "inherited from Prod". */
-  inheritedFrom: (key: keyof RdpDefaults) => string;
+  inheritedFrom: (key: keyof RdpDefaults) => string
   /** Only offered when there is something above to inherit from. */
-  inheritToggle?: { label: string };
+  inheritToggle?: { label: string }
   /**
    * The gateway password, typed here and stored by whoever owns the dialog —
    * the same contract the login password already uses, since a secret must not
    * be held in a value the component renders from a second time.
    */
   secret: {
-    typed: string;
-    onTyped: (value: string) => void;
-    own: boolean;
-    forget: boolean;
-    onForget: (forget: boolean) => void;
-  };
+    typed: string
+    onTyped: (value: string) => void
+    own: boolean
+    forget: boolean
+    onForget: (forget: boolean) => void
+  }
+}
+
+/**
+ * A resolution in words, written as literals rather than looked up.
+ *
+ * `t(resolution)` would be shorter and invisible to the phrase book's coverage
+ * test, which reads the source for `t('…')` — so the entry would never be
+ * demanded and the list would go on saying "fit" in a translated dialog, which
+ * is exactly what it was doing.
+ */
+function resolutionName(t: (text: string) => string, resolution: string): string {
+  return resolution === 'fixed' ? t('Fixed size') : t('Fit the pane')
 }
 
 /** What a blank sizing field ends up doing, in the words the list itself uses. */
-function sizingLabel(
-  t: (text: string) => string,
-  effective: ResolvedRdp,
-): string {
-  if (effective.sendDensity) return t("The far end lays itself out larger");
-  if (effective.magnification === 100)
-    return t("Do not adjust — every pixel its own");
-  if (effective.magnification === 0) return t("As much as this display needs");
-  return `${effective.magnification}%`;
+function sizingLabel(t: (text: string) => string, effective: ResolvedRdp): string {
+  if (effective.sendDensity) return t('The far end lays itself out larger')
+  if (effective.magnification === 100) return t('Do not adjust — every pixel its own')
+  if (effective.magnification === 0) return t('As much as this display needs')
+  return `${effective.magnification}%`
 }
 
 /**
@@ -54,9 +58,9 @@ export default function RdpFields({
   effective,
   inheritedFrom,
   inheritToggle,
-  secret,
+  secret
 }: Props): JSX.Element {
-  const t = useT();
+  const t = useT()
 
   /**
    * Which of the two ways of getting the size right this item states.
@@ -71,26 +75,26 @@ export default function RdpFields({
    */
   const sizing =
     value.sendDensity === undefined && value.magnification === undefined
-      ? ""
+      ? ''
       : value.sendDensity
-        ? "remote"
-        : String(value.magnification ?? effective.magnification);
+        ? 'remote'
+        : String(value.magnification ?? effective.magnification)
 
   function chooseSizing(choice: string): void {
-    if (choice === "") {
-      set("sendDensity", undefined);
-      set("magnification", undefined);
-      return;
+    if (choice === '') {
+      set('sendDensity', undefined)
+      set('magnification', undefined)
+      return
     }
-    if (choice === "remote") {
-      set("sendDensity", true);
+    if (choice === 'remote') {
+      set('sendDensity', true)
       /* The percentage is left as it stands rather than cleared: it is what a
          host too old to act on the density falls back to, and clearing it here
          would change that fallback without saying so. */
-      return;
+      return
     }
-    set("sendDensity", false);
-    set("magnification", Number(choice));
+    set('sendDensity', false)
+    set('magnification', Number(choice))
   }
 
   return (
@@ -100,9 +104,7 @@ export default function RdpFields({
           <input
             type="checkbox"
             checked={value.inheritRdp !== false}
-            onChange={(e) =>
-              set("inheritRdp", e.target.checked ? undefined : false)
-            }
+            onChange={(e) => set('inheritRdp', e.target.checked ? undefined : false)}
           />
           {inheritToggle.label}
         </label>
@@ -110,31 +112,25 @@ export default function RdpFields({
 
       <div className="form-row">
         <label style={{ flex: 3 }}>
-          {t("RD Gateway")}
-          <Hint>
+          <Hint label={t('RD Gateway')}>
             {t(
-              "A gateway says where a machine lives rather than who you are on it, so it is usually stated once on a group and left blank below. Blank reaches the host directly.",
+              'A gateway says where a machine lives rather than who you are on it, so it is usually stated once on a group and left blank below. Blank reaches the host directly.'
             )}
           </Hint>
           <input
-            value={value.gatewayHost ?? ""}
-            placeholder={
-              inheritedFrom("gatewayHost") || t("none — connect directly")
-            }
-            onChange={(e) => set("gatewayHost", e.target.value || undefined)}
+            value={value.gatewayHost ?? ''}
+            placeholder={inheritedFrom('gatewayHost') || t('none — connect directly')}
+            onChange={(e) => set('gatewayHost', e.target.value || undefined)}
           />
         </label>
         <label style={{ flex: 1 }}>
-          {t("Port")}
+          {t('Port')}
           <input
             type="number"
-            value={value.gatewayPort ?? ""}
+            value={value.gatewayPort ?? ''}
             placeholder={String(effective.gatewayPort)}
             onChange={(e) =>
-              set(
-                "gatewayPort",
-                e.target.value ? Number(e.target.value) : undefined,
-              )
+              set('gatewayPort', e.target.value ? Number(e.target.value) : undefined)
             }
           />
         </label>
@@ -144,25 +140,21 @@ export default function RdpFields({
         <>
           <div className="form-row">
             <label style={{ flex: 1 }}>
-              {t("Gateway username")}
+              {t('Gateway username')}
               <input
-                value={value.gatewayUsername ?? ""}
-                placeholder={
-                  inheritedFrom("gatewayUsername") || t("the host's own login")
-                }
-                onChange={(e) =>
-                  set("gatewayUsername", e.target.value || undefined)
-                }
+                value={value.gatewayUsername ?? ''}
+                placeholder={inheritedFrom('gatewayUsername') || t("the host's own login")}
+                onChange={(e) => set('gatewayUsername', e.target.value || undefined)}
               />
             </label>
             <label style={{ flex: 1 }}>
-              {t("Gateway password")}
+              {t('Gateway password')}
               <input
                 type="password"
                 value={secret.typed}
                 placeholder={
                   secret.own && !secret.forget
-                    ? t("(saved here)")
+                    ? t('(saved here)')
                     : t("(blank uses the host's own)")
                 }
                 onChange={(e) => secret.onTyped(e.target.value)}
@@ -172,156 +164,141 @@ export default function RdpFields({
 
           {secret.own && (
             <p className="settings-note">
-              {secret.forget
-                ? t("On save the gateway password stored here is forgotten.")
-                : t(
-                    "A gateway password is stored here, and the nearest value wins.",
-                  )}{" "}
-              <button
-                type="button"
-                onClick={() => secret.onForget(!secret.forget)}
-              >
-                {secret.forget ? t("Keep it") : t("Forget it")}
+              {secret.forget ? t('Will be forgotten on save') : t('Saved on this host')}
+              <Hint>
+                {secret.forget
+                  ? t('On save the gateway password stored here is forgotten.')
+                  : t('A gateway password is stored here, and the nearest value wins.')}
+              </Hint>{' '}
+              <button type="button" onClick={() => secret.onForget(!secret.forget)}>
+                {secret.forget ? t('Keep it') : t('Forget it')}
               </button>
             </p>
           )}
 
-          <label className="checkbox-row" style={{ flexDirection: "row" }}>
+          <label className="checkbox-row" style={{ flexDirection: 'row' }}>
             <input
               type="checkbox"
               checked={effective.gatewayBypassLocal}
-              onChange={(e) => set("gatewayBypassLocal", e.target.checked)}
+              onChange={(e) => set('gatewayBypassLocal', e.target.checked)}
             />
-            {t("Reach private addresses directly, without the gateway")}
+            {t('Reach private addresses directly, without the gateway')}
           </label>
         </>
       )}
 
       <div className="form-row">
         <label style={{ flex: 1 }}>
-          {t("Resolution")}
+          <Hint label={t('Resolution')}>
+            {/* Says what the current choice does, not what the setting is for:
+                the two answers are different enough to be worth reading. */}
+            {effective.resolution === 'fixed'
+              ? t('The desktop keeps this size and is scaled into the pane.')
+              : t(
+                  'The far end is asked to match the pane whenever it is resized, so every pixel stays its own.'
+                )}
+          </Hint>
           <select
-            value={value.resolution ?? ""}
-            onChange={(e) =>
-              set("resolution", (e.target.value || undefined) as RdpResolution)
-            }
+            value={value.resolution ?? ''}
+            onChange={(e) => set('resolution', (e.target.value || undefined) as RdpResolution)}
           >
             <option value="">
-              {t("Inherit")} (
-              {inheritedFrom("resolution") ? effective.resolution : "fit"})
+              {t('Inherit')} (
+              {resolutionName(t, inheritedFrom('resolution') ? effective.resolution : 'fit')})
             </option>
-            <option value="fit">{t("Fit the pane")}</option>
-            <option value="fixed">{t("Fixed size")}</option>
+            <option value="fit">{t('Fit the pane')}</option>
+            <option value="fixed">{t('Fixed size')}</option>
           </select>
         </label>
       </div>
 
-      {effective.resolution === "fixed" && (
+      {effective.resolution === 'fixed' && (
         <div className="form-row">
           <label style={{ flex: 1 }}>
-            {t("Width")}
+            {t('Width')}
             <input
               type="number"
-              value={value.desktopWidth ?? ""}
+              value={value.desktopWidth ?? ''}
               placeholder={String(effective.desktopWidth)}
               onChange={(e) =>
-                set(
-                  "desktopWidth",
-                  e.target.value ? Number(e.target.value) : undefined,
-                )
+                set('desktopWidth', e.target.value ? Number(e.target.value) : undefined)
               }
             />
           </label>
           <label style={{ flex: 1 }}>
-            {t("Height")}
+            {t('Height')}
             <input
               type="number"
-              value={value.desktopHeight ?? ""}
+              value={value.desktopHeight ?? ''}
               placeholder={String(effective.desktopHeight)}
               onChange={(e) =>
-                set(
-                  "desktopHeight",
-                  e.target.value ? Number(e.target.value) : undefined,
-                )
+                set('desktopHeight', e.target.value ? Number(e.target.value) : undefined)
               }
             />
           </label>
         </div>
       )}
-      <p className="settings-note">
-        {effective.resolution === "fixed"
-          ? t("The desktop keeps this size and is scaled into the pane.")
-          : t(
-              "The far end is asked to match the pane whenever it is resized, so every pixel stays its own.",
-            )}
-      </p>
 
       <label>
-        {t("Most pixels to ask for")}
-        <Hint>
+        <Hint label={t('Most pixels to ask for')}>
           {t(
-            "Counted in the screen's own pixels, so a Retina pane can ask for up to four times the data. On an ordinary monitor nothing here changes anything.",
+            "Counted in the screen's own pixels, so a Retina pane can ask for up to four times the data. On an ordinary monitor nothing here changes anything."
           )}
         </Hint>
         <select
           value={String(effective.pixelBudget)}
-          onChange={(e) => set("pixelBudget", Number(e.target.value))}
+          onChange={(e) => set('pixelBudget', Number(e.target.value))}
         >
-          <option value="1.5">{t("Fewest — a slow link")}</option>
-          <option value="3.5">{t("Balanced")}</option>
-          <option value="100">{t("As many as the screen has")}</option>
+          <option value="1.5">{t('Fewest — a slow link')}</option>
+          <option value="3.5">{t('Balanced')}</option>
+          <option value="100">{t('As many as the screen has')}</option>
         </select>
       </label>
       <label>
-        {t("How the desktop is made the right size")}
-        <Hint>
+        <Hint label={t('How the desktop is made the right size')}>
           {t(
-            "Asking the far end is the only way to get the right size at full sharpness, and Windows 8.1 and later act on it; older versions ignore it and the desktop stays as it was. Stretching here always works and costs sharpness.",
+            'Asking the far end is the only way to get the right size at full sharpness, and Windows 8.1 and later act on it; older versions ignore it and the desktop stays as it was. Stretching here always works and costs sharpness.'
           )}
         </Hint>
         <select value={sizing} onChange={(e) => chooseSizing(e.target.value)}>
           <option value="">
-            {t("Inherit")} ({sizingLabel(t, effective)})
+            {t('Inherit')} ({sizingLabel(t, effective)})
           </option>
-          <option value="remote">
-            {t("The far end lays itself out larger")}
-          </option>
-          <optgroup label={t("Stretch the picture on this side")}>
-            <option value="0">{t("As much as this display needs")}</option>
+          <option value="remote">{t('The far end lays itself out larger')}</option>
+          <optgroup label={t('Stretch the picture on this side')}>
+            <option value="0">{t('As much as this display needs')}</option>
             <option value="125">125%</option>
             <option value="150">150%</option>
             <option value="200">200%</option>
             <option value="300">300%</option>
           </optgroup>
-          <option value="100">{t("Do not adjust — every pixel its own")}</option>
+          <option value="100">{t('Do not adjust — every pixel its own')}</option>
         </select>
       </label>
-      <label className="checkbox-row" style={{ flexDirection: "row" }}>
+      <label className="checkbox-row" style={{ flexDirection: 'row' }}>
         <input
           type="checkbox"
           checked={effective.sound}
-          onChange={(e) => set("sound", e.target.checked)}
+          onChange={(e) => set('sound', e.target.checked)}
         />
-        {t("Play the remote sound here")}
-        <Hint>
+        <Hint label={t('Play the remote sound here')}>
           {t(
-            "Played by the desktop client itself, so it costs this side nothing and the link something.",
+            'Played by the desktop client itself, so it costs this side nothing and the link something.'
           )}
         </Hint>
       </label>
-      <label className="checkbox-row" style={{ flexDirection: "row" }}>
+      <label className="checkbox-row" style={{ flexDirection: 'row' }}>
         <input
           type="checkbox"
           checked={effective.commandAsControl}
-          onChange={(e) => set("commandAsControl", e.target.checked)}
+          onChange={(e) => set('commandAsControl', e.target.checked)}
         />
-        {t("Send ⌘ as Ctrl")}
-        <Hint>
+        <Hint label={t('Send ⌘ as Ctrl')}>
           {t(
-            "Copy and paste then land where they do on Windows. While the desktop has the keyboard this app's own ⌘ shortcuts do not fire; ⌘Q and ⌘Tab still belong to macOS.",
+            "Copy and paste then land where they do on Windows. While the desktop has the keyboard this app's own ⌘ shortcuts do not fire; ⌘Q and ⌘Tab still belong to macOS."
           )}
         </Hint>
       </label>
     </>
-  );
+  )
 }

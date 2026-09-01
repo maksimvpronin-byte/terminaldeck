@@ -77,8 +77,7 @@ export default function BackupSettings(): JSX.Element {
   return (
     <>
       <h3 className="settings-heading">
-        {t('Export')}
-        <Hint>
+        <Hint label={t('Export')}>
           {t(
             'Writes sessions, groups, snippets and inventory sources to one file. Terminal appearance and trusted host keys stay on this machine.'
           )}
@@ -124,8 +123,7 @@ export default function BackupSettings(): JSX.Element {
       </div>
 
       <h3 className="settings-heading">
-        {t('Import')}
-        <Hint>
+        <Hint label={t('Import')}>
           {t(
             'Entries are matched by id: an existing one is replaced, a new one is added, and nothing already here is deleted.'
           )}

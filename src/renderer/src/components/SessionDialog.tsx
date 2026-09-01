@@ -237,6 +237,16 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
         <div className="form-row">
           <label style={{ flex: 1 }}>
             {t('Protocol')}
+            {/* Only where it says something: for SSH the answer is the whole
+                rest of this dialog. */}
+            {protocolOf(profile) !== 'ssh' && (
+              <Hint>
+                {t(
+                  '{protocol} sessions open a desktop rather than a shell, so the file browser, port forwarding, monitoring and broadcast do not apply to them. How the desktop is reached and drawn is under Desktop below.',
+                  { protocol: traitsOf(protocolOf(profile)).label }
+                )}
+              </Hint>
+            )}
             <select
               value={protocolOf(profile)}
               onChange={(e) => set('protocol', e.target.value as Protocol)}
@@ -266,14 +276,6 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
             />
           </label>
         </div>
-
-        {protocolOf(profile) !== 'ssh' && (
-          <p className="settings-note">
-            {traitsOf(protocolOf(profile)).label} sessions open a desktop rather than a shell, so
-            the file browser, port forwarding, monitoring and broadcast do not apply to them. How
-            the desktop is reached and drawn is under <em>Desktop</em> below.
-          </p>
-        )}
 
         {profile.groupId && (
           <label className="checkbox-row" style={{ flexDirection: 'row' }}>
@@ -330,8 +332,7 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
                 checked={effective.followTerminalCwd}
                 onChange={(e) => set('followTerminalCwd', e.target.checked)}
               />
-              {t('SFTP panel follows the terminal’s directory')}
-              <Hint>
+              <Hint label={t('SFTP panel follows the terminal’s directory')}>
                 {t(
                   'Keeps the SFTP panel on the directory the shell is in. Types one setup line into the shell on connect so it reports where it is; its echo is hidden. Off by default: it lets the host move the file browser. The ⇉ button in the panel switches it at any time.'
                 )}
@@ -375,7 +376,11 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
         {traits.textual && (
           <>
             <label>
-              {t('On connect')}
+              <Hint label={t('On connect')}>
+                {t('Typed into the shell as soon as it is ready, so you see it run and')}{' '}
+                <code>cd</code>{' '}
+                {t('sticks. One command per line, run in order. It repeats on every reconnect.')}
+              </Hint>
               <textarea
                 rows={2}
                 value={profile.onConnectCommand ?? ''}
@@ -383,11 +388,6 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
                 onChange={(e) => set('onConnectCommand', e.target.value)}
               />
             </label>
-            <p className="settings-note">
-              {t('Typed into the shell as soon as it is ready, so you see it run and')}{' '}
-              <code>cd</code>{' '}
-              {t('sticks. One command per line, run in order. It repeats on every reconnect.')}
-            </p>
           </>
         )}
 
@@ -433,8 +433,7 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
         {traits.textual && (
           <details className="settings-section">
             <summary>
-              {t('Appearance')}
-              <Hint>
+              <Hint label={t('Appearance')}>
                 {t(
                 'Applies to this host’s terminals only. Anything left on “inherit” follows the group, and then Settings — so marking one production box red changes nothing else.'
               )}

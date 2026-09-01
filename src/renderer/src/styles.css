@@ -809,6 +809,13 @@ label {
   z-index: 4;
 }
 /* --- the question mark that holds a description --- */
+/* Caption and mark on one line, so the column a label lays out sees one child
+   rather than two. */
+.hint-label {
+  display: inline-flex;
+  align-items: center;
+}
+
 /* Sized in `em` so it follows whatever text it sits beside, and given no width
    of its own beyond its content: a mark that grew with the font would push the
    label it belongs to out of line. */

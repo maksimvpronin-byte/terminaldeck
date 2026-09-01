@@ -115,8 +115,7 @@ export default function InventorySourceDialog({
         </p>
 
         <h3 className="settings-heading">
-          {t('Default connection settings')}
-          <Hint>
+          <Hint label={t('Default connection settings')}>
             {t(
               'Inherited by every host from this repository unless the inventory or the host itself says otherwise.'
             )}
@@ -248,8 +247,7 @@ export default function InventorySourceDialog({
 
         <details className="settings-section">
           <summary>
-            {t('Appearance')}
-            <Hint>
+            <Hint label={t('Appearance')}>
               {t(
                 'Every host from this repository inherits it, so a whole environment can be told apart at a glance without touching a single host.'
               )}
