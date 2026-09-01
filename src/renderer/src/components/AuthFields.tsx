@@ -167,7 +167,7 @@ export default function AuthFields({
           sentence says which way this currently stands, and the button changes
           it — neither is something to go looking for behind a hover. */}
       {shownMethod !== 'agent' && ownSecret && (
-        <p className="settings-note">
+        <p className="settings-note action-note">
           {forgetSecret ? t('Will be forgotten on save') : t('Saved on this host')}
           <Hint>{forgetSecret ? words.forget : words.held}</Hint>{' '}
           <button type="button" onClick={() => onForgetSecret(!forgetSecret)}>

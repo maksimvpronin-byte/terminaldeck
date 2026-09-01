@@ -163,7 +163,7 @@ export default function RdpFields({
           </div>
 
           {secret.own && (
-            <p className="settings-note">
+            <p className="settings-note action-note">
               {secret.forget ? t('Will be forgotten on save') : t('Saved on this host')}
               <Hint>
                 {secret.forget

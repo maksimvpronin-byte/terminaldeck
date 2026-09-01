@@ -814,13 +814,19 @@ label {
 .hint-label {
   display: inline-flex;
   align-items: center;
+  /* The caption keeps the gap the labels around it have, so a field with a mark
+     and one without line up. */
+  margin-bottom: 2px;
 }
 
 /* Sized in `em` so it follows whatever text it sits beside, and given no width
    of its own beyond its content: a mark that grew with the font would push the
    label it belongs to out of line. */
 .hint-mark {
-  margin-left: 6px;
+  /* Room on both sides: it sits between a caption and whatever follows, and
+     with the caption's own colon or bracket right against it the line reads as
+     one word with a symbol stuck to it. */
+  margin: 0 6px;
   padding: 0;
   width: 1.25em;
   height: 1.25em;
@@ -1737,6 +1743,21 @@ textarea:focus {
   color: var(--text-dim);
   line-height: 1.5;
 }
+/* A note that carries a button: a state and the thing that changes it.
+   Laid out along one line and given a smaller button, because a full-height
+   control on a line of small grey text is what makes a form look untidy — the
+   line grows to the button's height and the rhythm of the column breaks. */
+.action-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.action-note button {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
 /* A note about something that will probably not work, rather than an error. */
 .warning-note {
   color: var(--text);

@@ -236,11 +236,13 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
 
         <div className="form-row">
           <label style={{ flex: 1 }}>
-            {t('Protocol')}
-            {/* Only where it says something: for SSH the answer is the whole
-                rest of this dialog. */}
-            {protocolOf(profile) !== 'ssh' && (
-              <Hint>
+            {/* The mark only where it says something — for SSH the answer is
+                the whole rest of this dialog — and the caption goes through the
+                hint either way, so the two never end up on separate lines. */}
+            {protocolOf(profile) === 'ssh' ? (
+              t('Protocol')
+            ) : (
+              <Hint label={t('Protocol')}>
                 {t(
                   '{protocol} sessions open a desktop rather than a shell, so the file browser, port forwarding, monitoring and broadcast do not apply to them. How the desktop is reached and drawn is under Desktop below.',
                   { protocol: traitsOf(protocolOf(profile)).label }
