@@ -14,6 +14,7 @@ import InventoryOverrideDialog from './InventoryOverrideDialog'
 import ContextMenu, { type MenuItem } from './ContextMenu'
 import { useT, type Translate } from '../i18n'
 import { RefreshIcon } from './icons'
+import Hint from './Hint'
 
 const COLLAPSED_KEY = 'terminaldeck.collapsedInventory'
 
@@ -435,6 +436,26 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
                     aria-hidden="true"
                   />
                   {source.name}
+                  {/* Branch, revision, counts and files together say which step
+                      of a sync went wrong — every one of those failures looks
+                      identical from the outside otherwise: a sync that reports
+                      success and leaves the hosts exactly as they were. Worth
+                      keeping and not worth four lines under every repository in
+                      the list, which is what it was. */}
+                  <Hint>
+                    <div>
+                      {ago(t, source.lastSyncedAt)}
+                      {` · ${source.branch || t('default branch')}`}
+                      {source.lastRevision ? ` · ${source.lastRevision}` : ''}
+                      {` · ${countsFor(source.id)}`}
+                    </div>
+                    {source.lastFiles && (
+                      <div>
+                        {t('read {count} files', { count: source.lastFiles.length })}
+                        {source.lastFiles.length > 0 ? `: ${source.lastFiles.join(', ')}` : ''}
+                      </div>
+                    )}
+                  </Hint>
                 </span>
                 <div className="actions">
                   <button
@@ -451,24 +472,12 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
                 </div>
               </div>
 
-              {/* Branch, revision, counts and files together say which step of a
-                  sync went wrong — every one of these failures otherwise looks
-                  identical from the outside: a sync that reports success and
-                  leaves the hosts exactly as they were. */}
-              <div className="inventory-meta" style={{ paddingLeft: 26 }}>
-                {busy ? t('syncing…') : ago(t, source.lastSyncedAt)}
-                {` · ${source.branch || t('default branch')}`}
-                {source.lastRevision ? ` · ${source.lastRevision}` : ''}
-                {!busy && ` · ${countsFor(source.id)}`}
-              </div>
-              {!busy && source.lastFiles && (
-                <div
-                  className="inventory-meta"
-                  style={{ paddingLeft: 26 }}
-                  title={source.lastFiles.join('\n') || t('none')}
-                >
-                  {t('read {count} files', { count: source.lastFiles.length })}
-                  {source.lastFiles.length > 0 ? `: ${source.lastFiles.join(', ')}` : ''}
+              {/* While a sync is running, and only then. It is the one state
+                  worth interrupting the list for: everything else about a
+                  repository is under the mark beside its name. */}
+              {busy && (
+                <div className="inventory-meta" style={{ paddingLeft: 26 }}>
+                  {t('syncing…')}
                 </div>
               )}
               {(source.lastError || syncErrors[source.id]) && (

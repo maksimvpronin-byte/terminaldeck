@@ -524,7 +524,6 @@ export const ru: Record<string, string> = {
   "no hosts found": "хостов не найдено",
   "hosts: {hosts}, groups: {groups}": "хостов: {hosts}, групп: {groups}",
   "read {count} files": "прочитано файлов: {count}",
-  "none": "нет",
 
   // Collections
   "New collection": "Новый набор",
