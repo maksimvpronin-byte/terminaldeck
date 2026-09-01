@@ -103,16 +103,37 @@ async function buildAuthConfig(
       if (!answers) throw new Error('Authentication cancelled')
       password = answers[0]
     }
-    return { password }
+    return { password, ...forwarding(auth) }
   }
   if (auth.authMethod === 'privateKey') {
     if (!auth.privateKeyPath) throw new Error('No private key path configured')
     const privateKey = readFileSync(auth.privateKeyPath)
     const passphrase = auth.secretRef ? vault.getSecret(auth.secretRef) : undefined
-    return { privateKey, passphrase }
+    return { privateKey, passphrase, ...forwarding(auth) }
   }
   // agent
   return { agent: agentSockForPlatform(), agentForward: auth.agentForward }
+}
+
+/**
+ * Agent forwarding for a host that signs in some other way.
+ *
+ * How you prove who you are and whether your agent travels with you are two
+ * different questions, and OpenSSH treats them as two: `ForwardAgent yes` works
+ * whether you typed a password or offered a key. This end used to answer both
+ * at once — the flag was attached only to the agent branch, so a host set to
+ * password authentication showed the checkbox, remembered it, and forwarded
+ * nothing.
+ *
+ * ssh2 needs the socket named before it will forward it, hence both fields. It
+ * will now offer the agent's keys before falling back to the password, which is
+ * also what `ssh` does with an agent loaded — and only for hosts where somebody
+ * asked for this.
+ */
+export function forwarding(auth: ResolvedAuth): { agent?: string; agentForward?: boolean } {
+  if (!auth.agentForward) return {}
+  const agent = agentSockForPlatform()
+  return agent ? { agent, agentForward: true } : {}
 }
 
 /**

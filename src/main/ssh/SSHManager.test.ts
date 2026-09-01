@@ -20,7 +20,7 @@ vi.mock('electron', () => ({
 }))
 
 userData = mkdtempSync(join(tmpdir(), 'terminaldeck-ssh-'))
-const { sshManager } = await import('./SSHManager')
+const { sshManager, forwarding } = await import('./SSHManager')
 
 interface Sent {
   channel: string
@@ -241,5 +241,46 @@ describe('when the renderer falls behind', () => {
     again()
 
     expect(stream.paused).toBe(true)
+  })
+})
+
+describe('agent forwarding', () => {
+  const auth = (agentForward: boolean): Parameters<typeof forwarding>[0] =>
+    ({ agentForward }) as Parameters<typeof forwarding>[0]
+
+  const withSock = <T,>(sock: string | undefined, run: () => T): T => {
+    const had = process.env.SSH_AUTH_SOCK
+    if (sock === undefined) delete process.env.SSH_AUTH_SOCK
+    else process.env.SSH_AUTH_SOCK = sock
+    try {
+      return run()
+    } finally {
+      if (had === undefined) delete process.env.SSH_AUTH_SOCK
+      else process.env.SSH_AUTH_SOCK = had
+    }
+  }
+
+  it('says nothing when nobody asked for it', () => {
+    expect(withSock('/tmp/agent.sock', () => forwarding(auth(false)))).toEqual({})
+  })
+
+  /**
+   * The point of the whole function. How you prove who you are and whether your
+   * agent travels with you are two questions, and this used to answer them as
+   * one: the flag was attached only to the agent branch, so a host signing in
+   * with a password showed the checkbox, remembered it, and forwarded nothing.
+   */
+  it('forwards for a host that signs in some other way', () => {
+    expect(withSock('/tmp/agent.sock', () => forwarding(auth(true)))).toEqual({
+      agent: '/tmp/agent.sock',
+      agentForward: true
+    })
+  })
+
+  it('asks for nothing when there is no agent to forward', () => {
+    // ssh2 needs the socket named before it will forward it, so without one
+    // there is nothing to say — and saying `agentForward` alone is an error.
+    if (process.platform === 'win32') return
+    expect(withSock(undefined, () => forwarding(auth(true)))).toEqual({})
   })
 })

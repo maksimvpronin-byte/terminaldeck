@@ -52,6 +52,14 @@ the other produces a version nobody can install, which is how 0.1.10 through
   point after which there is nothing left to upload them to; the editor is
   somebody else's program and this end cannot tell when a file is finished with
   before then.
+- **Agent forwarding only worked for hosts that signed in with the agent.** How
+  you prove who you are and whether your agent travels with you are two
+  questions, and OpenSSH treats them as two — `ForwardAgent yes` applies whether
+  you typed a password or offered a key. This end answered both at once: the
+  flag was attached to the agent branch alone, so a host set to password or key
+  authentication showed the checkbox, remembered what was ticked, and forwarded
+  nothing. It now applies whatever the login method, and asks for nothing when
+  there is no agent to forward.
 - **A file saved twice while the first save was still going up lost the second
   one.** The watcher returned early whenever an upload was in flight and nothing
   looked again afterwards, so over a slow link the editor said saved, the far
