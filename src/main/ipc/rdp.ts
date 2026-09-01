@@ -7,9 +7,15 @@ import { resolveAuth } from '../../shared/authResolution'
 import { protocolOf } from '../../shared/protocols'
 import { resolveRdp } from '../../shared/rdpResolution'
 import type { RdpView, SessionGroup, SessionProfile } from '../../shared/types'
+import { splitLogin } from '../../shared/rdpLogin'
 import { qualifyUser } from '../../shared/winSessions'
 import { inventoryStore } from '../inventory/InventoryStore'
 import { type RdpRoute, rdpGateway } from '../rdp/Gateway'
+import {
+  type DesktopGateway,
+  type DesktopRequest,
+  freeRdpBridge
+} from '../rdp/FreeRdpBridge'
 import { type PaneRect, type ShadowRequest, shadowHostBridge } from '../rdp/ShadowHostBridge'
 import { listSessions, shadowSession } from '../rdp/WinSessions'
 import { sessionStore } from '../store/SessionStore'
@@ -94,7 +100,122 @@ function routeFor(sessionId: string | undefined): RdpRoute {
   }
 }
 
+/**
+ * The gateway for one host, in the form the desktop client takes it.
+ *
+ * The same resolution `routeFor` does for the old path, kept beside it rather
+ * than shared: that one returns the shape this app's own gateway wants, and
+ * folding two callers into one function that answers both would be a function
+ * whose return value has to be read twice to know what it means.
+ */
+function desktopGateway(profile: SessionProfile, groups: SessionGroup[]): DesktopGateway | undefined {
+  const rdp = resolveRdp(profile, profile.groupId, groups)
+  if (!rdp.gatewayHost) return undefined
+
+  // A gateway with no login of its own is given the host's, which is what
+  // "use my connection credentials" means in every other client.
+  const auth = resolveAuth(profile, profile.groupId, groups)
+  const secretRef = rdp.gatewayUsername ? rdp.gatewaySecretRef : auth.secretRef
+  const login = splitLogin(rdp.gatewayUsername || auth.username || '')
+
+  return {
+    host: rdp.gatewayHost,
+    port: rdp.gatewayPort,
+    // Left unstated when it is the host's own login, so the client sets the
+    // "same credentials" flag rather than sending the pair twice.
+    username: rdp.gatewayUsername ? login.username : undefined,
+    domain: rdp.gatewayUsername ? login.domain : undefined,
+    password: rdp.gatewayUsername && secretRef ? vault.getSecret(secretRef) ?? '' : undefined,
+    bypassLocal: rdp.gatewayBypassLocal
+  }
+}
+
 export function registerRdpHandlers(): void {
+  /**
+   * Opens a desktop, drawn by td-rdp in a process of its own.
+   *
+   * Everything about *where* and *as whom* is resolved here and goes straight
+   * down a pipe. That is the difference the new client makes and it is worth
+   * stating plainly: the one it replaced signed in inside the window, so this
+   * app had to hand a stored password to the renderer to use RDP at all. It no
+   * longer does. The window names a host and is given an id.
+   *
+   * A password typed into the pane is still accepted, for the hosts that have
+   * none saved — it came from a person at the keyboard rather than the vault,
+   * and refusing it would only mean refusing to connect.
+   */
+  ipcMain.handle(
+    IPC.desktopStart,
+    (
+      _e,
+      request: {
+        sessionId: string
+        width: number
+        height: number
+        scale?: number
+        password?: string
+      }
+    ) => {
+      const win = focusedWin()
+      if (!win) throw new Error('No window to draw into')
+
+      const found = findHost(request.sessionId)
+      if (!found) throw new Error('Unknown session')
+      if (protocolOf(found.profile) !== 'rdp') throw new Error('That host is not an RDP host')
+
+      const rdp = resolveRdp(found.profile, found.profile.groupId, found.groups)
+      const auth = resolveAuth(found.profile, found.profile.groupId, found.groups)
+      const login = splitLogin(auth.username ?? '')
+      const stored = auth.secretRef ? vault.getSecret(auth.secretRef) : undefined
+
+      const desktop: DesktopRequest = {
+        host: found.profile.host,
+        port: found.profile.port,
+        width: request.width,
+        height: request.height,
+        scale: rdp.sendDensity ? request.scale : undefined,
+        sound: rdp.sound
+      }
+
+      return freeRdpBridge.start(
+        win,
+        desktop,
+        {
+          username: login.username,
+          domain: login.domain,
+          // What the vault holds, or what was typed when it holds nothing.
+          password: stored ?? request.password ?? ''
+        },
+        desktopGateway(found.profile, found.groups)
+      )
+    }
+  )
+
+  // Input, a new size, and the acknowledgement of a frame. `on` rather than
+  // `handle`: a mouse moving is sixty of these a second, and none of them has
+  // an answer worth waiting for.
+  ipcMain.on(
+    IPC.desktopSend,
+    (_e, id: string, fields: Record<string, string | number | boolean | undefined>) =>
+      freeRdpBridge.send(id, fields)
+  )
+  ipcMain.handle(IPC.desktopStop, (_e, id: string) => freeRdpBridge.stop(id))
+
+  /**
+   * The desktop client's own log, written beside the session logs.
+   *
+   * Kept in the main process as it arrives and written only when asked for,
+   * which is the lesson the last client taught the hard way: forwarding it live
+   * to a console took the renderer to four gigabytes inside a minute.
+   */
+  ipcMain.handle(IPC.desktopLog, async (_e, id: string) => {
+    const dir = join(app.getPath('userData'), 'logs')
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+    const target = join(dir, `desktop-${new Date().toISOString().replace(/[:.]/g, '-')}.log`)
+    await writeFile(target, freeRdpBridge.logFor(id).join('\n'), 'utf8')
+    return target
+  })
+
   // --- Graphical sessions ---
   /**
    * Reserves a single-use loopback address, and settles behind it how the

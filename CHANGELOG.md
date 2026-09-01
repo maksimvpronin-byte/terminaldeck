@@ -6,9 +6,31 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
-## Unreleased
+## 0.5.0
+
+The desktop pane was rebuilt on a different client. Everything else here had
+accumulated since 0.4.0.
 
 ### Added
+
+- **The desktop is drawn by FreeRDP, in a process of its own.** The client that
+  came before it ran as WebAssembly inside the window and had no graphics
+  pipeline at all — not disabled, absent: no `Microsoft::Windows::RDS::Graphics`
+  channel in its binary, no `h264`, `avc444` or `progressive` anywhere in it. So
+  a host that could have sent video sent run-length-encoded bitmaps instead, and
+  on one host 657 of 701 log lines were exactly that. What ships now is FreeRDP
+  3.31, built from source into `td-rdp`, which negotiates the whole pipeline —
+  H.264 in both AVC420 and AVC444, progressive RemoteFX, RemoteFX — and hands
+  back the rectangles that changed as plain RGBA down a pipe. The pane puts them
+  straight onto a canvas: nothing is re-encoded on the way and no pixel is
+  converted, because the bytes the decoder produced are the bytes `ImageData`
+  takes. At most one frame is ever in flight, so a busy window lowers the frame
+  rate instead of growing a queue.
+- **Sound from the far end**, switchable on a host or a whole group and on by
+  default, as it is in every Windows client. It travels on its own channel and
+  is played by the desktop client itself through the platform's own audio, so it
+  costs this side nothing and the link something — worth turning off where the
+  line should be spent on the picture.
 
 - **A Russian interface**, chosen in Settings and applied at once. The English
   text is the key, so a screen with no translation yet shows English rather than
@@ -185,10 +207,12 @@ the other produces a version nobody can install, which is how 0.1.10 through
   list is read from the host with `qwinsta`. Joining one opens a window Windows
   draws rather than a pane, because the mechanism runs over RPC and SMB rather
   than RDP; Windows only.
-- `TERMINALDECK_RDP_TRACE=1` turns on the local gateway's step-by-step report in
-  a shipped build. It is on by default in development. The client reports nearly
-  every fault as "General failure", so this is usually the only way to see where
-  a session actually stopped.
+- `TERMINALDECK_RDP_TRACE=1` runs the desktop client at FreeRDP's `DEBUG`, which
+  names the codecs and channels it agreed on with the host. The log is kept in
+  the main process — the last 400 lines per session — and written to
+  `logs/desktop-<time>.log` only when asked, never printed: the client it
+  replaced wrote several lines a frame into a console that held every one, and
+  took the window to four gigabytes inside forty seconds.
 
 ### Security
 
@@ -238,6 +262,21 @@ the other produces a version nobody can install, which is how 0.1.10 through
 
 ### Changed
 
+- **A stored password no longer enters the window.** It was the one documented
+  exception to this app's rule that secrets stay in the main process, and it
+  existed because the old client authenticated where it drew — CredSSP happened
+  in the renderer, so the renderer had to be handed the password. The new client
+  signs in in its own process, so the secret goes vault → main → pipe and the
+  window is only ever told a session id. A password typed into the pane by hand
+  still works, for hosts that have none saved.
+
+- **The window may no longer compile WebAssembly.** `'wasm-unsafe-eval'` and
+  `connect-src data:` were the price of the embedded client and left with it,
+  along with `img-src blob:`. `src/renderer/csp.test.ts` now guards against
+  their return rather than explaining why they are needed.
+
+- **The renderer bundle loses about 6 MB.** The client used to ship inside it.
+
 - `electron.vite.config.ts` states `build.externalizeDeps` where it used to list
   `externalizeDepsPlugin()`. electron-vite 5 deprecated the plugin in favour of
   the option; the behaviour is the same, and leaving native dependencies external
@@ -266,22 +305,33 @@ the other produces a version nobody can install, which is how 0.1.10 through
   turning notarization on is now a matter of deleting that line rather than
   setting it to `true`.
 
+### Removed
+
+- **Clipboard and file transfer between the two sides.** Both rode on the old
+  client's own extensions and neither survived the change. FreeRDP speaks the
+  channel for both — `cliprdr` — so this is the next piece of work rather than a
+  decision against them. Said plainly because it is a step backwards: text
+  copied inside a desktop session does not paste out of it today.
+
+- **Desktop panes on Windows and Linux, until their builds are written.** The
+  client is compiled per platform and only the macOS build script exists. A pane
+  there says the client is missing rather than opening.
+
 ### Notes
 
 - None of the gateway path has met a real gateway yet. The pieces are tested —
   NTLM against the worked example in [MS-NLMP] 4.2.4, the tunnel handshake
   against a stand-in that answers each step and each refusal — but a first real
   attempt should be expected to fail on something small.
-- The RDP client is IronRDP compiled to WebAssembly, and the main process
-  impersonates a Devolutions Gateway on loopback to satisfy it. Nothing native
-  is added and nothing external has to be installed, but the renderer bundle
-  grows from about 1 MB to 7 MB, since the client ships inside it.
-- The window's Content-Security-Policy gained three narrow allowances the client
-  cannot run without; `src/renderer/csp.test.ts` states what breaks if they are
-  removed.
-- Reading the stored password for an RDP host is the only place a saved secret
-  leaves the main process. It is scoped to one named host, because the client
-  authenticates in the window and CredSSP cannot be done from anywhere else.
+- The desktop client is compiled, which this project had avoided until now.
+  `npm run build:freerdp:mac` builds it; `npm run build:mac` refuses to package
+  without it. See [Building the desktop client](README.md#building-the-desktop-client).
+- The loopback gateway, and the [MS-TSGU] implementation under it — `Gateway.ts`,
+  `TsGateway.ts`, `ntlm.ts`, `md4.ts` and their tests — are no longer reached by
+  the desktop path: FreeRDP speaks to an RD Gateway itself. They are left in
+  place, tests and all, rather than deleted as a side effect of changing the
+  client. Whether to retire them is a decision of its own; see
+  `PLAN-freerdp.md`.
 
 ## 0.4.0
 

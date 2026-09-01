@@ -278,6 +278,20 @@ export default function RdpFields({
       <label className="checkbox-row" style={{ flexDirection: "row" }}>
         <input
           type="checkbox"
+          checked={effective.sound}
+          onChange={(e) => set("sound", e.target.checked)}
+        />
+        {t("Play the remote sound here")}
+      </label>
+      <p className="settings-note">
+        {t(
+          "Sound travels on its own channel and is played by the desktop client itself, so it costs nothing on this side but does cost bandwidth on the link. Worth turning off for a host reached over a slow connection, where the picture is what the line should be spent on.",
+        )}
+      </p>
+
+      <label className="checkbox-row" style={{ flexDirection: "row" }}>
+        <input
+          type="checkbox"
           checked={effective.commandAsControl}
           onChange={(e) => set("commandAsControl", e.target.checked)}
         />

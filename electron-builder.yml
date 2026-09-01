@@ -22,6 +22,20 @@ asarUnpack:
 npmRebuild: false
 mac:
   icon: resources/icon.png
+  # The desktop client and the FreeRDP libraries it loads. Built by
+  # `npm run build:freerdp:mac` and made portable by `build:freerdp:bundle`,
+  # which `build:mac` runs first so a build without them fails loudly rather
+  # than shipping an application whose desktop panes cannot open.
+  #
+  # Only td-rdp travels. The SDL clients in the same directory are for proving
+  # the build by hand and have no business in a release.
+  extraResources:
+    - from: resources/freerdp/build/macos-${arch}/bin/td-rdp
+      to: freerdp/bin/td-rdp
+    - from: resources/freerdp/build/macos-${arch}/lib
+      to: freerdp/lib
+      filter:
+        - '*.dylib'
   target:
     - target: dmg
       arch: [x64, arm64]

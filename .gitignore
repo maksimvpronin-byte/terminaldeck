@@ -10,6 +10,12 @@ build/
 .claude/settings.local.json
 graphify-out/
 
+# FreeRDP's own source and the binaries built from it: fetched and produced by
+# resources/freerdp/build-macos.sh, not written here.
+resources/freerdp/src/
+resources/freerdp/build/
+resources/freerdp/shim/build/
+
 # Built from ShadowHost.cs by npm run build:shadowhost; not a source file.
 resources/shadowhost/*.exe
 resources/shadowprobe/*.exe

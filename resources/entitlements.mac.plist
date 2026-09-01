@@ -10,6 +10,12 @@
     <true/>
     <key>com.apple.security.cs.allow-dyld-environment-variables</key>
     <true/>
+    <!-- The desktop client is a program of its own, in Resources, and it loads
+         the FreeRDP libraries bundled beside it. Under the hardened runtime a
+         process may otherwise only load libraries signed by the same team, and
+         these are built from source here rather than signed by anyone. -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
     <!-- Outbound SSH/SFTP connections. -->
     <key>com.apple.security.network.client</key>
     <true/>

@@ -18,6 +18,10 @@ import type { RdpDefaults, ResolvedRdp, SessionGroup } from './types'
 export const RDP_FALLBACK: ResolvedRdp = {
   gatewayPort: 443,
   gatewayBypassLocal: false,
+  // As every Windows client does. Sound arrives over its own channel and is
+  // played by the desktop client's process, so nothing about it crosses into
+  // the window.
+  sound: true,
   resolution: 'fit',
   desktopWidth: 1920,
   desktopHeight: 1080,
@@ -88,6 +92,7 @@ export function resolveRdp(
     // first level that says anything at all, blank included.
     magnification: pick(chain, 'magnification') ?? RDP_FALLBACK.magnification,
     // Booleans can be legitimately false, so they take the first explicit value.
+    sound: firstDefined(chain, 'sound') ?? RDP_FALLBACK.sound,
     sendDensity: firstDefined(chain, 'sendDensity') ?? RDP_FALLBACK.sendDensity,
     commandAsControl: firstDefined(chain, 'commandAsControl') ?? RDP_FALLBACK.commandAsControl
   }

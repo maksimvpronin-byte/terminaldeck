@@ -5,21 +5,22 @@
     <!--
       Each allowance below is here for one reason and no more:
 
-      wasm-unsafe-eval  Chromium refuses to compile WebAssembly under a CSP
-                        without it. Narrower than 'unsafe-eval', which would also
-                        hand back eval() and new Function() for JavaScript.
-      connect-src data:  The RDP client's WebAssembly is embedded as a
-                        data:application/wasm URL and loaded by fetching it.
-      connect-src ws://127.0.0.1:*  The RDP client opens its own socket to the
-                        gateway the main process runs on loopback, on a port the
-                        operating system picks. Loopback only — no host beyond
-                        this machine is reachable from the window.
-      img-src data:     Remote cursors arrive as base64 images and are set as CSS
-                        cursors.
+      img-src data:     Remote pointers arrive as pixels and are turned into CSS
+                        cursors through a canvas, which produces a data: URL.
+      connect-src ws://127.0.0.1:*  Vite's hot reload, in development only. A
+                        packaged build has no dev server and opens no socket
+                        from the window at all. Loopback either way — no host
+                        beyond this machine is reachable from here.
+
+      Three allowances left with the previous RDP client, which ran as
+      WebAssembly inside this window: 'wasm-unsafe-eval' to compile it,
+      connect-src data: to fetch the module out of a data URL, and img-src blob:.
+      The desktop client is now a program of its own and the window runs no
+      WebAssembly, so the window may no longer compile any.
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' data: ws://127.0.0.1:*;"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws://127.0.0.1:*;"
     />
     <title>TerminalDeck</title>
   </head>

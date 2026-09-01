@@ -1,9 +1,10 @@
 # Plan: replacing IronRDP with FreeRDP
 
-> **Status: step one passed, on the second attempt; nothing written yet.**
-> FreeRDP is decisively better than the embedded pane on the host that prompted
-> this — at a matched size, not only in a small window. The premise holds; the
-> route does not yet.
+> **Status: route B is written, unproven, and not yet compiled.**
+> FreeRDP is built for macOS, the shim is written against it, and the
+> application no longer imports IronRDP anywhere. What has not happened is a
+> single run: none of this has been compiled, let alone opened against a host.
+> Clipboard and file transfer did not survive the change and are not back.
 
 ## Why
 
@@ -151,18 +152,51 @@ unaffected. Both would have to be rebuilt against FreeRDP's own channels. The
 sizing work in `shared/desktopSize.ts` survives — it computes what to ask for,
 not how to ask.
 
-## Where this stands, and what is next
+## Where this stands
 
-Step one is passed. The route is undecided, and the honest order of work is:
+Route B, written. The order below was not the one planned — the plan put all
+three platform builds first, and this went to the shim after one — because
+proving the seam on one platform tells you whether the other two are worth
+building for.
 
-1. **Get FreeRDP building for macOS, Windows and Linux from CI, and keep it
-   built.** This is the dominant cost of every route, it is entirely independent
-   of the glue, and it is the thing most likely to sink the plan. Doing it first
-   means finding that out before writing a line of integration.
-2. Only then the shim, route B, against a build that already exists.
-3. The RD Gateway question — whether the 2,400 lines of MS-TSGU here are retired
-   in favour of FreeRDP's — stays a separate decision, taken after the shim
-   works with them still in place.
+**Done, on macOS:**
+
+1. `resources/freerdp/build-macos.sh` builds FreeRDP 3.31.0 from source, with
+   every optional dependency stated rather than picked up: openh264 in, ffmpeg
+   explicitly out (a hundred megabytes and a GPL problem, both acquired by
+   accident on the first run), Opus in for sound.
+2. `resources/freerdp/shim/` — `td-rdp`, about 1,100 lines of C. Tab-separated
+   commands in, length-prefixed records out; RGBA rectangles straight onto a
+   canvas with no re-encoding and no colour conversion. One frame in flight at a
+   time, which is the whole of the flow control.
+3. `src/main/rdp/FreeRdpBridge.ts` starts it, forwards its records, and answers
+   its certificate question through the store the RD Gateway already uses.
+4. `src/renderer/src/components/RemoteScreen.tsx` draws and takes the input.
+   `GraphicalHost.tsx` went from 1,132 lines to 351 and now only chooses between
+   a new desktop and a joined one.
+5. Packaging: `bundle-macos.sh` makes the build portable and re-signs it, and
+   electron-builder carries `td-rdp` and its libraries in `Resources/freerdp`.
+
+**What this bought, beyond the picture:** a stored password no longer enters the
+renderer. The old client authenticated in the window, which is why this app had
+one documented exception to "secrets stay in the main process". The exception is
+gone.
+
+**Not done, in the order it matters:**
+
+1. **None of it has been compiled.** That is the next thing and nothing else
+   counts until it is.
+2. **Clipboard and file transfer.** Both rode on IronRDP's extensions. FreeRDP
+   has `cliprdr` for both; this is work, not a wall, and it is a real regression
+   until it is done.
+3. **Windows and Linux builds.** Until they exist a desktop pane does not open
+   there at all, which is worse than what was there before. This is the dominant
+   remaining cost, as the plan said it would be.
+4. The RD Gateway question — whether the 2,400 lines of MS-TSGU here are retired
+   in favour of FreeRDP's — stays a separate decision. `Gateway.ts`,
+   `TsGateway.ts`, `ntlm.ts` and `md4.ts` are now unreachable from the desktop
+   path but are deliberately left in place, tests and all, rather than deleted
+   as a side effect of this change.
 
 ## Open questions, to answer before committing
 - Does the 16-bit colour cap survive the client swap? Almost certainly yes; the

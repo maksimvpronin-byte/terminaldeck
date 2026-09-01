@@ -1,6 +1,6 @@
 {
   "name": "terminaldeck",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Cross-platform SSH/SFTP terminal manager (MobaXterm/Royal TSX alternative)",
   "main": "./out/main/index.js",
   "author": "TerminalDeck",
@@ -19,9 +19,12 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "start": "install-electron && electron-vite preview",
-    "build:mac": "electron-vite build && electron-builder --mac",
-    "build:mac:dir": "electron-vite build && electron-builder --mac dir",
+    "build:mac": "npm run build:freerdp:bundle && electron-vite build && electron-builder --mac",
+    "build:mac:dir": "npm run build:freerdp:bundle && electron-vite build && electron-builder --mac dir",
     "build:shadowhost": "powershell -NoProfile -ExecutionPolicy Bypass -File resources/shadowhost/build.ps1",
+    "build:freerdp:mac": "bash resources/freerdp/build-macos.sh",
+    "build:freerdp:shim": "bash resources/freerdp/build-shim.sh",
+    "build:freerdp:bundle": "bash resources/freerdp/bundle-macos.sh",
     "build:win": "npm run build:shadowhost && electron-vite build && electron-builder --win",
     "build:linux": "electron-vite build && electron-builder --linux"
   },
@@ -30,8 +33,6 @@
     "url": "https://github.com/maksimvpronin-byte/terminaldeck.git"
   },
   "dependencies": {
-    "@devolutions/iron-remote-desktop": "^0.11.0",
-    "@devolutions/iron-remote-desktop-rdp": "^0.7.0",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/addon-search": "^0.15.0",
     "@xterm/addon-webgl": "^0.18.0",

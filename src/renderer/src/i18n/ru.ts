@@ -62,8 +62,6 @@ export const ru: Record<string, string> = {
   "Full screen, which is the only way Alt+Tab reaches the far side": "Полный экран — единственный способ передать Alt+Tab на ту сторону",
   "Hold Escape to leave full screen: while there, it belongs to the session": "Удерживайте Escape для выхода из полного экрана: там он принадлежит сессии",
   "A watched session cannot take Alt+Tab even full screen — Windows draws it": "Наблюдаемая сессия не получит Alt+Tab даже в полном экране — её рисует Windows",
-  "Drop files on the desktop, then paste there: dropping only offers them": "Бросьте файлы на рабочий стол и вставьте их там: бросок только предлагает их",
-  "Copy a file over there and a notice offers to save it here": "Скопируйте файл на той стороне — появится предложение сохранить его здесь",
   "The desktop takes the size of the pane, so dragging a split resizes it": "Рабочий стол принимает размер панели, поэтому перетаскивание разделителя меняет его",
   "A joined session keeps its own size: Windows draws it, and will not scale it": "Присоединённая сессия сохраняет свой размер: её рисует Windows и не масштабирует",
   "A host’s dialog holds a Desktop section: gateway, size, and the ⌘ key": "В диалоге хоста есть раздел «Рабочий стол»: шлюз, размер и клавиша ⌘",
@@ -194,7 +192,6 @@ export const ru: Record<string, string> = {
   "Split down (⌘⇧D)": "Разделить вниз (⌘⇧D)",
   "Split right (⌘D)": "Разделить вправо (⌘D)",
   "The pane toolbar hides there, so the desktop is the size of the display": "Панель инструментов там прячется, и стол становится размером с экран",
-  "Brush the top edge to bring it back without leaving full screen": "Коснитесь верхнего края, чтобы вернуть её, не выходя из полного экрана",
   "A Retina desktop is drawn the usual size by asking for fewer, larger pixels": "На Retina стол обычного размера получается из меньшего числа крупных пикселей",
   "How much larger is per host; nothing about the far machine is changed": "Насколько крупнее — задаётся на хосте; на дальней машине ничего не меняется",
   "Or tell the session the density and it draws itself larger, sharply": "Или сообщите сессии плотность — она нарисует себя крупнее и резко",
@@ -255,6 +252,19 @@ export const ru: Record<string, string> = {
   "As much as this display": "По этому экрану",
   "Not at all — every pixel its own": "Никак — каждый пиксель свой",
   "Pixels and size are different questions, and the budget above only answers the first. Windows lays out a 20-pixel menu the same way whether a pixel is a millimetre across or half of one, so a desktop drawn sharp on a Retina display is also drawn half the size an ordinary monitor gives it. A smaller desktop drawn larger is the answer this end can give on its own: nothing about the far machine is changed, and a session someone else is logged on to is not resized under them. Following the display asks a Retina pane for exactly its own points and draws every pixel as four — the usual size, and a softer picture than the display could hold.": "Пиксели и размер — разные вопросы, и предел выше отвечает только на первый. Windows рисует меню высотой 20 пикселей одинаково, будь пиксель шириной в миллиметр или в половину, поэтому рабочий стол, чётко нарисованный на Retina, нарисован ещё и вдвое мельче, чем дал бы обычный монитор. Рабочий стол поменьше, нарисованный покрупнее, — это ответ, который здешняя сторона может дать сама: на дальней машине ничего не меняется, и сессию, где работает кто-то другой, никто не перестраивает. «По этому экрану» запрашивает для Retina ровно точки панели и рисует каждый её пиксель как четыре — обычный размер и картинка мягче, чем экран мог бы удержать.",
+  "Rest at the top edge for a moment to bring it back; brushing past does not":
+    "Задержитесь у верхней кромки, и он вернётся; от беглого касания — нет",
+  "Play the remote sound here": "Проигрывать звук удалённой машины здесь",
+  "Sound travels on its own channel and is played by the desktop client itself, so it costs nothing on this side but does cost bandwidth on the link. Worth turning off for a host reached over a slow connection, where the picture is what the line should be spent on.":
+    "Звук идёт по отдельному каналу и проигрывается самим клиентом рабочего стола, так что этой стороне он ничего не стоит, а вот канал занимает. Имеет смысл выключить для хоста на медленной линии, где её лучше потратить на картинку.",
+  "The far end’s sound plays here, and can be turned off per host or group":
+    "Звук той стороны слышен здесь; выключается для хоста или для всей группы",
+  "The picture is decoded by a client of its own, so H.264 hosts are drawn as such":
+    "Картинку разбирает отдельный клиент, поэтому хосты с H.264 так и рисуются",
+  "Nothing types the password into the window: the client signs in outside it":
+    "Пароль не попадает в окно: клиент входит в систему за его пределами",
+  "Copying files between the two sides is not back yet — see the release notes":
+    "Обмен файлами между сторонами пока не вернулся — см. заметки к выпуску",
   "Send ⌘ as Ctrl": "Отправлять ⌘ как Ctrl",
   "Copy and paste then land where they do on Windows. While the desktop has the keyboard this app's own ⌘ shortcuts do not fire; ⌘Q and ⌘Tab still belong to macOS.": "Тогда копирование и вставка окажутся там же, где в Windows. Пока клавиатура у рабочего стола, собственные сочетания приложения с ⌘ не срабатывают; ⌘Q и ⌘Tab по-прежнему принадлежат macOS.",
   "Could not connect": "Не удалось подключиться",

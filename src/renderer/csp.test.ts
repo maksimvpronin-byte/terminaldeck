@@ -5,10 +5,11 @@ import { join } from 'path'
 /**
  * The window's Content-Security-Policy, guarded directive by directive.
  *
- * Every allowance here was added for one reason, and each was found the hard
- * way: without them the RDP client fails with `Failed to fetch`, or a bare
- * refusal to compile, neither of which points at a policy. Tightening this
- * policy is a reasonable instinct, so the test states what would break.
+ * It used to be the other way round: three allowances existed for a client that
+ * ran as WebAssembly in this window, each found the hard way, and this file
+ * stated what would break if they were tightened. That client is gone — the
+ * desktop is drawn by a program of its own now — so what is worth guarding is
+ * that they do not come back by habit.
  */
 const csp = ((): string => {
   const html = readFileSync(join(__dirname, 'index.html'), 'utf8')
@@ -27,26 +28,26 @@ describe('the window CSP', () => {
     expect(directive('default-src')).toBe("default-src 'self'")
   })
 
-  it('allows WebAssembly to compile', () => {
-    // Chromium refuses to compile a module under a CSP without this, and the
-    // RDP client is a WebAssembly module.
-    expect(directive('script-src')).toContain("'wasm-unsafe-eval'")
+  it('does not let the window compile WebAssembly', () => {
+    // Nothing in the renderer is a WebAssembly module any more. The allowance
+    // that let one compile was the price of the client that has been replaced,
+    // and it should not survive it.
+    expect(directive('script-src')).toBe("script-src 'self'")
   })
 
-  it('does not hand back eval for JavaScript along with it', () => {
-    // 'unsafe-eval' would cover wasm too, and far more besides.
+  it('hands back no form of eval', () => {
     expect(csp).not.toContain("'unsafe-eval'")
+    expect(csp).not.toContain("'wasm-unsafe-eval'")
   })
 
-  it('allows the wasm to be fetched from a data URL', () => {
-    // The RDP client embeds its module as data:application/wasm and loads it
-    // by fetching that URL, which connect-src governs.
-    expect(directive('connect-src')).toContain('data:')
+  it('does not let the window fetch a data URL', () => {
+    // This existed to load an embedded wasm module. An image may still be a
+    // data URL — see below — but nothing may be fetched as one.
+    expect(directive('connect-src')).not.toContain('data:')
   })
 
-  it('allows the client to reach the gateway on loopback', () => {
-    // The client opens its own WebSocket to the gateway main runs, on a port
-    // the operating system picks.
+  it('allows the dev server’s hot reload, and only on loopback', () => {
+    // Development only: a packaged window opens no socket of its own.
     expect(directive('connect-src')).toContain('ws://127.0.0.1:*')
   })
 
@@ -60,7 +61,9 @@ describe('the window CSP', () => {
     expect(connect).not.toMatch(/https?:\/\//)
   })
 
-  it('allows a remote cursor to arrive as a data image', () => {
+  it('allows a remote pointer to be drawn as a data image', () => {
+    // The far end sends its pointer as pixels; a canvas turns those into the
+    // data: URL that CSS takes as a cursor.
     expect(directive('img-src')).toContain('data:')
   })
 })

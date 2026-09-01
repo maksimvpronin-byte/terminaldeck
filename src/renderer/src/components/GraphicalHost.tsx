@@ -1,101 +1,30 @@
 import { useEffect, useRef, useState } from 'react'
-import '@devolutions/iron-remote-desktop'
-import {
-  Backend,
-  displayControl,
-  init as initRdp,
-  RdpFileTransferProvider,
-  type FileInfo
-} from '@devolutions/iron-remote-desktop-rdp'
-import type { UserInteraction } from '@devolutions/iron-remote-desktop'
 import { traitsOf, type Protocol } from '../../../shared/protocols'
 import type { RdpView } from '../../../shared/types'
-import { desktopSizeFor, type DesktopSize } from '../../../shared/desktopSize'
 import { shadowable, type WinSession } from '../../../shared/winSessions'
+import RemoteScreen, { type ScreenPhase } from './RemoteScreen'
 import ShadowView from './ShadowView'
-import { useCommandAsControl } from '../hooks/useCommandAsControl'
 import { useT } from '../i18n'
-import { captureClientLog } from '../rdpLog'
 
 type Phase =
   | { at: 'loading' }
   | { at: 'choosing' }
   | { at: 'password' }
-  | { at: 'connecting' }
-  | { at: 'connected' }
-  | { at: 'failed'; reason: string }
-  | { at: 'closed'; reason: string }
-
-/** What the component hands over once its canvas and WASM are ready. */
-interface ReadyDetail {
-  irgUserInteraction: UserInteraction
-}
-
-/**
- * Loads the WebAssembly module, once for the whole window.
- *
- * Not optional and not merely an optimisation: `init` is what instantiates the
- * module, and because it is the only thing referencing the embedded binary, a
- * build in which nothing calls it drops the entire 4.5 MB payload as unreachable
- * — leaving the JavaScript wrappers in the bundle and nothing underneath them.
- */
-let wasmReady: Promise<void> | null = null
-/**
- * How many lines of the client's log are worth keeping.
- *
- * Everything that answers a question — the protocols, the channels, the codecs
- * — is said while the session is being built. After that it is several lines
- * per frame, for as long as the desktop is open.
- */
-const CLIENT_LOG_LINES = 800
-
-function loadRdp(level: string | null): Promise<void> {
-  /**
-   * The level is fixed by the first session in the window, because the module
-   * is instantiated once. `debug` is what says which codecs and channels were
-   * agreed with the host — the one question that cannot be answered from
-   * outside the client, and the one that decides whether a slow desktop is
-   * something this end can do anything about. It is also several lines a frame,
-   * so it is asked for by hand; see the handler for `rdpTracing`.
-   */
-  wasmReady ??= startRdp(level)
-  return wasmReady
-}
-
-function startRdp(level: string | null): Promise<void> {
-  if (level) {
-    /**
-     * Caught rather than printed. The console holds every message it is given,
-     * and this one arrives faster than a window can hold it — twice it took the
-     * renderer to four gigabytes before anyone could read what they had turned
-     * it on for. The first lines go to a file instead, and the console is given
-     * back at that point, so the one line that does reach it is where to look.
-     */
-    captureClientLog(CLIENT_LOG_LINES, (lines) => {
-      window.td.rdp
-        .saveLog(lines)
-        // Deliberately the one thing printed: the console is back by now, and
-        // where the log went is the only line anyone needs to read from it.
-        // eslint-disable-next-line no-console
-        .then((path) => console.info(`Desktop client log (${lines.length} lines): ${path}`))
-        .catch(() => console.warn('Could not write the desktop client log'))
-    })
-  }
-  return initRdp(level ?? 'warn')
-}
+  | ScreenPhase
 
 /**
  * The pane body for a desktop session.
  *
- * IronRDP's client will not dial an RDP server directly — a proxy address is a
- * required parameter and it opens that WebSocket itself. So the main process
- * stands up a gateway of its own and hands out a single-use loopback address
- * for each session; see main/rdp/Gateway.ts.
+ * What it does is choose: a new desktop, or a seat at one somebody is already
+ * working in. A new one is drawn by `RemoteScreen`, which owns everything about
+ * a live session; a joined one belongs to a window Windows draws and this app
+ * only positions.
  *
- * Credentials are asked for here rather than read from the vault. Stored secrets
- * never leave the main process in this app, and this client authenticates in the
- * window, so wiring the vault to it would mean breaking that rule — a decision
- * worth taking deliberately rather than as a side effect of adding RDP.
+ * Credentials are not asked for here unless the host has none saved. The client
+ * runs in a process of its own and authenticates there, so a stored password
+ * goes from the vault straight down a pipe — the previous client signed in
+ * inside the window, which forced this app to hand the renderer a secret to use
+ * RDP at all. That is no longer true and this component no longer sees one.
  */
 export default function GraphicalHost({
   protocol,
@@ -112,105 +41,26 @@ export default function GraphicalHost({
    *  sit on top of whatever replaced it. */
   paneVisible: boolean
 }): JSX.Element {
-  const containerRef = useRef<HTMLDivElement | null>(null)
-  const interactionRef = useRef<UserInteraction | null>(null)
-  const transferRef = useRef<RdpFileTransferProvider | null>(null)
   const [phase, setPhase] = useState<Phase>({ at: 'loading' })
-  /** What a transfer is doing, shown over the desktop while it lasts. */
-  const [transfer, setTransfer] = useState('')
-  /** Files the far side has copied, waiting to be taken or ignored. */
-  const [offer, setOffer] = useState<FileInfo[] | null>(null)
   const [username, setUsername] = useState('')
   /** Only ever typed, and only when the host has none saved. */
   const [password, setPassword] = useState('')
+  /** Whether the host has one saved, which decides whether to ask at all. */
+  const [hasStoredPassword, setHasStoredPassword] = useState(false)
   /**
-   * What the last attempt used, so "Try again" can repeat it. Held in a ref
-   * rather than state: a password that came from the vault has no business
-   * being in a value the component renders from.
+   * What the last attempt used, so "Try again" can repeat it without asking
+   * again. A password that came from the vault is never here: this end never
+   * received one.
    */
-  const lastUsed = useRef<{ user: string; secret: string } | null>(null)
-  /** The address this attempt reserved, so its failure can be looked up. */
-  const reserved = useRef<string | null>(null)
+  const lastTyped = useRef<string | undefined>(undefined)
   /**
-   * The size last asked of the far end, shown while connecting and after a
-   * failure.
+   * Bumped for each attempt, and used as the screen's key.
    *
-   * Whether a desktop is drawn at the screen's pixels or the pane's points is
-   * the difference between a sharp picture and a magnified one, and from the
-   * outside the two are told apart only by squinting. Printing the number turns
-   * that into something anyone can read off — and says at a glance whether a
-   * host is still pinned to a fixed size.
+   * A retry is a new session, and remounting is how that is said: the component
+   * starts one when it mounts and ends it when it goes, so there is no second
+   * state machine here that could disagree with the first.
    */
-  const [asked, setAsked] = useState<string>('')
-
-  /**
-   * Fits the picture once the canvas is the size that was asked for.
-   *
-   * Fitting is done against the desktop size the client last had confirmed, and
-   * a request is answered by the server a round trip later — so fitting at the
-   * moment of asking scales the new canvas by the old dimensions, and the
-   * picture comes out the right height and the wrong width. Waiting for the
-   * canvas to become what was asked for is the one signal available from here
-   * that the size has landed.
-   */
-  function fitWhenSettled(interaction: UserInteraction, width: number): void {
-    const started = Date.now()
-    const tick = (): void => {
-      const canvas = canvasElement()
-      // Given up on after two seconds: a server may refuse a size outright, and
-      // a poll that never ends would outlive the session it belongs to.
-      if (!canvas || canvas.width === width || Date.now() - started > 2000) {
-        try {
-          interaction.setScale(1)
-        } catch {
-          // The session went while this was waiting.
-        }
-        return
-      }
-      window.setTimeout(tick, 100)
-    }
-    window.setTimeout(tick, 100)
-  }
-
-  /** The client's canvas, wherever it keeps it. */
-  function canvasElement(): HTMLCanvasElement | null {
-    const element = containerRef.current?.querySelector('iron-remote-desktop') as HTMLElement | null
-    return (
-      (element?.shadowRoot?.querySelector('canvas') as HTMLCanvasElement | null) ??
-      (element?.querySelector('canvas') as HTMLCanvasElement | null)
-    )
-  }
-
-  /**
-   * What the picture is actually made of, measured rather than assumed.
-   *
-   * Three plausible explanations for a desktop drawn too large were each ruled
-   * out only after being shipped, because nothing here reports what the client
-   * did with the size it was given. These numbers do: the pane, the element in
-   * it, the canvas's own pixels, and the size that canvas is drawn at. Where
-   * the last two differ by the screen's density, the picture is right; where
-   * they are equal, it is being drawn a device pixel per desktop pixel and is
-   * twice the size it should be.
-   */
-  function measure(): string {
-    const container = containerRef.current
-    const element = container?.querySelector('iron-remote-desktop') as HTMLElement | null
-    const canvas = canvasElement()
-    if (!container) return ''
-
-    const box = (e: Element | null): string => {
-      if (!e) return '—'
-      const r = e.getBoundingClientRect()
-      return `${Math.round(r.width)}×${Math.round(r.height)}`
-    }
-    return [
-      `pane ${box(container)}`,
-      `element ${box(element)}`,
-      canvas ? `canvas ${canvas.width}×${canvas.height} drawn ${box(canvas)}` : 'canvas —'
-    ].join(' · ')
-  }
-  /** What the host had saved, kept so the chooser can dial without asking. */
-  const [storedPassword, setStoredPassword] = useState('')
+  const [attempt, setAttempt] = useState(0)
   /**
    * How this host wants its desktop drawn, resolved through the same
    * inheritance chain its login comes from. Held until it arrives rather than
@@ -218,6 +68,14 @@ export default function GraphicalHost({
    * costs the far end a resolution change on every session.
    */
   const [look, setLook] = useState<RdpView | null>(null)
+  /**
+   * The size asked for and the size that came back, on the pane's tooltip.
+   *
+   * A server is free to refuse a size and keep its own, and when it does the
+   * picture is fitted to the pane and looks magnified — which from the outside
+   * is indistinguishable from asking for the wrong size.
+   */
+  const [asked, setAsked] = useState('')
   const [sessions, setSessions] = useState<WinSession[]>([])
   const [sessionsLoading, setSessionsLoading] = useState(true)
   const [sessionsProblem, setSessionsProblem] = useState<string | undefined>()
@@ -225,460 +83,21 @@ export default function GraphicalHost({
    * Whether to join without asking the person at the far end.
    *
    * Off by default, because taking someone's screen unannounced should be a
-   * decision rather than a default. The host has the final say either way:
-   * where its policy does not allow this, asking for it is refused outright
-   * rather than quietly downgraded to asking.
+   * decision rather than a default. The host has the final say either way.
    */
   const [skipPrompt, setSkipPrompt] = useState(false)
   /** The session being watched in this pane, once one has been chosen. */
   const [joined, setJoined] = useState<{ session: WinSession; control: boolean } | null>(null)
   const t = useT()
 
-  /**
-   * How big the desktop should be, in the far end's own pixels.
-   *
-   * The arithmetic — the density, the magnification, the host's pixel budget
-   * and what [MS-RDPEDISP] will accept — lives in shared/desktopSize.ts, where
-   * it is tested. What is left here is the two things it cannot know: how large
-   * the pane is at this moment, and how dense the display it is on happens to
-   * be.
-   */
-  function desiredSize(): DesktopSize | null {
-    const rect = containerRef.current?.getBoundingClientRect()
-    return desktopSizeFor(look, rect ?? null, window.devicePixelRatio)
-  }
-
-  // Only while a desktop of our own is on screen: a shadowed session is a
-  // window Windows draws, and this app's shortcuts should keep working over it.
-  useCommandAsControl(containerRef, look?.commandAsControl === true && phase.at === 'connected')
-
   const traits = traitsOf(protocol)
   const target = `${host ?? ''}:${port ?? traits.port}`
 
   /**
-   * Builds the client's element by hand rather than in JSX.
+   * What this host has stated, and whether it has a password.
    *
-   * The protocol backend is an object, so it must be set as a property — an
-   * attribute would stringify it — and it must be set *before* the element
-   * joins the document, because the component reads it when it connects. React
-   * inserts an element and only then runs effects and attaches refs, which is
-   * already too late: the component connects without a backend and throws from
-   * its own constructor, taking the pane's whole subtree down with it.
-   *
-   * Between `createElement` and `appendChild` is the one window where the
-   * property can be set in time, and JSX cannot express it.
-   */
-  useEffect(() => {
-    const container = containerRef.current
-    if (!container || protocol === 'ssh') return
-
-    const onReady = (event: Event): void => {
-      const detail = (event as CustomEvent<ReadyDetail>).detail
-      interactionRef.current = detail.irgUserInteraction
-
-      // Files travel over the RDP clipboard, the same way they do for the
-      // Windows client: copy on one side and the other is offered them.
-      //
-      // Turned on here rather than when the element was made, because a custom
-      // element has none of its own methods until the document has it — and
-      // still before connect, because the extensions this needs are registered
-      // while the session is built.
-      try {
-        const files = new RdpFileTransferProvider()
-        ;(detail.irgUserInteraction as unknown as FileTransferHost).enableFileTransfer(files)
-        transferRef.current = files
-        files.on('files-available', (offered) => setOffer(offered.length > 0 ? offered : null))
-        files.on('error', (failure) => setTransfer(describe(failure)))
-      } catch (err) {
-        // A session without file transfer is still a session; say so quietly
-        // rather than refusing to connect at all.
-        setTransfer(`Files cannot be transferred: ${describe(err)}`)
-      }
-    }
-
-    let element: HTMLElement
-    try {
-      element = document.createElement('iron-remote-desktop')
-      ;(element as unknown as { module: unknown }).module = Backend
-      /**
-       * A property, and only then an attribute — the same trap as `module`
-       * above.
-       *
-       * The client re-applies its scale mode every time the far end confirms a
-       * new desktop size, and it reads the mode from the *property* each time.
-       * Set as an attribute alone it reads as unset, matches none of the modes,
-       * and the canvas is left at its natural size: drawn a device pixel per
-       * desktop pixel, overflowing the pane and clipped rather than scaled.
-       * Which is invisible for exactly as long as the desktop and the pane are
-       * the same size.
-       */
-      ;(element as unknown as { scale: string }).scale = 'fit'
-      element.setAttribute('scale', 'fit')
-      element.className = 'graphical-canvas'
-      element.addEventListener('ready', onReady)
-      container.appendChild(element)
-    } catch (err) {
-      setPhase({ at: 'failed', reason: describe(err) })
-      return
-    }
-
-    return () => {
-      element.removeEventListener('ready', onReady)
-      // Shut the session down before the element goes, so the client is not
-      // left holding a canvas that has left the document.
-      try {
-        interactionRef.current?.shutdown()
-      } catch {
-        // Already gone, or never started. Nothing to salvage either way.
-      }
-      try {
-        transferRef.current?.dispose()
-      } catch {
-        // Never connected, or already gone with the session.
-      }
-      transferRef.current = null
-      interactionRef.current = null
-      element.remove()
-    }
-  }, [protocol])
-
-  /**
-   * Fetches what the far side has offered, once someone here asks for it.
-   *
-   * Copying over there only makes a file available; it is not a decision to put
-   * anything on this machine. Fetching it the moment the offer arrived meant a
-   * save dialog on every Ctrl+C pressed in the session, for files nobody wanted
-   * here — so the offer waits until it is taken.
-   *
-   * One file is saved wherever the dialog says. Several go into one folder,
-   * because a dialog per file for a folder full of them is its own nuisance.
-   */
-  async function fetchOffered(files: RdpFileTransferProvider, offer: FileInfo[]): Promise<void> {
-    setOffer(null)
-    let folder: string | undefined
-    if (offer.length > 1) {
-      folder = await window.td.dialogs.pickDirectory()
-      if (!folder) return
-    }
-
-    for (const [index, file] of offer.entries()) {
-      try {
-        setTransfer(`Fetching ${file.name}…`)
-        const blob = await files.downloadFile(file, index).completion
-        const saved = await window.td.dialogs.saveAs(
-          file.name,
-          new Uint8Array(await blob.arrayBuffer()),
-          folder
-        )
-        if (!saved) return setTransfer('')
-        setTransfer(offer.length > 1 ? `Saved ${index + 1} of ${offer.length}` : `Saved ${file.name}`)
-      } catch (err) {
-        return setTransfer(describe(err))
-      }
-    }
-  }
-
-  /**
-   * Offers files dropped on the pane to the far side.
-   *
-   * Dropping does not send anything: it puts the files on the session's
-   * clipboard, and the far side pulls them when someone pastes there. So the
-   * notice says what is left to do rather than reporting a transfer — waiting on
-   * the completion alone would sit at "sending" until a paste that might never
-   * come.
-   *
-   * The provider walks a dropped folder itself, so a directory goes whole rather
-   * than as the one entry the browser hands over.
-   */
-  async function onDrop(event: React.DragEvent): Promise<void> {
-    const files = transferRef.current
-    if (!files || protocol !== 'rdp') return
-    event.preventDefault()
-    try {
-      const dropped = await files.handleDrop(event.nativeEvent)
-      if (dropped.length === 0) return
-
-      const what = dropped.length === 1 ? dropped[0].name : `${dropped.length} items`
-      setTransfer(`${what} — now paste on the remote desktop`)
-
-      // Reported when it happens, if it happens; the notice above is the part
-      // that matters, and it stands until the paste replaces it.
-      void files
-        .uploadFiles(dropped)
-        .completion.then(() => setTransfer(`Copied ${what}`))
-        .catch((err: unknown) => setTransfer(describe(err)))
-    } catch (err) {
-      setTransfer(describe(err))
-    }
-  }
-
-  /**
-   * Full screen, with the system keys along with it.
-   *
-   * This is the only way Alt+Tab can ever reach the far side. The shell takes it
-   * before any program sees it, and the one documented exception is a page that
-   * is full screen and has asked to hold the keyboard — which is what Keyboard
-   * Lock is for. Held, the key arrives as an ordinary keystroke and the session
-   * forwards it like any other; nothing else here has to know.
-   *
-   * The lock is dropped with the screen. Chromium drops it on its own when full
-   * screen ends, but a session closed while still in it would otherwise leave
-   * this window holding Alt+Tab for the whole desktop.
-   */
-  useEffect(() => {
-    const container = containerRef.current
-    if (!container || protocol !== 'rdp') return
-
-    const keyboard = (navigator as Navigator & { keyboard?: { lock(keys?: string[]): Promise<void>; unlock(): void } })
-      .keyboard
-    const target = fullscreenTarget(container)
-
-    function onChange(): void {
-      if (document.fullscreenElement === target) {
-        // Named rather than blanket: everything else stays with the desktop, so
-        // the window cannot swallow keys nobody meant to give it.
-        void keyboard?.lock(['AltLeft', 'AltRight', 'Tab', 'Escape', 'MetaLeft', 'MetaRight'])
-      } else {
-        keyboard?.unlock()
-      }
-    }
-
-    document.addEventListener('fullscreenchange', onChange)
-    return () => {
-      document.removeEventListener('fullscreenchange', onChange)
-      keyboard?.unlock()
-    }
-  }, [protocol])
-
-  /**
-   * The substitutes for keys this machine keeps for itself.
-   *
-   * Windows takes Ctrl+Alt+Del in the kernel and Alt+Tab in the shell, both
-   * before any program sees them — that is the point of the first and the habit
-   * of the second. Every Windows client therefore offers stand-ins on keys the
-   * system does let through, and these are the ones they all use.
-   *
-   * Alt+Tab has no stand-in here. Even caught, there would be nothing to send
-   * it with: this client exposes a fixed handful of combinations and no way to
-   * build another. Alt+Home opens the far side's Start menu instead, which is
-   * where switching windows can be done by hand.
-   *
-   * Each is swallowed rather than passed on, because End and Home on their own
-   * mean something to whatever is running over there.
-   */
-  useEffect(() => {
-    const container = containerRef.current
-    if (!container || protocol !== 'rdp') return
-
-    function onKeyDown(event: KeyboardEvent): void {
-      // A split can hold two of these; only the one being typed into answers.
-      if (!container?.contains(event.target as Node)) return
-
-      if (event.key === 'F11') {
-        event.preventDefault()
-        event.stopPropagation()
-        toggleFullscreen(fullscreenTarget(container))
-        return
-      }
-
-      if (!event.altKey) return
-      const interaction = interactionRef.current
-      if (!interaction) return
-
-      const send =
-        event.ctrlKey && event.key === 'End'
-          ? (): void => interaction.ctrlAltDel()
-          : !event.ctrlKey && event.key === 'Home'
-            ? (): void => interaction.metaKey()
-            : undefined
-      if (!send) return
-
-      event.preventDefault()
-      event.stopPropagation()
-      try {
-        send()
-      } catch {
-        // The session went. Nothing to send it to, and nothing to report.
-      }
-    }
-
-    window.addEventListener('keydown', onKeyDown, true)
-    return () => window.removeEventListener('keydown', onKeyDown, true)
-  }, [protocol])
-
-  /**
-   * Makes the desktop the size of the pane, rather than scaling it into one.
-   *
-   * The element is told to fit what it is given, which stretches a picture of a
-   * fixed size and blurs it. Asking the far end to change resolution instead
-   * keeps every pixel its own, and is what a desktop client does when its window
-   * is dragged. Only the connected session can do this — a shadowed one belongs
-   * to whoever is working in it, and resizing it would resize their screen.
-   */
-  useEffect(() => {
-    const container = containerRef.current
-    if (!container || protocol !== 'rdp') return
-    // A host pinned to a size keeps it: the element scales that picture into
-    // whatever the pane is, which is the point of asking for a fixed one.
-    if (look?.resolution === 'fixed') return
-
-    let pending: number | undefined
-    let insisting: number | undefined
-    /**
-     * Until when a size that has not landed is worth sending again.
-     *
-     * The display control channel is opened by the *server*, and it arrives a
-     * second or two after the session does — measured at 2.1s on one host. A
-     * size sent before it exists is dropped, and the client says so only at
-     * debug level: "Could not encode a resize: Display Control Virtual Channel
-     * is not available". Nothing asked again, so the desktop kept the size the
-     * connection was built with and everything after that was the pane scaling
-     * a picture of the wrong size — which is most of what "blurry" means here.
-     */
-    let insistUntil = 0
-
-    const send = (): void => {
-      const interaction = interactionRef.current
-      const size = desiredSize()
-      if (!interaction || !size) return
-      /**
-       * Nothing to say to a session that has not started.
-       *
-       * The client's element hands over its interaction object as soon as it is
-       * in the document, seconds before the connection is made — and the pane
-       * changing from nothing to its real size sets the observer off in that
-       * window. The request was dropped at the far side with "failed to send
-       * resize event, receiver is closed", which is a warning for a thing that
-       * was never going to work and noise in front of the ones that matter. The
-       * size is sent again on `connected` regardless: this effect lists
-       * `phase.at`.
-       */
-      if (phase.at !== 'connected') return
-      try {
-        /**
-         * The density goes with the size, or nothing goes at all.
-         *
-         * [MS-RDPEDISP] carries it as DesktopScaleFactor, between 100 and 500;
-         * omitted, the field is left at zero, which the far end is required to
-         * ignore — so a host that has not asked for this changes nothing about
-         * the session it connects to.
-         */
-        const density = look?.sendDensity
-          ? Math.min(500, Math.max(100, Math.round(size.factor * 100)))
-          : undefined
-        interaction.resize(size.width, size.height, density)
-        /**
-         * Fit again, immediately, because asking for a size undoes it.
-         *
-         * The client answers its own resize by setting the canvas to exactly
-         * the size asked for, in CSS pixels and with no scaling — so a desktop
-         * measured in the screen's pixels is drawn at twice the size of the
-         * pane and clipped. Dragging the window shows this plainly: the client's
-         * own window-resize handler fits the picture, it looks right for a
-         * moment, and the resize that follows a quarter of a second later puts
-         * it back.
-         *
-         * ScreenScale.Fit; the enum is declared in the client's types but not
-         * exported, so there is nothing to import.
-         */
-        interaction.setScale(1)
-        // …and once more when the far end has actually delivered that size.
-        fitWhenSettled(interaction, size.width)
-        /**
-         * Ask again while the canvas is still the wrong size. Whichever of the
-         * two happens — the channel appears, or the far end simply took a
-         * moment — the answer is the same: say it again until the picture is
-         * the size that was asked for, then stop.
-         */
-        window.clearTimeout(insisting)
-        insisting = window.setTimeout(() => {
-          const canvas = canvasElement()
-          if (canvas?.width === size.width) return
-          if (Date.now() > insistUntil) return
-          send()
-        }, 700)
-        // Kept truthful as the pane moves: a number frozen at connect describes
-        // a session that no longer exists.
-        // Replaced rather than added to: this describes the session as it is
-        // now, and a line that grew with every drag said nothing at the end.
-        const stated =
-          `${size.width}×${size.height} · ×${window.devicePixelRatio}` +
-          (density ? ` · ${density}%` : '')
-        setAsked(stated)
-        window.setTimeout(() => setAsked(`${stated} — ${measure()}`), 400)
-      } catch {
-        // The session went while this was in flight. The next one will fit.
-      }
-    }
-
-    const observer = new ResizeObserver(() => {
-      // Dragging a split fires this every frame, and each one is a round trip
-      // and a full redraw. The far end only needs the size the drag ended on.
-      window.clearTimeout(pending)
-      pending = window.setTimeout(send, 250)
-    })
-    observer.observe(container)
-    // The observer says nothing when a session arrives into a pane that has not
-    // moved since, which is the common case.
-    if (phase.at === 'connected') {
-      insistUntil = Date.now() + 10_000
-      send()
-    }
-
-    /**
-     * Dragging the window to a screen of a different density changes how many
-     * pixels the pane is worth without changing how many points it measures, so
-     * nothing above notices. Left alone, the desktop keeps the size the old
-     * screen asked for: too few pixels on the way to a sharper display, too
-     * many on the way back.
-     */
-    let watchDensity: MediaQueryList | null = null
-    const onDensity = (): void => {
-      watch()
-      send()
-    }
-    const watch = (): void => {
-      watchDensity?.removeEventListener('change', onDensity)
-      watchDensity = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`)
-      watchDensity.addEventListener('change', onDensity)
-    }
-    watch()
-
-    return () => {
-      observer.disconnect()
-      watchDensity?.removeEventListener('change', onDensity)
-      window.clearTimeout(pending)
-      window.clearTimeout(insisting)
-    }
-    /**
-     * `desiredSize`, `fitWhenSettled` and `measure` are declared in the body, so
-     * they are new objects on every render; listing them would tear down the
-     * observer and the density watch on every render rather than when the size
-     * they compute actually changes. Everything reactive those three read is
-     * enumerated here instead — the rest of what they touch is refs.
-     *
-     * `desktopWidth` and `desktopHeight` are part of that and were missing:
-     * editing the resolution of a pinned session left the observer asking for
-     * the size the session was opened with, until something else on this list
-     * happened to change.
-     */
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    protocol,
-    phase.at,
-    look?.resolution,
-    look?.desktopWidth,
-    look?.desktopHeight,
-    look?.pixelBudget,
-    look?.magnification,
-    look?.sendDensity
-  ])
-
-  /**
-   * Uses what the host already has. The login and password live on the host —
-   * or on a group above it — like every other credential in this app, so asking
-   * again would be asking twice. A domain goes in the username as `DOMAIN\user`,
-   * which is what Windows itself accepts.
+   * Only whether — the password itself stays in the main process now, and the
+   * pane asks for one only when there is none to use.
    */
   useEffect(() => {
     if (protocol !== 'rdp' || !sessionId || !host) return
@@ -690,7 +109,7 @@ export default function GraphicalHost({
         if (alive) setLook(resolved)
       })
       .catch(() => {
-        // Nothing stated, or a host that has gone. The defaults below stand.
+        // Nothing stated, or a host that has gone. The defaults stand.
         if (alive) setLook(null)
       })
 
@@ -699,7 +118,7 @@ export default function GraphicalHost({
       .then((stored) => {
         if (!alive) return
         setUsername(stored.username)
-        setStoredPassword(stored.password)
+        setHasStoredPassword(stored.password.length > 0)
         setPhase({ at: 'choosing' })
       })
       .catch((err: Error) => {
@@ -730,126 +149,20 @@ export default function GraphicalHost({
 
   /** A new desktop of our own, in this pane. */
   function connectFresh(): void {
-    if (storedPassword) void connect(username, storedPassword)
+    if (hasStoredPassword) start(undefined)
     else setPhase({ at: 'password' })
+  }
+
+  function start(typed: string | undefined): void {
+    lastTyped.current = typed
+    setAttempt((n) => n + 1)
+    setPhase({ at: 'connecting' })
   }
 
   /** Someone else's desktop, shown in this pane. */
   function shadow(session: WinSession, control: boolean): void {
     if (!host) return
     setJoined({ session, control })
-  }
-
-  async function connect(user: string, secret: string): Promise<void> {
-    const interaction = interactionRef.current
-    if (!interaction || !host) return
-    lastUsed.current = { user, secret }
-
-    setPhase({ at: 'connecting' })
-    try {
-      await loadRdp(await window.td.rdp.tracing().catch(() => null))
-      // Reserved per attempt: the path is spent once used, so a retry after a
-      // failure needs a fresh one.
-      const proxyAddress = await window.td.rdp.reserve(sessionId)
-      reserved.current = proxyAddress
-      const builder = interaction.configBuilder()
-
-      /**
-       * Without this the desktop cannot be resized after it starts.
-       *
-       * [MS-RDPEDISP] travels on a dynamic virtual channel that has to be asked
-       * for while the session is being built; unasked for, `resize` has nowhere
-       * to send its request and silently does nothing. The session then keeps
-       * whatever size it was given at the start and the element stretches that
-       * picture to fill the pane — which looks like a desktop drawn too large
-       * and slightly soft, rather than like a feature that is missing.
-       */
-      builder.withExtension(displayControl(true))
-
-      /**
-       * The size to start at, so the first frame is already right.
-       *
-       * A resize after the fact costs a full redraw and a visible jump, and
-       * until one arrives the session is whatever the client defaulted to.
-       */
-      const startAt = desiredSize()
-      if (startAt) {
-        builder.withDesktopSize(startAt)
-        setAsked(
-          `${startAt.width}×${startAt.height}` +
-            (look?.resolution === 'fixed' ? ` (${t('fixed')})` : ` · ×${window.devicePixelRatio}`)
-        )
-      }
-      const config = builder
-        .withDestination(target)
-        .withProxyAddress(proxyAddress)
-        // The real gateway checks this; ours knows the caller by its one-time
-        // path, so the token is only here because the builder demands one.
-        .withAuthToken('local')
-        .withUsername(user)
-        .withPassword(secret)
-        // Left empty on purpose: a domain travels in the username as
-        // `DOMAIN\user`, the way it does everywhere else in Windows.
-        .withServerDomain('')
-        .build()
-
-      const session = await interaction.connect(config)
-
-      /**
-       * What the far end actually agreed to, beside what was asked for.
-       *
-       * A server is free to refuse a size and keep its own, and when it does
-       * the picture is scaled to fit the pane and looks magnified — which from
-       * the outside is indistinguishable from asking for the wrong size. The
-       * two numbers together say which of the two happened, and they are put on
-       * the pane's tooltip so the answer is a hover away rather than a rebuild.
-       */
-      const got = session.initialDesktopSize
-      setAsked(
-        (previous) =>
-          `${previous} → ${got ? `${got.width}×${got.height}` : t('size not reported')}`
-      )
-      window.setTimeout(() => setAsked((was) => `${was} — ${measure()}`), 400)
-
-      // The component keeps its screen hidden and translated off-view until
-      // told otherwise — its own `run` sets this back to false when the session
-      // ends, so nothing but the caller ever turns it on. Without it the
-      // session runs perfectly and paints where nobody can see it.
-      interaction.setVisibility(true)
-
-      // ScreenScale.Fit, stated once more now the session exists. The enum is
-      // declared in the client's types but not exported, so there is nothing to
-      // import; the property set on the element is what keeps it applied.
-      interaction.setScale(1)
-
-      // Copy and paste across the session boundary. Off until asked for, and
-      // asked for here rather than in the builder because it is a property of
-      // the live session — a failure to enable it must not cost the desktop.
-      try {
-        interaction.setEnableClipboard(true)
-        interaction.setEnableAutoClipboard(true)
-      } catch {
-        // An older client without the channel; the desktop still works.
-      }
-
-      setPhase({ at: 'connected' })
-
-      // Resolves when the far end goes away, which is the session ending
-      // normally rather than an error.
-      const ended = await session.run()
-      setPhase({ at: 'closed', reason: ended.reason() })
-    } catch (err) {
-      /**
-       * The client's own message is "General failure" for almost anything, and
-       * "not enough bytes" when this app's own proxy closed the socket — in
-       * both cases the reason lives in the main process. Asked for here rather
-       * than pushed, so it belongs to this attempt and no other.
-       */
-      const explained = reserved.current
-        ? await window.td.rdp.failure(reserved.current).catch(() => undefined)
-        : undefined
-      setPhase({ at: 'failed', reason: explained ?? describe(err) })
-    }
   }
 
   // A joined session takes the pane over entirely: its picture belongs to a
@@ -880,36 +193,22 @@ export default function GraphicalHost({
     )
   }
 
+  /** Whether a live session should exist at all right now. */
+  const running =
+    attempt > 0 && (phase.at === 'connecting' || phase.at === 'connected')
+
   return (
     <div className="graphical-host" title={asked}>
-      {/* The client's element is put here by the effect above, and stays for
-          every phase: it owns its canvas and the WebAssembly behind it, so
-          remounting would throw both away mid-session. React must not manage
-          its children, or it would fight the component for them. */}
-      <div
-        className="graphical-screen"
-        ref={containerRef}
-        // Dropping a file on a desktop sends it there. Chromium would otherwise
-        // navigate the window to the file, taking the session with it.
-        onDragOver={(e) => protocol === 'rdp' && e.preventDefault()}
-        onDrop={(e) => void onDrop(e)}
-      />
-
-      {/* An offer, not an arrival: copying over there put these within reach,
-          and nothing comes to this machine until it is asked for. */}
-      {offer && (
-        <div className="graphical-transfer offer">
-          <span>
-            {offer.length === 1 ? offer[0].name : `${offer.length} files`} copied over there
-          </span>
-          <button onClick={() => void fetchOffered(transferRef.current!, offer)}>{t('Save here…')}</button>
-          <button className="icon-button" title={t('Ignore')} onClick={() => setOffer(null)}>
-            ✕
-          </button>
-        </div>
+      {running && sessionId && (
+        <RemoteScreen
+          key={attempt}
+          sessionId={sessionId}
+          look={look}
+          password={lastTyped.current}
+          onPhase={setPhase}
+          onMeasured={setAsked}
+        />
       )}
-
-      {!offer && transfer && <div className="graphical-transfer">{transfer}</div>}
 
       {phase.at !== 'connected' && (
         <div className="graphical-overlay">
@@ -1007,9 +306,9 @@ export default function GraphicalHost({
                   placeholder={t('Password')}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && void connect(username, password)}
+                  onKeyDown={(e) => e.key === 'Enter' && start(password)}
                 />
-                <button className="primary" onClick={() => void connect(username, password)}>
+                <button className="primary" onClick={() => start(password)}>
                   {t('Connect')}
                 </button>
               </>
@@ -1032,10 +331,9 @@ export default function GraphicalHost({
                 <p className="settings-note">{phase.reason}</p>
                 <button
                   onClick={() => {
-                    const previous = lastUsed.current
-                    // Repeats the stored password without ever showing it; only
-                    // a host with nothing saved falls back to asking again.
-                    if (previous) void connect(previous.user, previous.secret)
+                    // The stored password is used again without ever being
+                    // shown here; only a host with nothing saved is asked.
+                    if (hasStoredPassword || lastTyped.current) start(lastTyped.current)
                     else setPhase({ at: 'password' })
                   }}
                 >
@@ -1050,83 +348,4 @@ export default function GraphicalHost({
   )
 }
 
-/**
- * Says what went wrong in the client's own terms.
- *
- * IronRDP raises a structured error whose `kind` separates a wrong password
- * from a host that could not be reached — worth keeping, because "failed" alone
- * sends people to check the wrong thing.
- */
-/**
- * What goes full screen: the pane, not the picture inside it.
- *
- * So the button there and the F11 here mean the same thing, rather than each
- * claiming the screen for a different element. The toolbar comes along but
- * stops taking a strip of the screen — see `.pane:fullscreen` in styles.css,
- * where it slides out of the way and back on a brush of the top edge, so the
- * desktop is asked for the size of the display itself.
- */
-/** The one method of the element this component needs and its types omit. */
-interface FileTransferHost {
-  enableFileTransfer(provider: RdpFileTransferProvider): unknown
-}
-
-export function fullscreenTarget(container: Element): Element {
-  return container.closest('.pane') ?? container
-}
-
-export function toggleFullscreen(target: Element): void {
-  if (document.fullscreenElement === target) void document.exitFullscreen()
-  else void target.requestFullscreen()
-}
-
-function describe(err: unknown): string {
-  const KINDS = [
-    'General failure',
-    'Wrong password',
-    'Logon failure',
-    'Access denied',
-    'The gateway rejected the request',
-    'Could not reach the host',
-    'Negotiation failed'
-  ]
-
-  // Every accessor below is a call into WebAssembly, and each can throw on its
-  // own — an error object whose memory has already been freed throws on any
-  // method. Reading them defensively is the difference between a message and a
-  // pane that takes the window down with it.
-  const read = <T,>(get: () => T): T | undefined => {
-    try {
-      return get()
-    } catch {
-      return undefined
-    }
-  }
-
-  const iron = err as {
-    kind?: () => number
-    backtrace?: () => string
-    rdcleanpathDetails?: () => { wsaErrorCode?: number; tlsAlertCode?: number } | undefined
-  }
-
-  if (typeof iron?.kind === 'function') {
-    const label = KINDS[read(() => iron.kind!()) ?? -1] ?? 'Failed'
-    const detail = read(() => iron.rdcleanpathDetails?.())
-    const parts = [
-      detail?.wsaErrorCode ? `socket error ${detail.wsaErrorCode}` : null,
-      detail?.tlsAlertCode ? `TLS alert ${detail.tlsAlertCode}` : null,
-      read(() => iron.backtrace?.())
-    ].filter(Boolean)
-    return parts.length > 0 ? `${label} — ${parts.join(' · ')}` : label
-  }
-
-  if (err instanceof Error) return err.message
-  if (typeof err === 'string' && err) return err
-
-  // Anything else, including the property bags WebAssembly throws, which carry
-  // no name, message or stack — the shape React reports as "undefined:
-  // undefined". Say *something* rather than losing it.
-  const own = read(() => JSON.stringify(err))
-  if (own && own !== '{}' && own !== 'null') return own
-  return `Unrecognised failure (${Object.prototype.toString.call(err)})`
-}
+export { fullscreenTarget, toggleFullscreen } from './RemoteScreen'

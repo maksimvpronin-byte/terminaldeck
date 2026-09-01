@@ -82,10 +82,8 @@ const SECTIONS: Section[] = [
       { keys: 'F11', what: 'Full screen, which is the only way Alt+Tab reaches the far side' },
       { what: 'Hold Escape to leave full screen: while there, it belongs to the session' },
       { what: 'The pane toolbar hides there, so the desktop is the size of the display' },
-      { what: 'Brush the top edge to bring it back without leaving full screen' },
+      { what: 'Rest at the top edge for a moment to bring it back; brushing past does not' },
       { what: 'A watched session cannot take Alt+Tab even full screen — Windows draws it' },
-      { what: 'Drop files on the desktop, then paste there: dropping only offers them' },
-      { what: 'Copy a file over there and a notice offers to save it here' },
       { what: 'The desktop takes the size of the pane, so dragging a split resizes it' },
       { what: 'A joined session keeps its own size: Windows draws it, and will not scale it' },
       { what: 'A host’s dialog holds a Desktop section: gateway, size, and the ⌘ key' },
@@ -99,7 +97,11 @@ const SECTIONS: Section[] = [
       { keys: '⌘ as Ctrl', what: 'Optional, per host: ⌘C and ⌘V then work as they do on Windows' },
       { what: 'While it is on, this app’s own ⌘ shortcuts do not fire over a focused desktop' },
       { what: 'A certificate the machine cannot verify is asked about once, then remembered' },
-      { what: 'Settings → Security lists what was trusted by hand, and forgets it on request' }
+      { what: 'Settings → Security lists what was trusted by hand, and forgets it on request' },
+      { what: 'The far end’s sound plays here, and can be turned off per host or group' },
+      { what: 'The picture is decoded by a client of its own, so H.264 hosts are drawn as such' },
+      { what: 'Nothing types the password into the window: the client signs in outside it' },
+      { what: 'Copying files between the two sides is not back yet — see the release notes' }
     ]
   },
   {

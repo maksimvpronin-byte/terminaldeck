@@ -116,6 +116,31 @@ export const IPC = {
    * can act on only exists in the main process.
    */
   rdpFailure: 'rdp:failure',
+  /**
+   * A desktop session, drawn by td-rdp in a process of its own.
+   *
+   * The window asks for one by naming a saved host, and gets back an id. It is
+   * never told where that host is reached or who it is reached as — with the
+   * client out of the renderer, authentication happens in the main process and
+   * a stored password has no reason to cross into the window at all.
+   */
+  desktopStart: 'desktop:start',
+  /**
+   * Everything the window has to say to a running session: keys, the mouse, a
+   * new size, and the acknowledgement of a frame.
+   *
+   * One channel rather than one per kind, and `send` rather than `invoke`: a
+   * mouse moving is sixty messages a second and none of them has an answer
+   * worth waiting for.
+   */
+  desktopSend: 'desktop:send',
+  desktopStop: 'desktop:stop',
+  /** What the client wrote about itself, for saving where it can be read. */
+  desktopLog: 'desktop:log',
+  /** main -> renderer, each suffixed with the desktop session id */
+  desktopEvent: 'desktop:event',
+  desktopFrame: 'desktop:frame',
+  desktopCursor: 'desktop:cursor',
   /** Who is logged on to a Windows host, for the shadow picker. */
   rdpListSessions: 'rdp:listSessions',
   /** Opens the Windows client on an existing session, in a window of its own. */

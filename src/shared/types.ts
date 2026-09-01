@@ -78,6 +78,15 @@ export interface RdpDefaults {
    */
   gatewayBypassLocal?: boolean
   /**
+   * Whether the far end's sound is played here.
+   *
+   * On by default, as it is in every Windows client. It costs bandwidth on a
+   * link that has none to spare, which is why a host or a whole group can turn
+   * it off — but a desktop that is silent when nobody asked for silence is a
+   * fault people spend a while looking for in the wrong place.
+   */
+  sound?: boolean
+  /**
    * `fit` follows the pane and resizes the far end with it, which is what the
    * app has always done. `fixed` pins the desktop to a stated size and scales
    * the picture into the pane, for a host that resizes badly or a session that
@@ -168,6 +177,8 @@ export interface ResolvedRdp {
   gatewayUsername?: string
   gatewaySecretRef?: string
   gatewayBypassLocal: boolean
+  /** Whether the far end's sound is played on this machine. */
+  sound: boolean
   resolution: RdpResolution
   desktopWidth: number
   desktopHeight: number

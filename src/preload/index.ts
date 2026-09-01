@@ -25,6 +25,17 @@ import type {
 import type { RemoteStats } from '../shared/remoteStats'
 import type { WinSession } from '../shared/winSessions'
 
+/**
+ * The far end's pointer: the image it wants shown, or that it wants none.
+ *
+ * Two shapes rather than one with optional fields, because "hidden" and "a
+ * 32×32 image" have nothing in common and a reader should not have to check a
+ * width to find out which arrived.
+ */
+export type DesktopCursor =
+  | { width: number; height: number; hotX: number; hotY: number; pixels: Uint8Array }
+  | { kind: 'hidden' | 'default' }
+
 const api = {
   vault: {
     status: (): Promise<VaultStatus> => ipcRenderer.invoke(IPC.vaultStatus),
@@ -222,6 +233,79 @@ const api = {
     ): (() => void) => {
       const channel = `${IPC.shadowEvent}:${id}`
       const listener = (_e: unknown, p: { event: string; detail?: string }): void => cb(p)
+      ipcRenderer.on(channel, listener)
+      return () => ipcRenderer.removeListener(channel, listener)
+    },
+    /**
+     * Opens a desktop, drawn by a client in a process of its own.
+     *
+     * A host is named and an id comes back. Where that host is reached and as
+     * whom is settled in the main process and never told to the window — the
+     * client that used to sign in here is gone, and with it the one reason a
+     * stored password ever crossed into the renderer.
+     */
+    desktopStart: (request: {
+      sessionId: string
+      width: number
+      height: number
+      /** 100–500, when the host asked for its density to be sent. */
+      scale?: number
+      /** Typed here, for a host that has nothing saved. */
+      password?: string
+    }): Promise<string> => ipcRenderer.invoke(IPC.desktopStart, request),
+    /**
+     * Anything the pane has to say to a running desktop: a key, the mouse, a
+     * new size, or that a frame has been drawn.
+     *
+     * Fire and forget on purpose. A mouse moving is sixty of these a second and
+     * a promise for each would cost more than the message.
+     */
+    desktopSend: (
+      id: string,
+      fields: Record<string, string | number | boolean | undefined>
+    ): void => ipcRenderer.send(IPC.desktopSend, id, fields),
+    desktopStop: (id: string): Promise<void> => ipcRenderer.invoke(IPC.desktopStop, id),
+    /** Writes what the client said about itself where it can be read. */
+    desktopLog: (id: string): Promise<string> => ipcRenderer.invoke(IPC.desktopLog, id),
+    onDesktopEvent: (
+      id: string,
+      cb: (p: Record<string, unknown>) => void
+    ): (() => void) => {
+      const channel = `${IPC.desktopEvent}:${id}`
+      const listener = (_e: unknown, p: Record<string, unknown>): void => cb(p)
+      ipcRenderer.on(channel, listener)
+      return () => ipcRenderer.removeListener(channel, listener)
+    },
+    /**
+     * The pixels that changed, as they left the decoder.
+     *
+     * `pixels` is RGBA with the rows in reading order, which is exactly what
+     * `ImageData` takes — so between the far end's screen and this one there is
+     * no colour conversion anywhere, only the copies that move the rectangle
+     * along.
+     */
+    onDesktopFrame: (
+      id: string,
+      cb: (frame: {
+        x: number
+        y: number
+        width: number
+        height: number
+        pixels: Uint8Array
+      }) => void
+    ): (() => void) => {
+      const channel = `${IPC.desktopFrame}:${id}`
+      const listener = (
+        _e: unknown,
+        frame: { x: number; y: number; width: number; height: number; pixels: Uint8Array }
+      ): void => cb(frame)
+      ipcRenderer.on(channel, listener)
+      return () => ipcRenderer.removeListener(channel, listener)
+    },
+    /** The far end's mouse pointer: an image with its hotspot, or a state. */
+    onDesktopCursor: (id: string, cb: (cursor: DesktopCursor) => void): (() => void) => {
+      const channel = `${IPC.desktopCursor}:${id}`
+      const listener = (_e: unknown, cursor: DesktopCursor): void => cb(cursor)
       ipcRenderer.on(channel, listener)
       return () => ipcRenderer.removeListener(channel, listener)
     },

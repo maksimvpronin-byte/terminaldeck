@@ -740,12 +740,21 @@ label {
   right: 0;
   z-index: 6;
   transform: translateY(calc(-100% + 3px));
+  /* Hiding is immediate. Only the revealing half waits — see below. */
   transition: transform 120ms ease;
   border-bottom-color: transparent;
 }
+/* Comes back for a pointer that stays, not for one that passes.
+   The top edge is where a remote desktop sends people constantly: the far
+   side's own window controls, its tab strip and its menu bar all live there.
+   Appearing on every pass put this toolbar over the very thing being reached
+   for. The delay lives on the hover rule rather than the base one because a
+   transition takes its timing from the state it is moving *to* — so brushing
+   past starts nothing, and leaving still snaps it away at once. */
 .pane:fullscreen .pane-toolbar:hover,
 .pane:fullscreen .pane-toolbar:focus-within {
   transform: none;
+  transition: transform 120ms ease 700ms;
   border-bottom-color: var(--border);
 }
 
@@ -1116,15 +1125,29 @@ label {
   min-width: 0;
   min-height: 0;
   display: flex;
+  /* Centred, so a desktop whose shape does not match the pane's is letterboxed
+     rather than pushed into a corner. Which happens constantly: the far end
+     answers a resize a round trip after it is asked. */
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
+  /* Black behind it for the same reason a projector screen is not white: the
+     margins should not compete with the picture. */
+  background: #000;
+  /* It takes the keyboard, so it is focusable — but a focus ring around a
+     desktop reads as part of the desktop. The pane's own border already says
+     which one is active. */
+  outline: none;
 }
-/* The client owns this element and puts its canvas inside; nothing else may lay
-   it out, or the framebuffer is measured against the wrong box. */
+/* Sized in JavaScript, from the desktop's own dimensions and the pane's, so
+   that the picture keeps its shape. `flex: 1` here would hand the main axis
+   back to the flexbox and stretch it — invisible for exactly as long as the
+   desktop and the pane happen to have the same proportions. */
 .graphical-canvas {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
+  flex: 0 0 auto;
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
 }
 /* Over the screen rather than instead of it: the element the client drew into
    has to stay mounted while credentials are being asked for. */

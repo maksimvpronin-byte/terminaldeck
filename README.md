@@ -94,7 +94,8 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
   group above it, like every other credential here, and a domain travels in the username as
   `DOMAIN\user`
 - **A Desktop section on the host, the group and an inventory override**: the RD Gateway to
-  reach the machine through, the resolution, and whether ⌘ is sent as Ctrl. It inherits along
+  reach the machine through, the resolution, whether the far end's sound plays here, and
+  whether ⌘ is sent as Ctrl. It inherits along
   the same chain the login does, so a gateway shared by a floor of machines is stated once on
   the group and left blank on each host. Each field says what it would inherit and from where
 - **The gateway is spoken to directly** — [MS-TSGU], implemented here: an HTTPS request to
@@ -153,22 +154,36 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
   logged on to it and is never resized at all. Windows 8.1 and Server 2012 R2 and later act on
   it ([MS-RDPEDISP]); anything older ignores it and the magnification above is what is left
 - **Full screen gives the whole display to the desktop.** The pane toolbar slides out of the
-  way there and comes back on a brush of the top edge, so the size asked for is the display's
+  way there and comes back for a pointer that rests at the top edge — not for one that passes,
+  which is the difference between a toolbar and a nuisance: the far side's own window controls
+  and tab strip live at that same edge. So the size asked for is the display's
   own rather than the display less a toolbar — which matters beyond the room it frees, since a
   size no monitor has is the one that cannot land pixel for pixel. F11 enters and leaves, and
   holding Escape leaves; while there, Alt+Tab reaches the far side
 - **Send ⌘ as Ctrl**, per host and off by default. Copy and paste then land where they do on
   Windows. While it is on and the desktop has the keyboard, this app's own ⌘ shortcuts do not
   fire; ⌘Q and ⌘Tab still belong to macOS
-- **No native dependency and no external service.** The client is
-  [IronRDP](https://github.com/Devolutions/IronRDP) compiled to WebAssembly, so the same build
-  works on every platform. It insists on talking to a Devolutions Gateway, so the main process
-  stands one up on loopback: a single-use address per session, which performs the X.224
-  exchange and the TLS handshake and reports the server's certificate chain back — the client
-  needs it because CredSSP binds to the server's public key
+- **The picture comes from a real RDP client, in a process of its own.** It is
+  [FreeRDP](https://github.com/FreeRDP/FreeRDP) 3.31, built from source and shipped inside the
+  application as a small program called `td-rdp`: it connects, decodes, and writes the
+  rectangles that changed down a pipe as plain RGBA, which the pane puts straight onto a canvas.
+  Nothing is re-encoded on the way, and there is no colour conversion anywhere — the bytes the
+  decoder produced are the bytes `ImageData` takes
+- **Which is what makes a desktop sharp and quick.** The whole graphics pipeline is negotiated:
+  H.264 in both AVC420 and AVC444, progressive RemoteFX under that, and RemoteFX below it. The
+  WebAssembly client this replaced had none of it — not disabled, absent — so a host that could
+  have sent video sent run-length-encoded bitmaps instead, which on a 27" screen is what
+  "blurry and slow" meant. See `PLAN-freerdp.md` for the evidence and the decision
+- **A separate process, deliberately.** A fault in a decoder ends one pane rather than the
+  window, nothing is tied to Electron's ABI, and the client signs in where it runs — so a
+  stored password now goes from the vault straight down a pipe and never enters the renderer at
+  all. The client before it authenticated inside the window, which forced the one exception
+  this app made to that rule. That exception is gone
+- **Sound**, played by the client itself through the platform's own audio, and switchable per
+  host or group. It travels on its own channel, so it costs this side nothing and the link
+  something — worth turning off where the line should be spent on the picture
 - Panels that ride on an SSH connection — the file browser, port forwarding, monitoring,
   broadcast — are hidden for a desktop rather than greyed out, since none of them is coming
-- **Clipboard** in both directions, so text copied in the session pastes locally and back
 - Opening a host asks what you want: a **new session** in the pane, or one of the sessions
   already logged on to that machine — watched, or with the keyboard and mouse taken. The list
   comes from the host itself and is read positionally rather than by column heading, so a
@@ -184,18 +199,16 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
 - Joining without the prompt is a **checkbox, off by default**. The host's policy decides
   whether it is permitted at all; where it is not, asking for it is refused outright rather
   than quietly falling back to asking
-- When a session will not start, set `TERMINALDECK_RDP_TRACE=1` and the local gateway reports
-  each step it took — whether the host answered, what it agreed to during protocol negotiation,
-  whether TLS came up. The client reports nearly every fault as "General failure", so this is
-  usually the only way to see where it actually stopped. The same flag puts the desktop client
-  itself into `debug`, which is what names the codecs and channels it agreed on. That log is **not**
-  printed: at `debug` the client writes several lines per frame, and a console holding every one of
-  them took the window to four gigabytes and an out-of-memory crash inside forty seconds. So the
-  first 800 lines — everything said while the session is being built, which is where the answers
-  are — are written to `logs/rdp-<time>.log` in the user-data directory, the rest are dropped, and
-  the console is given back with one line saying where the file is. Any value other than `1` is
-  handed to the client as its log filter, for a version that supports one; 0.11 logged nothing at
-  all when given `info,ironrdp_connector=debug`
+- When a session will not start, set `TERMINALDECK_RDP_TRACE=1`. The desktop client is then run
+  at FreeRDP's `DEBUG`, which is what names the codecs and channels it agreed on with the host.
+  It is kept, not printed — the last client taught that lesson expensively, several lines per
+  frame into a console that holds every one of them, four gigabytes and an out-of-memory crash
+  inside forty seconds. The main process keeps the last 400 lines per session and writes them to
+  `logs/desktop-<time>.log` in the user-data directory only when asked. The client's own output
+  cannot reach the pipe that carries the picture even in principle: it takes the real standard
+  output for itself at startup and points descriptor 1 at the log, so a stray `printf` anywhere
+  in FreeRDP or the libraries under it lands where it belongs rather than desynchronising a
+  frame
 
 ### Files and networking
 
@@ -264,6 +277,11 @@ paths have only ever been exercised by unit tests or by hand on a local stand-in
 
 **Written but not yet proven in real use**
 
+- **The FreeRDP client itself.** It replaced the WebAssembly one on the strength of a
+  side-by-side comparison against one host over one link, which is what the picture is for —
+  and everything below the picture is new: input, the resize channel, the certificate question,
+  the gateway. Built and proven on macOS; the Windows and Linux builds are not written yet, so
+  a desktop pane on those platforms does not open at all until they are
 - **The RD Gateway.** One real gateway, one account, one machine behind it: a desktop opens and
   works. That is one deployment and not a claim about gateways in general — the settings that
   decide whether a sign-in is accepted live on the server, and this one's are not every one's.
@@ -282,16 +300,24 @@ paths have only ever been exercised by unit tests or by hand on a local stand-in
 
 - Telnet and serial. Telnet is plaintext and only useful for legacy network gear; serial would
   pull in a native module and complicate every build. RDP *was* on this list — "a graphical
-  client, not a terminal, and not doable well as a side feature" — until it turned out to be
-  doable without a native dependency at all. See **Desktops** above.
+  client, not a terminal, and not doable well as a side feature" — and came off it on the
+  strength of a WebAssembly client that needed nothing native. That turned out to be the wrong
+  trade: the client that asked nothing of the build also had no graphics pipeline, and the
+  picture was the thing being paid for. There is now a compiled client, built per platform and
+  shipped in the application. See **Desktops** above.
+- **Clipboard and file transfer, for now.** Both rode on the previous client's own extensions
+  and neither survived the change. FreeRDP speaks the channels — `cliprdr` for both — and they
+  are the next piece of work rather than a decision against them. Said plainly here because it
+  is a step backwards, and a real one: text copied in a desktop session does not paste out of
+  it today.
 - Joining an existing session **inside a pane**. It is offered, but the window belongs to
   Windows: the mechanism goes over RPC and SMB rather than RDP, and the embedded client does
   not implement it. Drawing it here would mean implementing Remote Desktop Services shadowing
   from scratch.
-- The console session (`/admin`). The flag that selects it exists in IronRDP's protocol layer
-  but is not exposed through its WebAssembly client, so this needs a change upstream.
-  Connecting as the same user already reconnects to that user's existing session, which is
-  most of what it is wanted for.
+- The console session (`/admin`). FreeRDP carries the flag and nothing but a setting stands in
+  the way now, so this is a small piece of work rather than an impossibility — it is simply not
+  done. Connecting as the same user already reconnects to that user's existing session, which
+  is most of what it is wanted for.
 - PuTTY session import — Windows-only value, deferred since the MVP.
 - Code signing and notarization. Configured and documented below, but no certificate is in use,
   which also means macOS auto-update downloads an update it cannot apply.
@@ -311,6 +337,35 @@ one to take a couple of minutes. On first launch you'll be asked to create a mas
 the local credential vault (stored in the OS user-data directory, never sent anywhere).
 
 Syncing an inventory needs `git` on `PATH`; the Inventory tab says so if it is missing.
+
+### Building the desktop client
+
+Desktop panes need `td-rdp`, which is compiled rather than downloaded. It is not built by
+`npm install` and not needed for anything else, so a checkout used only for SSH can skip this
+entirely — a desktop pane will simply say the client is missing.
+
+On macOS:
+
+```bash
+brew install cmake ninja pkg-config openssl@3 openh264 opus sdl2 sdl2_ttf sdl2_image
+npm run build:freerdp:mac
+```
+
+That fetches FreeRDP 3.31.0, builds it and the shim into
+`resources/freerdp/build/macos-<arch>/`, and keeps the whole log beside it. It takes a few
+minutes and prints the failing lines itself if it does not finish. Changing a line of the shim
+afterwards does not need any of that again:
+
+```bash
+npm run build:freerdp:shim
+```
+
+`npm run build:mac` runs `build:freerdp:bundle` first, which copies every library the build
+actually uses in beside it, rewrites the absolute Homebrew paths to `@rpath`, and re-signs what
+it touched — an unsigned Mach-O with a stale signature is refused outright on Apple Silicon, and
+the symptom is a build that works only on the machine that made it.
+
+Windows and Linux builds are not written yet.
 
 ## Type-checking and tests
 

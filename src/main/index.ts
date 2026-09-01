@@ -3,6 +3,7 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { registerIpcHandlers } from './ipc/handlers'
 import { installCertificateVerifier } from './rdp/CertificateTrust'
+import { freeRdpBridge } from './rdp/FreeRdpBridge'
 import { registerUpdater } from './updater'
 import { IPC } from '../shared/ipc-channels'
 
@@ -108,6 +109,19 @@ app.whenReady().then(() => {
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+})
+
+/**
+ * Nothing that draws a desktop outlives the application.
+ *
+ * The clients would exit on their own — their input pipe closes when this
+ * process goes, and end of input is how they are told to stop — but only once
+ * whatever they were doing came back to check. Saying it plainly first means a
+ * quit is a quit rather than a race, and a session mid-frame does not hold the
+ * far end open while it finishes.
+ */
+app.on('before-quit', () => {
+  freeRdpBridge.stopAll()
 })
 
 app.on('window-all-closed', () => {
