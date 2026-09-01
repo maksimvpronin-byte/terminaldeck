@@ -15,6 +15,7 @@ graphify-out/
 resources/freerdp/src/
 resources/freerdp/build/
 resources/freerdp/shim/build/
+resources/freerdp/vcpkg/
 
 # Built from ShadowHost.cs by npm run build:shadowhost; not a source file.
 resources/shadowhost/*.exe

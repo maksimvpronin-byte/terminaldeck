@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buttonEvent, PTR, PTR_X, wheelUnits } from './rdpInput'
+import { buttonEvent, PTR, PTR_X, wheelFlags, wheelUnits } from './rdpInput'
 
 describe('buttonEvent', () => {
   it('does not confuse the middle button with the right one', () => {
@@ -49,5 +49,43 @@ describe('wheelUnits', () => {
   it('stays inside the eight bits the field has', () => {
     expect(wheelUnits(-100000, 0)).toBe(255)
     expect(wheelUnits(100000, 0)).toBe(-255)
+  })
+})
+
+describe('wheelFlags', () => {
+  /** What the far end does with the field, from FreeRDP's own client. */
+  const asRead = (flags: number): number => {
+    const value = flags & 0xff
+    return flags & PTR.wheelNegative ? -1 * (0x100 - value) : value
+  }
+
+  it('survives the round trip in both directions', () => {
+    // The whole point: a turn must arrive as the turn that was made. Sending
+    // the magnitude beside a sign bit made one direction arrive as 253.
+    for (const units of [1, 3, 120, 255, -1, -3, -120, -255]) {
+      expect(asRead(wheelFlags(units)!)).toBe(units)
+    }
+  })
+
+  it('says which axis it turned on', () => {
+    expect(wheelFlags(120)! & PTR.wheel).toBe(PTR.wheel)
+    expect(wheelFlags(120, true)! & PTR.hwheel).toBe(PTR.hwheel)
+  })
+
+  it('marks a backwards turn, and only a backwards one', () => {
+    expect(wheelFlags(-120)! & PTR.wheelNegative).toBe(PTR.wheelNegative)
+    expect(wheelFlags(120)! & PTR.wheelNegative).toBe(0)
+  })
+
+  it('has nothing to send for a wheel that did not turn', () => {
+    expect(wheelFlags(0)).toBeNull()
+  })
+
+  it('keeps the rotation inside the byte that carries it', () => {
+    for (const units of [1, 255, -1, -255]) {
+      const value = wheelFlags(units)! & 0xff
+      expect(value).toBeGreaterThanOrEqual(0)
+      expect(value).toBeLessThanOrEqual(0xff)
+    }
   })
 })

@@ -10,6 +10,7 @@ import TunnelsPanel from './TunnelsPanel'
 import MonitorBar from './MonitorBar'
 import { protocolOf, traitsOf } from '../../../shared/protocols'
 import { SplitRightIcon, SplitDownIcon, CloseIcon, DetachIcon } from './icons'
+import { useToolbarReveal } from '../hooks/useToolbarReveal'
 import { keyHint } from '../state/keys'
 import { useT } from '../i18n'
 
@@ -101,6 +102,8 @@ export default function Pane({
     if (item.kind === 'tab') closeTab(item.id)
   }
 
+  const toolbarOut = useToolbarReveal(rootRef)
+
   return (
     <div
       className={`pane ${isActive ? 'active' : ''}`}
@@ -111,7 +114,7 @@ export default function Pane({
     >
       {dropEdge && <div className={`pane-drop-hint ${dropEdge}`} />}
       <div
-        className={`pane-toolbar ${broadcast && node.broadcastEnabled ? 'broadcasting' : ''}`}
+        className={`pane-toolbar ${toolbarOut ? 'out' : ''} ${broadcast && node.broadcastEnabled ? 'broadcasting' : ''}`}
         style={node.color ? { borderLeft: `3px solid ${node.color}` } : undefined}
       >
         <span>{node.title}</span>

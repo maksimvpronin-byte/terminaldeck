@@ -55,6 +55,10 @@ accumulated since 0.4.0.
   it is a setting of that machine, and a session someone else is logged on to
   would be resized under them. A host, a group or an inventory override can pin
   the percentage, 100% being every pixel the screen has.
+- **One list, not a checkbox that greys out a percentage.** Stretching the picture on this
+  side and asking the far end to lay itself out larger answer the same question, and offering
+  both at once invited setting one and then disabling it with the other. They are still two
+  settings underneath — they inherit separately — but a host is asked once.
 - **A host may tell its session how dense this display is**, off by default.
   Magnifying the picture here gets the size right and costs sharpness, because
   a quarter of the pixels are being stretched over the pane; telling the far end
@@ -313,9 +317,40 @@ accumulated since 0.4.0.
   decision against them. Said plainly because it is a step backwards: text
   copied inside a desktop session does not paste out of it today.
 
-- **Desktop panes on Windows and Linux, until their builds are written.** The
-  client is compiled per platform and only the macOS build script exists. A pane
-  there says the client is missing rather than opening.
+- **Desktop panes on Linux, until its build is written.** The client is compiled
+  per platform. A pane there says the client is missing rather than opening.
+  Windows has a build script — `npm run build:freerdp:win`, using vcpkg where
+  macOS uses Homebrew — but it has never been run, so treat it as written rather
+  than working.
+
+### Fixed
+
+- **A frame was reassembled in a way that cost the square of its size.** The
+  reader concatenated each piece arriving from the client onto one growing
+  buffer — fine for a terminal, where a message is a line, and quadratic for a
+  desktop, where a message is a frame: a full-screen 4K frame is 29 MB and
+  arrives in something like four hundred pieces, so each one copied everything
+  before it. Six gigabytes of memcpy per frame, which is what a scroll felt
+  like. Held as a list, the same frame is copied once.
+- **A pixel-for-pixel picture was given up to a rounding.** The canvas was sized
+  by flooring the fitted scale to whole pixels, and a pane is measured in
+  fractions of a point — so the fit landed a hair either side of one desktop
+  pixel per device pixel, and every frame was resampled to be two device pixels
+  narrower than the pane.
+- **Scrolling ran fast one way and slow the other.** A backwards wheel turn is
+  not the magnitude with a sign bit beside it: the low byte carries its two's
+  complement, and the far end reads `-(0x100 - value)`. Three notches down were
+  arriving as two hundred and fifty-three. The encoding moved to shared code
+  where a test states what the far end will read back.
+- **The pane toolbar took clicks meant for the desktop.** Full screen left a
+  three-pixel strip of it over the picture, which both swallowed clicks and
+  revealed the whole toolbar when the pointer passed — along the one edge where
+  a remote desktop keeps its own tab strip, menu bar and window buttons. It now
+  leaves entirely and cannot be hovered at all; pushing the pointer against the
+  top of the display and holding it for half a second brings it back.
+- **Desktop settings did not reach a session already open.** They were read once
+  when the pane opened, so changing the size settings and saving them did
+  nothing at all, with no sign of why.
 
 ### Notes
 

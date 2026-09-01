@@ -89,6 +89,18 @@ typedef struct
 	 */
 	int inflight;
 
+	/**
+	 * Guards everything above about the picture, and the scratch buffer below.
+	 *
+	 * Painting does not happen on one thread. FreeRDP runs its dynamic virtual
+	 * channels on their own, and the graphics pipeline rides on those — so a
+	 * decoded frame arrives on that thread while an acknowledgement, a resize
+	 * or a refresh arrives on this one. Without this they overlap in the
+	 * middle of a rectangle: two of them copy out of the same scratch buffer
+	 * at once, and one of them wins.
+	 */
+	CRITICAL_SECTION paint;
+
 	BYTE* scratch; /* the rectangle being sent, made contiguous */
 	size_t scratch_size;
 
@@ -136,6 +148,7 @@ static td_cmd* pop_command(tdContext* td)
 
 static void note_damage(tdContext* td, UINT32 x1, UINT32 y1, UINT32 x2, UINT32 y2)
 {
+	/* Caller holds td->paint. */
 	if (x2 <= x1 || y2 <= y1)
 		return;
 	if (!td->dirty)
@@ -166,6 +179,7 @@ static void note_damage(tdContext* td, UINT32 x1, UINT32 y1, UINT32 x2, UINT32 y
  */
 static void flush_frame(tdContext* td)
 {
+	/* Caller holds td->paint. */
 	rdpGdi* gdi = td->common.context.gdi;
 	if (!gdi || !gdi->primary_buffer || !td->dirty || td->inflight)
 		return;
@@ -212,6 +226,41 @@ static void flush_frame(tdContext* td)
 		td->stopping = 1;
 }
 
+/** Notes what changed and sends it if the last frame has been taken. */
+static void paint_damage(tdContext* td, UINT32 x1, UINT32 y1, UINT32 x2, UINT32 y2)
+{
+	EnterCriticalSection(&td->paint);
+	note_damage(td, x1, y1, x2, y2);
+	flush_frame(td);
+	LeaveCriticalSection(&td->paint);
+}
+
+/**
+ * The frame was drawn over there; the next one may go.
+ *
+ * Everything that changed while it was travelling is already in the rectangle,
+ * so this is where a busy screen turns into a lower frame rate rather than a
+ * queue.
+ */
+static void paint_taken(tdContext* td)
+{
+	EnterCriticalSection(&td->paint);
+	td->inflight = 0;
+	flush_frame(td);
+	LeaveCriticalSection(&td->paint);
+}
+
+/** Everything is new: forget what was in flight and send the whole screen. */
+static void paint_all(tdContext* td, UINT32 width, UINT32 height)
+{
+	EnterCriticalSection(&td->paint);
+	td->dirty = 0;
+	td->inflight = 0;
+	note_damage(td, 0, 0, width, height);
+	flush_frame(td);
+	LeaveCriticalSection(&td->paint);
+}
+
 static BOOL td_begin_paint(rdpContext* context)
 {
 	rdpGdi* gdi = context->gdi;
@@ -245,8 +294,7 @@ static BOOL td_end_paint(rdpContext* context)
 	if (x2 <= x1 || y2 <= y1)
 		return TRUE;
 
-	note_damage(td, (UINT32)x1, (UINT32)y1, (UINT32)x2, (UINT32)y2);
-	flush_frame(td);
+	paint_damage(td, (UINT32)x1, (UINT32)y1, (UINT32)x2, (UINT32)y2);
 	return TRUE;
 }
 
@@ -257,16 +305,25 @@ static BOOL td_desktop_resize(rdpContext* context)
 	const UINT32 width = freerdp_settings_get_uint32(settings, FreeRDP_DesktopWidth);
 	const UINT32 height = freerdp_settings_get_uint32(settings, FreeRDP_DesktopHeight);
 
-	if (!gdi_resize(context->gdi, width, height))
+	/**
+	 * Under the same lock the picture is read under.
+	 *
+	 * `gdi_resize` frees the framebuffer and allocates another. The thread
+	 * copying a rectangle out of it is a different one, and a buffer swapped
+	 * underneath that copy is a read past the end of freed memory — rare,
+	 * silent, and fatal when it does happen.
+	 */
+	EnterCriticalSection(&td->paint);
+	const BOOL resized = gdi_resize(context->gdi, width, height);
+	LeaveCriticalSection(&td->paint);
+	if (!resized)
 		return FALSE;
 
-	/* Everything is new, and the frame in flight described a screen that no
-	 * longer exists. */
-	td->dirty = 0;
-	td->inflight = 0;
-	note_damage(td, 0, 0, width, height);
+	/* Said before the pixels, so the pane has resized its canvas by the time
+	 * they land — and the frame that was in flight described a screen that no
+	 * longer exists, so it is forgotten rather than acknowledged. */
 	td_event("{\"e\":\"size\",\"width\":%u,\"height\":%u}", width, height);
-	flush_frame(td);
+	paint_all(td, width, height);
 	return TRUE;
 }
 
@@ -486,8 +543,7 @@ static BOOL td_post_connect(freerdp* instance)
 		const UINT32 width = freerdp_settings_get_uint32(context->settings, FreeRDP_DesktopWidth);
 		const UINT32 height = freerdp_settings_get_uint32(context->settings, FreeRDP_DesktopHeight);
 		td_event("{\"e\":\"connected\",\"width\":%u,\"height\":%u}", width, height);
-		note_damage(td, 0, 0, width, height);
-		flush_frame(td);
+		paint_all(td, width, height);
 	}
 	return TRUE;
 }
@@ -586,25 +642,11 @@ static void apply_command(tdContext* td, const td_cmd* cmd)
 		                                              (UINT16)td_cmd_int(cmd, "x", 0),
 		                                              (UINT16)td_cmd_int(cmd, "y", 0));
 	}
-	else if (strcmp(action, "wheel") == 0)
-	{
-		/* The rotation travels in the low bits of the same field as the flags,
-		 * as a signed step, and is clamped to what that field holds. Encoded
-		 * here rather than up there because it is a detail of [MS-RDPBCGR]
-		 * and not of any renderer. */
-		int delta = td_cmd_int(cmd, "delta", 0);
-		UINT16 flags = td_cmd_bool(cmd, "horizontal", 0) ? PTR_FLAGS_HWHEEL : PTR_FLAGS_WHEEL;
-		if (delta < 0)
-		{
-			delta = -delta;
-			flags |= PTR_FLAGS_WHEEL_NEGATIVE;
-		}
-		if (delta > 0xFF)
-			delta = 0xFF;
-		flags |= (UINT16)(delta & WheelRotationMask);
-		(void)freerdp_input_send_mouse_event(input, flags, (UINT16)td_cmd_int(cmd, "x", 0),
-		                                     (UINT16)td_cmd_int(cmd, "y", 0));
-	}
+	/* A wheel has no action of its own: the rotation is folded into an
+	 * ordinary pointer event's flags, and the folding is done in
+	 * shared/rdpInput.ts where a test can state what the far end will read
+	 * back. It was done here first, from the shape of the field, and it was
+	 * wrong in one direction only — three notches down arrived as 253. */
 	else if (strcmp(action, "key") == 0)
 	{
 		UINT16 flags = td_cmd_bool(cmd, "down", 1) ? KBD_FLAGS_DOWN : KBD_FLAGS_RELEASE;
@@ -648,18 +690,13 @@ static void apply_command(tdContext* td, const td_cmd* cmd)
 	}
 	else if (strcmp(action, "ack") == 0)
 	{
-		td->inflight = 0;
-		flush_frame(td);
+		paint_taken(td);
 	}
 	else if (strcmp(action, "refresh") == 0)
 	{
 		rdpGdi* gdi = context->gdi;
 		if (gdi)
-		{
-			td->inflight = 0;
-			note_damage(td, 0, 0, gdi->width, gdi->height);
-			flush_frame(td);
-		}
+			paint_all(td, gdi->width, gdi->height);
 	}
 	else if (strcmp(action, "stop") == 0)
 	{
@@ -937,6 +974,7 @@ static BOOL client_new(freerdp* instance, rdpContext* context)
 	 * start, and a prompt from a process with no terminal would hang. */
 
 	InitializeCriticalSection(&td->lock);
+	InitializeCriticalSection(&td->paint);
 	td->arrived = CreateEvent(NULL, TRUE, FALSE, NULL);
 	td->answered = CreateEvent(NULL, TRUE, FALSE, NULL);
 	return td->arrived != NULL && td->answered != NULL;
@@ -960,6 +998,7 @@ static void client_free(freerdp* instance, rdpContext* context)
 	if (td->answered)
 		(void)CloseHandle(td->answered);
 	DeleteCriticalSection(&td->lock);
+	DeleteCriticalSection(&td->paint);
 	free(td->scratch);
 }
 

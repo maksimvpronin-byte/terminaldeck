@@ -3,6 +3,7 @@ import { traitsOf, type Protocol } from '../../../shared/protocols'
 import type { RdpView } from '../../../shared/types'
 import { shadowable, type WinSession } from '../../../shared/winSessions'
 import RemoteScreen, { type ScreenPhase } from './RemoteScreen'
+import { useStore } from '../state/store'
 import ShadowView from './ShadowView'
 import { useT } from '../i18n'
 
@@ -94,13 +95,23 @@ export default function GraphicalHost({
   const target = `${host ?? ''}:${port ?? traits.port}`
 
   /**
-   * What this host has stated, and whether it has a password.
+   * How this host wants its desktop drawn, re-read whenever that could have
+   * changed.
    *
-   * Only whether — the password itself stays in the main process now, and the
-   * pane asks for one only when there is none to use.
+   * Read once, this was a trap worth removing: changing the size settings and
+   * saving them did nothing at all to the session already on screen, with no
+   * sign of why. Someone then changes the setting again, and again, looking at
+   * a picture that was never going to move until the tab was closed.
+   *
+   * The resolution itself walks the host and every group above it, and the main
+   * process does that walk — so the two below are not read here. They are what
+   * says the answer may have changed.
    */
+  const profile = useStore((s) => s.sessions.find((x) => x.id === sessionId))
+  const groups = useStore((s) => s.groups)
+
   useEffect(() => {
-    if (protocol !== 'rdp' || !sessionId || !host) return
+    if (protocol !== 'rdp' || !sessionId) return
     let alive = true
 
     window.td.rdp
@@ -112,6 +123,24 @@ export default function GraphicalHost({
         // Nothing stated, or a host that has gone. The defaults stand.
         if (alive) setLook(null)
       })
+
+    return () => {
+      alive = false
+    }
+    /* `profile` and `groups` are triggers rather than inputs: what they would
+       be read for happens in the main process, and listing them is how this
+       learns that a save happened. */
+  }, [protocol, sessionId, profile, groups])
+
+  /**
+   * Who this host logs in as, and whether it has a password saved.
+   *
+   * Only whether — the password itself stays in the main process now, and the
+   * pane asks for one only when there is none to use.
+   */
+  useEffect(() => {
+    if (protocol !== 'rdp' || !sessionId || !host) return
+    let alive = true
 
     window.td.rdp
       .credentials(sessionId)

@@ -79,7 +79,8 @@ function executable(): string {
   // In development it sits where the build script put it, in a directory named
   // for the platform and architecture it was built for — the same two words
   // electron-builder uses, so the path is spelled once.
-  const platform = process.platform === 'darwin' ? 'macos' : process.platform
+  const platform =
+    process.platform === 'darwin' ? 'macos' : process.platform === 'win32' ? 'windows' : 'linux'
   return join(
     app.getAppPath(),
     'resources',

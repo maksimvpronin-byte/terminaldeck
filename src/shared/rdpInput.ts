@@ -81,3 +81,24 @@ export function wheelUnits(delta: number, deltaMode: number): number {
   // The magnitude travels in eight bits, with the ninth carrying the sign.
   return Math.max(-255, Math.min(255, units))
 }
+
+/**
+ * A wheel turn, as the flags field that carries it.
+ *
+ * The rotation rides in the low byte of the same field as the flags, and a
+ * backwards turn is **not** the magnitude with a sign bit beside it — it is
+ * that byte's two's complement, with `wheelNegative` saying to read it that
+ * way. The far end computes `-(0x100 - value)`, so a turn of three sent as a
+ * plain 3 is read as a turn of 253.
+ *
+ * Which is not a subtle symptom: scrolling one way moves a line and the other
+ * way clears the document. It is stated here, against a test, rather than in
+ * the client where it was written from the shape of the field and was wrong.
+ */
+export function wheelFlags(units: number, horizontal = false): number | null {
+  if (units === 0) return null
+  const axis = horizontal ? PTR.hwheel : PTR.wheel
+  const magnitude = Math.min(255, Math.abs(units))
+  if (units > 0) return axis | magnitude
+  return axis | PTR.wheelNegative | ((0x100 - magnitude) & 0xff)
+}

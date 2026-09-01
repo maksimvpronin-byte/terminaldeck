@@ -82,7 +82,7 @@ const SECTIONS: Section[] = [
       { keys: 'F11', what: 'Full screen, which is the only way Alt+Tab reaches the far side' },
       { what: 'Hold Escape to leave full screen: while there, it belongs to the session' },
       { what: 'The pane toolbar hides there, so the desktop is the size of the display' },
-      { what: 'Rest at the top edge for a moment to bring it back; brushing past does not' },
+      { what: 'Push the pointer against the very top of the screen and hold it to bring the toolbar back' },
       { what: 'A watched session cannot take Alt+Tab even full screen — Windows draws it' },
       { what: 'The desktop takes the size of the pane, so dragging a split resizes it' },
       { what: 'A joined session keeps its own size: Windows draws it, and will not scale it' },

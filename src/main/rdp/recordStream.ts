@@ -43,17 +43,50 @@ export interface RecordReader {
 
 export function createRecordReader(onRecord: OnRecord, onBroken?: (why: string) => void): RecordReader {
   /**
-   * What has arrived and not yet been used.
+   * What has arrived and not yet been used, kept as the chunks it arrived in.
    *
-   * Concatenated rather than kept as a list of chunks: the record being
-   * assembled is usually the only thing here, and the arithmetic for reading a
-   * length that straddles two chunks is the kind that is wrong for months.
+   * The obvious version of this concatenates each chunk onto one growing
+   * buffer, and that is what it did. It is fine for a terminal, where a message
+   * is a line — and quadratic for a desktop, where a message is a frame: a
+   * 4K frame is 29 MB and reaches this in something like four hundred pieces,
+   * so each arrival copied the whole of what came before. Six gigabytes of
+   * memcpy per frame, which is what a scroll felt like.
+   *
+   * Held as a list, the same frame is copied exactly once — when it is whole
+   * and about to be handed on.
    */
-  // Annotated rather than inferred: `Buffer.alloc` promises the narrower
-  // `Buffer<ArrayBuffer>`, while a chunk off a pipe is only `ArrayBufferLike`,
-  // and concatenating the two is what the compiler objects to.
-  let held: Buffer = Buffer.alloc(0)
+  let chunks: Buffer[] = []
+  let held = 0
   let broken = false
+
+  /** The first `n` bytes, without consuming them. Only ever the header. */
+  function peek(n: number): Buffer {
+    const out = Buffer.allocUnsafe(n)
+    let filled = 0
+    for (const chunk of chunks) {
+      const want = Math.min(chunk.length, n - filled)
+      chunk.copy(out, filled, 0, want)
+      filled += want
+      if (filled === n) break
+    }
+    return out
+  }
+
+  /** Takes the first `n` bytes, copying them once and dropping what is spent. */
+  function take(n: number): Buffer {
+    const out = Buffer.allocUnsafe(n)
+    let filled = 0
+    while (filled < n) {
+      const chunk = chunks[0]
+      const want = Math.min(chunk.length, n - filled)
+      chunk.copy(out, filled, 0, want)
+      filled += want
+      if (want === chunk.length) chunks.shift()
+      else chunks[0] = chunk.subarray(want)
+    }
+    held -= n
+    return out
+  }
 
   return {
     get broken() {
@@ -61,31 +94,29 @@ export function createRecordReader(onRecord: OnRecord, onBroken?: (why: string) 
     },
 
     push(chunk: Buffer): void {
-      if (broken) return
-      held = held.length === 0 ? chunk : Buffer.concat([held, chunk])
+      if (broken || chunk.length === 0) return
+      chunks.push(chunk)
+      held += chunk.length
 
       for (;;) {
-        if (held.length < HEADER) return
-        const type = held[0]
-        const length = held.readUInt32LE(1)
+        if (held < HEADER) return
+        const header = peek(HEADER)
+        const type = header[0]
+        const length = header.readUInt32LE(1)
 
         if (length > LIMIT) {
           broken = true
-          held = Buffer.alloc(0)
+          chunks = []
+          held = 0
           onBroken?.(`a record claiming ${length} bytes, which cannot be right`)
           return
         }
-        if (held.length < HEADER + length) return
+        if (held < HEADER + length) return
 
-        /**
-         * A view, not a copy, and then copied once.
-         *
-         * `subarray` shares memory with everything else still held, so a frame
-         * handed on as a view would keep the whole buffer alive and would
-         * change under the caller when the next chunk is concatenated in.
-         */
-        onRecord(type, Buffer.from(held.subarray(HEADER, HEADER + length)))
-        held = held.subarray(HEADER + length)
+        take(HEADER)
+        // Its own memory, so nothing that arrives later can change it under
+        // whoever is drawing it.
+        onRecord(type, take(length))
       }
     }
   }

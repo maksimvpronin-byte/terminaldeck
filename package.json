@@ -25,7 +25,10 @@
     "build:freerdp:mac": "bash resources/freerdp/build-macos.sh",
     "build:freerdp:shim": "bash resources/freerdp/build-shim.sh",
     "build:freerdp:bundle": "bash resources/freerdp/bundle-macos.sh",
-    "build:win": "npm run build:shadowhost && electron-vite build && electron-builder --win",
+    "build:freerdp:win": "powershell -NoProfile -ExecutionPolicy Bypass -File resources/freerdp/build-windows.ps1",
+    "build:freerdp:win:shim": "powershell -NoProfile -ExecutionPolicy Bypass -File resources/freerdp/build-windows.ps1 -ShimOnly",
+    "build:freerdp:win:bundle": "powershell -NoProfile -ExecutionPolicy Bypass -File resources/freerdp/bundle-windows.ps1",
+    "build:win": "npm run build:shadowhost && npm run build:freerdp:win:bundle && electron-vite build && electron-builder --win",
     "build:linux": "electron-vite build && electron-builder --linux"
   },
   "repository": {

@@ -28,6 +28,18 @@ interface Props {
   };
 }
 
+/** What a blank sizing field ends up doing, in the words the list itself uses. */
+function sizingLabel(
+  t: (text: string) => string,
+  effective: ResolvedRdp,
+): string {
+  if (effective.sendDensity) return t("The far end lays itself out larger");
+  if (effective.magnification === 100)
+    return t("Do not adjust — every pixel its own");
+  if (effective.magnification === 0) return t("As much as this display needs");
+  return `${effective.magnification}%`;
+}
+
 /**
  * The desktop half of a session, a group or an inventory override: how a host
  * is reached, how big its screen is, and what the ⌘ key does over it.
@@ -44,6 +56,41 @@ export default function RdpFields({
   secret,
 }: Props): JSX.Element {
   const t = useT();
+
+  /**
+   * Which of the two ways of getting the size right this item states.
+   *
+   * These were two controls — a checkbox and a percentage — answering one
+   * question between them: ticking the box greyed the select out entirely. Two
+   * controls for one mutually exclusive choice is a shape that invites someone
+   * to set a percentage, tick the box, and wonder why nothing happened.
+   *
+   * Underneath they are still two settings. They inherit separately, and only
+   * one of them is anything the far end is ever told about.
+   */
+  const sizing =
+    value.sendDensity === undefined && value.magnification === undefined
+      ? ""
+      : value.sendDensity
+        ? "remote"
+        : String(value.magnification ?? effective.magnification);
+
+  function chooseSizing(choice: string): void {
+    if (choice === "") {
+      set("sendDensity", undefined);
+      set("magnification", undefined);
+      return;
+    }
+    if (choice === "remote") {
+      set("sendDensity", true);
+      /* The percentage is left as it stands rather than cleared: it is what a
+         host too old to act on the density falls back to, and clearing it here
+         would change that fallback without saying so. */
+      return;
+    }
+    set("sendDensity", false);
+    set("magnification", Number(choice));
+  }
 
   return (
     <>
@@ -220,58 +267,43 @@ export default function RdpFields({
           <option value="100">{t("As many as the screen has")}</option>
         </select>
       </label>
+      {/* The long version — why this is counted in the screen's pixels rather
+          than the pane's points, and what it costs past this point — is in the
+          README. A dialog is read while deciding something, and four hundred
+          words is not a decision aid. */}
       <p className="settings-note">
         {t(
-          "The size is counted in the screen's own pixels rather than the pane's points, so a desktop can be drawn sharper than the pane is wide. On a display with one pixel per point — every ordinary monitor — that is exactly the pane and this setting changes nothing. On a Retina display, magnified as little as the setting below allows, it is up to four times the data: past this budget the desktop is asked for less than was wanted rather than the largest size.",
+          "Counted in the screen's own pixels, so a Retina pane can ask for up to four times the data. On an ordinary monitor nothing here changes anything.",
         )}
       </p>
 
-      <label className="checkbox-row" style={{ flexDirection: "row" }}>
-        <input
-          type="checkbox"
-          checked={effective.sendDensity}
-          onChange={(e) => set("sendDensity", e.target.checked)}
-        />
-        {t("Tell the session how dense this display is")}
-      </label>
-      <p className="settings-note">
-        {t(
-          "Then the far end draws its own interface larger instead of the picture being stretched here, which is the same size at full sharpness — and the only way to get it. DPI is agreed per connection rather than written into the machine, and only a session of this app's own is ever told: a session someone else is logged on to is never resized at all. Windows 8.1 and Server 2012 R2 and later act on it; anything older ignores it and the desktop stays as it was, so the setting below is what to fall back on. With the budget above at everything the screen has, this is a desktop drawn pixel for pixel.",
-        )}
-      </p>
-
-      <label style={{ opacity: effective.sendDensity ? 0.5 : 1 }}>
-        {t("How much larger the picture is drawn")}
-        <select
-          disabled={effective.sendDensity}
-          value={
-            value.magnification === undefined ? "" : String(value.magnification)
-          }
-          onChange={(e) =>
-            set(
-              "magnification",
-              e.target.value === "" ? undefined : Number(e.target.value),
-            )
-          }
-        >
+      <label>
+        {t("How the desktop is made the right size")}
+        <select value={sizing} onChange={(e) => chooseSizing(e.target.value)}>
           <option value="">
-            {t("Inherit")} (
-            {effective.magnification
-              ? `${effective.magnification}%`
-              : t("as much as this display")}
-            )
+            {t("Inherit")} ({sizingLabel(t, effective)})
           </option>
-          <option value="0">{t("As much as this display")}</option>
-          <option value="100">{t("Not at all — every pixel its own")}</option>
-          <option value="125">125%</option>
-          <option value="150">150%</option>
-          <option value="200">200%</option>
-          <option value="300">300%</option>
+          <option value="remote">
+            {t("The far end lays itself out larger")}
+          </option>
+          <optgroup label={t("Stretch the picture on this side")}>
+            <option value="0">{t("As much as this display needs")}</option>
+            <option value="125">125%</option>
+            <option value="150">150%</option>
+            <option value="200">200%</option>
+            <option value="300">300%</option>
+          </optgroup>
+          <option value="100">{t("Do not adjust — every pixel its own")}</option>
         </select>
       </label>
+      {/* The reasoning behind all of this — that pixels and size are different
+          questions, that Windows lays out a 20-pixel menu the same way whether a
+          pixel is a millimetre across or half of one, and that the density is
+          agreed per connection rather than written into the far machine — is in
+          the README. */}
       <p className="settings-note">
         {t(
-          "Pixels and size are different questions, and the budget above only answers the first. Windows lays out a 20-pixel menu the same way whether a pixel is a millimetre across or half of one, so a desktop drawn sharp on a Retina display is also drawn half the size an ordinary monitor gives it. A smaller desktop drawn larger is the answer this end can give on its own: nothing about the far machine is changed, and a session someone else is logged on to is not resized under them. Following the display asks a Retina pane for exactly its own points and draws every pixel as four — the usual size, and a softer picture than the display could hold.",
+          "Asking the far end is the only way to get the right size at full sharpness, and Windows 8.1 and later act on it; older versions ignore it and the desktop stays as it was. Stretching here always works and costs sharpness.",
         )}
       </p>
 
@@ -285,7 +317,7 @@ export default function RdpFields({
       </label>
       <p className="settings-note">
         {t(
-          "Sound travels on its own channel and is played by the desktop client itself, so it costs nothing on this side but does cost bandwidth on the link. Worth turning off for a host reached over a slow connection, where the picture is what the line should be spent on.",
+          "Played by the desktop client itself, so it costs this side nothing and the link something.",
         )}
       </p>
 

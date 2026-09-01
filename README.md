@@ -144,6 +144,13 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
   as four. On an ordinary monitor that is a factor of 1 and nothing changes. A host, a group or
   an inventory override can pin the percentage instead — 100% asks for every pixel the screen
   has and is as sharp as the display gets, at the size that made this setting necessary
+- **Both of those are one control**, because they are one decision. Stretching the picture here
+  and asking the far end to lay itself out larger are two answers to the same question, and
+  they were a checkbox that greyed out a percentage — a shape that invites setting the
+  percentage, ticking the box, and wondering why nothing happened. The list offers asking the
+  far end, stretching here by this display's density or by a stated percentage, and not
+  adjusting at all. Underneath they remain two settings: they inherit separately, and only one
+  of them is anything the far end is ever told
 - **Or the session can be told the density**, per host and off by default. Then the far end
   lays its own interface out larger and the picture is not stretched at all — the same size at
   full sharpness, which is what a native client does and the only way to get it. What is sent
@@ -153,10 +160,12 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
   and only a session of this app's own is ever told — a joined session belongs to whoever is
   logged on to it and is never resized at all. Windows 8.1 and Server 2012 R2 and later act on
   it ([MS-RDPEDISP]); anything older ignores it and the magnification above is what is left
-- **Full screen gives the whole display to the desktop.** The pane toolbar slides out of the
-  way there and comes back for a pointer that rests at the top edge — not for one that passes,
-  which is the difference between a toolbar and a nuisance: the far side's own window controls
-  and tab strip live at that same edge. So the size asked for is the display's
+- **Full screen gives the whole display to the desktop.** The pane toolbar leaves entirely
+  there — not a strip of it stays, and while it is away it cannot take a click either. The far
+  side keeps its own tab strip, menu bar and window buttons along that same top edge, and a
+  toolbar that reappeared on a passing pointer landed over the very thing being reached for.
+  Pushing the pointer against the top of the display and holding it for half a second brings it
+  back; moving down past it puts it away. So the size asked for is the display's
   own rather than the display less a toolbar — which matters beyond the room it frees, since a
   size no monitor has is the one that cannot land pixel for pixel. F11 enters and leaves, and
   holding Escape leaves; while there, Alt+Tab reaches the far side
@@ -365,7 +374,34 @@ actually uses in beside it, rewrites the absolute Homebrew paths to `@rpath`, an
 it touched — an unsigned Mach-O with a stale signature is refused outright on Apple Silicon, and
 the symptom is a build that works only on the machine that made it.
 
-Windows and Linux builds are not written yet.
+On Windows, with Visual Studio 2022 and its C++ workload, plus CMake, Ninja and Git on the
+path:
+
+```
+npm run build:freerdp:win
+```
+
+The libraries come from vcpkg rather than Homebrew — OpenSSL, openh264, opus and zlib. Point
+`VCPKG_ROOT` at an existing one, or the script fetches its own into `resources/freerdp/vcpkg/`,
+which costs a long first run and nothing afterwards. `-ShimOnly`, exposed as
+`npm run build:freerdp:win:shim`, rebuilds only `td-rdp.exe`. The SDL client is deliberately not
+built there: on macOS it is what proves the build by hand, and on Windows it would drag SDL2 and
+two more packages through vcpkg for a program that is never shipped.
+
+`npm run build:win` runs `build:freerdp:win:bundle` first, which copies the DLLs in beside
+`td-rdp.exe` — Windows looks for them there, so there is no rpath to rewrite and no signature to
+repair. It refuses to continue if the client has not been built, because a release without it
+has a desktop pane that cannot open and the failure would reach whoever installed it rather than
+whoever built it.
+
+**The Windows script has never been run.** It is written from the macOS one and from FreeRDP's
+own build documentation, and the macOS one took five real failures to get right — a missing
+tool, a missing SDL package, ffmpeg arriving uninvited, an Opus header one directory away from
+where its own pkg-config file said, and a CMake package whose name is not the name of the
+directory holding it. Expect the same kind of thing here, and expect the script to print the
+failing lines itself when it happens.
+
+Linux is not written yet.
 
 ## Type-checking and tests
 

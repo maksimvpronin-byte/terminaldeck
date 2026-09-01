@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { desktopSizeFor, type DesktopSize } from '../../../shared/desktopSize'
-import { buttonEvent, PTR, wheelUnits } from '../../../shared/rdpInput'
+import { buttonEvent, PTR, wheelFlags, wheelUnits } from '../../../shared/rdpInput'
 import { rdpKeyFor, substituteCommand, unicodeKey } from '../../../shared/rdpScancodes'
 import type { RdpView } from '../../../shared/types'
 
@@ -91,6 +91,8 @@ export default function RemoteScreen({
   const sizeRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 })
   /** The last size asked for, so a settled drag does not ask twice. */
   const askedRef = useRef<string>('')
+  /** The density last sent with it, which is the other half of the request. */
+  const scaleRef = useRef<number>(0)
   /**
    * The pointer the far end last sent, kept rather than used and dropped.
    *
@@ -106,6 +108,11 @@ export default function RemoteScreen({
   onPhaseRef.current = onPhase
   const onMeasuredRef = useRef(onMeasured)
   onMeasuredRef.current = onMeasured
+  /* Through a ref like the two above: the session's subscriptions are set up
+     once, and a function captured there would go on wording the tooltip with
+     whatever the density was when the pane opened. */
+  const measuredRef = useRef(measured)
+  measuredRef.current = measured
 
   /**
    * How big the desktop should be, in the far end's own pixels.
@@ -142,15 +149,60 @@ export default function RemoteScreen({
     if (!canvas || !container || !sizeRef.current.width) return
 
     const rect = container.getBoundingClientRect()
-    const scale = Math.min(
+    const fit = Math.min(
       rect.width / sizeRef.current.width,
       rect.height / sizeRef.current.height
     )
-    canvas.style.width = `${Math.floor(sizeRef.current.width * scale)}px`
-    canvas.style.height = `${Math.floor(sizeRef.current.height * scale)}px`
+
+    /**
+     * One desktop pixel per device pixel, whenever that is what nearly fits.
+     *
+     * Any other scale makes the browser resample every frame, and resampling
+     * is what "blurry" means. A pane is measured in fractions of a point, so
+     * the fit computed from it lands a hair either side of the exact ratio —
+     * and the floor this used to apply rounded that hair the wrong way, giving
+     * up a sharp picture to be two device pixels narrower than the pane.
+     *
+     * Snapped only when the two are within a pixel of each other across the
+     * whole width, so a genuinely different size is still scaled to fit.
+     */
+    const oneToOne = 1 / (window.devicePixelRatio || 1)
+    const scale = Math.abs(fit - oneToOne) * sizeRef.current.width < 1 ? oneToOne : fit
+
+    // Fractional, deliberately. Rounding to whole CSS pixels is the same
+    // mistake in a smaller place.
+    canvas.style.width = `${sizeRef.current.width * scale}px`
+    canvas.style.height = `${sizeRef.current.height * scale}px`
     // The picture just changed size, so the pointer beside it is now the wrong
     // one. It is the same image; only what it should be divided by moved.
     applyCursor()
+  }
+
+  /**
+   * What was asked of the far end and what it did, in one line.
+   *
+   * Both halves, always. Showing only the request was a real gap: a desktop
+   * that came back smaller than it was asked for looks exactly like a desktop
+   * that was asked for wrongly — the picture is stretched either way — and
+   * with only one number there is nothing to tell them apart. The density
+   * goes on the end because it is the half of the request that the far end is
+   * free to ignore, and ignoring it is what makes a sharp desktop tiny.
+   */
+  function measured(got?: { width: number; height: number }): string {
+    const density = `×${window.devicePixelRatio}`
+    const asked = scaleRef.current
+      ? `${askedRef.current} at ${scaleRef.current}%`
+      : askedRef.current
+    /* The budget, because it is the one input that silently changes the answer.
+       A pane that grows past it gets a smaller desktop stretched to fill it,
+       and from the outside that is indistinguishable from a host refusing the
+       size — the difference took two rounds of screenshots to establish, and
+       this is the number that would have settled it in one. */
+    const budget = lookRef.current?.pixelBudget
+    const limit = budget && budget < 50 ? ` · budget ${budget} Mpx` : ''
+    return got
+      ? `${asked} → ${got.width}×${got.height} · ${density}${limit}`
+      : `${asked} · ${density}${limit}`
   }
 
   /**
@@ -307,9 +359,10 @@ export default function RemoteScreen({
         }
         idRef.current = id
         askedRef.current = size ? `${size.width}×${size.height}` : ''
-        onMeasuredRef.current(
-          size ? `${size.width}×${size.height} · ×${window.devicePixelRatio}` : ''
-        )
+        scaleRef.current = size && look?.sendDensity
+          ? Math.min(500, Math.max(100, Math.round(size.factor * 100)))
+          : 0
+        onMeasuredRef.current(size ? measuredRef.current() : '')
 
         stopSubscriptions = [
           window.td.rdp.onDesktopFrame(id, draw),
@@ -328,6 +381,14 @@ export default function RemoteScreen({
             const what = String(event.e ?? '')
             if (what === 'connected' || what === 'size') {
               resize(Number(event.width ?? 0), Number(event.height ?? 0))
+              // Every delivery, not only the first: a resize is where the two
+              // numbers most often stop agreeing.
+              onMeasuredRef.current(
+                measuredRef.current({
+                  width: Number(event.width ?? 0),
+                  height: Number(event.height ?? 0)
+                })
+              )
               if (what === 'connected') {
                 onPhaseRef.current({ at: 'connected' })
                 // The far end has said what it will actually draw, which is not
@@ -335,7 +396,10 @@ export default function RemoteScreen({
                 // came back the wrong size says so rather than merely looking
                 // magnified.
                 onMeasuredRef.current(
-                  `${askedRef.current} → ${event.width}×${event.height} · ×${window.devicePixelRatio}`
+                  measuredRef.current({
+                    width: Number(event.width ?? 0),
+                    height: Number(event.height ?? 0)
+                  })
                 )
               }
             } else if (what === 'failed') {
@@ -395,18 +459,14 @@ export default function RemoteScreen({
       const stated = `${size.width}×${size.height}`
       if (stated === askedRef.current) return
       askedRef.current = stated
+      // Zero leaves the field unstated, which the far end must ignore — so a
+      // host that never asked for this is unaffected by it.
+      scaleRef.current = lookRef.current?.sendDensity
+        ? Math.min(500, Math.max(100, Math.round(size.factor * 100)))
+        : 0
 
-      tell({
-        a: 'resize',
-        width: size.width,
-        height: size.height,
-        // Zero leaves the field unstated, which the far end must ignore — so a
-        // host that never asked for this is unaffected by it.
-        scale: lookRef.current?.sendDensity
-          ? Math.min(500, Math.max(100, Math.round(size.factor * 100)))
-          : 0
-      })
-      onMeasuredRef.current(`${stated} · ×${window.devicePixelRatio}`)
+      tell({ a: 'resize', width: size.width, height: size.height, scale: scaleRef.current })
+      onMeasuredRef.current(measuredRef.current())
     }
 
     const observer = new ResizeObserver(() => {
@@ -648,10 +708,16 @@ export default function RemoteScreen({
       onWheel={(e) => {
         const at = pointOf(e)
         if (!at) return
-        const vertical = wheelUnits(e.deltaY, e.deltaMode)
-        const horizontal = wheelUnits(e.deltaX, e.deltaMode)
-        if (vertical) tell({ a: 'wheel', delta: vertical, x: at.x, y: at.y })
-        if (horizontal) tell({ a: 'wheel', delta: horizontal, horizontal: true, x: at.x, y: at.y })
+        // A wheel turn is an ordinary pointer event with the rotation folded
+        // into its flags; see wheelFlags, which is where the folding is stated
+        // and tested. Both axes, because a trackpad turns both at once.
+        const turns = [
+          wheelFlags(wheelUnits(e.deltaY, e.deltaMode)),
+          wheelFlags(wheelUnits(e.deltaX, e.deltaMode), true)
+        ]
+        for (const flags of turns) {
+          if (flags !== null) tell({ a: 'mouse', flags, x: at.x, y: at.y })
+        }
       }}
     >
       <canvas ref={canvasRef} className="graphical-canvas" />
@@ -665,8 +731,8 @@ export default function RemoteScreen({
  * So the button there and F11 here mean the same thing, rather than each
  * claiming the screen for a different element. The toolbar comes along but
  * stops taking a strip of the screen — see `.pane:fullscreen` in styles.css,
- * where it slides out of the way and comes back for a pointer that rests there
- * rather than one that passes, so the
+ * where it leaves entirely rather than leaving a strip that would swallow
+ * clicks meant for the desktop, so the
  * desktop is asked for the size of the display itself.
  */
 export function fullscreenTarget(container: Element): Element {

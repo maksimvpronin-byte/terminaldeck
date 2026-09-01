@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <winpr/synch.h>
+
 #ifdef _WIN32
 #include <fcntl.h>
 #include <io.h>
@@ -18,6 +20,19 @@
 
 /* The real pipe, after td_proto_init has moved it out of everyone's reach. */
 static FILE* out_pipe = NULL;
+
+/**
+ * One record at a time, whichever thread is writing it.
+ *
+ * FreeRDP's dynamic virtual channels run on a thread of their own, and the
+ * graphics pipeline rides on them — so a decoded frame is written from that
+ * thread while a pointer update or an event is written from the main one. Two
+ * unguarded writers interleave a header into the middle of somebody's pixels,
+ * and everything after it is misaligned: the picture comes back with a band of
+ * torn rows near the top and the rest shifted sideways, which is exactly how
+ * this was found.
+ */
+static CRITICAL_SECTION writing;
 
 int td_proto_init(void)
 {
@@ -40,6 +55,8 @@ int td_proto_init(void)
 	out_pipe = fdopen(moved, "wb");
 	if (!out_pipe)
 		return 0;
+
+	InitializeCriticalSection(&writing);
 
 	/* No buffering of our own: every record is flushed the moment it is
 	 * whole, and a second layer of buffer under that only adds a copy. */
@@ -247,13 +264,18 @@ int td_write_record(uint8_t type, const void* payload, size_t length)
 
 	if (!out_pipe)
 		return 0;
-	if (fwrite(header, 1, sizeof(header), out_pipe) != sizeof(header))
-		return 0;
-	if (length > 0 && fwrite(payload, 1, length, out_pipe) != length)
-		return 0;
-	/* Flushed every time. A frame held back for a fuller buffer is latency
-	 * that shows on screen, and this is the one place it could accumulate. */
-	return fflush(out_pipe) == 0;
+
+	EnterCriticalSection(&writing);
+	int ok = fwrite(header, 1, sizeof(header), out_pipe) == sizeof(header);
+	if (ok && length > 0)
+		ok = fwrite(payload, 1, length, out_pipe) == length;
+	/* Flushed every time, and inside the lock. A frame held back for a fuller
+	 * buffer is latency that shows on screen; a flush outside the lock would
+	 * let the next record's header overtake this one's payload. */
+	if (ok)
+		ok = fflush(out_pipe) == 0;
+	LeaveCriticalSection(&writing);
+	return ok;
 }
 
 const char* td_json_escape(char* out, size_t size, const char* in)

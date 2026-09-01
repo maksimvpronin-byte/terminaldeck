@@ -59,6 +59,14 @@ win:
   extraResources:
     - from: resources/shadowhost/ShadowHost.exe
       to: shadowhost/ShadowHost.exe
+    # The desktop client and the libraries it needs. Windows looks for those
+    # beside the executable, so they travel into the same directory rather than
+    # a lib/ of their own — see bundle-windows.ps1, which puts them there.
+    - from: resources/freerdp/build/windows-${arch}/bin
+      to: freerdp/bin
+      filter:
+        - 'td-rdp.exe'
+        - '*.dll'
   target:
     - target: nsis
       arch: [x64, arm64]

@@ -1,0 +1,45 @@
+<#
+Puts the DLLs beside td-rdp.exe, which is where Windows looks for them.
+
+The counterpart of bundle-macos.sh, and much shorter, because Windows solves
+this problem by looking in the executable's own directory. There is no rpath to
+rewrite and no signature to repair — only files to copy.
+
+What has to travel: FreeRDP's own three, which CMake already installs into bin\,
+and the four vcpkg provides — OpenSSL, openh264, opus, zlib — which it does not,
+because a Ninja build has none of the app-local deployment a Visual Studio
+project would get.
+
+Run by `npm run build:win` before packaging, and safe to run again: it copies
+what is missing and says what it found.
+#>
+$ErrorActionPreference = 'Stop'
+
+$here = Split-Path -Parent $MyInvocation.MyCommand.Path
+$arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'x64' }
+$triplet = "$arch-windows"
+$out = if ($env:FREERDP_PREFIX) { $env:FREERDP_PREFIX } else { Join-Path $here "build\windows-$arch" }
+$bin = Join-Path $out 'bin'
+
+function Say([string]$text) { Write-Host "`n==> $text" -ForegroundColor White }
+function Die([string]$text) { Write-Host "`nerror: $text" -ForegroundColor Red; exit 1 }
+
+if (-not (Test-Path (Join-Path $bin 'td-rdp.exe'))) {
+  # Refused rather than skipped. A release built without this has a desktop
+  # pane that cannot open, and the failure would reach whoever installed it
+  # instead of whoever built it.
+  Die "no td-rdp.exe at $bin — run: npm run build:freerdp:win"
+}
+
+$vcpkg = if ($env:VCPKG_ROOT) { $env:VCPKG_ROOT } else { Join-Path $here 'vcpkg' }
+$from = Join-Path $vcpkg "installed\$triplet\bin"
+if (-not (Test-Path $from)) { Die "no vcpkg libraries at $from — run: npm run build:freerdp:win" }
+
+Say "Copying the dependencies into $bin"
+# All of them rather than the four by name: openssl brings its own pair, and the
+# set changes with the version. They are small, and a list that is right today
+# is a list that is wrong the next time vcpkg splits a package.
+Copy-Item (Join-Path $from '*.dll') -Destination $bin -Force
+
+Say 'What will be shipped'
+Get-ChildItem (Join-Path $bin '*.exe'), (Join-Path $bin '*.dll') | Format-Table Name, Length -AutoSize

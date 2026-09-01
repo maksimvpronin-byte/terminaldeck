@@ -733,28 +733,30 @@ label {
 .pane:fullscreen {
   border: 0;
 }
+/* Full screen: entirely out of the way, and out of the mouse's way too.
+   No sliver is left peeking. A strip of toolbar over the picture is a strip
+   that swallows clicks, and the top edge is exactly where a remote desktop
+   sends people — the far side's own tab strip, menu bar and window buttons all
+   live there. `pointer-events: none` is the half that matters: hidden, this
+   element cannot take a click meant for the desktop under it, and cannot
+   reveal itself by being hovered on the way past.
+   What brings it back is deliberate instead — see `useToolbarReveal`: the pointer pressed against the very edge of the display and held
+   there. */
 .pane:fullscreen .pane-toolbar {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   z-index: 6;
-  transform: translateY(calc(-100% + 3px));
-  /* Hiding is immediate. Only the revealing half waits — see below. */
+  transform: translateY(-100%);
+  pointer-events: none;
   transition: transform 120ms ease;
   border-bottom-color: transparent;
 }
-/* Comes back for a pointer that stays, not for one that passes.
-   The top edge is where a remote desktop sends people constantly: the far
-   side's own window controls, its tab strip and its menu bar all live there.
-   Appearing on every pass put this toolbar over the very thing being reached
-   for. The delay lives on the hover rule rather than the base one because a
-   transition takes its timing from the state it is moving *to* — so brushing
-   past starts nothing, and leaving still snaps it away at once. */
-.pane:fullscreen .pane-toolbar:hover,
+.pane:fullscreen .pane-toolbar.out,
 .pane:fullscreen .pane-toolbar:focus-within {
   transform: none;
-  transition: transform 120ms ease 700ms;
+  pointer-events: auto;
   border-bottom-color: var(--border);
 }
 

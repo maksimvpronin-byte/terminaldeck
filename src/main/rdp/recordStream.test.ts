@@ -76,6 +76,36 @@ describe('createRecordReader', () => {
     expect(seen[0].equals(before)).toBe(true)
   })
 
+  it('reassembles a frame that arrives in hundreds of pieces', () => {
+    // The shape that matters for a desktop and not for a terminal: a frame is
+    // megabytes and a pipe hands it over in small pieces. This used to copy
+    // everything received so far on each one.
+    const whole = frame(0, 0, 64, 64)
+    const seen: Buffer[] = []
+    const reader = createRecordReader((_type, payload) => seen.push(payload))
+
+    for (let at = 0; at < whole.length; at += 37) {
+      reader.push(whole.subarray(at, Math.min(at + 37, whole.length)))
+    }
+
+    expect(seen).toHaveLength(1)
+    expect(seen[0].equals(whole.subarray(5))).toBe(true)
+  })
+
+  it('picks up the next record from the tail of the chunk that ended the last', () => {
+    // A pipe does not respect record boundaries, so the piece that completes
+    // one frame routinely carries the start of the next.
+    const seen: number[] = []
+    const reader = createRecordReader((_type, payload) => seen.push(payload.length))
+    const stream = Buffer.concat([frame(0, 0, 2, 2), frame(0, 0, 3, 3), frame(0, 0, 4, 4)])
+
+    reader.push(stream.subarray(0, 30))
+    reader.push(stream.subarray(30, 90))
+    reader.push(stream.subarray(90))
+
+    expect(seen).toEqual([8 + 16, 8 + 36, 8 + 64])
+  })
+
   it('stops rather than allocating whatever a broken length says', () => {
     const onBroken = vi.fn()
     const seen = vi.fn()

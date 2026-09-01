@@ -244,19 +244,21 @@ export const ru: Record<string, string> = {
   "Fewest — a slow link": "Меньше всего — медленный канал",
   "Balanced": "Сбалансированно",
   "As many as the screen has": "Столько, сколько у экрана",
-  "The size is counted in the screen's own pixels rather than the pane's points, so a desktop can be drawn sharper than the pane is wide. On a display with one pixel per point — every ordinary monitor — that is exactly the pane and this setting changes nothing. On a Retina display, magnified as little as the setting below allows, it is up to four times the data: past this budget the desktop is asked for less than was wanted rather than the largest size.": "Размер считается в собственных пикселях экрана, а не в точках панели, поэтому рабочий стол можно нарисовать чётче, чем ширина панели. На экране, где точка равна пикселю — то есть на любом обычном мониторе, — это ровно площадь панели, и настройка ничего не меняет. На Retina, при наименьшем допустимом увеличении из настройки ниже, это вчетверо больше данных: за этим пределом запрашивается меньше, чем хотелось, а не самый большой размер.",
-  "Tell the session how dense this display is": "Сообщать сессии плотность этого экрана",
-  "Then the far end draws its own interface larger instead of the picture being stretched here, which is the same size at full sharpness — and the only way to get it. DPI is agreed per connection rather than written into the machine, and only a session of this app's own is ever told: a session someone else is logged on to is never resized at all. Windows 8.1 and Server 2012 R2 and later act on it; anything older ignores it and the desktop stays as it was, so the setting below is what to fall back on. With the budget above at everything the screen has, this is a desktop drawn pixel for pixel.": "Тогда та сторона рисует свой интерфейс крупнее сама, вместо того чтобы картинку растягивали здесь: тот же размер при полной резкости — и другого способа получить его нет. DPI согласуется на подключение, а не записывается в машину, и сообщается только собственной сессии приложения: сессию, где работает кто-то другой, никто не перестраивает. Windows 8.1 и Server 2012 R2 и новее это учитывают; всё, что старше, игнорирует, и рабочий стол остаётся как был — тогда остаётся настройка ниже. Если предел выше стоит на «столько, сколько у экрана», рабочий стол рисуется пиксель в пиксель.",
-  "How much larger the picture is drawn": "Насколько крупнее рисуется картинка",
-  "as much as this display": "по этому экрану",
-  "As much as this display": "По этому экрану",
-  "Not at all — every pixel its own": "Никак — каждый пиксель свой",
-  "Pixels and size are different questions, and the budget above only answers the first. Windows lays out a 20-pixel menu the same way whether a pixel is a millimetre across or half of one, so a desktop drawn sharp on a Retina display is also drawn half the size an ordinary monitor gives it. A smaller desktop drawn larger is the answer this end can give on its own: nothing about the far machine is changed, and a session someone else is logged on to is not resized under them. Following the display asks a Retina pane for exactly its own points and draws every pixel as four — the usual size, and a softer picture than the display could hold.": "Пиксели и размер — разные вопросы, и предел выше отвечает только на первый. Windows рисует меню высотой 20 пикселей одинаково, будь пиксель шириной в миллиметр или в половину, поэтому рабочий стол, чётко нарисованный на Retina, нарисован ещё и вдвое мельче, чем дал бы обычный монитор. Рабочий стол поменьше, нарисованный покрупнее, — это ответ, который здешняя сторона может дать сама: на дальней машине ничего не меняется, и сессию, где работает кто-то другой, никто не перестраивает. «По этому экрану» запрашивает для Retina ровно точки панели и рисует каждый её пиксель как четыре — обычный размер и картинка мягче, чем экран мог бы удержать.",
   "Rest at the top edge for a moment to bring it back; brushing past does not":
     "Задержитесь у верхней кромки, и он вернётся; от беглого касания — нет",
+  "Counted in the screen's own pixels, so a Retina pane can ask for up to four times the data. On an ordinary monitor nothing here changes anything.":
+    "Считается в собственных пикселях экрана, поэтому панель Retina может запросить вчетверо больше данных. На обычном мониторе тут ничего ни на что не влияет.",
+  "How the desktop is made the right size":
+    "Как рабочий стол приводится к нужному размеру",
+  "The far end lays itself out larger": "Та сторона сама рисует себя крупнее",
+  "Stretch the picture on this side": "Растягивать картинку здесь",
+  "As much as this display needs": "Насколько нужно этому экрану",
+  "Do not adjust — every pixel its own": "Не подгонять — каждый пиксель свой",
+  "Asking the far end is the only way to get the right size at full sharpness, and Windows 8.1 and later act on it; older versions ignore it and the desktop stays as it was. Stretching here always works and costs sharpness.":
+    "Попросить ту сторону — единственный способ получить нужный размер при полной резкости; Windows 8.1 и новее это учитывают, старее игнорируют, и рабочий стол остаётся как был. Растягивание здесь работает всегда и стоит резкости.",
+  "Played by the desktop client itself, so it costs this side nothing and the link something.":
+    "Проигрывает сам клиент рабочего стола: этой стороне бесплатно, каналу — нет.",
   "Play the remote sound here": "Проигрывать звук удалённой машины здесь",
-  "Sound travels on its own channel and is played by the desktop client itself, so it costs nothing on this side but does cost bandwidth on the link. Worth turning off for a host reached over a slow connection, where the picture is what the line should be spent on.":
-    "Звук идёт по отдельному каналу и проигрывается самим клиентом рабочего стола, так что этой стороне он ничего не стоит, а вот канал занимает. Имеет смысл выключить для хоста на медленной линии, где её лучше потратить на картинку.",
   "The far end’s sound plays here, and can be turned off per host or group":
     "Звук той стороны слышен здесь; выключается для хоста или для всей группы",
   "The picture is decoded by a client of its own, so H.264 hosts are drawn as such":
