@@ -254,6 +254,31 @@ export const ru: Record<string, string> = {
   'Will be forgotten on save': 'Будет забыт при сохранении',
   '{protocol} sessions open a desktop rather than a shell, so the file browser, port forwarding, monitoring and broadcast do not apply to them. How the desktop is reached and drawn is under Desktop below.':
     'Сессии {protocol} открывают рабочий стол, а не оболочку, поэтому файловый браузер, проброс портов, мониторинг и трансляция к ним не относятся. Как рабочий стол достигается и рисуется — ниже, в разделе «Рабочий стол».',
+  'this group': 'этой группы',
+  'Hosts inside use this unless they hold one of their own — a host that does keeps using it.':
+    'Хосты внутри используют его, если у них нет своего; хост со своим продолжает пользоваться своим.',
+  'On save this group forgets its own, and uses the one {source}.':
+    'При сохранении группа забудет свой и возьмёт тот, что {source}.',
+  'On save this group forgets its own, and uses whatever each host is asked for.':
+    'При сохранении группа забудет свой, и каждый хост будет спрашивать его сам.',
+  'not set': 'не задано',
+  'Edit group': 'Изменить группу',
+  'New group': 'Новая группа',
+  'Anything left blank is inherited from the parent group. Sessions inside inherit whatever this group ends up with, so a shared login can be set once here.':
+    'Всё оставленное пустым наследуется от родительской группы. Сессии внутри наследуют то, что получилось у этой группы, — поэтому общий логин достаточно задать здесь один раз.',
+  'Parent group': 'Родительская группа',
+  '(top level)': '(верхний уровень)',
+  'Inherit connection settings from the parent group':
+    'Наследовать настройки подключения от родительской группы',
+  'Run in the shell of every host in this group, one command per line.':
+    'Выполняется в оболочке каждого хоста этой группы, по одной команде в строке.',
+  'Everything in this group inherits what you set here, so a whole environment can be given its own colours in one place.':
+    'Всё в этой группе наследует заданное здесь — так целой среде можно задать свои цвета в одном месте.',
+  'Inherit appearance from the parent group': 'Наследовать оформление от родительской группы',
+  'Inherit desktop settings from the parent group':
+    'Наследовать настройки рабочего стола от родительской группы',
+  'Applies to the RDP hosts in this group. A gateway stated here reaches every one of them, which is the point of putting it on a group rather than on each machine.':
+    'Относится к RDP-хостам этой группы. Шлюз, указанный здесь, достаёт до каждого из них — ради этого его и задают на группе, а не на каждой машине.',
   "Inherit": "Наследовать",
   "Fit the pane": "По размеру панели",
   "Fixed size": "Фиксированный размер",

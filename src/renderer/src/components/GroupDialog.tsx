@@ -15,6 +15,7 @@ import AuthFields, { type AuthWords } from './AuthFields'
 import RdpFields from './RdpFields'
 import ModalBackdrop from './ModalBackdrop'
 import { useT } from '../i18n'
+import Hint from './Hint'
 
 interface Props {
   /** Existing group to edit, or the parent id for a new one. */
@@ -117,12 +118,16 @@ export default function GroupDialog({ initial, parentId = null, onClose }: Props
   const authWords: AuthWords = {
     inherit: t('Inherit'),
     secretHint,
-    self: 'this group',
-    held: 'Hosts inside use this unless they hold one of their own — a host that does keeps using it.',
-    forget: `On save this group forgets its own, and uses ${
-      from('secretRef') ? `the one ${from('secretRef')}` : 'whatever each host is asked for'
-    }.`,
-    keyPath: from('privateKeyPath') || 'not set'
+    self: t('this group'),
+    held: t(
+      'Hosts inside use this unless they hold one of their own — a host that does keeps using it.'
+    ),
+    forget: from('secretRef')
+      ? t('On save this group forgets its own, and uses the one {source}.', {
+          source: from('secretRef')
+        })
+      : t('On save this group forgets its own, and uses whatever each host is asked for.'),
+    keyPath: from('privateKeyPath') || t('not set')
   }
 
   // A group cannot become its own descendant.
@@ -141,24 +146,27 @@ export default function GroupDialog({ initial, parentId = null, onClose }: Props
   return (
     <ModalBackdrop onClose={onClose}>
       <div className="modal-card">
-        <h2>{initial ? 'Edit group' : 'New group'}</h2>
-        <p className="settings-note">
-          Anything left blank is inherited from the parent group. Sessions inside inherit whatever
-          this group ends up with, so a shared login can be set once here.
-        </p>
+        <h2>
+          {initial ? t('Edit group') : t('New group')}
+          <Hint>
+            {t(
+              'Anything left blank is inherited from the parent group. Sessions inside inherit whatever this group ends up with, so a shared login can be set once here.'
+            )}
+          </Hint>
+        </h2>
 
         <label>
-          Name
+          {t('Name')}
           <input autoFocus value={group.name} onChange={(e) => set('name', e.target.value)} />
         </label>
 
         <label>
-          Parent group
+          {t('Parent group')}
           <select
             value={group.parentId ?? ''}
             onChange={(e) => set('parentId', e.target.value || null)}
           >
-            <option value="">(top level)</option>
+            <option value="">{t('(top level)')}</option>
             {candidateParents.map((g) => (
               <option key={g.id} value={g.id}>
                 {g.name}
@@ -177,21 +185,21 @@ export default function GroupDialog({ initial, parentId = null, onClose }: Props
                 chooseInheritance(e.target.checked)
               }}
             />
-            Inherit connection settings from the parent group
+            {t('Inherit connection settings from the parent group')}
           </label>
         )}
 
         <div className="form-row">
           <label style={{ flex: 3 }}>
-            Username
+            {t('Username')}
             <input
               value={group.username ?? ''}
-              placeholder={from('username') || effective.username || 'not set'}
+              placeholder={from('username') || effective.username || t('not set')}
               onChange={(e) => set('username', e.target.value)}
             />
           </label>
           <label style={{ flex: 1 }}>
-            Port
+            {t('Port')}
             <input
               type="number"
               value={group.port ?? ''}
@@ -214,17 +222,16 @@ export default function GroupDialog({ initial, parentId = null, onClose }: Props
         />
 
         <label>
-          On connect
+          <Hint label={t('On connect')}>
+            {t('Run in the shell of every host in this group, one command per line.')}
+          </Hint>
           <textarea
             rows={2}
             value={group.onConnectCommand ?? ''}
-            placeholder={from('onConnectCommand') || 'e.g. sudo -i'}
+            placeholder={from('onConnectCommand') || t('e.g. sudo -i')}
             onChange={(e) => set('onConnectCommand', e.target.value)}
           />
         </label>
-        <p className="settings-note">
-          Run in the shell of every host in this group, one command per line.
-        </p>
 
         <label className="checkbox-row">
           <input
@@ -232,15 +239,17 @@ export default function GroupDialog({ initial, parentId = null, onClose }: Props
             checked={effective.followTerminalCwd}
             onChange={(e) => set('followTerminalCwd', e.target.checked)}
           />
-          SFTP panel follows the terminal&apos;s directory
+          {t('SFTP panel follows the terminal’s directory')}
         </label>
 
         <details className="settings-section">
-          <summary>Appearance</summary>
-          <p className="settings-note">
-            Everything in this group inherits what you set here, so a whole environment can be
-            given its own colours in one place.
-          </p>
+          <summary>
+            <Hint label={t('Appearance')}>
+              {t(
+                'Everything in this group inherits what you set here, so a whole environment can be given its own colours in one place.'
+              )}
+            </Hint>
+          </summary>
           <AppearanceFields
             value={group}
             set={setLook}
@@ -248,24 +257,28 @@ export default function GroupDialog({ initial, parentId = null, onClose }: Props
             inherited={inheritedLook}
             inheritedFrom={appearanceFrom}
             inheritToggle={
-              group.parentId ? { label: 'Inherit appearance from the parent group' } : undefined
+              group.parentId ? { label: t('Inherit appearance from the parent group') } : undefined
             }
           />
         </details>
 
         <details className="settings-section">
-          <summary>Desktop</summary>
-          <p className="settings-note">
-            Applies to the RDP hosts in this group. A gateway stated here reaches every one of
-            them, which is the point of putting it on a group rather than on each machine.
-          </p>
+          <summary>
+            <Hint label={t('Desktop')}>
+              {t(
+                'Applies to the RDP hosts in this group. A gateway stated here reaches every one of them, which is the point of putting it on a group rather than on each machine.'
+              )}
+            </Hint>
+          </summary>
           <RdpFields
             value={group}
             set={setRdp}
             effective={desktop}
             inheritedFrom={rdpNote}
             inheritToggle={
-              group.parentId ? { label: 'Inherit desktop settings from the parent group' } : undefined
+              group.parentId
+                ? { label: t('Inherit desktop settings from the parent group') }
+                : undefined
             }
             secret={{
               typed: gatewaySecret,
@@ -280,9 +293,9 @@ export default function GroupDialog({ initial, parentId = null, onClose }: Props
         {error && <span className="error-text">{error}</span>}
 
         <div className="modal-actions">
-          <button onClick={onClose}>Cancel</button>
+          <button onClick={onClose}>{t('Cancel')}</button>
           <button className="primary" onClick={submit} disabled={!group.name.trim()}>
-            Save
+            {t('Save')}
           </button>
         </div>
       </div>
