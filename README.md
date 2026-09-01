@@ -495,6 +495,10 @@ npm run build:win
 The libraries come from vcpkg rather than Homebrew. Set `VCPKG_ROOT` to an existing one, or the
 script fetches its own into `resources/freerdp/vcpkg/`.
 
+The Visual C++ runtime is copied in beside the desktop client, from the redistributable that
+ships with Visual Studio. Without it the portable build starts on a machine that has never had
+Visual Studio and cannot open a desktop pane — which is the machine a portable build exists for.
+
 **Linux** — produces an AppImage and a `.deb`:
 
 ```bash

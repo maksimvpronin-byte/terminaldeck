@@ -46,6 +46,39 @@ $vcpkg = if ($env:VCPKG_ROOT) { $env:VCPKG_ROOT } else { Join-Path $here 'vcpkg'
 $from = Join-Path $vcpkg "installed\$triplet\bin"
 if (-not (Test-Path $from)) { Die "no vcpkg libraries at $from — run: npm run build:freerdp:win" }
 
+# ------------------------------------------- the Visual C++ runtime
+#
+# The one thing a portable build cannot assume is there.
+#
+# td-rdp.exe and every library vcpkg produced are linked against the dynamic
+# Visual C++ runtime, which is not part of Windows: it arrives with Visual
+# Studio, or with the redistributable somebody installed. A machine that has
+# neither — which is exactly the machine a portable build is carried to — starts
+# the application fine and cannot start the desktop client at all.
+#
+# Copied from the redistributable directory inside the Visual Studio install,
+# which is the arrangement Microsoft licenses for exactly this. Not from
+# System32: those belong to the machine that is building, and their version is
+# whatever that machine happens to have.
+$vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+if (Test-Path $vswhere) {
+  $vs = & $vswhere -latest -products * -property installationPath
+  $redist = Join-Path $vs "VC\Redist\MSVC"
+  if ($vs -and (Test-Path $redist)) {
+    $crt = Get-ChildItem $redist -Directory |
+      Sort-Object Name -Descending |
+      ForEach-Object { Join-Path $_.FullName "$arch\Microsoft.VC143.CRT" } |
+      Where-Object { Test-Path $_ } |
+      Select-Object -First 1
+    if ($crt) {
+      Step "Copying the Visual C++ runtime from $crt"
+      Copy-Item (Join-Path $crt '*.dll') -Destination $bin -Force
+    } else {
+      Write-Host "warning: no VC++ runtime found under $redist — a machine without the redistributable will not run the desktop client" -ForegroundColor Yellow
+    }
+  }
+}
+
 Step "Copying the dependencies into $bin"
 # All of them rather than the four by name: openssl brings its own pair, and the
 # set changes with the version. They are small, and a list that is right today
