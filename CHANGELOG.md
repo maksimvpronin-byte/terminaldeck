@@ -6,7 +6,14 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
-## 0.5.1
+## 0.6.0
+
+Numbered as a minor release rather than the patch it started as. It began with
+three small things and grew six features while it went: a question mark beside
+every explanation, panels that can be dragged, a settings tab of its own for the
+language, a searchable trusted-key list, a configurable lock delay, and five
+parts of the application that its own help had never mentioned. A patch fixes;
+this also adds.
 
 ### Added
 
