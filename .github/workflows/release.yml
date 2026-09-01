@@ -24,14 +24,20 @@ jobs:
             script: build:mac
             freerdp: mac
             shim: build:freerdp:shim
+            # Hashed into the cache key. Only this platform's own recipe: with
+            # every script in one hash, editing the Windows one threw away the
+            # macOS cache and cost half an hour for a file it never reads.
+            recipe: resources/freerdp/build-macos.sh
           - os: windows-latest
             script: build:win
             freerdp: win
             shim: build:freerdp:win:shim
+            recipe: resources/freerdp/build-windows.ps1
           - os: ubuntu-latest
             script: build:linux
             freerdp: ''
             shim: ''
+            recipe: ''
 
     runs-on: ${{ matrix.os }}
 
@@ -76,7 +82,7 @@ jobs:
           path: |
             resources/freerdp/build
             resources/freerdp/vcpkg
-          key: freerdp-3.31.0-${{ matrix.os }}-${{ hashFiles('resources/freerdp/build-macos.sh', 'resources/freerdp/build-windows.ps1', 'resources/freerdp/shim/CMakeLists.txt') }}
+          key: freerdp-3.31.0-${{ matrix.os }}-${{ hashFiles(matrix.recipe, 'resources/freerdp/shim/CMakeLists.txt') }}
 
       - name: Install what FreeRDP is built against
         if: matrix.freerdp == 'mac' && steps.freerdp.outputs.cache-hit != 'true'
