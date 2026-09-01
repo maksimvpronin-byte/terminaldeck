@@ -318,6 +318,7 @@ export const ru: Record<string, string> = {
   "{total} trusted": "доверено: {total}",
   "{rest} more — narrow the filter to reach them":
     "ещё {rest} — уточните фильтр, чтобы до них добраться",
+  "Review…": "Просмотреть…",
   "Inherit": "Наследовать",
   "Fit the pane": "По размеру панели",
   "Fixed size": "Фиксированный размер",

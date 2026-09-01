@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import Hint from './Hint'
 import { useStore } from '../state/store'
 import { useT } from '../i18n'
+import ModalBackdrop from './ModalBackdrop'
 
 interface TrustedHost {
   host: string
@@ -26,30 +27,31 @@ const LOCK_DELAYS = [0, 1, 5, 15, 30, 60, 120, 480]
 const SHOWN = 20
 
 /**
- * A list of what has been trusted, for a machine that has trusted a lot.
+ * What has been trusted, and the one thing anybody does with it.
  *
- * It used to draw every entry with a button beside it. That reads as a list
- * until somebody has three thousand hosts, at which point it is neither a list
- * nor anything else: nobody scrolls three thousand rows to find one, and the
- * setting screen it lives on becomes unusable for everything else on it.
+ * Not on the settings screen. A machine that has met three thousand hosts has
+ * three thousand of these, and no arrangement of them belongs on a page whose
+ * other business is a password field and a lock delay — a filtered twenty is
+ * still twenty rows in front of everything else, for a list somebody opens when
+ * a server has been rebuilt and not otherwise.
  *
- * So: a count, a filter, and the first twenty matches. Finding one entry is a
- * search, which is what it always was — the scrolling was never how anybody
- * did it.
+ * So the screen carries a count and a button, and this is what the button
+ * opens: a filter, the first twenty matches, and a note saying how many are
+ * left.
  */
-function TrustedList({
+function TrustedDialog({
+  title,
   entries,
-  empty,
-  onForget
+  onForget,
+  onClose
 }: {
+  title: string
   entries: TrustedHost[]
-  empty: string
   onForget: (host: string) => void
+  onClose: () => void
 }): JSX.Element {
   const t = useT()
   const [query, setQuery] = useState('')
-
-  if (entries.length === 0) return <p className="settings-note">{empty}</p>
 
   const needle = query.trim().toLowerCase()
   const found = needle
@@ -61,37 +63,65 @@ function TrustedList({
   const shown = found.slice(0, SHOWN)
 
   return (
-    <>
-      <div className="form-row">
+    <ModalBackdrop onClose={onClose}>
+      <div className="modal-card">
+        <h2>{title}</h2>
         <input
-          style={{ flex: 1 }}
+          autoFocus
           value={query}
           placeholder={t('Filter by host or fingerprint…')}
           onChange={(e) => setQuery(e.target.value)}
         />
-      </div>
-      <p className="settings-note">
-        {needle
-          ? t('{found} of {total} match', { found: found.length, total: entries.length })
-          : t('{total} trusted', { total: entries.length })}
-      </p>
-      <div className="known-hosts-list">
-        {shown.map((e) => (
-          <div className="known-host-row" key={e.host}>
-            <div className="known-host-name">{e.host}</div>
-            <div className="known-host-fp">{e.fingerprint}</div>
-            <button onClick={() => onForget(e.host)}>{t('Forget')}</button>
-          </div>
-        ))}
-      </div>
-      {found.length > shown.length && (
         <p className="settings-note">
-          {t('{rest} more — narrow the filter to reach them', {
-            rest: found.length - shown.length
-          })}
+          {needle
+            ? t('{found} of {total} match', { found: found.length, total: entries.length })
+            : t('{total} trusted', { total: entries.length })}
         </p>
-      )}
-    </>
+
+        <div className="known-hosts-list">
+          {shown.map((e) => (
+            <div className="known-host-row" key={e.host}>
+              <div className="known-host-name">{e.host}</div>
+              <div className="known-host-fp">{e.fingerprint}</div>
+              <button onClick={() => onForget(e.host)}>{t('Forget')}</button>
+            </div>
+          ))}
+        </div>
+        {found.length > shown.length && (
+          <p className="settings-note">
+            {t('{rest} more — narrow the filter to reach them', {
+              rest: found.length - shown.length
+            })}
+          </p>
+        )}
+
+        <div className="modal-actions">
+          <button className="primary" onClick={onClose}>
+            {t('Done')}
+          </button>
+        </div>
+      </div>
+    </ModalBackdrop>
+  )
+}
+
+/** The count, and the way in. */
+function TrustedSummary({
+  entries,
+  empty,
+  onOpen
+}: {
+  entries: TrustedHost[]
+  empty: string
+  onOpen: () => void
+}): JSX.Element {
+  const t = useT()
+  if (entries.length === 0) return <p className="settings-note">{empty}</p>
+  return (
+    <p className="settings-note action-note">
+      {t('{total} trusted', { total: entries.length })}
+      <button onClick={onOpen}>{t('Review…')}</button>
+    </p>
   )
 }
 
@@ -104,6 +134,7 @@ export default function SecuritySettings(): JSX.Element {
   const [confirm, setConfirm] = useState('')
   const [pwError, setPwError] = useState<string | null>(null)
   const [pwDone, setPwDone] = useState(false)
+  const [reviewing, setReviewing] = useState<'hosts' | 'certificates' | null>(null)
   const [hosts, setHosts] = useState<TrustedHost[]>([])
   const [certificates, setCertificates] = useState<TrustedHost[]>([])
 
@@ -224,10 +255,10 @@ export default function SecuritySettings(): JSX.Element {
           )}
         </Hint>
       </h3>
-      <TrustedList
+      <TrustedSummary
         entries={hosts}
         empty={t('No hosts trusted yet.')}
-        onForget={forget}
+        onOpen={() => setReviewing('hosts')}
       />
 
       <h3 className="settings-heading">
@@ -237,11 +268,28 @@ export default function SecuritySettings(): JSX.Element {
           )}
         </Hint>
       </h3>
-      <TrustedList
+      <TrustedSummary
         entries={certificates}
         empty={t('No certificates trusted by hand.')}
-        onForget={forgetCertificate}
+        onOpen={() => setReviewing('certificates')}
       />
+
+      {reviewing === 'hosts' && (
+        <TrustedDialog
+          title={t('Trusted host keys')}
+          entries={hosts}
+          onForget={forget}
+          onClose={() => setReviewing(null)}
+        />
+      )}
+      {reviewing === 'certificates' && (
+        <TrustedDialog
+          title={t('Trusted certificates')}
+          entries={certificates}
+          onForget={forgetCertificate}
+          onClose={() => setReviewing(null)}
+        />
+      )}
     </>
   )
 }

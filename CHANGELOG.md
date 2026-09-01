@@ -10,6 +10,13 @@ the other produces a version nobody can install, which is how 0.1.10 through
 
 ### Added
 
+- **The trusted host keys are behind a button rather than on the page.** They
+  were drawn as a row apiece, which reads as a list until somebody has three
+  thousand of them — and then it is neither a list nor a settings screen. What
+  the screen shows now is a count and "Review…", and what that opens is a filter
+  with the first twenty matches. Nobody scrolls three thousand rows to find one;
+  finding one was always a search, and it is one worth opening only when a
+  server has been rebuilt.
 - **Five things the application does were missing from its own help**: agent
   forwarding, jump hosts, session logging, port forwarding and the monitoring
   strip — two of them whole panels with a toolbar button each. The shortcut and
