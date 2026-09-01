@@ -12,6 +12,7 @@ import { parseAnsibleInventory, type AnsibleVars } from './ansible'
 import { syncRepo, headRevision } from './GitRepo'
 import { applyOverride, withoutBlanks } from '../../shared/overrides'
 import { readJson, writeJson } from '../store/jsonFile'
+import { insideCheckout } from './checkout'
 
 function configPath(): string {
   return join(app.getPath('userData'), 'inventories.json')
@@ -57,6 +58,7 @@ function resolveInventoryFiles(repoDir: string, paths: string[]): string[] {
   const files: string[] = []
   for (const rel of paths.length > 0 ? paths : ['.']) {
     const target = join(repoDir, rel)
+    if (!insideCheckout(repoDir, target)) continue
     if (!existsSync(target)) continue
     if (statSync(target).isDirectory()) {
       for (const f of readdirSync(target)) {

@@ -43,6 +43,22 @@ export async function isGitAvailable(): Promise<boolean> {
   }
 }
 
+/**
+ * Refuses a value git would read as an option rather than as what it is.
+ *
+ * `execFile` takes an argument list, so there is no shell and nothing to
+ * escape — but git still parses its own arguments, and a repository URL
+ * beginning with a dash is not a URL to it. `--upload-pack=<command>` in that
+ * position runs the command. Nobody would type that; the URL does not have to
+ * be typed, because it also arrives through an imported backup or a
+ * configuration somebody else prepared.
+ */
+function refuseOption(what: string, value: string): void {
+  if (value.startsWith('-')) {
+    throw new Error(`The ${what} may not begin with a dash: git would read it as an option`)
+  }
+}
+
 /** Clones on first use, then fast-forwards. Returns the checkout directory. */
 export async function syncRepo(
   root: string,
@@ -50,19 +66,23 @@ export async function syncRepo(
   repoUrl: string,
   branch?: string
 ): Promise<string> {
+  refuseOption('repository address', repoUrl)
+  if (branch) refuseOption('branch', branch)
+
   const dir = join(root, sourceId)
 
   if (!existsSync(join(dir, '.git'))) {
     // Shallow and single-branch: we only ever read the current tree.
     const args = ['clone', '--depth', '1', '--single-branch']
     if (branch) args.push('--branch', branch)
-    args.push(repoUrl, dir)
+    // Everything after this is a path or a URL, whatever it looks like.
+    args.push('--', repoUrl, dir)
     await git(args)
     return dir
   }
 
   // Discard local drift rather than fail on conflicts — this is a read-only mirror.
-  await git(['fetch', '--depth', '1', 'origin', branch ?? 'HEAD'], dir)
+  await git(['fetch', '--depth', '1', '--', 'origin', branch ?? 'HEAD'], dir)
   await git(['reset', '--hard', 'FETCH_HEAD'], dir)
   await git(['clean', '-fd'], dir)
   return dir

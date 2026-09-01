@@ -334,6 +334,21 @@ accumulated since 0.4.0.
 
 ### Security
 
+- **A repository address could be read by git as an instruction.** Inventory
+  sources are cloned through the system git binary with an argument list rather
+  than a shell, so there is nothing to escape — but git parses its own
+  arguments, and an address beginning with a dash is not an address to it.
+  `--upload-pack=<command>` in that position runs the command. Nobody would type
+  that; the point is that the address does not have to be typed, since it also
+  arrives through an imported backup or a configuration somebody else prepared.
+  Addresses and branch names beginning with a dash are refused, and everything
+  positional now travels after `--`.
+- **An inventory path could read files outside its checkout.** The paths in a
+  source are relative and read as such, and `join` walks out of a directory as
+  happily as into it: `../../../etc` resolved cleanly, and whatever YAML was
+  found there would have been parsed and presented as hosts. Reached the same
+  way as the address above, and refused now.
+
 - **Every dependency with an open advisory raised past it.** A Trivy scan of
   `package-lock.json` on 2026-08-25 found 50 — 2 critical, 21 high, 27 medium —
   and none of them is a flaw in this app's own code, so all 50 are answered by an
