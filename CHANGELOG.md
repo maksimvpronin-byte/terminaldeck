@@ -339,6 +339,25 @@ accumulated since 0.4.0.
 
 ### Security
 
+- **Five doors were left open with nothing behind them.** The window could
+  still ask the main process to reserve an address on the loopback gateway, to
+  report why a session on it failed, to say what log level the embedded client
+  should use, to write that client's log to disk — and to write arbitrary bytes
+  into a folder of the window's choosing. All five served the WebAssembly client
+  and the file transfer that went with it, both gone, and nothing had called any
+  of them since. Removed, along with the resolver that read a gateway password
+  out of the vault for the first of them.
+
+  This removes the way in, not the gateway: `Gateway.ts`, `TsGateway.ts` and the
+  [MS-TSGU] implementation under them are untouched and still tested. Whether to
+  retire those is a decision of its own.
+- **Only http and https are handed to the operating system** when something in
+  the window asks to open a link. Nothing asks today — there are no anchors in
+  the interface and the terminal does not turn output into links — so this
+  guards a path that does not exist rather than one that does. It is here
+  because of the cost if one appeared: `openExternal` gives the URL to the
+  system, and `file://` opens whatever is registered for it while `smb://` on
+  Windows offers the user's credentials to whoever is listening.
 - **A repository address could be read by git as an instruction.** Inventory
   sources are cloned through the system git binary with an argument list rather
   than a shell, so there is nothing to escape — but git parses its own

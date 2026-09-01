@@ -81,8 +81,29 @@ function createWindow(): void {
 
   registerUpdater(mainWindow)
 
+  /**
+   * Nothing opens a window; a link is handed to the browser, and only a link.
+   *
+   * Nothing in this interface asks for one today — there are no anchors in the
+   * renderer and the terminal does not turn output into links — so this is a
+   * guard against a path that does not exist yet rather than one that does.
+   * It is here because of what the missing check would cost if one appeared:
+   * `openExternal` hands a URL to the operating system, and `file://` opens a
+   * file with whatever is registered for it while `smb://` on Windows will
+   * offer the user's credentials to whoever is listening. A hostile host that
+   * ever managed to put a link on this screen would get a click's worth of
+   * whatever the system does with it. Two schemes are all this application
+   * needs.
+   */
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
+    const scheme = ((): string => {
+      try {
+        return new URL(details.url).protocol
+      } catch {
+        return ''
+      }
+    })()
+    if (scheme === 'http:' || scheme === 'https:') shell.openExternal(details.url)
     return { action: 'deny' }
   })
 

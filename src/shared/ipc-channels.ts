@@ -87,11 +87,6 @@ export const IPC = {
   sftpProgress: 'sftp:progress',
 
   /**
-   * Reserves a single-use address on the local gateway that stands in for a
-   * Devolutions Gateway, which IronRDP's client insists on talking to.
-   */
-  rdpReserve: 'rdp:reserve',
-  /**
    * The stored login for one host, for a client that signs in from the window.
    * Scoped to a single session on purpose — see the handler.
    */
@@ -102,20 +97,6 @@ export const IPC = {
    * never learns where a session is routed, let alone the password it takes.
    */
   rdpSettings: 'rdp:settings',
-  /**
-   * Whether the step-by-step report is on. The window asks so the embedded
-   * client's own logging can follow the same switch — what it negotiates with
-   * a host is only visible from inside it.
-   */
-  rdpTracing: 'rdp:tracing',
-  /** The first lines of the desktop client's own log, written where they can be read. */
-  rdpSaveLog: 'rdp:saveLog',
-  /**
-   * Why the last attempt on one reserved address failed. The client's own
-   * report is "General failure" for almost everything, so the reason a person
-   * can act on only exists in the main process.
-   */
-  rdpFailure: 'rdp:failure',
   /**
    * A desktop session, drawn by td-rdp in a process of its own.
    *
@@ -190,8 +171,5 @@ export const IPC = {
   dialogPickPrivateKey: 'dialog:pickPrivateKey',
   dialogPickSavePath: 'dialog:pickSavePath',
   dialogPickOpenPath: 'dialog:pickOpenPath',
-  dialogPickDirectory: 'dialog:pickDirectory',
-
-  /** Asks where to put a file that arrived from a remote desktop, then writes it. */
-  fileSaveAs: 'file:saveAs'
+  dialogPickDirectory: 'dialog:pickDirectory'
 } as const

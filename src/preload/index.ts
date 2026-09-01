@@ -178,21 +178,6 @@ const api = {
     }
   },
   rdp: {
-    /**
-     * A single-use ws:// address on the gateway that main stands up locally.
-     * The host id decides what sits behind it — a direct dial or a gateway —
-     * which is settled in the main process and never reported back.
-     */
-    reserve: (sessionId?: string): Promise<string> =>
-      ipcRenderer.invoke(IPC.rdpReserve, sessionId),
-    /** Whether to turn the embedded client's own logging up to match. */
-    /** The log level the desktop client was asked for, or null to stay quiet. */
-    tracing: (): Promise<string | null> => ipcRenderer.invoke(IPC.rdpTracing),
-    /** Writes the caught client log beside the session logs; answers with the path. */
-    saveLog: (lines: string[]): Promise<string> => ipcRenderer.invoke(IPC.rdpSaveLog, lines),
-    /** What actually went wrong, when the client only says "General failure". */
-    failure: (proxyAddress: string): Promise<string | undefined> =>
-      ipcRenderer.invoke(IPC.rdpFailure, proxyAddress),
     /** How this host's desktop should be drawn: size, and keyboard behaviour. */
     settings: (sessionId: string): Promise<RdpView> =>
       ipcRenderer.invoke(IPC.rdpSettings, sessionId),
@@ -471,13 +456,7 @@ const api = {
     pickSavePath: (defaultName: string): Promise<string | undefined> =>
       ipcRenderer.invoke(IPC.dialogPickSavePath, defaultName),
     pickOpenPath: (): Promise<string | undefined> => ipcRenderer.invoke(IPC.dialogPickOpenPath),
-    pickDirectory: (): Promise<string | undefined> => ipcRenderer.invoke(IPC.dialogPickDirectory),
-    /**
-     * Asks where to put a file from a remote desktop and writes it there.
-     * Given a folder it writes into that instead, without asking.
-     */
-    saveAs: (name: string, bytes: Uint8Array, folder?: string): Promise<string | undefined> =>
-      ipcRenderer.invoke(IPC.fileSaveAs, name, bytes, folder)
+    pickDirectory: (): Promise<string | undefined> => ipcRenderer.invoke(IPC.dialogPickDirectory)
   }
 }
 

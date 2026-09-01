@@ -10,7 +10,6 @@ import type { RdpView, SessionGroup, SessionProfile } from '../../shared/types'
 import { splitLogin } from '../../shared/rdpLogin'
 import { qualifyUser } from '../../shared/winSessions'
 import { inventoryStore } from '../inventory/InventoryStore'
-import { type RdpRoute, rdpGateway } from '../rdp/Gateway'
 import {
   type DesktopGateway,
   type DesktopRequest,
@@ -69,44 +68,11 @@ function findHost(
 }
 
 /**
- * How one host is to be reached, gateway password included.
- *
- * Resolved here and kept here. The window is handed a loopback address and
- * nothing else, so a gateway credential — unlike the host's own, which CredSSP
- * forces into the renderer — never leaves the main process at all.
- */
-function routeFor(sessionId: string | undefined): RdpRoute {
-  if (!sessionId) return {}
-  const found = findHost(sessionId)
-  if (!found) return {}
-
-  const rdp = resolveRdp(found.profile, found.profile.groupId, found.groups)
-  if (!rdp.gatewayHost) return {}
-
-  // A gateway with no login of its own is given the host's, which is what
-  // "use my connection credentials" means in every other client.
-  const auth = resolveAuth(found.profile, found.profile.groupId, found.groups)
-  const username = rdp.gatewayUsername || auth.username
-  const secretRef = rdp.gatewayUsername ? rdp.gatewaySecretRef : auth.secretRef
-
-  return {
-    gateway: {
-      host: rdp.gatewayHost,
-      port: rdp.gatewayPort,
-      username,
-      password: secretRef ? vault.getSecret(secretRef) ?? '' : '',
-      bypassLocal: rdp.gatewayBypassLocal
-    }
-  }
-}
-
-/**
  * The gateway for one host, in the form the desktop client takes it.
  *
- * The same resolution `routeFor` does for the old path, kept beside it rather
- * than shared: that one returns the shape this app's own gateway wants, and
- * folding two callers into one function that answers both would be a function
- * whose return value has to be read twice to know what it means.
+ * There were two of these until the loopback gateway's handler went: one
+ * answering in the shape this application's own gateway wanted, one in the
+ * shape the client wants. Only the second has a caller now.
  */
 function desktopGateway(profile: SessionProfile, groups: SessionGroup[]): DesktopGateway | undefined {
   const rdp = resolveRdp(profile, profile.groupId, groups)
@@ -218,52 +184,19 @@ export function registerRdpHandlers(): void {
 
   // --- Graphical sessions ---
   /**
-   * Reserves a single-use loopback address, and settles behind it how the
-   * session will actually be routed. Takes a host id rather than a route so the
-   * gateway and its password are resolved here; see routeFor.
-   */
-  ipcMain.handle(IPC.rdpReserve, (_e, sessionId?: string) =>
-    rdpGateway.reserve(routeFor(sessionId))
-  )
-
-  /**
-   * What level the desktop client should log at, or nothing to leave it quiet.
+   * Four handlers stood here and are gone with the client that used them.
    *
-   * Asked for by hand only. It used to be on for every `npm run dev`, and that
-   * is not a safe default: the client logs several lines per frame, the console
-   * holds each one with its arguments, and a live desktop took the renderer to
-   * four gigabytes and an out-of-memory crash inside a minute. What it says
-   * about codecs and channels is worth having, in the seconds it takes to read
-   * it — not for the length of a working session.
+   * `rdp:reserve` and `rdp:failure` served the loopback gateway the embedded
+   * WebAssembly client insisted on dialling; `rdp:tracing` and `rdp:saveLog`
+   * carried that client's own logging back out of the window. The desktop is
+   * drawn by a separate process now, which signs in itself and keeps its own
+   * log in the main process — so nothing asked for any of them, and a door
+   * nobody walks through is still a door.
    *
-   * `=1` means `debug`, which is everything. Any other value is handed over as
-   * it stands, in case the client understands a filter — 0.11 did not, and went
-   * silent when given one, so narrowing the question means a short session
-   * rather than a narrow filter.
+   * This removes the way in, not the gateway. `Gateway.ts`, `TsGateway.ts` and
+   * the [MS-TSGU] implementation under them are untouched and still tested;
+   * whether to retire them is a decision of its own. See PLAN-freerdp.md.
    */
-  ipcMain.handle(IPC.rdpTracing, () => {
-    const asked = process.env.TERMINALDECK_RDP_TRACE
-    if (!asked) return null
-    return asked === '1' ? 'debug' : asked
-  })
-
-  /**
-   * Keeps what the client said, out of the window that cannot hold it.
-   *
-   * The renderer catches the first lines and drops the rest; this puts them
-   * beside the session logs, where a path can be pasted into an issue.
-   */
-  ipcMain.handle(IPC.rdpSaveLog, async (_e, lines: string[]) => {
-    const dir = join(app.getPath('userData'), 'logs')
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-    const target = join(dir, `rdp-${new Date().toISOString().replace(/[:.]/g, '-')}.log`)
-    await writeFile(target, lines.join('\n'), 'utf8')
-    return target
-  })
-
-  ipcMain.handle(IPC.rdpFailure, (_e, proxyAddress: string) =>
-    rdpGateway.failureFor(proxyAddress)
-  )
 
   /**
    * The desktop settings for one host: how big it should be, and how the
