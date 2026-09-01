@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { mkdtempSync, existsSync, rmSync } from 'fs'
+import { mkdtempSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { PassThrough, Writable } from 'stream'
@@ -74,6 +74,9 @@ function stubSession(
     ): void {
       calls.push({ op: 'fastGet', path: remote, to: local })
       transfer.step?.(512, 512, 1024)
+      // The real one creates the file. The stub has to as well, or it cannot
+      // say anything about what happens to it afterwards.
+      writeFileSync(local, 'fetched', 'utf8')
       cb(null)
     },
     mkdir(path: string, cb: (err?: Error | null) => void): void {
@@ -248,7 +251,16 @@ describe('running a transfer plan', () => {
 
     expect(result).toEqual({ written: 1, skipped: 0 })
     expect(existsSync(join(localDir, 'nested', 'deeper'))).toBe(true)
-    expect(calls).toEqual([{ op: 'fastGet', path: '/srv/a.txt', to: dest }])
+    expect(readFileSync(dest, 'utf8')).toBe('fetched')
+
+    /**
+     * Fetched under another name and moved onto the destination at the end, so
+     * a connection that drops halfway cannot leave a truncated file where a
+     * whole one used to be. Nothing partial is left behind either.
+     */
+    expect(calls[0].to).not.toBe(dest)
+    expect(calls[0].to).toMatch(/\.part-/)
+    expect(readdirSync(join(localDir, 'nested', 'deeper'))).toEqual(['a.txt'])
   })
 
   it('reports progress against the file it is moving', async () => {

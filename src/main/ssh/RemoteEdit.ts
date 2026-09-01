@@ -1,7 +1,7 @@
 import { shell, type BrowserWindow } from 'electron'
-import { join } from 'path'
+import { dirname, join } from 'path'
 import { spawn } from 'child_process'
-import { mkdtempSync, existsSync, statSync, watch, type FSWatcher } from 'fs'
+import { mkdtempSync, existsSync, statSync, rmSync, watch, type FSWatcher } from 'fs'
 import { tmpdir } from 'os'
 import { IPC } from '../../shared/ipc-channels'
 import { sftpManager } from './SFTPManager'
@@ -13,6 +13,8 @@ interface EditSession {
   watcher: FSWatcher
   /** Guards against re-uploading a file we just wrote ourselves. */
   uploading: boolean
+  /** A save that arrived while the previous one was still going up. */
+  savedAgain: boolean
   lastMtimeMs: number
   timer?: NodeJS.Timeout
 }
@@ -98,6 +100,7 @@ class RemoteEditManager {
       remotePath,
       localPath,
       uploading: false,
+      savedAgain: false,
       lastMtimeMs: statSync(localPath).mtimeMs,
       watcher: watch(dir, () => this.onChanged(win, key))
     }
@@ -115,7 +118,21 @@ class RemoteEditManager {
 
   private onChanged(win: BrowserWindow, key: string): void {
     const session = this.sessions.get(key)
-    if (!session || session.uploading) return
+    if (!session) return
+
+    /**
+     * A save during an upload is remembered, not dropped.
+     *
+     * This used to return here and nothing looked again, so saving twice over a
+     * slow link sent the first version and silently kept the second to itself —
+     * the editor says saved, the far end has the older file, and nothing on
+     * either side says otherwise. That is the worst shape a bug can take in
+     * something that edits files.
+     */
+    if (session.uploading) {
+      session.savedAgain = true
+      return
+    }
 
     // Editors often touch the file several times per save; settle first.
     clearTimeout(session.timer)
@@ -149,6 +166,13 @@ class RemoteEditManager {
     } finally {
       session.uploading = false
     }
+
+    // Whatever was saved while this one was in flight goes now. The mtime check
+    // at the top means a spurious wake-up costs nothing.
+    if (session.savedAgain) {
+      session.savedAgain = false
+      this.onChanged(win, key)
+    }
   }
 
   stop(connectionId: string, remotePath: string): void {
@@ -158,6 +182,35 @@ class RemoteEditManager {
     clearTimeout(session.timer)
     session.watcher.close()
     this.sessions.delete(key)
+  }
+
+  /**
+   * Deletes the copies, on the way out.
+   *
+   * Every file opened for editing is downloaded into a temporary directory of
+   * its own, and nothing removed them — so a remote `sshd_config`, or anything
+   * else worth editing over SSH, was left lying in plain text under the
+   * system's temporary directory. macOS and Linux clear that eventually;
+   * Windows does not.
+   *
+   * Done at quit rather than when a file is closed, because the editor is
+   * somebody else's program and this end cannot tell when they have finished
+   * with it. After quit there is nothing left to upload to, so a copy that
+   * stays is all cost and no use.
+   */
+  cleanUp(): void {
+    for (const session of this.sessions.values()) {
+      clearTimeout(session.timer)
+      session.watcher.close()
+      try {
+        rmSync(dirname(session.localPath), { recursive: true, force: true })
+      } catch {
+        // A file still held open, or a directory already gone. Not worth
+        // delaying a quit over, and the next boot clears it on two platforms
+        // out of three.
+      }
+    }
+    this.sessions.clear()
   }
 
   /** Called when a connection goes away: its watchers are pointless afterwards. */

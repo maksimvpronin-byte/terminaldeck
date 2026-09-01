@@ -1,5 +1,6 @@
 import type { SFTPWrapper } from 'ssh2'
 import { readdir, mkdir, stat, lstat, readFile } from 'fs/promises'
+import { renameSync, rmSync } from 'fs'
 import { join, basename } from 'path'
 import { sshManager } from './SSHManager'
 import { buildTransferPlan, shouldWrite, type DestInfo } from '../../shared/transferPlan'
@@ -31,6 +32,8 @@ function looksBinary(buffer: Buffer): boolean {
 
 class SFTPManager {
   private sessions = new Map<string, SFTPWrapper>()
+  /** Makes each in-progress download's temporary name its own. */
+  private nextTransfer = 0
 
   private async getSftp(connectionId: string): Promise<SFTPWrapper> {
     const cached = this.sessions.get(connectionId)
@@ -153,16 +156,58 @@ class SFTPManager {
     onProgress?: (transferred: number, total: number) => void
   ): Promise<void> {
     const sftp = await this.getSftp(connectionId)
-    await new Promise<void>((resolve, reject) => {
-      sftp.fastGet(
-        remotePath,
-        localPath,
-        { step: (transferred, _chunk, total) => onProgress?.(transferred, total) },
-        (err) => (err ? reject(err) : resolve())
-      )
-    })
+
+    /**
+     * Written beside the destination and moved onto it at the end.
+     *
+     * Straight into the destination is what `scp` does, and it means a
+     * connection that drops halfway leaves a truncated file where a whole one
+     * used to be — the download that was meant to fetch a copy having destroyed
+     * the copy already there. The rename is atomic within a directory, so the
+     * name holds the old file or the new one and never half of either.
+     *
+     * The unique suffix is not decoration: two panes fetching the same file
+     * into the same folder would otherwise write into one another's partial.
+     */
+    const partial = `${localPath}.part-${process.pid}-${this.nextTransfer++}`
+    try {
+      await new Promise<void>((resolve, reject) => {
+        sftp.fastGet(
+          remotePath,
+          partial,
+          { step: (transferred, _chunk, total) => onProgress?.(transferred, total) },
+          (err) => (err ? reject(err) : resolve())
+        )
+      })
+      renameSync(partial, localPath)
+    } catch (err) {
+      // Nothing half-finished is left lying beside the file it failed to become.
+      try {
+        rmSync(partial, { force: true })
+      } catch {
+        // Already gone, or never created.
+      }
+      throw err
+    }
   }
 
+  /**
+   * Sends a local file to the far end, straight into place.
+   *
+   * Deliberately not through a temporary name and a rename, which is what
+   * `download` above does and what would seem consistent. Two reasons, and
+   * both are worse than the problem they would solve:
+   *
+   * The new file would be created by us, so it would carry our ownership and
+   * our default permissions rather than the ones the file being replaced had.
+   * Uploading over a server's configuration file and quietly changing its mode
+   * or its owner is a larger accident than a transfer that fails partway.
+   *
+   * And SSH_FXP_RENAME is not POSIX rename: on most servers it refuses when the
+   * destination exists. Overwriting needs OpenSSH's `posix-rename` extension,
+   * which is not everywhere, so this would trade one failure mode for a
+   * different one that only shows up on somebody else's server.
+   */
   async upload(
     connectionId: string,
     localPath: string,

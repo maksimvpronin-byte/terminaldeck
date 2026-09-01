@@ -18,6 +18,31 @@ the other produces a version nobody can install, which is how 0.1.10 through
 
 ### Fixed
 
+- **An interrupted download destroyed the file it was meant to replace.** It
+  wrote straight into the destination, so a connection dropping halfway left a
+  truncated file where a whole one had been — the fetch that was meant to bring
+  a copy having ruined the copy already there. Downloads now land under another
+  name and are moved onto the destination when they are complete.
+
+  Uploads deliberately still write straight into place. Through a temporary name
+  the new file would carry this application's ownership and default permissions
+  rather than those of the file it replaces — quietly changing the mode of a
+  server's configuration file is a larger accident than a transfer that fails —
+  and SSH_FXP_RENAME is not POSIX rename: most servers refuse it when the
+  destination exists, so overwriting would depend on an OpenSSH extension that
+  is not everywhere.
+- **Copies of remote files opened for editing were never deleted.** Each one is
+  downloaded into a temporary directory of its own, and they stayed there — a
+  remote `sshd_config`, or anything else worth editing over SSH, left in plain
+  text under the system's temporary directory. Cleared at quit, which is the
+  point after which there is nothing left to upload them to; the editor is
+  somebody else's program and this end cannot tell when a file is finished with
+  before then.
+- **A file saved twice while the first save was still going up lost the second
+  one.** The watcher returned early whenever an upload was in flight and nothing
+  looked again afterwards, so over a slow link the editor said saved, the far
+  end kept the older file, and neither side said a word. A save that arrives
+  during an upload is now remembered and sent when that one finishes.
 - **Three of the six files this application keeps were written unsafely**, and
   which three was an accident of who wrote them. Sessions, known host keys and
   trusted certificates were written in place; the vault, collections and

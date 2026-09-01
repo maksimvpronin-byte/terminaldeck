@@ -4,6 +4,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { registerIpcHandlers } from './ipc/handlers'
 import { installCertificateVerifier } from './rdp/CertificateTrust'
 import { freeRdpBridge } from './rdp/FreeRdpBridge'
+import { remoteEdit } from './ssh/RemoteEdit'
 import { registerUpdater } from './updater'
 import { IPC } from '../shared/ipc-channels'
 
@@ -122,6 +123,8 @@ app.whenReady().then(() => {
  */
 app.on('before-quit', () => {
   freeRdpBridge.stopAll()
+  // The copies of remote files opened for editing. See RemoteEdit.cleanUp.
+  remoteEdit.cleanUp()
 })
 
 app.on('window-all-closed', () => {
