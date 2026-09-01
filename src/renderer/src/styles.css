@@ -1750,7 +1750,12 @@ textarea:focus {
    margin, and the space written between them, which a flex row turns into an
    item with a gap on either side of it. Shrinking the button was the whole of
    what was needed. */
-.action-note button {
+/* `:not(.hint-mark)` because the question mark is a button too, and this rule
+   was reaching it: sixteen pixels of side padding turned a circle into an oval
+   with the glyph pushed off its centre — on this one line and nowhere else,
+   which is what made it look like a mystery rather than a rule doing exactly
+   what it said. */
+.action-note button:not(.hint-mark) {
   padding: 1px 8px;
   font-size: 11px;
   vertical-align: middle;
