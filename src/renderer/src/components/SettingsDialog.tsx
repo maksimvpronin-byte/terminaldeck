@@ -13,7 +13,9 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
   const updateSettings = useStore((s) => s.updateSettings)
   const preview = themeOf(settings)
   const t = useT()
-  const [tab, setTab] = useState<'terminal' | 'files' | 'security' | 'backup'>('terminal')
+  const [tab, setTab] = useState<'general' | 'terminal' | 'files' | 'security' | 'backup'>(
+    'general'
+  )
 
   async function pickEditor(): Promise<void> {
     const path = await window.td.dialogs.pickOpenPath()
@@ -25,23 +27,16 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <h2>{t('Settings')}</h2>
 
-        <label>
-          <Hint label={t('Language')}>
-            {t('Applies at once, and to this window only — nothing is sent anywhere.')}
-          </Hint>
-          <select
-            value={settings.language}
-            onChange={(e) => updateSettings({ language: e.target.value as Language })}
-          >
-            {LANGUAGES.map((language) => (
-              <option key={language.id} value={language.id}>
-                {language.name}
-              </option>
-            ))}
-          </select>
-        </label>
-
+        {/* Nothing floats above the tabs any more. Language sat up here, which
+            put it on every tab — a setting somebody changes once, permanently in
+            front of the ones they came to change. */}
         <div className="settings-tabs">
+          <button
+            className={tab === 'general' ? 'active' : ''}
+            onClick={() => setTab('general')}
+          >
+            {t('General')}
+          </button>
           <button
             className={tab === 'terminal' ? 'active' : ''}
             onClick={() => setTab('terminal')}
@@ -91,6 +86,24 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
 
         {tab === 'security' && <SecuritySettings />}
         {tab === 'backup' && <BackupSettings />}
+
+        {tab === 'general' && (
+          <label>
+            <Hint label={t('Language')}>
+              {t('Applies at once, and to this window only — nothing is sent anywhere.')}
+            </Hint>
+            <select
+              value={settings.language}
+              onChange={(e) => updateSettings({ language: e.target.value as Language })}
+            >
+              {LANGUAGES.map((language) => (
+                <option key={language.id} value={language.id}>
+                  {language.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
 
         {tab === 'terminal' && (
           <>

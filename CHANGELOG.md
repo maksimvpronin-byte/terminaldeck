@@ -10,6 +10,11 @@ the other produces a version nobody can install, which is how 0.1.10 through
 
 ### Added
 
+- **The language is on a tab of its own** rather than floating above them all.
+  It sat in the dialog's header, which put it on every tab — a setting somebody
+  changes once, permanently in front of the ones they came to change. Settings →
+  General holds it, and whatever else turns out to be about the application
+  rather than about terminals, files, security or backups.
 - **The trusted host keys are behind a button rather than on the page.** They
   were drawn as a row apiece, which reads as a list until somebody has three
   thousand of them — and then it is neither a list nor a settings screen. What

@@ -319,6 +319,7 @@ export const ru: Record<string, string> = {
   "{rest} more — narrow the filter to reach them":
     "ещё {rest} — уточните фильтр, чтобы до них добраться",
   "Review…": "Просмотреть…",
+  "General": "Общие",
   "Inherit": "Наследовать",
   "Fit the pane": "По размеру панели",
   "Fixed size": "Фиксированный размер",
