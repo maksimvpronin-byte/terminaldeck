@@ -18,6 +18,15 @@ the other produces a version nobody can install, which is how 0.1.10 through
 
 ### Fixed
 
+- **The transfer dialog and the transfer disagreed about what silence means.**
+  `defaultDecisions` fills every conflict with "skip" and says in a comment that
+  skipping is the default; the dialog shows "skip" for anything undecided. The
+  code that actually moves the files read that same silence as permission to
+  overwrite. Three places, two answers, and the one that ran was the
+  destructive one — so a conflict whose answer went missing was destroyed while
+  both of the others claimed it had been left alone. An explicit answer is still
+  obeyed either way; silence over a path the plan named as a conflict now means
+  leave it.
 - **An interrupted download destroyed the file it was meant to replace.** It
   wrote straight into the destination, so a connection dropping halfway left a
   truncated file where a whole one had been — the fetch that was meant to bring

@@ -3,7 +3,12 @@ import { readdir, mkdir, stat, lstat, readFile } from 'fs/promises'
 import { renameSync, rmSync } from 'fs'
 import { join, basename } from 'path'
 import { sshManager } from './SSHManager'
-import { buildTransferPlan, shouldWrite, type DestInfo } from '../../shared/transferPlan'
+import {
+  buildTransferPlan,
+  conflictedPaths,
+  shouldWrite,
+  type DestInfo
+} from '../../shared/transferPlan'
 import { baseNameOf, joinRemote, parentOf } from '../../shared/remotePath'
 import { parseLongnameOwner } from '../../shared/permissions'
 import type {
@@ -604,8 +609,11 @@ class SFTPManager {
     }
     let written = 0
     let skipped = 0
+    /* What the plan found already occupied. A conflict with no answer is left
+       alone rather than overwritten; see shouldWrite. */
+    const conflicted = conflictedPaths(plan)
     for (const item of plan.items) {
-      if (!shouldWrite(item.destPath, decisions)) {
+      if (!shouldWrite(item.destPath, decisions, conflicted)) {
         skipped++
         continue
       }

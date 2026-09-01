@@ -1,5 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { mkdtempSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import {
+  mkdirSync,
+  mkdtempSync,
+  existsSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync
+} from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { PassThrough, Writable } from 'stream'
@@ -261,6 +269,33 @@ describe('running a transfer plan', () => {
     expect(calls[0].to).not.toBe(dest)
     expect(calls[0].to).toMatch(/\.part-/)
     expect(readdirSync(join(localDir, 'nested', 'deeper'))).toEqual(['a.txt'])
+  })
+
+  /**
+   * The dialog offers a choice; if the answer never arrives, the file it was
+   * asked about must survive. This used to write it — the enforced default and
+   * the offered one disagreed — so the check is here as well as on the rule
+   * itself, because what matters is that the answer reaches the transfer.
+   */
+  it('leaves a conflicting destination alone when nothing was decided', async () => {
+    const calls: Call[] = []
+    attach('conn', stubSession(calls, { '/srv/a.txt': { size: 1024 } }))
+    // beforeEach clears this directory; the other tests get it back because a
+    // transfer makes its own, and this one writes before any transfer runs.
+    mkdirSync(localDir, { recursive: true })
+    const dest = join(localDir, 'a.txt')
+    writeFileSync(dest, 'mine', 'utf8')
+
+    const withConflict = plan('download', [item('/srv/a.txt', dest)])
+    withConflict.conflicts = [
+      { ...item('/srv/a.txt', dest), destSize: 4, destMtime: 0, reason: 'file' }
+    ]
+
+    const result = await sftpManager.runPlan('conn', withConflict)
+
+    expect(result).toEqual({ written: 0, skipped: 1 })
+    expect(readFileSync(dest, 'utf8')).toBe('mine')
+    expect(calls).toEqual([])
   })
 
   it('reports progress against the file it is moving', async () => {

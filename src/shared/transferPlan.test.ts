@@ -141,4 +141,25 @@ describe('shouldWrite', () => {
   it('honours an overwrite', () => {
     expect(shouldWrite('/srv/a', { '/srv/a': 'overwrite' })).toBe(true)
   })
+
+  /**
+   * The case the other two answers disagreed about.
+   *
+   * `defaultDecisions` fills every conflict with `skip` and says skipping is
+   * the default; the dialog shows `skip` for anything undecided. This used to
+   * read the same silence as permission to overwrite — so a conflict whose
+   * answer went missing was destroyed while both of the other two claimed it
+   * had been left alone.
+   */
+  it('leaves a conflict alone when nothing was decided about it', () => {
+    expect(shouldWrite('/srv/a', {}, new Set(['/srv/a']))).toBe(false)
+  })
+
+  it('still writes a destination that raised no conflict', () => {
+    expect(shouldWrite('/srv/new', {}, new Set(['/srv/a']))).toBe(true)
+  })
+
+  it('lets an explicit overwrite through even for a conflict', () => {
+    expect(shouldWrite('/srv/a', { '/srv/a': 'overwrite' }, new Set(['/srv/a']))).toBe(true)
+  })
 })

@@ -93,6 +93,32 @@ export function defaultDecisions(plan: TransferPlan): TransferDecisions {
 }
 
 /** Whether a given file should be written, given the answers collected. */
-export function shouldWrite(destPath: string, decisions: TransferDecisions): boolean {
-  return decisions[destPath] !== 'skip'
+/**
+ * Whether one destination may be written.
+ *
+ * The third argument is the whole point. Without it this could not tell a
+ * destination nobody objected to from one that raised a conflict whose answer
+ * went missing, and it treated both as permission to overwrite — while
+ * `defaultDecisions` above fills every conflict with `skip` and says in a
+ * comment that skipping is the default, and the dialog shows `skip` for
+ * anything undecided. Three places, two answers, and the one that ran was the
+ * destructive one.
+ *
+ * So: an explicit answer is obeyed. Silence means write, unless the path was
+ * named as a conflict — and then it means leave it alone, which is what the
+ * other two already claimed.
+ */
+export function shouldWrite(
+  destPath: string,
+  decisions: TransferDecisions,
+  conflicted: ReadonlySet<string> = new Set()
+): boolean {
+  const decided = decisions[destPath]
+  if (decided) return decided !== 'skip'
+  return !conflicted.has(destPath)
+}
+
+/** The destinations a plan says something already occupies. */
+export function conflictedPaths(plan: TransferPlan): ReadonlySet<string> {
+  return new Set(plan.conflicts.map((c) => c.destPath))
 }
