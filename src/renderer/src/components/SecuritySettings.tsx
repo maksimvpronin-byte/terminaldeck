@@ -14,8 +14,12 @@ interface TrustedHost {
  * A short list rather than a number box: the useful answers are few, and a
  * field that accepts 7 also accepts 0.5 and 100000, each of which is a way to
  * turn the lock off without meaning to.
+ *
+ * Eight hours is on the list because a working day is the interval people
+ * actually want — long enough that the vault is not asking again after lunch,
+ * and still an end to it, which "never" is not.
  */
-const LOCK_DELAYS = [0, 1, 5, 15, 30, 60, 120]
+const LOCK_DELAYS = [0, 1, 5, 15, 30, 60, 120, 480]
 
 export default function SecuritySettings(): JSX.Element {
   const t = useT()

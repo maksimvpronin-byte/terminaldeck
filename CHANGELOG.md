@@ -11,7 +11,7 @@ the other produces a version nobody can install, which is how 0.1.10 through
 ### Added
 
 - **The idle lock delay is a setting**, in Settings → Security: never, or from a
-  minute to two hours, fifteen as before. The right answer is a property of the
+  minute to a working day, fifteen as before. The right answer is a property of the
   room rather than of the application — fifteen minutes is impatient for someone
   reading a build log on a machine nobody else can reach, and generous for a
   laptop on a desk in an open office.
