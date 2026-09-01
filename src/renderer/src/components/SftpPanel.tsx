@@ -27,7 +27,6 @@ import {
   TREE_MAX,
   TREE_MIN,
   col,
-  clamp,
   loadColumns,
   loadPanelWidth,
   loadTreeOpen,
@@ -40,6 +39,7 @@ import {
   saveTreeWidth,
   type ColumnWidths
 } from '../state/sftpLayout'
+import { startWidthDrag } from '../state/dragWidth'
 
 interface Transfer {
   path: string
@@ -101,14 +101,7 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
   const pathRef = useRef(path)
   pathRef.current = path
 
-  /**
-   * One drag, wherever the grip is. `sign` is -1 for a handle on the left of
-   * what it sizes — the panel's own edge, which widens as the pointer goes
-   * left — and 1 for the ordinary case of a grip on the right.
-   *
-   * Every width is remembered: a layout arranged once should survive closing
-   * the panel, and the next connection.
-   */
+  /** One drag, wherever the grip is; see state/dragWidth.ts. */
   function startDrag(
     down: React.MouseEvent,
     from: number,
@@ -118,25 +111,7 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
     apply: (next: number) => void,
     persist: (final: number) => void
   ): void {
-    down.preventDefault()
-    down.stopPropagation()
-    const startX = down.clientX
-    let latest = from
-    const onMove = (move: MouseEvent): void => {
-      latest = clamp(from + (move.clientX - startX) * sign, min, max)
-      apply(latest)
-    }
-    const onUp = (): void => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-      // Held on the body so the cursor does not flicker while the pointer is
-      // dragged off the grip and over the terminal.
-      document.body.style.cursor = ''
-      persist(latest)
-    }
-    document.body.style.cursor = 'col-resize'
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
+    startWidthDrag(down, { from, sign, min, max, apply, persist })
   }
 
   function resizeColumn(key: keyof ColumnWidths, down: React.MouseEvent): void {

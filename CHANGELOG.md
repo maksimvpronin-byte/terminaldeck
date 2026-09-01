@@ -10,6 +10,13 @@ the other produces a version nobody can install, which is how 0.1.10 through
 
 ### Added
 
+- **The host list can be dragged wider**, and stays where it is left. It was
+  fixed at 260 pixels, which is not enough for a repository whose groups nest
+  four deep — the tree simply ran out of room. Its width is remembered in this
+  window rather than in the settings file: how wide a panel should be is a
+  property of the screen somebody is sitting at, not of a configuration they
+  would carry to another machine. The file panel already worked this way, and
+  the two now share one implementation of the drag.
 - **The explanations moved into a question mark beside what they explain.** The
   dialogs here explain themselves at length, and the explanations are worth
   having — but read once. Left on the page they push the controls apart until a

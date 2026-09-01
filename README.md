@@ -349,6 +349,9 @@ the local credential vault (stored in the OS user-data directory, never sent any
 
 Syncing an inventory needs `git` on `PATH`; the Inventory tab says so if it is missing.
 
+Both side panels are dragged by their inner edge and remember their width in the window
+they were set in.
+
 ### Building the desktop client
 
 Desktop panes need `td-rdp`, which is compiled rather than downloaded. It is not built by

@@ -147,12 +147,31 @@ label {
   font-size: 11px;
 }
 .sidebar {
+  /* The width is set from the component, which remembers where it was left;
+     these are the fallback for the first run and the floor a drag cannot go
+     under. `position: relative` is what the grip below is positioned against. */
   width: 260px;
   min-width: 200px;
+  position: relative;
   background: var(--bg-1);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
+}
+/* Over the panel's own border rather than beside it: a strip of its own would
+   take room from the list for something that is only ever grabbed. Four pixels
+   is what a pointer can find without hunting. */
+.sidebar-resize {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  width: 5px;
+  height: 100%;
+  z-index: 5;
+  cursor: col-resize;
+}
+.sidebar-resize:hover {
+  background: var(--accent-dim);
 }
 .titlebar-spacer {
   height: 28px;

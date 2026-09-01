@@ -21,6 +21,13 @@ import SettingsDialog from './SettingsDialog'
 import ContextMenu, { type MenuItem } from './ContextMenu'
 import { keyHint } from '../state/keys'
 import { useT } from '../i18n'
+import {
+  SIDEBAR_MAX,
+  SIDEBAR_MIN,
+  loadSidebarWidth,
+  saveSidebarWidth,
+  startWidthDrag
+} from '../state/dragWidth'
 
 const ROOT_TARGET = '__root__'
 const COLLAPSED_KEY = 'terminaldeck.collapsedGroups'
@@ -42,6 +49,9 @@ export default function Sidebar({
   onOpenHelp: () => void
 }): JSX.Element {
   const t = useT()
+  /* Held here rather than in the store: nothing else in the application asks
+     how wide this is, and it is written on every frame of a drag. */
+  const [width, setWidth] = useState(loadSidebarWidth)
   const groups = useStore((s) => s.groups)
   const sessions = useStore((s) => s.sessions)
   const removeGroup = useStore((s) => s.removeGroup)
@@ -479,7 +489,24 @@ export default function Sidebar({
   }
 
   return (
-    <div className="sidebar">
+    <div className="sidebar" style={{ width, flex: `0 0 ${width}px` }}>
+      {/* The grip sits on the panel's own right edge, over the border, so there
+          is something to take hold of without a strip of its own taking room
+          from the list. */}
+      <div
+        className="sidebar-resize"
+        title={t('Drag to resize the panel')}
+        onMouseDown={(e) =>
+          startWidthDrag(e, {
+            from: width,
+            sign: 1,
+            min: SIDEBAR_MIN,
+            max: SIDEBAR_MAX,
+            apply: setWidth,
+            persist: saveSidebarWidth
+          })
+        }
+      />
       <div className="titlebar-spacer" />
 
       <div className="sidebar-tabs">
