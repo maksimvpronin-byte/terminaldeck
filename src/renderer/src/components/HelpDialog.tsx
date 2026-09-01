@@ -60,6 +60,8 @@ const SECTIONS: Section[] = [
       { what: 'The edge you drop nearest decides which half the new pane takes' },
       { what: 'Use ⇱ in a pane toolbar to move it back out into its own tab' },
       { what: 'Drag the divider between panes to resize them' },
+      { what: 'Drag the inner edge of the host list or the file panel to widen it' },
+      { what: 'Both remember their width in the window they were set in' },
       { what: 'A dot on a background tab means new output arrived there' }
     ]
   },
@@ -135,6 +137,11 @@ const SECTIONS: Section[] = [
       { what: 'It inherits too, so a whole group can start with sudo -i' },
       { what: 'Colour a host or group to tell production apart at a glance' },
       { what: 'A green dot marks a host that already has a terminal open' },
+      { what: '"Jump host" reaches a machine through another one, as ProxyJump does' },
+      { what: 'The hop is made by this app, so nothing runs on the machine in between' },
+      { what: '"Forward SSH agent" lets the far host ask this one to sign, whatever you logged in with' },
+      { what: 'The key never travels; root on that host can use it while you are there, so pick hosts you trust' },
+      { what: '"Log session output to file" keeps a transcript per connection under the logs folder' },
       { keys: '⌘L', what: 'Lock the vault; it also locks itself after the delay set in Settings → Security' },
       { what: 'Settings → Backup moves everything to another machine, credentials optional' }
     ]
@@ -145,6 +152,20 @@ const SECTIONS: Section[] = [
       { keys: '⌘K', what: 'Snippet palette: ⏎ runs, ⇧⏎ drops it on the prompt unrun' },
       { what: 'Broadcast mirrors your typing into every terminal you tick' },
       { what: 'The palette states where a command will land before you send it' }
+    ]
+  },
+  {
+    title: 'Tunnels and monitoring',
+    rows: [
+      { what: 'Tunnels in a pane toolbar forwards ports over that connection' },
+      { what: 'Local sends a port here to somewhere the host can reach' },
+      { what: 'Remote does the opposite: a port on the host arrives here' },
+      { what: 'Dynamic is a SOCKS proxy, for a browser to reach a whole network' },
+      { what: 'A rule saved on a session starts by itself whenever that session connects' },
+      { what: '"Ad-hoc tunnel" runs one for this connection only and is not saved' },
+      { what: 'Monitor in the same toolbar shows load, memory, network, uptime and disks' },
+      { what: 'It asks the host every three seconds and stops after three failures in a row' },
+      { what: 'Nothing is installed there: it is one command on a channel of its own' }
     ]
   },
   {

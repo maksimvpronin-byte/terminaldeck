@@ -279,6 +279,40 @@ export const ru: Record<string, string> = {
     'Наследовать настройки рабочего стола от родительской группы',
   'Applies to the RDP hosts in this group. A gateway stated here reaches every one of them, which is the point of putting it on a group rather than on each machine.':
     'Относится к RDP-хостам этой группы. Шлюз, указанный здесь, достаёт до каждого из них — ради этого его и задают на группе, а не на каждой машине.',
+  "Drag the inner edge of the host list or the file panel to widen it":
+    "Потяните за внутренний край списка хостов или файловой панели, чтобы расширить",
+  "Both remember their width in the window they were set in":
+    "Обе запоминают ширину в том окне, где её задали",
+  "\"Jump host\" reaches a machine through another one, as ProxyJump does":
+    "«Промежуточный хост» достаёт до машины через другую — как ProxyJump",
+  "The hop is made by this app, so nothing runs on the machine in between":
+    "Переход делает само приложение, поэтому на промежуточной машине ничего не выполняется",
+  "\"Forward SSH agent\" lets the far host ask this one to sign, whatever you logged in with":
+    "«Пробрасывать агент SSH» позволяет далёкому хосту просить подпись у этой машины — независимо от того, чем вы вошли",
+  "The key never travels; root on that host can use it while you are there, so pick hosts you trust":
+    "Ключ никуда не уезжает; но root на том хосте может им воспользоваться, пока вы там, — поэтому включайте для машин, которым доверяете",
+  "\"Log session output to file\" keeps a transcript per connection under the logs folder":
+    "«Записывать вывод сессии в файл» держит расшифровку каждого подключения в папке журналов",
+  "Tunnels and monitoring":
+    "Туннели и мониторинг",
+  "Tunnels in a pane toolbar forwards ports over that connection":
+    "«Туннели» в панели вкладки пробрасывают порты через это подключение",
+  "Local sends a port here to somewhere the host can reach":
+    "Локальный отправляет порт отсюда туда, куда достаёт хост",
+  "Remote does the opposite: a port on the host arrives here":
+    "Обратный делает наоборот: порт на хосте появляется здесь",
+  "Dynamic is a SOCKS proxy, for a browser to reach a whole network":
+    "Динамический — это прокси SOCKS, чтобы браузер достал до целой сети",
+  "A rule saved on a session starts by itself whenever that session connects":
+    "Правило, сохранённое на сессии, запускается само при каждом её подключении",
+  "\"Ad-hoc tunnel\" runs one for this connection only and is not saved":
+    "«Разовый туннель» работает только для этого подключения и не сохраняется",
+  "Monitor in the same toolbar shows load, memory, network, uptime and disks":
+    "«Монитор» в той же панели показывает загрузку, память, сеть, время работы и диски",
+  "It asks the host every three seconds and stops after three failures in a row":
+    "Он опрашивает хост каждые три секунды и останавливается после трёх неудач подряд",
+  "Nothing is installed there: it is one command on a channel of its own":
+    "Ничего туда не ставится: это одна команда на отдельном канале",
   "Inherit": "Наследовать",
   "Fit the pane": "По размеру панели",
   "Fixed size": "Фиксированный размер",

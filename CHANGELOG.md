@@ -10,6 +10,12 @@ the other produces a version nobody can install, which is how 0.1.10 through
 
 ### Added
 
+- **Five things the application does were missing from its own help**: agent
+  forwarding, jump hosts, session logging, port forwarding and the monitoring
+  strip — two of them whole panels with a toolbar button each. The shortcut and
+  feature list now covers them, including what agent forwarding costs: the key
+  never travels, and root on the host you forwarded to can use it for as long as
+  you are there.
 - **The host list can be dragged wider**, and stays where it is left. It was
   fixed at 260 pixels, which is not enough for a repository whose groups nest
   four deep — the tree simply ran out of room. Its width is remembered in this
