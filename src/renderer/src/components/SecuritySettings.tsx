@@ -22,6 +22,79 @@ interface TrustedHost {
  */
 const LOCK_DELAYS = [0, 1, 5, 15, 30, 60, 120, 480]
 
+/** How many rows are worth drawing before a filter is the better answer. */
+const SHOWN = 20
+
+/**
+ * A list of what has been trusted, for a machine that has trusted a lot.
+ *
+ * It used to draw every entry with a button beside it. That reads as a list
+ * until somebody has three thousand hosts, at which point it is neither a list
+ * nor anything else: nobody scrolls three thousand rows to find one, and the
+ * setting screen it lives on becomes unusable for everything else on it.
+ *
+ * So: a count, a filter, and the first twenty matches. Finding one entry is a
+ * search, which is what it always was — the scrolling was never how anybody
+ * did it.
+ */
+function TrustedList({
+  entries,
+  empty,
+  onForget
+}: {
+  entries: TrustedHost[]
+  empty: string
+  onForget: (host: string) => void
+}): JSX.Element {
+  const t = useT()
+  const [query, setQuery] = useState('')
+
+  if (entries.length === 0) return <p className="settings-note">{empty}</p>
+
+  const needle = query.trim().toLowerCase()
+  const found = needle
+    ? entries.filter(
+        (e) =>
+          e.host.toLowerCase().includes(needle) || e.fingerprint.toLowerCase().includes(needle)
+      )
+    : entries
+  const shown = found.slice(0, SHOWN)
+
+  return (
+    <>
+      <div className="form-row">
+        <input
+          style={{ flex: 1 }}
+          value={query}
+          placeholder={t('Filter by host or fingerprint…')}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </div>
+      <p className="settings-note">
+        {needle
+          ? t('{found} of {total} match', { found: found.length, total: entries.length })
+          : t('{total} trusted', { total: entries.length })}
+      </p>
+      <div className="known-hosts-list">
+        {shown.map((e) => (
+          <div className="known-host-row" key={e.host}>
+            <div className="known-host-name">{e.host}</div>
+            <div className="known-host-fp">{e.fingerprint}</div>
+            <button onClick={() => onForget(e.host)}>{t('Forget')}</button>
+          </div>
+        ))}
+      </div>
+      {found.length > shown.length && (
+        <p className="settings-note">
+          {t('{rest} more — narrow the filter to reach them', {
+            rest: found.length - shown.length
+          })}
+        </p>
+      )}
+    </>
+  )
+}
+
 export default function SecuritySettings(): JSX.Element {
   const t = useT()
   const lockAfterMinutes = useStore((s) => s.settings.lockAfterMinutes)
@@ -151,19 +224,11 @@ export default function SecuritySettings(): JSX.Element {
           )}
         </Hint>
       </h3>
-      {hosts.length === 0 ? (
-        <p className="settings-note">{t('No hosts trusted yet.')}</p>
-      ) : (
-        <div className="known-hosts-list">
-          {hosts.map((h) => (
-            <div className="known-host-row" key={h.host}>
-              <div className="known-host-name">{h.host}</div>
-              <div className="known-host-fp">{h.fingerprint}</div>
-              <button onClick={() => forget(h.host)}>{t('Forget')}</button>
-            </div>
-          ))}
-        </div>
-      )}
+      <TrustedList
+        entries={hosts}
+        empty={t('No hosts trusted yet.')}
+        onForget={forget}
+      />
 
       <h3 className="settings-heading">
         <Hint label={t('Trusted certificates')}>
@@ -172,19 +237,11 @@ export default function SecuritySettings(): JSX.Element {
           )}
         </Hint>
       </h3>
-      {certificates.length === 0 ? (
-        <p className="settings-note">{t('No certificates trusted by hand.')}</p>
-      ) : (
-        <div className="known-hosts-list">
-          {certificates.map((c) => (
-            <div className="known-host-row" key={c.host}>
-              <div className="known-host-name">{c.host}</div>
-              <div className="known-host-fp">{c.fingerprint}</div>
-              <button onClick={() => forgetCertificate(c.host)}>{t('Forget')}</button>
-            </div>
-          ))}
-        </div>
-      )}
+      <TrustedList
+        entries={certificates}
+        empty={t('No certificates trusted by hand.')}
+        onForget={forgetCertificate}
+      />
     </>
   )
 }

@@ -70,6 +70,10 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
                 <Hint label={t('Command')}>
                   {t(
                     'Used by “Edit locally” in the SFTP panel. Leave empty to hand the file to whatever the system opens it with — on Windows that is often Notepad, or nothing at all.'
+                  )}{' '}
+                  <code>{'{file}'}</code>{' '}
+                  {t(
+                    'is replaced by the path; without it the path is appended. Give the full path to the program — a windowed app does not inherit the PATH from your shell, so a bare code or subl may not be found.'
                   )}
                 </Hint>
                 <input
@@ -82,12 +86,6 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
                 {t('Browse…')}
               </button>
             </div>
-            <p className="settings-note">
-              <code>{'{file}'}</code>{' '}
-              {t(
-                'is replaced by the path; without it the path is appended. Give the full path to the program — a windowed app does not inherit the PATH from your shell, so a bare code or subl may not be found.'
-              )}
-            </p>
           </>
         )}
 

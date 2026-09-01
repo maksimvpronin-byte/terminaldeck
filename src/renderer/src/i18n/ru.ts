@@ -313,6 +313,11 @@ export const ru: Record<string, string> = {
     "Он опрашивает хост каждые три секунды и останавливается после трёх неудач подряд",
   "Nothing is installed there: it is one command on a channel of its own":
     "Ничего туда не ставится: это одна команда на отдельном канале",
+  "Filter by host or fingerprint…": "Фильтр по хосту или отпечатку…",
+  "{found} of {total} match": "подходит {found} из {total}",
+  "{total} trusted": "доверено: {total}",
+  "{rest} more — narrow the filter to reach them":
+    "ещё {rest} — уточните фильтр, чтобы до них добраться",
   "Inherit": "Наследовать",
   "Fit the pane": "По размеру панели",
   "Fixed size": "Фиксированный размер",
