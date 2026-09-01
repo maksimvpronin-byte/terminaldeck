@@ -1750,8 +1750,14 @@ textarea:focus {
 .action-note {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
+}
+/* The row's own gap is the spacing here; the mark's margin would be added to
+   it on both sides, which is what left it floating between the text and the
+   button. */
+.action-note .hint-mark {
+  margin: 0;
 }
 .action-note button {
   padding: 2px 8px;
