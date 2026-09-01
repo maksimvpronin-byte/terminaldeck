@@ -1,6 +1,6 @@
 import { app } from 'electron'
 import { join, dirname, extname, relative } from 'path'
-import { readFileSync, writeFileSync, renameSync, existsSync, mkdirSync, readdirSync, statSync } from 'fs'
+import { readFileSync, existsSync, readdirSync, statSync } from 'fs'
 import { parse } from 'yaml'
 import type {
   InventoryData,
@@ -11,6 +11,7 @@ import type {
 import { parseAnsibleInventory, type AnsibleVars } from './ansible'
 import { syncRepo, headRevision } from './GitRepo'
 import { applyOverride, withoutBlanks } from '../../shared/overrides'
+import { readJson, writeJson } from '../store/jsonFile'
 
 function configPath(): string {
   return join(app.getPath('userData'), 'inventories.json')
@@ -80,23 +81,14 @@ class InventoryStore {
   }
 
   private load(): InventoryData {
-    const p = configPath()
-    if (!existsSync(p)) return { version: 1, sources: [], overrides: [] }
-    try {
-      const parsed = JSON.parse(readFileSync(p, 'utf8')) as Partial<InventoryData>
-      return { version: 1, sources: parsed.sources ?? [], overrides: parsed.overrides ?? [] }
-    } catch {
-      return { version: 1, sources: [], overrides: [] }
-    }
+    // Normalised after reading rather than trusted: a file written by an older
+    // version, or edited by hand, may be missing either list.
+    const parsed = readJson<Partial<InventoryData>>(configPath(), () => ({}))
+    return { version: 1, sources: parsed.sources ?? [], overrides: parsed.overrides ?? [] }
   }
 
   private persist(): void {
-    const dir = app.getPath('userData')
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-    const target = configPath()
-    const tmp = `${target}.tmp`
-    writeFileSync(tmp, JSON.stringify(this.data, null, 2), 'utf8')
-    renameSync(tmp, target)
+    writeJson(configPath(), this.data)
   }
 
   sources(): InventorySource[] {

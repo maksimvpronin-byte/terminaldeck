@@ -1,8 +1,8 @@
 import { app } from 'electron'
 import { join } from 'path'
-import { readFileSync, writeFileSync, renameSync, existsSync, mkdirSync } from 'fs'
 import type { SessionGroup, SessionProfile, SessionStoreData } from '../../shared/types'
 import { applyOrder } from '../../shared/ordering'
+import { readJson, writeJson } from './jsonFile'
 
 function storePath(): string {
   return join(app.getPath('userData'), 'sessions.json')
@@ -29,19 +29,7 @@ class SessionStore {
    * instead, so what is left of it survives long enough to be repaired by hand.
    */
   private load(): SessionStoreData {
-    const p = storePath()
-    if (!existsSync(p)) return empty()
-    try {
-      return JSON.parse(readFileSync(p, 'utf8')) as SessionStoreData
-    } catch {
-      try {
-        renameSync(p, `${p}.damaged-${Date.now()}`)
-      } catch {
-        // Nowhere to put it — a read-only directory, or it went between the
-        // two calls. Starting empty is still better than refusing to start.
-      }
-      return empty()
-    }
+    return readJson<SessionStoreData>(storePath(), empty)
   }
 
   /**
@@ -54,12 +42,7 @@ class SessionStore {
    * carefully are the two that are written least.
    */
   private persist(): void {
-    const dir = app.getPath('userData')
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-    const target = storePath()
-    const tmp = `${target}.tmp`
-    writeFileSync(tmp, JSON.stringify(this.data, null, 2), 'utf8')
-    renameSync(tmp, target)
+    writeJson(storePath(), this.data)
   }
 
   getAll(): SessionStoreData {

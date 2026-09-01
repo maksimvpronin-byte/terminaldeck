@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import { join } from 'path'
 import { createHash } from 'crypto'
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
+import { readJson, writeJson } from '../store/jsonFile'
 
 /** host:port -> OpenSSH-style "SHA256:base64" fingerprint of the server key. */
 type KnownHostsFile = Record<string, string>
@@ -26,19 +26,11 @@ class KnownHosts {
   }
 
   private load(): KnownHostsFile {
-    const p = storePath()
-    if (!existsSync(p)) return {}
-    try {
-      return JSON.parse(readFileSync(p, 'utf8')) as KnownHostsFile
-    } catch {
-      return {}
-    }
+    return readJson<KnownHostsFile>(storePath(), () => ({}))
   }
 
   private persist(): void {
-    const dir = app.getPath('userData')
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-    writeFileSync(storePath(), JSON.stringify(this.data, null, 2), 'utf8')
+    writeJson(storePath(), this.data)
   }
 
   get(host: string, port: number): string | undefined {

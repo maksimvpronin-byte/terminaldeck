@@ -18,15 +18,27 @@ the other produces a version nobody can install, which is how 0.1.10 through
 
 ### Fixed
 
-- **The host tree was written the one way the vault never is.** Every host,
-  group and setting lives in `sessions.json`, which is rewritten on each edit
-  and each drag — and it was written in place, so anything interrupting the
-  write left a truncated file. The vault and the collection store both go
-  through a temporary file and a rename, with a comment explaining why; the file
-  written most often was the one that did not. Worse, a damaged file was read as
-  an empty tree without a word, and the next save wrote that empty tree over
-  what was left. It is put aside under a name of its own now, and both
-  behaviours are covered by tests that fail without the fix.
+- **Three of the six files this application keeps were written unsafely**, and
+  which three was an accident of who wrote them. Sessions, known host keys and
+  trusted certificates were written in place; the vault, collections and
+  snippets went through a temporary file and a rename. The careful three are the
+  ones written least. All six read the same way now, through one place that
+  states the rule — so the next store added gets it without having to know it
+  exists.
+
+  For the two security stores the cost was not only tidiness: a truncated
+  `known_hosts.json` is an application that has forgotten which key it trusted,
+  and the next connection to that host is treated as a first meeting.
+- **A damaged file was read as an empty one, silently, in five of the six.**
+  What that shows is an application with nothing in it — no hosts, no snippets,
+  no remembered keys — which reads as "everything is gone", and the first save
+  after that writes the emptiness over what was left. Damaged files are moved
+  aside under a name of their own now.
+
+  The file that made this worth chasing is `sessions.json` — every host, group
+  and setting, rewritten on each edit and each drag, and the only one of the six
+  written that often. Both halves are covered by tests that fail without the
+  fix.
 - **A desktop pane could read past the end of its own picture.** The rectangle
   of what changed is clamped against the framebuffer as it was when the
   rectangle was noted, and `gdi_resize` — on another thread — frees that buffer

@@ -1,8 +1,8 @@
 import { app, dialog, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { createHash } from 'crypto'
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { setCertificateVerifier, type CertificateQuestion } from './certificateVerifier'
+import { readJson, writeJson } from '../store/jsonFile'
 
 /**
  * Which TLS certificates a desktop session may be carried over.
@@ -37,19 +37,11 @@ class CertificateStore {
   private data: TrustedCertificates = this.load()
 
   private load(): TrustedCertificates {
-    const path = storePath()
-    if (!existsSync(path)) return {}
-    try {
-      return JSON.parse(readFileSync(path, 'utf8')) as TrustedCertificates
-    } catch {
-      return {}
-    }
+    return readJson<TrustedCertificates>(storePath(), () => ({}))
   }
 
   private persist(): void {
-    const dir = app.getPath('userData')
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-    writeFileSync(storePath(), JSON.stringify(this.data, null, 2), 'utf8')
+    writeJson(storePath(), this.data)
   }
 
   get(host: string, port: number): string | undefined {

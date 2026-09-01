@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import { join } from 'path'
-import { readFileSync, writeFileSync, renameSync, existsSync, mkdirSync } from 'fs'
 import type { HostCollection } from '../../shared/types'
+import { readJson, writeJson } from './jsonFile'
 
 interface CollectionFile {
   version: 1
@@ -26,23 +26,11 @@ class CollectionStore {
   }
 
   private load(): CollectionFile {
-    const p = storePath()
-    if (!existsSync(p)) return { version: 1, collections: [] }
-    try {
-      const parsed = JSON.parse(readFileSync(p, 'utf8')) as Partial<CollectionFile>
-      return { version: 1, collections: parsed.collections ?? [] }
-    } catch {
-      return { version: 1, collections: [] }
-    }
+    return readJson<CollectionFile>(storePath(), () => ({ version: 1, collections: [] }))
   }
 
   private persist(): void {
-    const dir = app.getPath('userData')
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-    const target = storePath()
-    const tmp = `${target}.tmp`
-    writeFileSync(tmp, JSON.stringify(this.data, null, 2), 'utf8')
-    renameSync(tmp, target)
+    writeJson(storePath(), this.data)
   }
 
   list(): HostCollection[] {

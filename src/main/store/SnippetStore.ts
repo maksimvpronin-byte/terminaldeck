@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import { join } from 'path'
-import { readFileSync, writeFileSync, renameSync, existsSync, mkdirSync } from 'fs'
 import type { Snippet } from '../../shared/types'
+import { readJson, writeJson } from './jsonFile'
 
 interface SnippetFile {
   version: 1
@@ -20,23 +20,14 @@ class SnippetStore {
   }
 
   private load(): SnippetFile {
-    const p = storePath()
-    if (!existsSync(p)) return { version: 1, snippets: [] }
-    try {
-      const parsed = JSON.parse(readFileSync(p, 'utf8')) as Partial<SnippetFile>
-      return { version: 1, snippets: parsed.snippets ?? [] }
-    } catch {
-      return { version: 1, snippets: [] }
-    }
+    // Normalised after reading rather than trusted: a file written by an older
+    // version, or edited by hand, may be missing the list entirely.
+    const parsed = readJson<Partial<SnippetFile>>(storePath(), () => ({}))
+    return { version: 1, snippets: parsed.snippets ?? [] }
   }
 
   private persist(): void {
-    const dir = app.getPath('userData')
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-    const target = storePath()
-    const tmp = `${target}.tmp`
-    writeFileSync(tmp, JSON.stringify(this.data, null, 2), 'utf8')
-    renameSync(tmp, target)
+    writeJson(storePath(), this.data)
   }
 
   list(): Snippet[] {
