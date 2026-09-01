@@ -180,18 +180,48 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
    * belongs to the group that states it. Saying so matters: without it a wrong
    * group password looks like it was used when the host's own one was.
    */
-  const credential = auth.shownMethod === 'privateKey' ? 'passphrase' : 'password'
+  /**
+   * Two whole sentences per case rather than one with a word slotted in.
+   *
+   * "This host has a {credential} of its own" reads correctly in English and
+   * falls apart in a language where the noun changes the rest of the sentence.
+   * It also hides the phrase from the coverage test, which reads the source for
+   * `t('…')` and cannot see a string built at runtime — which is how these came
+   * to be the only English left in a translated dialog.
+   */
+  const held =
+    auth.shownMethod === 'privateKey'
+      ? t(
+          'This host has a passphrase of its own, and the nearest value wins: moving it into a group leaves the group’s unused.'
+        )
+      : t(
+          'This host has a password of its own, and the nearest value wins: moving it into a group leaves the group’s unused.'
+        )
+  const inheritedSecret = inheritNote('secretRef')
+  const forget =
+    auth.shownMethod === 'privateKey'
+      ? inheritedSecret
+        ? t('On save this host forgets its own passphrase and uses the one {source}.', {
+            source: inheritedSecret
+          })
+        : t(
+            'On save this host forgets its own passphrase and uses whatever it is asked for on connect.'
+          )
+      : inheritedSecret
+        ? t('On save this host forgets its own password and uses the one {source}.', {
+            source: inheritedSecret
+          })
+        : t(
+            'On save this host forgets its own password and uses whatever it is asked for on connect.'
+          )
+
   const authWords: AuthWords = {
     inherit: t('Inherit'),
     secretHint,
-    self: 'this host',
-    held: `This host has a ${credential} of its own, and the nearest value wins: moving it into a group leaves the group's unused.`,
-    forget: `On save this host forgets its own ${credential} and uses ${
-      inheritNote('secretRef')
-        ? `the one ${inheritNote('secretRef')}`
-        : 'whatever it is asked for on connect'
-    }.`,
-    keyPath: inheritNote('privateKeyPath') || 'No file selected'
+    self: t('this host'),
+    held,
+    forget,
+    keyPath: inheritNote('privateKeyPath') || t('No file selected')
   }
 
   return (
@@ -301,12 +331,12 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
                 onChange={(e) => set('followTerminalCwd', e.target.checked)}
               />
               {t('SFTP panel follows the terminal’s directory')}
+              <Hint>
+                {t(
+                  'Keeps the SFTP panel on the directory the shell is in. Types one setup line into the shell on connect so it reports where it is; its echo is hidden. Off by default: it lets the host move the file browser. The ⇉ button in the panel switches it at any time.'
+                )}
+              </Hint>
             </label>
-            <p className="settings-note">
-              {t(
-                'Keeps the SFTP panel on the directory the shell is in. Types one setup line into the shell on connect so it reports where it is; its echo is hidden. Off by default: it lets the host move the file browser. The ⇉ button in the panel switches it at any time.'
-              )}
-            </p>
           </>
         )}
 

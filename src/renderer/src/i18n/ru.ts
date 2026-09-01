@@ -232,6 +232,24 @@ export const ru: Record<string, string> = {
   "Forget it": "Забыть",
   "Reach private addresses directly, without the gateway": "К приватным адресам обращаться напрямую, минуя шлюз",
   "Resolution": "Разрешение",
+  '{value} from {source}': '{value} — из {source}',
+  'blinking': 'мигающий',
+  'steady': 'ровный',
+  'This host has a passphrase of its own, and the nearest value wins: moving it into a group leaves the group’s unused.':
+    'У этого хоста своя парольная фраза, и побеждает ближайшее значение: перенос её в группу оставит групповую невостребованной.',
+  'This host has a password of its own, and the nearest value wins: moving it into a group leaves the group’s unused.':
+    'У этого хоста свой пароль, и побеждает ближайшее значение: перенос его в группу оставит групповой невостребованным.',
+  'On save this host forgets its own passphrase and uses the one {source}.':
+    'При сохранении хост забудет свою парольную фразу и возьмёт ту, что {source}.',
+  'On save this host forgets its own passphrase and uses whatever it is asked for on connect.':
+    'При сохранении хост забудет свою парольную фразу и будет спрашивать её при подключении.',
+  'On save this host forgets its own password and uses the one {source}.':
+    'При сохранении хост забудет свой пароль и возьмёт тот, что {source}.',
+  'On save this host forgets its own password and uses whatever it is asked for on connect.':
+    'При сохранении хост забудет свой пароль и будет спрашивать его при подключении.',
+  // Genitive: it sits inside "the key file comes from …" and nowhere else.
+  'this host': 'этого хоста',
+  'No file selected': 'Файл не выбран',
   "Inherit": "Наследовать",
   "Fit the pane": "По размеру панели",
   "Fixed size": "Фиксированный размер",
@@ -287,7 +305,6 @@ export const ru: Record<string, string> = {
   "A joined session opens in a window of its own — Windows draws it, not this app.": "Присоединённая сессия открывается в отдельном окне — его рисует Windows, а не это приложение.",
   "The host allows this only where its policy says so; where it does not, the connection is refused rather than falling back to asking.": "Хост разрешает это только там, где так говорит его политика; где не разрешает — подключение отклоняется, а не переходит к вопросу.",
   "Password for": "Пароль для",
-  "this host": "этого хоста",
   "No password is saved for this host. Save one in its dialog to stop being asked.": "Для этого хоста пароль не сохранён. Сохраните его в диалоге хоста, чтобы больше не спрашивали.",
   "Connecting to": "Подключение к",
   "Name and host are required": "Нужно указать имя и хост",
@@ -345,7 +362,6 @@ export const ru: Record<string, string> = {
   "Continue": "Продолжить",
   "Quick connect": "Быстрое подключение",
   "Host and username are required": "Нужно указать адрес и логин",
-  "No file selected": "Файл не выбран",
 
   // Security settings
   "Goes to the shell, never to this app: Ctrl+C interrupts, Ctrl+D ends the session, Ctrl+K, Ctrl+W and Ctrl+L do what readline says":
