@@ -1,4 +1,4 @@
-<#
+﻿<#
 Puts the DLLs beside td-rdp.exe, which is where Windows looks for them.
 
 The counterpart of bundle-macos.sh, and much shorter, because Windows solves

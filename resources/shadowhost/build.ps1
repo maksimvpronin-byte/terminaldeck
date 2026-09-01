@@ -1,4 +1,4 @@
-<#
+﻿<#
   Builds ShadowHost.exe.
 
   Uses the C# compiler that ships with the .NET Framework, present on every

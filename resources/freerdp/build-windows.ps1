@@ -1,4 +1,4 @@
-<#
+﻿<#
 Builds FreeRDP and td-rdp for Windows, into resources\freerdp\build\windows-<arch>.
 
 The same shape as build-macos.sh, and the same reasoning: a pinned version, so a
@@ -18,6 +18,13 @@ last step copies them there instead of rewriting install names.
 Requires: Visual Studio 2022 with the C++ workload, CMake and Git. Set
 VCPKG_ROOT to an existing vcpkg, or one is fetched into resources\freerdp\vcpkg.
 #>
+# This file, and every .ps1 beside it, begins with a UTF-8 byte order mark, and
+# that is not decoration. `npm run build:freerdp:win` invokes `powershell`, which
+# is Windows PowerShell 5.1, and 5.1 reads a file without one as Windows-1252 —
+# so every dash and quotation mark in the comments and strings below arrives as
+# two bytes of nonsense, unterminating strings and unbalancing braces. The
+# script then fails to parse at all, and what the log shows is a syntax error a
+# hundred lines away from anything that is actually wrong.
 [CmdletBinding()]
 param(
   # Rebuild only td-rdp against a FreeRDP that is already built. Changing a line
