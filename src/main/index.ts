@@ -5,6 +5,8 @@ import { registerIpcHandlers } from './ipc/handlers'
 import { installCertificateVerifier } from './rdp/CertificateTrust'
 import { freeRdpBridge } from './rdp/FreeRdpBridge'
 import { remoteEdit } from './ssh/RemoteEdit'
+import { remoteMonitor } from './ssh/RemoteMonitor'
+import { shadowHostBridge } from './rdp/ShadowHostBridge'
 import { registerUpdater } from './updater'
 import { IPC } from '../shared/ipc-channels'
 
@@ -123,6 +125,17 @@ app.whenReady().then(() => {
  */
 app.on('before-quit', () => {
   freeRdpBridge.stopAll()
+  /**
+   * The shadow viewers, which are the ones that matter here.
+   *
+   * Each is a `ShadowHost.exe` holding an mstsc window open, and it exits when
+   * its input pipe closes — but only when it next looks, and a viewer waiting
+   * on the far end may not look for a while. Both of these `stopAll` methods
+   * existed for this and neither was called from anywhere: the monitors would
+   * have died with the process, and the viewers might have outlived it.
+   */
+  shadowHostBridge.stopAll()
+  remoteMonitor.stopAll()
   // The copies of remote files opened for editing. See RemoteEdit.cleanUp.
   remoteEdit.cleanUp()
 })

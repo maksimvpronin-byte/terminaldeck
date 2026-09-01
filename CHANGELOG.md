@@ -18,6 +18,11 @@ the other produces a version nobody can install, which is how 0.1.10 through
 
 ### Fixed
 
+- **A shadow viewer could outlive the application.** `ShadowHost.exe` holds an
+  mstsc window open and exits when its input pipe closes — but only when it next
+  looks, and one waiting on the far end may not look for a while. The method
+  that stops them all existed and was called from nowhere, as did the one for
+  the monitoring pollers. Both are attached to quit now.
 - **The transfer dialog and the transfer disagreed about what silence means.**
   `defaultDecisions` fills every conflict with "skip" and says in a comment that
   skipping is the default; the dialog shows "skip" for anything undecided. The
