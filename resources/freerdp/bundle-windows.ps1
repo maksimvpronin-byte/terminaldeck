@@ -21,7 +21,7 @@ $triplet = "$arch-windows"
 $out = if ($env:FREERDP_PREFIX) { $env:FREERDP_PREFIX } else { Join-Path $here "build\windows-$arch" }
 $bin = Join-Path $out 'bin'
 
-function Say([string]$text) { Write-Host "`n==> $text" -ForegroundColor White }
+function Step([string]$text) { Write-Host "`n==> $text" -ForegroundColor Cyan }
 function Die([string]$text) { Write-Host "`nerror: $text" -ForegroundColor Red; exit 1 }
 
 if (-not (Test-Path (Join-Path $bin 'td-rdp.exe'))) {
@@ -35,11 +35,11 @@ $vcpkg = if ($env:VCPKG_ROOT) { $env:VCPKG_ROOT } else { Join-Path $here 'vcpkg'
 $from = Join-Path $vcpkg "installed\$triplet\bin"
 if (-not (Test-Path $from)) { Die "no vcpkg libraries at $from — run: npm run build:freerdp:win" }
 
-Say "Copying the dependencies into $bin"
+Step "Copying the dependencies into $bin"
 # All of them rather than the four by name: openssl brings its own pair, and the
 # set changes with the version. They are small, and a list that is right today
 # is a list that is wrong the next time vcpkg splits a package.
 Copy-Item (Join-Path $from '*.dll') -Destination $bin -Force
 
-Say 'What will be shipped'
+Step 'What will be shipped'
 Get-ChildItem (Join-Path $bin '*.exe'), (Join-Path $bin '*.dll') | Format-Table Name, Length -AutoSize
