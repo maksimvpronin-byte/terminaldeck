@@ -1743,25 +1743,17 @@ textarea:focus {
   color: var(--text-dim);
   line-height: 1.5;
 }
-/* A note that carries a button: a state and the thing that changes it.
-   Laid out along one line and given a smaller button, because a full-height
-   control on a line of small grey text is what makes a form look untidy — the
-   line grows to the button's height and the rhythm of the column breaks. */
-.action-note {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-/* The row's own gap is the spacing here; the mark's margin would be added to
-   it on both sides, which is what left it floating between the text and the
-   button. */
-.action-note .hint-mark {
-  margin: 0;
-}
+/* A note that carries a button: a state, and the thing that changes it.
+   Laid out as the sentence it is. It was made a flex row first, to stop a
+   full-height button stretching the line — which worked and brought three
+   sources of spacing where there should be one: the row's gap, the mark's own
+   margin, and the space written between them, which a flex row turns into an
+   item with a gap on either side of it. Shrinking the button was the whole of
+   what was needed. */
 .action-note button {
-  padding: 2px 8px;
+  padding: 1px 8px;
   font-size: 11px;
+  vertical-align: middle;
 }
 
 /* A note about something that will probably not work, rather than an error. */

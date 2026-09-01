@@ -169,7 +169,7 @@ export default function RdpFields({
                 {secret.forget
                   ? t('On save the gateway password stored here is forgotten.')
                   : t('A gateway password is stored here, and the nearest value wins.')}
-              </Hint>
+              </Hint>{' '}
               <button type="button" onClick={() => secret.onForget(!secret.forget)}>
                 {secret.forget ? t('Keep it') : t('Forget it')}
               </button>
