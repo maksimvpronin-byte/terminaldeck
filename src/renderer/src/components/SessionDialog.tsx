@@ -24,6 +24,7 @@ import AuthFields, { type AuthWords } from './AuthFields'
 import RdpFields from './RdpFields'
 import { useT } from '../i18n'
 import ModalBackdrop from './ModalBackdrop'
+import Hint from './Hint'
 
 interface Props {
   initial?: SessionProfile
@@ -401,12 +402,14 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
 
         {traits.textual && (
           <details className="settings-section">
-            <summary>{t('Appearance')}</summary>
-            <p className="settings-note">
-              {t(
+            <summary>
+              {t('Appearance')}
+              <Hint>
+                {t(
                 'Applies to this host’s terminals only. Anything left on “inherit” follows the group, and then Settings — so marking one production box red changes nothing else.'
               )}
-            </p>
+              </Hint>
+            </summary>
             <AppearanceFields
               value={profile}
               set={setLook}

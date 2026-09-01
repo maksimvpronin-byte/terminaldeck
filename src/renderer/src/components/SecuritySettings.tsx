@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import Hint from './Hint'
 import { useStore } from '../state/store'
 import { useT } from '../i18n'
 
@@ -83,6 +84,11 @@ export default function SecuritySettings(): JSX.Element {
       <h3 className="settings-heading">{t('Locking')}</h3>
       <label>
         {t('Lock after this long untouched')}
+        <Hint>
+          {t(
+            'Untouched means no typing, no pointer and no scrolling anywhere in the window, a terminal included. Locking closes nothing: sessions stay open and keep running, and the vault stops answering for stored passwords until the master password is given again.'
+          )}
+        </Hint>
         <select
           value={String(lockAfterMinutes)}
           onChange={(e) => updateSettings({ lockAfterMinutes: Number(e.target.value) })}
@@ -98,18 +104,15 @@ export default function SecuritySettings(): JSX.Element {
           ))}
         </select>
       </label>
-      <p className="settings-note">
-        {t(
-          'Untouched means no typing, no pointer and no scrolling anywhere in the window, a terminal included. Locking closes nothing: sessions stay open and keep running, and the vault stops answering for stored passwords until the master password is given again.'
-        )}
-      </p>
 
-      <h3 className="settings-heading">{t('Master password')}</h3>
-      <p className="settings-note">
-        {t(
-          'Every stored secret is re-encrypted under the new password. Nothing is lost, and the password itself is never written to disk.'
-        )}
-      </p>
+      <h3 className="settings-heading">
+        {t('Master password')}
+        <Hint>
+          {t(
+            'Every stored secret is re-encrypted under the new password. Nothing is lost, and the password itself is never written to disk.'
+          )}
+        </Hint>
+      </h3>
       <label>
         {t('Current password')}
         <input type="password" value={current} onChange={(e) => setCurrent(e.target.value)} />
@@ -132,22 +135,26 @@ export default function SecuritySettings(): JSX.Element {
         </button>
       </div>
 
-      <h3 className="settings-heading">{t('Session logs')}</h3>
-      <p className="settings-note">
-        {t(
-          'Sessions with “Log session output to file” enabled write here. The transcript contains everything the terminal showed, so treat it as sensitive.'
-        )}
-      </p>
+      <h3 className="settings-heading">
+        {t('Session logs')}
+        <Hint>
+          {t(
+            'Sessions with “Log session output to file” enabled write here. The transcript contains everything the terminal showed, so treat it as sensitive.'
+          )}
+        </Hint>
+      </h3>
       <div>
         <button onClick={() => window.td.logs.reveal()}>{t('Open logs folder')}</button>
       </div>
 
-      <h3 className="settings-heading">{t('Trusted host keys')}</h3>
-      <p className="settings-note">
-        {t(
-          'Removing an entry makes TerminalDeck ask again on the next connection. Do that when a server was legitimately rebuilt and its key changed.'
-        )}
-      </p>
+      <h3 className="settings-heading">
+        {t('Trusted host keys')}
+        <Hint>
+          {t(
+            'Removing an entry makes TerminalDeck ask again on the next connection. Do that when a server was legitimately rebuilt and its key changed.'
+          )}
+        </Hint>
+      </h3>
       {hosts.length === 0 ? (
         <p className="settings-note">{t('No hosts trusted yet.')}</p>
       ) : (
@@ -162,12 +169,14 @@ export default function SecuritySettings(): JSX.Element {
         </div>
       )}
 
-      <h3 className="settings-heading">{t('Trusted certificates')}</h3>
-      <p className="settings-note">
-        {t(
-          'Desktop sessions only, and only certificates this machine could not verify on its own — a gateway or a host that issues its own. One signed by a public authority is checked against the system and never listed here, so a routine reissue changes nothing.'
-        )}
-      </p>
+      <h3 className="settings-heading">
+        {t('Trusted certificates')}
+        <Hint>
+          {t(
+            'Desktop sessions only, and only certificates this machine could not verify on its own — a gateway or a host that issues its own. One signed by a public authority is checked against the system and never listed here, so a routine reissue changes nothing.'
+          )}
+        </Hint>
+      </h3>
       {certificates.length === 0 ? (
         <p className="settings-note">{t('No certificates trusted by hand.')}</p>
       ) : (

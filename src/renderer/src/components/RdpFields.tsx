@@ -3,6 +3,7 @@ import type {
   RdpResolution,
   ResolvedRdp,
 } from "../../../shared/types";
+import Hint from "./Hint";
 import { useT } from "../i18n";
 
 interface Props {
@@ -107,15 +108,14 @@ export default function RdpFields({
         </label>
       )}
 
-      <p className="settings-note">
-        {t(
-          "A gateway says where a machine lives rather than who you are on it, so it is usually stated once on a group and left blank below. Blank reaches the host directly.",
-        )}
-      </p>
-
       <div className="form-row">
         <label style={{ flex: 3 }}>
           {t("RD Gateway")}
+          <Hint>
+            {t(
+              "A gateway says where a machine lives rather than who you are on it, so it is usually stated once on a group and left blank below. Blank reaches the host directly.",
+            )}
+          </Hint>
           <input
             value={value.gatewayHost ?? ""}
             placeholder={
@@ -258,6 +258,11 @@ export default function RdpFields({
 
       <label>
         {t("Most pixels to ask for")}
+        <Hint>
+          {t(
+            "Counted in the screen's own pixels, so a Retina pane can ask for up to four times the data. On an ordinary monitor nothing here changes anything.",
+          )}
+        </Hint>
         <select
           value={String(effective.pixelBudget)}
           onChange={(e) => set("pixelBudget", Number(e.target.value))}
@@ -267,18 +272,13 @@ export default function RdpFields({
           <option value="100">{t("As many as the screen has")}</option>
         </select>
       </label>
-      {/* The long version — why this is counted in the screen's pixels rather
-          than the pane's points, and what it costs past this point — is in the
-          README. A dialog is read while deciding something, and four hundred
-          words is not a decision aid. */}
-      <p className="settings-note">
-        {t(
-          "Counted in the screen's own pixels, so a Retina pane can ask for up to four times the data. On an ordinary monitor nothing here changes anything.",
-        )}
-      </p>
-
       <label>
         {t("How the desktop is made the right size")}
+        <Hint>
+          {t(
+            "Asking the far end is the only way to get the right size at full sharpness, and Windows 8.1 and later act on it; older versions ignore it and the desktop stays as it was. Stretching here always works and costs sharpness.",
+          )}
+        </Hint>
         <select value={sizing} onChange={(e) => chooseSizing(e.target.value)}>
           <option value="">
             {t("Inherit")} ({sizingLabel(t, effective)})
@@ -296,17 +296,6 @@ export default function RdpFields({
           <option value="100">{t("Do not adjust — every pixel its own")}</option>
         </select>
       </label>
-      {/* The reasoning behind all of this — that pixels and size are different
-          questions, that Windows lays out a 20-pixel menu the same way whether a
-          pixel is a millimetre across or half of one, and that the density is
-          agreed per connection rather than written into the far machine — is in
-          the README. */}
-      <p className="settings-note">
-        {t(
-          "Asking the far end is the only way to get the right size at full sharpness, and Windows 8.1 and later act on it; older versions ignore it and the desktop stays as it was. Stretching here always works and costs sharpness.",
-        )}
-      </p>
-
       <label className="checkbox-row" style={{ flexDirection: "row" }}>
         <input
           type="checkbox"
@@ -314,13 +303,12 @@ export default function RdpFields({
           onChange={(e) => set("sound", e.target.checked)}
         />
         {t("Play the remote sound here")}
+        <Hint>
+          {t(
+            "Played by the desktop client itself, so it costs this side nothing and the link something.",
+          )}
+        </Hint>
       </label>
-      <p className="settings-note">
-        {t(
-          "Played by the desktop client itself, so it costs this side nothing and the link something.",
-        )}
-      </p>
-
       <label className="checkbox-row" style={{ flexDirection: "row" }}>
         <input
           type="checkbox"
@@ -328,12 +316,12 @@ export default function RdpFields({
           onChange={(e) => set("commandAsControl", e.target.checked)}
         />
         {t("Send ⌘ as Ctrl")}
+        <Hint>
+          {t(
+            "Copy and paste then land where they do on Windows. While the desktop has the keyboard this app's own ⌘ shortcuts do not fire; ⌘Q and ⌘Tab still belong to macOS.",
+          )}
+        </Hint>
       </label>
-      <p className="settings-note">
-        {t(
-          "Copy and paste then land where they do on Windows. While the desktop has the keyboard this app's own ⌘ shortcuts do not fire; ⌘Q and ⌘Tab still belong to macOS.",
-        )}
-      </p>
     </>
   );
 }

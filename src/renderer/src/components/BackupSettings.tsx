@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { ImportSummary } from '../../../shared/types'
 import { useStore } from '../state/store'
 import { useT } from '../i18n'
+import Hint from './Hint'
 
 export default function BackupSettings(): JSX.Element {
   const t = useT()
@@ -75,12 +76,14 @@ export default function BackupSettings(): JSX.Element {
 
   return (
     <>
-      <h3 className="settings-heading">{t('Export')}</h3>
-      <p className="settings-note">
-        {t(
-          'Writes sessions, groups, snippets and inventory sources to one file. Terminal appearance and trusted host keys stay on this machine.'
-        )}
-      </p>
+      <h3 className="settings-heading">
+        {t('Export')}
+        <Hint>
+          {t(
+            'Writes sessions, groups, snippets and inventory sources to one file. Terminal appearance and trusted host keys stay on this machine.'
+          )}
+        </Hint>
+      </h3>
 
       <label className="checkbox-row" style={{ flexDirection: 'row' }}>
         <input
@@ -120,12 +123,14 @@ export default function BackupSettings(): JSX.Element {
         </button>
       </div>
 
-      <h3 className="settings-heading">{t('Import')}</h3>
-      <p className="settings-note">
-        {t(
-          'Entries are matched by id: an existing one is replaced, a new one is added, and nothing already here is deleted.'
-        )}
-      </p>
+      <h3 className="settings-heading">
+        {t('Import')}
+        <Hint>
+          {t(
+            'Entries are matched by id: an existing one is replaced, a new one is added, and nothing already here is deleted.'
+          )}
+        </Hint>
+      </h3>
       <label>
         {t('Password, if the file contains credentials')}
         <input

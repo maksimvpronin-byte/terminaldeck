@@ -7,6 +7,7 @@ import { SESSION_COLOURS } from '../state/colours'
 import AppearanceFields from './AppearanceFields'
 import ModalBackdrop from './ModalBackdrop'
 import { useT } from '../i18n'
+import Hint from './Hint'
 
 interface Props {
   /** An existing collection to rename or recolour. */
@@ -136,12 +137,14 @@ export default function CollectionDialog({
         </label>
 
         <details className="settings-section">
-          <summary>{t('Appearance')}</summary>
-          <p className="settings-note">
-            {t(
-              "Worn by every host in this set. A host that has settings of its own keeps them; a host that does not takes these instead of its group's."
-            )}
-          </p>
+          <summary>
+            {t('Appearance')}
+            <Hint>
+              {t(
+                "Worn by every host in this set. A host that has settings of its own keeps them; a host that does not takes these instead of its group's."
+              )}
+            </Hint>
+          </summary>
           <AppearanceFields
             value={look}
             set={setLookField}

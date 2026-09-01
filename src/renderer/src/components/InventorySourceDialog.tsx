@@ -7,6 +7,7 @@ import { SESSION_COLOURS } from '../state/colours'
 import AppearanceFields from './AppearanceFields'
 import ModalBackdrop from './ModalBackdrop'
 import { useT } from '../i18n'
+import Hint from './Hint'
 
 export default function InventorySourceDialog({
   initial,
@@ -113,12 +114,14 @@ export default function InventorySourceDialog({
           )}
         </p>
 
-        <h3 className="settings-heading">{t('Default connection settings')}</h3>
-        <p className="settings-note">
-          {t(
-            'Inherited by every host from this repository unless the inventory or the host itself says otherwise.'
-          )}
-        </p>
+        <h3 className="settings-heading">
+          {t('Default connection settings')}
+          <Hint>
+            {t(
+              'Inherited by every host from this repository unless the inventory or the host itself says otherwise.'
+            )}
+          </Hint>
+        </h3>
 
         <div className="form-row">
           <label style={{ flex: 3 }}>
@@ -244,12 +247,14 @@ export default function InventorySourceDialog({
         </label>
 
         <details className="settings-section">
-          <summary>{t('Appearance')}</summary>
-          <p className="settings-note">
-            {t(
-              'Every host from this repository inherits it, so a whole environment can be told apart at a glance without touching a single host.'
-            )}
-          </p>
+          <summary>
+            {t('Appearance')}
+            <Hint>
+              {t(
+                'Every host from this repository inherits it, so a whole environment can be told apart at a glance without touching a single host.'
+              )}
+            </Hint>
+          </summary>
           <AppearanceFields
             value={source}
             set={setLook}

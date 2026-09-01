@@ -10,6 +10,18 @@ the other produces a version nobody can install, which is how 0.1.10 through
 
 ### Added
 
+- **The explanations moved into a question mark beside what they explain.** The
+  dialogs here explain themselves at length, and the explanations are worth
+  having — but read once. Left on the page they push the controls apart until a
+  dialog with six settings needs scrolling and the settings are hard to find
+  among the prose about them. Hovering the mark shows the text, and so does
+  focusing it with the keyboard: a description reachable only by pointer is one
+  that some people cannot read at all.
+
+  What stayed on the page: anything that reports a state rather than describing
+  a control — "Reading both sides…", "No hosts trusted yet" — and the warnings
+  about the operation in front of you, which are the last things that should be
+  hidden behind a hover.
 - **The idle lock delay is a setting**, in Settings → Security: never, or from a
   minute to a working day, fifteen as before. The right answer is a property of the
   room rather than of the application — fifteen minutes is impatient for someone

@@ -3,6 +3,7 @@ import { useStore } from '../state/store'
 import { FONT_CHOICES, THEME_GROUPS, DEFAULT_SETTINGS, themeOf } from '../state/settings'
 import SecuritySettings from './SecuritySettings'
 import BackupSettings from './BackupSettings'
+import Hint from './Hint'
 import ModalBackdrop from './ModalBackdrop'
 import { keyHint } from '../state/keys'
 import { LANGUAGES, useT, type Language } from '../i18n'
@@ -26,6 +27,9 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
 
         <label>
           {t('Language')}
+          <Hint>
+            {t('Applies at once, and to this window only — nothing is sent anywhere.')}
+          </Hint>
           <select
             value={settings.language}
             onChange={(e) => updateSettings({ language: e.target.value as Language })}
@@ -37,9 +41,6 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
             ))}
           </select>
         </label>
-        <p className="settings-note">
-          {t('Applies at once, and to this window only — nothing is sent anywhere.')}
-        </p>
 
         <div className="settings-tabs">
           <button
@@ -65,14 +66,14 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
         {tab === 'files' && (
           <>
             <h3 className="settings-heading">{t('External editor')}</h3>
-            <p className="settings-note">
-              {t(
-                'Used by “Edit locally” in the SFTP panel. Leave empty to hand the file to whatever the system opens it with — on Windows that is often Notepad, or nothing at all.'
-              )}
-            </p>
             <div className="form-row">
               <label style={{ flex: 1 }}>
                 {t('Command')}
+                <Hint>
+                  {t(
+                    'Used by “Edit locally” in the SFTP panel. Leave empty to hand the file to whatever the system opens it with — on Windows that is often Notepad, or nothing at all.'
+                  )}
+                </Hint>
                 <input
                   value={settings.externalEditor}
                   placeholder="e.g. code -w {file}"
@@ -97,11 +98,13 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
 
         {tab === 'terminal' && (
           <>
-        <p className="settings-note">
-          {t(
-            'The defaults every terminal starts from. A group or a single host can override any of this in its own dialog, under Appearance.'
-          )}
-        </p>
+            {/* A statement about the whole tab rather than about one control,
+                so it stays where it can be read without being looked for. */}
+            <p className="settings-note">
+              {t(
+                'The defaults every terminal starts from. A group or a single host can override any of this in its own dialog, under Appearance.'
+              )}
+            </p>
 
         <label>
           {t('Font')}

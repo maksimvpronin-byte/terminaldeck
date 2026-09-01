@@ -808,6 +808,49 @@ label {
      click, depending on which of them ends up on top. */
   z-index: 4;
 }
+/* --- the question mark that holds a description --- */
+/* Sized in `em` so it follows whatever text it sits beside, and given no width
+   of its own beyond its content: a mark that grew with the font would push the
+   label it belongs to out of line. */
+.hint-mark {
+  margin-left: 6px;
+  padding: 0;
+  width: 1.25em;
+  height: 1.25em;
+  line-height: 1;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.85em;
+  cursor: help;
+  flex: 0 0 auto;
+  vertical-align: middle;
+}
+.hint-mark:hover,
+.hint-mark:focus-visible {
+  color: var(--text);
+  border-color: var(--accent);
+}
+/* Fixed rather than absolute, and drawn into the body: every dialog here
+   scrolls, and a bubble positioned inside one is clipped by it — which only
+   shows up on the last control in a long list. */
+.hint-bubble {
+  position: fixed;
+  z-index: 300;
+  max-width: 360px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-2);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.45;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  /* It explains what is under the pointer; it must never be under it itself. */
+  pointer-events: none;
+}
+
 /* --- remote monitoring strip --- */
 .monitor-bar {
   display: flex;

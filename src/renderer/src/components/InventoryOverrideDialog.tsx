@@ -20,6 +20,7 @@ import AuthFields, { type AuthWords } from './AuthFields'
 import RdpFields from './RdpFields'
 import ModalBackdrop from './ModalBackdrop'
 import { useT } from '../i18n'
+import Hint from './Hint'
 
 interface Props {
   /** The host or Ansible group the local settings apply to. */
@@ -321,12 +322,14 @@ export default function InventoryOverrideDialog({ node, groups, onClose }: Props
 
         {isHost(node) && protocolOf(node) === 'rdp' && (
           <details className="settings-section">
-            <summary>{t('Desktop')}</summary>
-            <p className="settings-note">
-              {t(
+            <summary>
+              {t('Desktop')}
+              <Hint>
+                {t(
                 'Kept locally, so a sync never takes it away — including a gateway the repository does not know about.'
               )}
-            </p>
+              </Hint>
+            </summary>
             <RdpFields
               value={override}
               set={setRdp}
