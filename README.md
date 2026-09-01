@@ -462,20 +462,67 @@ once yet and a check that starts out red teaches everyone to ignore it.
 
 ## Building installers
 
-Each command compiles the app and packages it; artifacts land in `dist/`.
+### From a clone to an installer
+
+Three ordered commands per platform, and the order matters: packaging refuses to
+continue without the desktop client, and nothing builds that for you.
+
+**macOS** — produces a `.dmg` and a `.zip` for Apple Silicon:
 
 ```bash
-npm run build:mac       # .dmg and .zip, x64 + arm64
-npm run build:win       # NSIS installer and a portable .exe, x64 + arm64
-npm run build:linux     # AppImage and .deb
-npm run build:mac:dir   # unpacked .app only — quicker, for checking a change
+brew install cmake ninja pkg-config openssl@3 openh264 opus sdl2 sdl2_ttf sdl2_image
+npm install
+npm run build:freerdp:mac
+npm run build:mac
 ```
 
-Add `-- --publish always` to upload the artifacts to a GitHub release.
+The FreeRDP build takes half an hour or so the first time and is not repeated: it stays in
+`resources/freerdp/build/`. `FREERDP_SDL=0` leaves out the SDL client, which exists only to prove
+a build by hand against a real host — that is what CI does, and it saves three Homebrew packages
+and several minutes.
 
-**Each platform builds on itself.** electron-builder can only produce a package for the platform
-it runs on here, because native dependencies (`cpu-features`, pulled in by ssh2) are rebuilt
-against the target. Running `build:win` on a Mac fails on that step. Cross-building is possible
+**Windows** — produces an NSIS installer and a portable `.exe` for x64. Needs Visual Studio 2022
+with the C++ workload, plus CMake and Git on `PATH`:
+
+```
+npm install
+npm run build:freerdp:win
+npm run build:win
+```
+
+The libraries come from vcpkg rather than Homebrew. Set `VCPKG_ROOT` to an existing one, or the
+script fetches its own into `resources/freerdp/vcpkg/`.
+
+**Linux** — produces an AppImage and a `.deb`:
+
+```bash
+npm install
+npm run build:linux
+```
+
+No desktop client is built there yet, so a desktop pane on Linux says the client is missing
+rather than opening. Everything else works.
+
+### Afterwards
+
+```bash
+npm run build:mac:dir   # unpacked .app only — quicker, for checking a change
+npm run build:freerdp:shim        # rebuild only the client's own C, in seconds
+npm run build:freerdp:win:shim    # the same on Windows
+```
+
+Add `-- --publish always` to any of the packaging commands to upload the artifacts to a GitHub
+release.
+
+macOS packages Apple Silicon only and Windows x64 only, because the desktop client is built by
+the machine that packages it. Building for the other architecture means running the whole
+sequence on a machine of that architecture.
+
+**Each platform builds on itself**, and now each architecture too. electron-builder can only
+produce a package for the platform it runs on here, because native dependencies (`cpu-features`,
+pulled in by ssh2) are rebuilt against the target — running `build:win` on a Mac fails on that
+step. The desktop client adds the second half of that rule: it is compiled by the machine doing
+the packaging, so the package carries that machine's architecture. Cross-building is possible
 with Docker or wine, but the supported route in this repository is CI: pushing a `v*` tag builds
 all three on their own runners (see Releasing below), which is also how the published releases
 are made.
