@@ -25,7 +25,20 @@ prefix="${FREERDP_PREFIX:-$here/build/macos-$arch}"
 say() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 die() { printf '\n\033[31merror: %s\033[0m\n' "$*" >&2; exit 1; }
 
-[ -d "$prefix/lib" ] || die "no build at $prefix — run npm run build:freerdp:mac first"
+# Builds it rather than refusing, so packaging is one command from a fresh
+# clone. Said out loud first: somebody who expected two minutes should know why
+# it is going to be thirty, and that it happens once.
+if [ ! -d "$prefix/lib" ]; then
+  say "No desktop client yet — building FreeRDP first"
+  cat <<'WHY'
+This takes about half an hour and happens once: what it produces stays in
+resources/freerdp/build/ and later packaging runs reuse it. Changing the shim's
+own C afterwards is `npm run build:freerdp:shim`, which takes seconds.
+WHY
+  FREERDP_SDL="${FREERDP_SDL:-0}" bash "$here/build-macos.sh"
+fi
+
+[ -d "$prefix/lib" ] || die "the desktop client did not build — see the log above"
 
 # Anything under these is the operating system's and is present everywhere.
 is_system() { case "$1" in /usr/lib/*|/System/*) return 0 ;; *) return 1 ;; esac; }

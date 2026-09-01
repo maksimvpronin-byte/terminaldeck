@@ -464,29 +464,31 @@ once yet and a check that starts out red teaches everyone to ignore it.
 
 ### From a clone to an installer
 
-Three ordered commands per platform, and the order matters: packaging refuses to
-continue without the desktop client, and nothing builds that for you.
+Two commands per platform. The desktop client is compiled rather than downloaded, and packaging
+builds it when it is not there — once, saying first that it is about to take half an hour.
 
 **macOS** — produces a `.dmg` and a `.zip` for Apple Silicon:
 
 ```bash
-brew install cmake ninja pkg-config openssl@3 openh264 opus sdl2 sdl2_ttf sdl2_image
+brew install cmake ninja pkg-config openssl@3 openh264 opus
 npm install
-npm run build:freerdp:mac
 npm run build:mac
 ```
 
-The FreeRDP build takes half an hour or so the first time and is not repeated: it stays in
-`resources/freerdp/build/`. `FREERDP_SDL=0` leaves out the SDL client, which exists only to prove
-a build by hand against a real host — that is what CI does, and it saves three Homebrew packages
-and several minutes.
+The first run builds FreeRDP, which takes about half an hour and says so before it starts. It
+happens once: what it produces stays in `resources/freerdp/build/` and every later packaging run
+reuses it.
+
+Two extra packages — `sdl2 sdl2_ttf sdl2_image` — build the SDL client alongside it, which is
+worth having when something is wrong and it is not clear which side is at fault: it reaches a
+real host with the same code and no application around it. Packaging never includes it, so it is
+`npm run build:freerdp:mac` on its own that wants them.
 
 **Windows** — produces an NSIS installer and a portable `.exe` for x64. Needs Visual Studio 2022
 with the C++ workload, plus CMake and Git on `PATH`:
 
 ```
 npm install
-npm run build:freerdp:win
 npm run build:win
 ```
 

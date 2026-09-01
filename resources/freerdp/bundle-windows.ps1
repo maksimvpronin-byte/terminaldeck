@@ -24,11 +24,22 @@ $bin = Join-Path $out 'bin'
 function Step([string]$text) { Write-Host "`n==> $text" -ForegroundColor Cyan }
 function Die([string]$text) { Write-Host "`nerror: $text" -ForegroundColor Red; exit 1 }
 
+# Built rather than refused, so packaging is one command from a fresh clone.
+# Said out loud first: somebody who expected two minutes should know why it is
+# going to be thirty, and that it happens once.
 if (-not (Test-Path (Join-Path $bin 'td-rdp.exe'))) {
-  # Refused rather than skipped. A release built without this has a desktop
-  # pane that cannot open, and the failure would reach whoever installed it
-  # instead of whoever built it.
-  Die "no td-rdp.exe at $bin — run: npm run build:freerdp:win"
+  Step 'No desktop client yet — building FreeRDP first'
+  Write-Host @'
+This takes about half an hour and happens once: what it produces stays in
+resources\freerdp\build\ and later packaging runs reuse it. Changing the shim's
+own C afterwards is `npm run build:freerdp:win:shim`, which takes seconds.
+'@
+  & npm run build:freerdp:win
+  if ($LASTEXITCODE -ne 0) { Die 'the desktop client did not build — see the log above' }
+}
+
+if (-not (Test-Path (Join-Path $bin 'td-rdp.exe'))) {
+  Die "still no td-rdp.exe at $bin — see the log above"
 }
 
 $vcpkg = if ($env:VCPKG_ROOT) { $env:VCPKG_ROOT } else { Join-Path $here 'vcpkg' }
