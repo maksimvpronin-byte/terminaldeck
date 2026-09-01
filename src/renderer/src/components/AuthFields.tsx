@@ -169,7 +169,9 @@ export default function AuthFields({
       {shownMethod !== 'agent' && ownSecret && (
         <p className="settings-note action-note">
           {forgetSecret ? t('Will be forgotten on save') : t('Saved on this host')}
-          <Hint>{forgetSecret ? words.forget : words.held}</Hint>{' '}
+          {/* No space written between them: the mark carries its own margin on
+              both sides, and a space here is added to the right one only. */}
+          <Hint>{forgetSecret ? words.forget : words.held}</Hint>
           <button type="button" onClick={() => onForgetSecret(!forgetSecret)}>
             {forgetSecret ? t('Keep it') : t('Forget it')}
           </button>
