@@ -18,6 +18,21 @@ the other produces a version nobody can install, which is how 0.1.10 through
 
 ### Fixed
 
+- **The host tree was written the one way the vault never is.** Every host,
+  group and setting lives in `sessions.json`, which is rewritten on each edit
+  and each drag — and it was written in place, so anything interrupting the
+  write left a truncated file. The vault and the collection store both go
+  through a temporary file and a rename, with a comment explaining why; the file
+  written most often was the one that did not. Worse, a damaged file was read as
+  an empty tree without a word, and the next save wrote that empty tree over
+  what was left. It is put aside under a name of its own now, and both
+  behaviours are covered by tests that fail without the fix.
+- **A desktop pane could read past the end of its own picture.** The rectangle
+  of what changed is clamped against the framebuffer as it was when the
+  rectangle was noted, and `gdi_resize` — on another thread — frees that buffer
+  for a smaller one. The gap was two lock acquisitions wide. It is now cleared
+  under the same lock that swaps the buffer, and clamped again at the moment it
+  is read.
 - **Whole screens were untranslated without the phrase-book test noticing.** It
   read only `t('…')` written with single quotes, which is precisely the wrong
   half: a string containing an apostrophe has to be written with double quotes,

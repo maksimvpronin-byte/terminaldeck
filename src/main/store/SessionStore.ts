@@ -1,6 +1,6 @@
 import { app } from 'electron'
 import { join } from 'path'
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
+import { readFileSync, writeFileSync, renameSync, existsSync, mkdirSync } from 'fs'
 import type { SessionGroup, SessionProfile, SessionStoreData } from '../../shared/types'
 import { applyOrder } from '../../shared/ordering'
 
@@ -19,20 +19,47 @@ class SessionStore {
     this.data = this.load()
   }
 
+  /**
+   * Reads the tree, and does not quietly throw it away when it cannot.
+   *
+   * Returning an empty tree from a failed parse is the obvious thing and the
+   * wrong one: the window then shows no hosts, which reads as "my sessions are
+   * gone", and the first save after that writes the empty tree over the file
+   * that still held them. A damaged file is put aside under a name of its own
+   * instead, so what is left of it survives long enough to be repaired by hand.
+   */
   private load(): SessionStoreData {
     const p = storePath()
     if (!existsSync(p)) return empty()
     try {
       return JSON.parse(readFileSync(p, 'utf8')) as SessionStoreData
     } catch {
+      try {
+        renameSync(p, `${p}.damaged-${Date.now()}`)
+      } catch {
+        // Nowhere to put it — a read-only directory, or it went between the
+        // two calls. Starting empty is still better than refusing to start.
+      }
       return empty()
     }
   }
 
+  /**
+   * Writes through a temporary file and a rename, as the vault and the
+   * collection store already did.
+   *
+   * This one wrote in place, which is a truncated file the moment anything
+   * interrupts it — and this is the file holding every host, group and setting,
+   * rewritten on each edit and each drag. The two files that were treated
+   * carefully are the two that are written least.
+   */
   private persist(): void {
     const dir = app.getPath('userData')
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-    writeFileSync(storePath(), JSON.stringify(this.data, null, 2), 'utf8')
+    const target = storePath()
+    const tmp = `${target}.tmp`
+    writeFileSync(tmp, JSON.stringify(this.data, null, 2), 'utf8')
+    renameSync(tmp, target)
   }
 
   getAll(): SessionStoreData {

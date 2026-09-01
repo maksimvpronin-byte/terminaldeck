@@ -184,10 +184,27 @@ static void flush_frame(tdContext* td)
 	if (!gdi || !gdi->primary_buffer || !td->dirty || td->inflight)
 		return;
 
+	/**
+	 * Clamped again, here, against the framebuffer as it is right now.
+	 *
+	 * The rectangle was already clamped when it was noted — but against the
+	 * size the framebuffer had *then*, and `gdi_resize` frees that buffer and
+	 * allocates a smaller one. Every path that resizes clears the rectangle
+	 * too, so this should never bite; "should never" is not a bound, and what
+	 * is on the other side of it is a read past the end of the picture.
+	 */
+	UINT32 x2 = td->dx2 > (UINT32)gdi->width ? (UINT32)gdi->width : td->dx2;
+	UINT32 y2 = td->dy2 > (UINT32)gdi->height ? (UINT32)gdi->height : td->dy2;
+	if (td->dx1 >= x2 || td->dy1 >= y2)
+	{
+		td->dirty = 0;
+		return;
+	}
+
 	const UINT32 x = td->dx1;
 	const UINT32 y = td->dy1;
-	const UINT32 w = td->dx2 - td->dx1;
-	const UINT32 h = td->dy2 - td->dy1;
+	const UINT32 w = x2 - x;
+	const UINT32 h = y2 - y;
 
 	const size_t needed = (size_t)w * h * 4u + 8u;
 	if (needed > td->scratch_size)
@@ -315,6 +332,12 @@ static BOOL td_desktop_resize(rdpContext* context)
 	 */
 	EnterCriticalSection(&td->paint);
 	const BOOL resized = gdi_resize(context->gdi, width, height);
+	/* Forgotten under the same lock the buffer was swapped under, not under a
+	 * second one taken afterwards: in the gap between two acquisitions the
+	 * other thread reads a rectangle measured against a framebuffer that no
+	 * longer exists. */
+	td->dirty = 0;
+	td->inflight = 0;
 	LeaveCriticalSection(&td->paint);
 	if (!resized)
 		return FALSE;
