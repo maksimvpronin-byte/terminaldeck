@@ -1790,14 +1790,15 @@ textarea:focus {
   color: var(--success);
   font-size: 12px;
 }
+/* No scroll of its own. It had one — two hundred pixels of it — from when this
+   drew every trusted key there was; the list is capped at twenty rows now and a
+   filter finds the rest. A scrolling box inside a scrolling dialog only bought
+   a row sliced through the middle at the boundary, which is what it looked
+   like. */
 .known-hosts-list {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-height: 200px;
-  overflow-y: auto;
-  /* Room for the scrollbar so it never sits on top of the Forget buttons. */
-  padding-right: 2px;
 }
 .known-host-row {
   display: grid;
