@@ -81,13 +81,15 @@ if (Test-Path $vswhere) {
       Select-Object -First 1 -ExpandProperty FullName
     if ($crt) {
       Step "Copying the Visual C++ runtime from $crt"
-      # Only what is not already here. CMake installed the runtime that the
-      # compiler doing the building ships with, and that one is right by
-      # definition; the redistributable fills in the rest of the set.
-      foreach ($dll in Get-ChildItem (Join-Path $crt '*.dll')) {
-        $to = Join-Path $bin $dll.Name
-        if (-not (Test-Path $to)) { Copy-Item $dll.FullName -Destination $to }
-      }
+      # Unconditionally, and this matters. An earlier version of this copied
+      # only what was missing, on the reasoning that CMake had already installed
+      # the compiler's own runtime and knew better. But this directory is
+      # restored from a build cache, so what is "already there" can be the work
+      # of an older version of this script — and the run that tried it kept the
+      # very files it was written to replace. The chosen redistributable
+      # matches the toolset that did the compiling; it is what should ship, and
+      # the copy has to say so every time rather than defer to a leftover.
+      Copy-Item (Join-Path $crt '*.dll') -Destination $bin -Force
     } else {
       Write-Host "warning: no VC++ runtime found under $redist — a machine without the redistributable will not run the desktop client" -ForegroundColor Yellow
     }
