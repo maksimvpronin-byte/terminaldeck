@@ -126,6 +126,56 @@ all:
     expect(hosts[0].groupId).toBe(groupId(SRC, 'all/b'))
   })
 
+  /**
+   * The layout that came back as "the inventory loaded but the groups did
+   * not": groups written as siblings of `all` rather than nested under
+   * `all.children`, which is how a Kubernetes inventory is ordinarily laid
+   * out. Reading `all` and stopping threw every one of them away — and the
+   * hosts still appeared, because `all.hosts` lists them too, so the tree
+   * looked like it had worked.
+   */
+  describe('groups written beside "all" rather than under it', () => {
+    const beside = parse(`
+all:
+  hosts:
+    m1: { ansible_host: 10.0.0.1 }
+    w1: { ansible_host: 10.0.0.2 }
+control:
+  hosts:
+    m1:
+  vars:
+    ansible_user: root
+workers:
+  hosts:
+    w1:
+`)
+
+    it('reads them, as children of all', () => {
+      const { groups } = parseAnsibleInventory(beside, SRC)
+      expect(groups.map((g) => g.name)).toEqual(['all', 'control', 'workers'])
+      expect(groups.find((g) => g.name === 'control')!.parentId).toBe(groupId(SRC, 'all'))
+    })
+
+    it('gives each host the group that actually names it', () => {
+      const { hosts } = parseAnsibleInventory(beside, SRC)
+      expect(hosts.find((h) => h.name === 'm1')!.groupId).toBe(groupId(SRC, 'all/control'))
+      expect(hosts.find((h) => h.name === 'w1')!.groupId).toBe(groupId(SRC, 'all/workers'))
+    })
+
+    it('lists the host under all and under its own group', () => {
+      const { memberships } = parseAnsibleInventory(beside, SRC)
+      expect(memberships[hostId(SRC, 'm1')]).toEqual([
+        groupId(SRC, 'all'),
+        groupId(SRC, 'all/control')
+      ])
+    })
+
+    it('lets those groups carry the connection settings', () => {
+      const { groups } = parseAnsibleInventory(beside, SRC)
+      expect(groups.find((g) => g.name === 'control')!.username).toBe('root')
+    })
+  })
+
   it('handles top-level groups without an "all" wrapper', () => {
     const flat = parse('web:\n  hosts:\n    w1: {}\n')
     const { groups, hosts } = parseAnsibleInventory(flat, SRC)

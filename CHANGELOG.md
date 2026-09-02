@@ -10,6 +10,21 @@ the other produces a version nobody can install, which is how 0.1.10 through
 
 ### Fixed
 
+- **An inventory's groups are read, not just `all`.** A YAML inventory is a
+  mapping of group name to group, and `all` is only the one Ansible gives a
+  meaning to. The parser read `all`, stopped, and threw the rest away.
+
+  That is not an exotic layout — writing the groups as siblings of `all` rather
+  than nesting them under `all.children` is the ordinary shape of a Kubernetes
+  inventory, and it fails quietly: the hosts are listed under `all.hosts` as
+  well, so they all appeared, under `ALL`, and the repository looked like one
+  with no groups in it.
+
+  Every top-level key is now a group, placed under `all` the way Ansible places
+  it. Two things follow that were missing with them: a host is shown under each
+  group that names it, and a group's own `vars` — and its file in `group_vars/`
+  — reach the hosts inside it, which is usually where the login lives.
+
 - **Shortcuts stay out of a field being typed into.** Every one of them is a
   modifier and a single letter, and they fired wherever the focus was — so a
   group being named could lose its dialog to `w`, or have the snippet palette

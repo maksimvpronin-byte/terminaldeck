@@ -111,10 +111,34 @@ export function parseAnsibleInventory(
     }
   }
 
-  // The conventional root is `all`, but a file may list top-level groups directly.
+  /*
+   * Every key at the top level is a group, and `all` is only the one Ansible
+   * gives a meaning to.
+   *
+   * This used to read `all` and stop, which quietly threw away every other
+   * group in the file. That is not an exotic layout: writing the groups as
+   * siblings of `all` rather than nesting them under `all.children` is the
+   * ordinary way a Kubernetes inventory is laid out, and the hosts still
+   * appeared — they are listed under `all.hosts` as well — so the tree looked
+   * like it had worked and had simply lost every group in the repository.
+   *
+   * Ansible makes every group a child of `all`, so that is where they are put.
+   * A file with no `all` at all keeps them at the top, as before.
+   */
   const root = doc as Record<string, RawGroup | null>
-  if (root.all) walk('all', root.all, null)
-  else for (const [name, raw] of Object.entries(root)) walk(name, raw, null)
+  const isGroup = (value: unknown): value is RawGroup | null =>
+    value === null || (typeof value === 'object' && !Array.isArray(value))
+
+  if ('all' in root) {
+    walk('all', root.all, null)
+    for (const [name, raw] of Object.entries(root)) {
+      if (name !== 'all' && isGroup(raw)) walk(name, raw, 'all')
+    }
+  } else {
+    for (const [name, raw] of Object.entries(root)) {
+      if (isGroup(raw)) walk(name, raw, null)
+    }
+  }
 
   for (const [key, entry] of seen) {
     // Ansible merges group vars parents-first and alphabetically within a level,
