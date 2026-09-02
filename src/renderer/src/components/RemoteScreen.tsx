@@ -554,8 +554,54 @@ export default function RemoteScreen({
       return true
     }
 
+    /**
+     * The modifiers, and the state each one answers to.
+     *
+     * Both sides of a pair map to the same state: `getModifierState('Control')`
+     * is true while either Ctrl is down, so a hand moving from one to the other
+     * leaves both marked held for a moment. Sending one release too few is the
+     * failure this exists to prevent; sending one too many costs nothing, since
+     * a key released twice over there is already released.
+     */
+    const MODIFIERS: Array<[code: string, state: string]> = [
+      ['ControlLeft', 'Control'],
+      ['ControlRight', 'Control'],
+      ['ShiftLeft', 'Shift'],
+      ['ShiftRight', 'Shift'],
+      ['AltLeft', 'Alt'],
+      ['AltRight', 'Alt'],
+      ['MetaLeft', 'Meta'],
+      ['MetaRight', 'Meta']
+    ]
+
+    /**
+     * Puts the far end's idea of the modifiers back in step with this one's.
+     *
+     * A key-up that never arrives leaves a modifier held over there for good,
+     * and every letter typed afterwards is a shortcut — on a remote machine
+     * running this very application, a `k` opens the snippet palette. It is
+     * lost whenever the focus moves between the press and the release, which
+     * the handlers below cannot forward, and this application moves it itself:
+     * its own palettes take the focus the moment they open.
+     *
+     * `blur` releases everything and covers the common case. This covers the
+     * rest, and needs no event to fire at all: every keystroke carries the true
+     * state of every modifier, so the next key pressed after a loss corrects it.
+     * That is the same repair as pressing Ctrl by hand, which is what people
+     * were doing, without their having to notice that it was needed.
+     */
+    const reconcileModifiers = (event: KeyboardEvent): void => {
+      for (const [code, state] of MODIFIERS) {
+        if (held.has(code) && !event.getModifierState(state)) {
+          held.delete(code)
+          sendKey(code, false)
+        }
+      }
+    }
+
     const onKeyDown = (event: KeyboardEvent): void => {
       if (!container.contains(document.activeElement)) return
+      reconcileModifiers(event)
 
       // Full screen belongs to the pane, and the toolbar button means the same
       // thing; see `.pane:fullscreen` in styles.css.
@@ -723,11 +769,9 @@ export default function RemoteScreen({
         ])
         if (lock) {
           void lock.catch((err: Error) => {
-            // eslint-disable-next-line no-console
             console.error(`[desktop] the keyboard could not be captured: ${err.message}`)
           })
         } else {
-          // eslint-disable-next-line no-console
           console.error('[desktop] no keyboard capture here — Alt+Tab stays with this machine')
         }
 

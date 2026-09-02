@@ -10,6 +10,25 @@ the other produces a version nobody can install, which is how 0.1.10 through
 
 ### Fixed
 
+- **A modifier is never left held on the far machine.** The session forwards
+  `Ctrl down` as a scancode and forwards `Ctrl up` only while the focus is
+  still inside it — so a focus that moves between the press and the release
+  leaves the far end holding a key nobody is holding, for every application
+  over there. Pressing Ctrl once cleared it, which is a fresh pair of events
+  putting the two sides back in step by hand.
+
+  Found the hard way, and only because of what it was being tested on: a
+  desktop running this very application, where a `k` typed into a form opened
+  the snippet palette. On anything else it would have read as the far machine
+  misbehaving.
+
+  Losing the release is not exotic — this application moves the focus itself,
+  since its own palettes take it the moment they open. So rather than trying
+  not to lose one, every keystroke now carries the true state of every
+  modifier and puts the far end back in step. The next key pressed after a loss
+  repairs it, which is the same repair people were making by hand, without
+  their having to know it was needed.
+
 - **An inventory's groups are read, not just `all`.** A YAML inventory is a
   mapping of group name to group, and `all` is only the one Ansible gives a
   meaning to. The parser read `all`, stopped, and threw the rest away.
