@@ -701,9 +701,35 @@ export default function RemoteScreen({
       holding = held
 
       if (held) {
-        // Named rather than blanket, so the window cannot swallow keys nobody
-        // meant to give it.
-        void keyboard?.lock(['AltLeft', 'AltRight', 'Tab', 'Escape', 'MetaLeft', 'MetaRight'])
+        /*
+         * Named rather than blanket, so the window cannot swallow keys nobody
+         * meant to give it.
+         *
+         * And said out loud when it does not happen. This is what puts Alt+Tab
+         * on the far machine rather than this one, and without it the key is
+         * taken by the local system and the session never hears of it — which
+         * looks exactly like the session ignoring it. The call can be missing
+         * outright, and it can be refused; both were silent, and a whole
+         * feature absent with nothing anywhere to say so is how the last three
+         * faults today managed to hide.
+         */
+        const lock = keyboard?.lock([
+          'AltLeft',
+          'AltRight',
+          'Tab',
+          'Escape',
+          'MetaLeft',
+          'MetaRight'
+        ])
+        if (lock) {
+          void lock.catch((err: Error) => {
+            // eslint-disable-next-line no-console
+            console.error(`[desktop] the keyboard could not be captured: ${err.message}`)
+          })
+        } else {
+          // eslint-disable-next-line no-console
+          console.error('[desktop] no keyboard capture here — Alt+Tab stays with this machine')
+        }
 
         /*
          * And the session takes the keyboard it was just given.
