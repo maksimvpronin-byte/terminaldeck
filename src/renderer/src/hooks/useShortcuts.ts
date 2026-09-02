@@ -64,6 +64,33 @@ export function useShortcuts(actions: {
   openHostsRef.current = actions.openHosts
 
   useEffect(() => {
+    /**
+     * Whether the modifier has been seen going down and not coming back up.
+     *
+     * `event.ctrlKey` is normally the truth and is trusted as such — this is
+     * the second opinion, for when it is not. A modifier's `keyup` is lost
+     * whenever the window stops being the one receiving keys while the key is
+     * held: alt-tabbing out of a session does it, and so does this application
+     * itself, since the palettes these shortcuts open take the focus the moment
+     * they appear. What is left behind is a `ctrlKey` that stays true with
+     * nobody holding anything, and then every letter typed is a command —
+     * reported as a group being named and the snippet palette opening over the
+     * dialog.
+     *
+     * Which is why the reset is on `blur` rather than anywhere cleverer: the
+     * moment the keystroke can go missing is the moment we stop being able to
+     * see it, and that is the one moment we are told about. Pressing the
+     * modifier again puts it back, which is what people already do by reflex.
+     */
+    let held = false
+
+    function onModifier(e: KeyboardEvent): void {
+      if (e.key === 'Control' || e.key === 'Meta') held = e.type === 'keydown'
+    }
+    function forget(): void {
+      held = false
+    }
+
     function onKeyDown(e: KeyboardEvent): void {
       /**
        * ⌘ on a Mac, and only ⌘.
@@ -76,7 +103,8 @@ export function useShortcuts(actions: {
        * keystroke never reached the far end.
        */
       const mod = IS_MAC ? e.metaKey : e.ctrlKey
-      if (!mod) return
+      // Both have to agree: what the event says, and what we watched happen.
+      if (!mod || !held) return
 
       /**
        * AltGr is Ctrl+Alt on Windows and Linux, and it is how a keyboard
@@ -189,8 +217,18 @@ export function useShortcuts(actions: {
       }
     }
 
+    // The tracker first, so a modifier pressed and used in one breath is
+    // already known about by the time the letter arrives.
+    window.addEventListener('keydown', onModifier, true)
+    window.addEventListener('keyup', onModifier, true)
+    window.addEventListener('blur', forget)
     window.addEventListener('keydown', onKeyDown, true)
-    return () => window.removeEventListener('keydown', onKeyDown, true)
+    return () => {
+      window.removeEventListener('keydown', onModifier, true)
+      window.removeEventListener('keyup', onModifier, true)
+      window.removeEventListener('blur', forget)
+      window.removeEventListener('keydown', onKeyDown, true)
+    }
   }, [])
 }
 
