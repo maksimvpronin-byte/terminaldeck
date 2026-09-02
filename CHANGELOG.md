@@ -10,6 +10,19 @@ the other produces a version nobody can install, which is how 0.1.10 through
 
 ### Fixed
 
+- **Shortcuts stay out of a field being typed into.** Every one of them is a
+  modifier and a single letter, and they fired wherever the focus was — so a
+  group being named could lose its dialog to `w`, or have the snippet palette
+  open over it on `k`. Reported exactly that way, with the palette sitting on
+  top of a half-filled repository dialog.
+
+  The terminal stays as it was, and has to: xterm types into a textarea of its
+  own, and opening a tab or the palette from a shell is what these are for.
+
+  A combination that also holds Alt is left alone too. AltGr is Ctrl+Alt on
+  Windows and Linux — it is how a keyboard makes a character rather than a
+  command, and nothing here wants Alt in the first place.
+
 - **A full-screen session takes the keyboard it was given.** Going full screen
   locks Alt+Tab, Escape and the ⌘ keys away from the local system so they can
   reach the far machine instead. They were not reaching it: the session's key

@@ -26,6 +26,28 @@ function desktopHoldsKeyboard(): boolean {
 }
 
 /**
+ * Whether this keystroke belongs to something being typed into.
+ *
+ * Every shortcut here is a modifier and one letter, which is also what a great
+ * many keyboards produce while somebody fills in a form — so a field being
+ * typed into keeps its keys. Naming a group and losing the dialog because the
+ * letter happened to be `w`, or having the snippet palette open over it on a
+ * `k`, is not a shortcut firing, it is text being taken away.
+ *
+ * The terminal is the exception, and it has to be: xterm types into a textarea
+ * of its own, and opening a tab or the palette from a shell is exactly what
+ * these are for. It is recognised by our own container rather than by xterm's
+ * class name, which is a detail of a dependency.
+ */
+function isTyping(target: EventTarget | null): boolean {
+  const element = target as HTMLElement | null
+  if (!element || typeof element.closest !== 'function') return false
+  if (element.closest('.terminal-host')) return false
+  const tag = element.tagName
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || element.isContentEditable
+}
+
+/**
  * Window-level shortcuts. Registered in the capture phase so they win over
  * xterm.js, which otherwise swallows the keystroke into the remote shell.
  */
@@ -55,6 +77,17 @@ export function useShortcuts(actions: {
        */
       const mod = IS_MAC ? e.metaKey : e.ctrlKey
       if (!mod) return
+
+      /**
+       * AltGr is Ctrl+Alt on Windows and Linux, and it is how a keyboard
+       * produces a character rather than a command. Nothing here wants Alt, so
+       * insisting it is absent costs nothing and takes a whole class of typed
+       * accident away.
+       */
+      if (e.altKey) return
+
+      // Not over a field somebody is filling in — see `isTyping`.
+      if (isTyping(e.target)) return
 
       /**
        * A full-screen desktop takes the whole keyboard, this app included.
