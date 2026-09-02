@@ -188,12 +188,14 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
 - **Full screen gives the whole display to the desktop.** The pane toolbar leaves entirely
   there — not a strip of it stays, and while it is away it cannot take a click either. The far
   side keeps its own tab strip, menu bar and window buttons along that same top edge, and a
-  toolbar that reappeared on a passing pointer landed over the very thing being reached for.
-  Pushing the pointer against the top of the display and holding it for half a second brings it
-  back; moving down past it puts it away. So the size asked for is the display's
-  own rather than the display less a toolbar — which matters beyond the room it frees, since a
-  size no monitor has is the one that cannot land pixel for pixel. F11 enters and leaves, and
-  holding Escape leaves; while there, Alt+Tab reaches the far side
+  toolbar over the picture is a toolbar over the very thing being reached for. It does not come
+  back on a gesture either: every button on it carries a tooltip, a tooltip is a window of the
+  operating system drawn above everything on the screen, and one shown as the strip slid away
+  under a pointer that had not moved did not reliably come down with it — it stayed at the top
+  of the display, over whatever was switched to next, taking every click inside it. So the size
+  asked for is the display's own rather than the display less a toolbar — which matters beyond
+  the room it frees, since a size no monitor has is the one that cannot land pixel for pixel.
+  F11 enters and leaves, and holding Escape leaves; while there, Alt+Tab reaches the far side
 - **Full screen hands the whole keyboard to the session.** Every shortcut this application owns
   stands down while a desktop is full screen — `⌘W`/`Ctrl+W`, the tab and workspace numbers, the
   snippet and host palettes, the vault lock, the zoom keys, and on a Mac the menu accelerators

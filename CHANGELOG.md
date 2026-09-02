@@ -6,6 +6,42 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.7.1
+
+Two windows of the operating system that this application put on the screen
+and did not always take back. Both were tooltips, both sat at the top edge of
+a full-screen desktop, and both were reported the same way: the corner of the
+screen stopped working, in a different application entirely.
+
+### Fixed
+
+- **Nothing of this application is left over a full-screen desktop.** A strip
+  of pane toolbar could be brought back there by pressing the pointer against
+  the top of the display and holding it. It is gone, and so is the strip: in
+  full screen the toolbar is not hidden, it is not rendered at all.
+
+  What it cost was worth more than it was. Every button on that strip carries a
+  `title`, and a `title` is a native tooltip — a window of the operating system,
+  drawn above everything on the screen and owned by no page. Sliding the strip
+  out from under a pointer that has not moved is not the same as the pointer
+  leaving it, and a tooltip that was up when the strip left did not reliably
+  come down: it stayed at the top of the display, over whatever the user
+  switched to next, swallowing every click inside it. Reported twice as "the
+  top-left corner of the screen stopped working", in Outlook both times.
+
+  The way out never went through that strip anyway — F11 leaves full screen and
+  so does holding Escape, both stated in the help — so what is lost is a
+  gesture, and what is gained is that the top edge of a full-screen session
+  belongs entirely to the far side, which is where its own tab strip, menu bar
+  and window buttons live.
+
+- **The desktop's measured size is no longer a native tooltip.** It said what
+  size was asked for and what the server gave back, and it was the `title` of
+  the element covering the whole session — so it was displayed for as long as
+  anyone worked in one, and it is the only title in this application whose text
+  changes while it is on screen. Both halves of the same trap as above. It is a
+  mark in the pane toolbar now, and what that opens is drawn inside the page.
+
 ## 0.7.0
 
 ### Added

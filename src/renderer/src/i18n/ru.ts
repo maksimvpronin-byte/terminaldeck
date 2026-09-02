@@ -189,7 +189,6 @@ export const ru: Record<string, string> = {
   "Close pane (⌘W)": "Закрыть панель (⌘W)",
   "Split down (⌘⇧D)": "Разделить вниз (⌘⇧D)",
   "Split right (⌘D)": "Разделить вправо (⌘D)",
-  "The pane toolbar hides there, so the desktop is the size of the display": "Панель инструментов там прячется, и стол становится размером с экран",
   "A Retina desktop is drawn the usual size by asking for fewer, larger pixels": "На Retina стол обычного размера получается из меньшего числа крупных пикселей",
   "How much larger is per host; nothing about the far machine is changed": "Насколько крупнее — задаётся на хосте; на дальней машине ничего не меняется",
   "Or tell the session the density and it draws itself larger, sharply": "Или сообщите сессии плотность — она нарисует себя крупнее и резко",
@@ -437,8 +436,6 @@ export const ru: Record<string, string> = {
     "Уходит в оболочку, а не в приложение: Ctrl+C прерывает, Ctrl+D завершает сессию, Ctrl+K, Ctrl+W и Ctrl+L делают то, что положено readline",
   "Lock the vault; it also locks itself after the delay set in Settings → Security":
     "Заблокировать хранилище; оно и само блокируется через срок, заданный в Настройки → Безопасность",
-  "Push the pointer against the very top of the screen and hold it to bring the toolbar back":
-    "Упритесь указателем в самый верх экрана и подержите — панель вернётся",
   "SFTP": "SFTP",
   "Monitor": "Монитор",
   "No saved sessions yet. Click \"+ Session\" to add one.":
@@ -765,4 +762,7 @@ export const ru: Record<string, string> = {
   "Nothing is held back: F11 and holding Escape are the way out, and neither is a shortcut": "Ничего не удерживается: выход — F11 или удержание Escape, ни то ни другое не является сочетанием",
   "In a window rather than full screen the app keeps its shortcuts as before": "В оконном режиме, а не в полном экране, сочетания приложения работают как раньше",
   "⌘Q and ⌘Tab stay with macOS in a window, and go to the session in full screen": "⌘Q и ⌘Tab остаются за macOS в окне и уходят в сеанс в полном экране",
+  "The size this desktop asked for, and what the server gave back.": "Размер, который запросил этот рабочий стол, и то, что вернул сервер.",
+  "The pane toolbar goes entirely, so the desktop is the size of the display": "Панель инструментов убирается совсем, и стол становится размером с экран",
+  "There is nothing of this app over the picture — the top edge belongs to the far side": "Ничего от этого приложения поверх картинки нет — верхний край принадлежит той стороне",
 }

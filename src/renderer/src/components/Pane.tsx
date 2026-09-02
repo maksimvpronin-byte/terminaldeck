@@ -10,7 +10,7 @@ import TunnelsPanel from './TunnelsPanel'
 import MonitorBar from './MonitorBar'
 import { protocolOf, traitsOf } from '../../../shared/protocols'
 import { SplitRightIcon, SplitDownIcon, CloseIcon, DetachIcon } from './icons'
-import { useToolbarReveal } from '../hooks/useToolbarReveal'
+import Hint from './Hint'
 import { keyHint } from '../state/keys'
 import { useT } from '../i18n'
 
@@ -61,6 +61,14 @@ export default function Pane({
   const traits = traitsOf(protocol)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const [dropEdge, setDropEdge] = useState<DropEdge | null>(null)
+  /**
+   * What size a desktop was asked for and what the server gave back.
+   *
+   * Kept here so it can be read from a mark in this toolbar rather than from a
+   * native tooltip over the session itself — see `onMeasured` in GraphicalHost
+   * for what that cost. Empty for a terminal, which has no such thing.
+   */
+  const [measured, setMeasured] = useState('')
 
   const isActive = isActiveTab && activePaneId === node.id
 
@@ -104,8 +112,6 @@ export default function Pane({
     if (item.kind === 'tab') closeTab(item.id)
   }
 
-  const toolbarOut = useToolbarReveal(rootRef)
-
   return (
     <div
       className={`pane ${isActive ? 'active' : ''}`}
@@ -116,10 +122,20 @@ export default function Pane({
     >
       {dropEdge && <div className={`pane-drop-hint ${dropEdge}`} />}
       <div
-        className={`pane-toolbar ${toolbarOut ? 'out' : ''} ${broadcast && node.broadcastEnabled ? 'broadcasting' : ''}`}
+        className={`pane-toolbar ${broadcast && node.broadcastEnabled ? 'broadcasting' : ''}`}
         style={node.color ? { borderLeft: `3px solid ${node.color}` } : undefined}
       >
-        <span>{node.title}</span>
+        {/* Name and mark in one element, because the toolbar lays its children
+            out with space-between: a third child would be pushed to the middle
+            of the strip rather than sitting beside the name it belongs to. */}
+        <span className="pane-name">
+          {node.title}
+          {measured && (
+            <Hint>
+              {t('The size this desktop asked for, and what the server gave back.')} {measured}
+            </Hint>
+          )}
+        </span>
         <div className="actions">
           {broadcast && traits.broadcast && (
             <label className="broadcast-check" title={t("Include this terminal in broadcast")}>
@@ -223,6 +239,7 @@ export default function Pane({
             port={port}
             sessionId={sessionId ?? undefined}
             credentialId={credentialId}
+            onMeasured={setMeasured}
             paneVisible={isActiveTab}
           />
         )}

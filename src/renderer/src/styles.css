@@ -713,7 +713,15 @@ label {
   display: flex;
   gap: 4px;
 }
-.pane-toolbar button {
+.pane-name {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+/* `:not(.hint-mark)` for the reason it is written on `.action-note` too: the
+   question mark is a button, and six pixels of side padding turn its circle
+   into an oval with the glyph off centre. */
+.pane-toolbar button:not(.hint-mark) {
   padding: 2px 6px;
   font-size: 11px;
 }
@@ -734,10 +742,9 @@ label {
  * which is the one case where the picture cannot land pixel for pixel however
  * the density is negotiated. Out of the flow, the body is the screen exactly.
  *
- * A sliver is left at the top rather than nothing at all, because the way back
- * out should be findable by someone who did not read the tooltip: brushing the
- * top edge slides the toolbar down, and it goes away again on its own. F11 and
- * holding Escape still work without going anywhere near it.
+ * Nothing is left at the top to find it by. F11 leaves, and so does holding
+ * Escape; both are stated in the help, and neither needs a strip of interface
+ * kept over the picture to be reachable.
  */
 /**
  * No frame around a pane that is the only thing on the screen.
@@ -752,31 +759,27 @@ label {
 .pane:fullscreen {
   border: 0;
 }
-/* Full screen: entirely out of the way, and out of the mouse's way too.
-   No sliver is left peeking. A strip of toolbar over the picture is a strip
-   that swallows clicks, and the top edge is exactly where a remote desktop
-   sends people — the far side's own tab strip, menu bar and window buttons all
-   live there. `pointer-events: none` is the half that matters: hidden, this
-   element cannot take a click meant for the desktop under it, and cannot
-   reveal itself by being hovered on the way past.
-   What brings it back is deliberate instead — see `useToolbarReveal`: the pointer pressed against the very edge of the display and held
-   there. */
+/* Full screen: gone, not hidden.
+ *
+ * A strip of toolbar over the picture is a strip that swallows clicks, and the
+ * top edge is exactly where a remote desktop sends people — the far side's own
+ * tab strip, menu bar and window buttons all live there.
+ *
+ * It used to slide back on a deliberate gesture, the pointer pressed against
+ * the very edge of the display and held there. That is gone with it, and the
+ * reason is worth writing down: every button on the strip carries a `title`,
+ * and a `title` is a native tooltip, which is a window of the operating system
+ * drawn above everything on the screen. Sliding the strip out from under a
+ * pointer that has not moved is not the same as the pointer leaving it, and a
+ * tooltip that was up when the strip left did not always come down — it stayed
+ * at the top of the display, over whatever the user switched to next, taking
+ * every click inside it. That is a bad trade for a toolbar reachable in one
+ * keystroke: F11 leaves full screen, and so does holding Escape.
+ *
+ * `display: none` rather than a transform, so there is no element there to be
+ * hovered, focused, or left holding a tooltip. */
 .pane:fullscreen .pane-toolbar {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 6;
-  transform: translateY(-100%);
-  pointer-events: none;
-  transition: transform 120ms ease;
-  border-bottom-color: transparent;
-}
-.pane:fullscreen .pane-toolbar.out,
-.pane:fullscreen .pane-toolbar:focus-within {
-  transform: none;
-  pointer-events: auto;
-  border-bottom-color: var(--border);
+  display: none;
 }
 
 .pane-body {

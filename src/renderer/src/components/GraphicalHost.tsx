@@ -33,6 +33,7 @@ export default function GraphicalHost({
   port,
   sessionId,
   credentialId,
+  onMeasured,
   paneVisible
 }: {
   protocol: Protocol
@@ -45,6 +46,18 @@ export default function GraphicalHost({
    * password reaches this component whichever login is used.
    */
   credentialId?: string
+  /**
+   * What size was asked for and what came back, handed to the pane to show.
+   *
+   * It used to be the `title` of the element below, which is a native tooltip —
+   * an operating-system window Chromium puts on top of everything. That one
+   * got stuck: it is the only title in this application that changes while it
+   * is on screen, and it covers a whole desktop rather than a button, so it is
+   * displayed for as long as somebody is working in the session. Alt-tab away
+   * at the wrong moment and it stayed there, over other people's applications,
+   * swallowing every click inside it.
+   */
+  onMeasured?: (text: string) => void
   /** False while another tab is in front: a window over a hidden pane would
    *  sit on top of whatever replaced it. */
   paneVisible: boolean
@@ -235,7 +248,7 @@ export default function GraphicalHost({
     attempt > 0 && (phase.at === 'connecting' || phase.at === 'connected')
 
   return (
-    <div className="graphical-host" title={asked}>
+    <div className="graphical-host">
       {running && sessionId && (
         <RemoteScreen
           key={attempt}
@@ -244,7 +257,10 @@ export default function GraphicalHost({
           look={look}
           password={lastTyped.current}
           onPhase={setPhase}
-          onMeasured={setAsked}
+          onMeasured={(text) => {
+            setAsked(text)
+            onMeasured?.(text)
+          }}
         />
       )}
 
