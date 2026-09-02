@@ -82,6 +82,7 @@ const SECTIONS: Section[] = [
     rows: [
       { keys: 'Ctrl+Alt+End', what: 'Ctrl+Alt+Del on the far side; this machine keeps the real one' },
       { keys: 'F11', what: 'Full screen, which is the only way Alt+Tab reaches the far side' },
+      { what: 'On a Mac that is ⌥Tab: ⌘Tab belongs to macOS and cannot be taken from it' },
       { what: 'Hold Escape to leave full screen: while there, it belongs to the session' },
       { what: 'Full screen also hands over every shortcut this app owns, ⌘W and Ctrl+W included' },
       { what: 'So a key aimed at the far machine cannot close a tab on this one instead' },

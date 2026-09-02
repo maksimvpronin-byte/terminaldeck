@@ -6,6 +6,17 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## Unreleased
+
+### Fixed
+
+- **The help says which key reaches the far side on a Mac.** It said "Alt+Tab",
+  which on a Mac is read as the app switcher — and the app switcher is `⌘Tab`,
+  which macOS takes below the level any application can reach, so it is the one
+  key that cannot work. `⌥Tab` is reserved for nothing there and arrives on the
+  far machine as exactly the Alt+Tab Windows is waiting for. Cost an afternoon
+  of looking for a fault in the forwarding.
+
 ## 0.7.2
 
 ### Fixed

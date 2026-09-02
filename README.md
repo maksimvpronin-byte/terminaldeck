@@ -195,7 +195,10 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
   of the display, over whatever was switched to next, taking every click inside it. So the size
   asked for is the display's own rather than the display less a toolbar — which matters beyond
   the room it frees, since a size no monitor has is the one that cannot land pixel for pixel.
-  F11 enters and leaves, and holding Escape leaves; while there, Alt+Tab reaches the far side
+  F11 enters and leaves, and holding Escape leaves; while there, Alt+Tab reaches the far side.
+  On a Mac that is **⌥Tab**: `⌘Tab` is the system's own switcher, taken by macOS below the level
+  any application can reach, so it never arrives — while `⌥Tab` is reserved for nothing there and
+  lands on the far machine as the Alt+Tab that Windows is waiting for
 - **Full screen hands the whole keyboard to the session.** Every shortcut this application owns
   stands down while a desktop is full screen — `⌘W`/`Ctrl+W`, the tab and workspace numbers, the
   snippet and host palettes, the vault lock, the zoom keys, and on a Mac the menu accelerators

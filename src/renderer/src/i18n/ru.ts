@@ -765,4 +765,5 @@ export const ru: Record<string, string> = {
   "The size this desktop asked for, and what the server gave back.": "Размер, который запросил этот рабочий стол, и то, что вернул сервер.",
   "The pane toolbar goes entirely, so the desktop is the size of the display": "Панель инструментов убирается совсем, и стол становится размером с экран",
   "There is nothing of this app over the picture — the top edge belongs to the far side": "Ничего от этого приложения поверх картинки нет — верхний край принадлежит той стороне",
+  "On a Mac that is ⌥Tab: ⌘Tab belongs to macOS and cannot be taken from it": "На маке это ⌥Tab: ⌘Tab принадлежит macOS, и отобрать его нельзя",
 }
