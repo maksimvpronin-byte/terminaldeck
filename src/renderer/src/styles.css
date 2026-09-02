@@ -173,6 +173,12 @@ label {
 .sidebar-resize:hover {
   background: var(--accent-dim);
 }
+/* Somewhere to take hold of the window where macOS hides its title bar.
+ *
+ * A drag region is not a paint effect: it is handed to the operating system,
+ * which takes the mouse over it before the page hears anything. So this element
+ * is not rendered at all while a pane is full screen — see the Sidebar, where
+ * that is decided and why. */
 .titlebar-spacer {
   height: 28px;
   flex-shrink: 0;

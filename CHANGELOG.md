@@ -8,12 +8,31 @@ the other produces a version nobody can install, which is how 0.1.10 through
 
 ## 0.7.1
 
-Two windows of the operating system that this application put on the screen
-and did not always take back. Both were tooltips, both sat at the top edge of
-a full-screen desktop, and both were reported the same way: the corner of the
-screen stopped working, in a different application entirely.
+Three things that took the mouse away from a full-screen desktop, reported as
+one: a corner of the far machine that had stopped responding. The first is the
+one that was actually doing it.
 
 ### Fixed
+
+- **The top-left corner of a full-screen session takes clicks again.** A strip
+  there swallowed them — invisible, about as wide as the host list and some
+  twenty-eight points tall — and what it swallowed never reached the far
+  machine at all.
+
+  It was the sidebar's window-drag region: the piece of empty space at the top
+  of the host list that exists so a window with no title bar of its own can
+  still be picked up and moved. A drag region is not a paint effect. It is
+  computed from the layout and handed to the operating system, which takes the
+  mouse over it before the page is told anything.
+
+  Full screen is asked for on a *pane*, not on the window, so everything around
+  that pane stops being drawn — and stays laid out. The sidebar was invisible
+  and its drag region was not: it went on sitting at the top-left of the
+  display, over the desktop, taking every click inside it. Invisible, because
+  by then there was nothing left to see.
+
+  It is not rendered at all while a pane is full screen now, rather than marked
+  undraggable, so there is no region left to get the arithmetic of wrong.
 
 - **Nothing of this application is left over a full-screen desktop.** A strip
   of pane toolbar could be brought back there by pressing the pointer against

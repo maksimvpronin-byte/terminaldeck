@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { nanoid } from 'nanoid'
 import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from 'react'
 import type { SessionGroup, SessionProfile } from '../../../shared/types'
@@ -32,6 +32,22 @@ import {
   startWidthDrag
 } from '../state/dragWidth'
 
+/**
+ * Whether anything on the page is currently full screen.
+ *
+ * Watched here for one reason, and it is not a visual one — see the strip this
+ * governs below.
+ */
+function useAnythingFullscreen(): boolean {
+  const [full, setFull] = useState(() => document.fullscreenElement !== null)
+  useEffect(() => {
+    const onChange = (): void => setFull(document.fullscreenElement !== null)
+    document.addEventListener('fullscreenchange', onChange)
+    return () => document.removeEventListener('fullscreenchange', onChange)
+  }, [])
+  return full
+}
+
 const ROOT_TARGET = '__root__'
 const COLLAPSED_KEY = 'terminaldeck.collapsedGroups'
 
@@ -55,6 +71,7 @@ export default function Sidebar({
   /* Held here rather than in the store: nothing else in the application asks
      how wide this is, and it is written on every frame of a drag. */
   const [width, setWidth] = useState(loadSidebarWidth)
+  const fullscreen = useAnythingFullscreen()
   const groups = useStore((s) => s.groups)
   const sessions = useStore((s) => s.sessions)
   const removeGroup = useStore((s) => s.removeGroup)
@@ -534,7 +551,21 @@ export default function Sidebar({
           })
         }
       />
-      <div className="titlebar-spacer" />
+      {/* Not while a session is full screen.
+       *
+       * This strip is a window-drag region, which is not a paint effect: it is
+       * handed to the operating system, and the operating system takes the
+       * mouse over it before the page is told anything at all. Full screen is
+       * asked for on a *pane*, so this sidebar stops being drawn but does not
+       * stop being laid out — and the region went on sitting at the top-left of
+       * the display, roughly this panel wide and twenty-eight points tall,
+       * swallowing every click meant for the desktop underneath. Invisible,
+       * because there was nothing left to see; and reported, twice, as a corner
+       * of the far machine that had stopped responding.
+       *
+       * Removed rather than marked `no-drag`, so there is no region to get the
+       * arithmetic of wrong. */}
+      {!fullscreen && <div className="titlebar-spacer" />}
 
       <div className="sidebar-tabs">
         <button className={tab === 'sessions' ? 'active' : ''} onClick={() => setTab('sessions')}>
