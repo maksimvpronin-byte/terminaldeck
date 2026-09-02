@@ -82,6 +82,24 @@ if (-not (Test-Path $vswhere)) { Die 'Visual Studio is not installed, or is olde
 $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
 if (-not $vs) { Die 'Visual Studio is installed without the C++ workload' }
 
+# The year in "Visual Studio 17 2022" is the version that is installed, and it
+# cannot be written down here: the runner moved to Visual Studio 18, and CMake,
+# asked for 17, reported that it could find no Visual Studio at all — while
+# vcpkg beside it had just built every dependency with that same compiler. So
+# ask vswhere which one is here, and take the name out of CMake's own list of
+# generators. Neither the year nor the spelling is guessed, and a version newer
+# than either of them knows about says so plainly instead of lying about VS.
+$vsVersion = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationVersion
+$vsMajor = ($vsVersion -split '\.')[0]
+$generator = cmake --help |
+  Select-String -Pattern "^[* ]*(Visual Studio $vsMajor [0-9]{4})\s*=" |
+  ForEach-Object { $_.Matches[0].Groups[1].Value } |
+  Select-Object -First 1
+if (-not $generator) {
+  Die "Visual Studio $vsVersion is installed, but this CMake ($((cmake --version | Select-Object -First 1))) has no generator for it — update CMake"
+}
+Write-Host "  Visual Studio $vsVersion, building with '$generator'"
+
 # --------------------------------------------------------------------- vcpkg
 $vcpkg = if ($env:VCPKG_ROOT) { $env:VCPKG_ROOT } else { Join-Path $here 'vcpkg' }
 if (-not (Test-Path (Join-Path $vcpkg 'vcpkg.exe'))) {
@@ -128,8 +146,9 @@ if (-not $ShimOnly) {
   # The Visual Studio generator rather than Ninja. Ninja needs a compiler on
   # PATH and takes the first one it finds — on a GitHub runner that is MinGW's
   # gcc, which is not what the vcpkg libraries beside it were built with. The VS
-  # generator finds MSVC itself and needs no environment set up around it.
-  cmake -S $src -B (Join-Path $src 'build') -G 'Visual Studio 17 2022' -A $vsArch `
+  # generator finds MSVC itself and needs no environment set up around it. Which
+  # VS it is was worked out above, not assumed.
+  cmake -S $src -B (Join-Path $src 'build') -G $generator -A $vsArch `
     -DCMAKE_BUILD_TYPE=Release `
     -DCMAKE_TOOLCHAIN_FILE="$toolchain" `
     -DVCPKG_TARGET_TRIPLET="$triplet" `
@@ -169,7 +188,7 @@ if (-not (Test-Path (Join-Path $out 'lib\cmake\FreeRDP3'))) {
 Step 'Building td-rdp'
 $shim = Join-Path $here 'shim'
 Remove-Item -Recurse -Force (Join-Path $shim 'build') -ErrorAction SilentlyContinue
-cmake -S $shim -B (Join-Path $shim 'build') -G 'Visual Studio 17 2022' -A $vsArch `
+cmake -S $shim -B (Join-Path $shim 'build') -G $generator -A $vsArch `
   -DCMAKE_BUILD_TYPE=Release `
   -DCMAKE_TOOLCHAIN_FILE="$toolchain" `
   -DVCPKG_TARGET_TRIPLET="$triplet" `

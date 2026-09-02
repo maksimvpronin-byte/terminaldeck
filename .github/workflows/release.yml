@@ -74,14 +74,26 @@ jobs:
       # does, while the shim takes seconds and changes often. A cache hit skips
       # the first and still rebuilds the second, so a change to our own C is
       # never served from a stale cache.
-      - name: Cache the desktop client's dependencies
+      # Two caches rather than one. vcpkg is a package manager, and the packages
+      # it installs do not depend on how we go on to build FreeRDP, so it is
+      # keyed loosely and restored even when the recipe has changed — that is
+      # the ten minutes of dependency building. FreeRDP's own output is keyed on
+      # the recipe exactly: restoring it across a change to the build flags
+      # would hand the run a library built to instructions we no longer give.
+      - name: Cache vcpkg
+        if: matrix.freerdp == 'win'
+        uses: actions/cache@v4
+        with:
+          path: resources/freerdp/vcpkg
+          key: vcpkg-${{ matrix.os }}-${{ hashFiles(matrix.recipe) }}
+          restore-keys: vcpkg-${{ matrix.os }}-
+
+      - name: Cache the desktop client
         if: matrix.freerdp != ''
         id: freerdp
         uses: actions/cache@v4
         with:
-          path: |
-            resources/freerdp/build
-            resources/freerdp/vcpkg
+          path: resources/freerdp/build
           key: freerdp-3.31.0-${{ matrix.os }}-${{ hashFiles(matrix.recipe, 'resources/freerdp/shim/CMakeLists.txt') }}
 
       - name: Install what FreeRDP is built against
