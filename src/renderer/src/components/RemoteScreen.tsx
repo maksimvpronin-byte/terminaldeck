@@ -704,6 +704,20 @@ export default function RemoteScreen({
         // Named rather than blanket, so the window cannot swallow keys nobody
         // meant to give it.
         void keyboard?.lock(['AltLeft', 'AltRight', 'Tab', 'Escape', 'MetaLeft', 'MetaRight'])
+
+        /*
+         * And the session takes the keyboard it was just given.
+         *
+         * Locking without this is the worst of both: the keys are taken from
+         * the local system and handed to a session that then drops them,
+         * because the handler ignores anything arriving while the focus is
+         * outside it. Full screen is entered from the button on the pane's
+         * toolbar, which leaves the focus on that button — and the toolbar is
+         * not rendered in full screen, so the focus falls to the body and every
+         * key goes nowhere at all. Alt+Tab is the one that shows it first,
+         * since the lock has just made this the only route it has.
+         */
+        container.focus()
       } else {
         keyboard?.unlock()
       }

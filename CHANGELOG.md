@@ -6,6 +6,26 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## Unreleased
+
+### Fixed
+
+- **A full-screen session takes the keyboard it was given.** Going full screen
+  locks Alt+Tab, Escape and the ⌘ keys away from the local system so they can
+  reach the far machine instead. They were not reaching it: the session's key
+  handler ignores anything arriving while the focus is outside it, and full
+  screen is entered from a button on the pane's toolbar — which leaves the
+  focus on that button, and the toolbar is not rendered in full screen, so the
+  focus fell to the body.
+
+  So the keys were taken from one machine and delivered to neither. Alt+Tab
+  showed it first, because the lock had just made this its only route; copy and
+  paste went the same way, and came back after switching windows and clicking
+  the picture, which is what put the focus back by hand.
+
+  Alt+Tab still does not switch local windows while a session is full screen —
+  that is the point of the lock, and F11 or holding Escape is the way out.
+
 ## 0.7.1
 
 Three things that took the mouse away from a full-screen desktop, reported as
