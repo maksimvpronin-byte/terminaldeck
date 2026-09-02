@@ -72,8 +72,36 @@ this also adds.
   client is built by the runner that packages it, and those are what the runners
   are. The other two architectures need a second job apiece.
 
+- **The Windows client builds, and the script names no version.** Getting there
+  took five failures, of which two were a version written into a file: a
+  generator asking for "Visual Studio 17 2022" on a runner that had moved to
+  Visual Studio 18, where CMake replies that it can find no Visual Studio at all
+  — beside a vcpkg that had just built every dependency with that same compiler
+  — and a Visual C++ runtime copied from an older toolset's redistributable than
+  the one doing the compiling, which is the single direction that is not allowed
+  to work and fails only on a machine with no Visual Studio, the machine a
+  portable build is for. vswhere now says which is installed, CMake's own list of
+  generators gives the matching name, and the runtime comes from the newest
+  redistributable. The other three: a UTF-8 BOM, without which PowerShell 5.1
+  reads em-dashes as Windows-1252; CMake defaulting to a runner's MinGW gcc; and
+  a cache that handed back the very files a fix had just replaced.
+
+  The Windows package now carries the client, FreeRDP, OpenSSL, the codecs and
+  the runtime. It has not yet opened a desktop pane on Windows: the build is
+  proven, the session is not.
+
 
 ### Fixed
+
+- **Every download on Windows made a directory beside the file.** Working out
+  where to put a file searched its destination for the last `/`. A local path on
+  Windows holds no forward slash at all, so the search failed, the last character
+  was taken off the file name, and `a.txt` arrived next to a directory called
+  `a.tx`. It went unnoticed because that call is recursive and made the real
+  parent on the way past — and would have stopped being merely untidy at the
+  first path holding a forward slash earlier on, where the directory made is the
+  wrong one and the file has nowhere to land. Found by the Windows job on its
+  first run that got far enough to run the tests, which is what it is for.
 
 - **A shadow viewer could outlive the application.** `ShadowHost.exe` holds an
   mstsc window open and exits when its input pipe closes — but only when it next
