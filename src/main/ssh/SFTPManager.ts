@@ -1,7 +1,7 @@
 import type { SFTPWrapper } from 'ssh2'
 import { readdir, mkdir, stat, lstat, readFile } from 'fs/promises'
 import { renameSync, rmSync } from 'fs'
-import { join, basename } from 'path'
+import { join, basename, dirname } from 'path'
 import { sshManager } from './SSHManager'
 import {
   buildTransferPlan,
@@ -632,9 +632,13 @@ class SFTPManager {
           onProgress?.(t, total, item.sourcePath)
         )
       } else {
-        await mkdir(item.destPath.slice(0, item.destPath.lastIndexOf('/')) || '/', {
-          recursive: true
-        })
+        // dirname, not a hand-rolled search for the last '/'. This is a local
+        // path, and on Windows it holds no forward slash at all: the search
+        // returned -1, slice(0, -1) chopped the last character off the file
+        // name, and every download quietly created a directory beside itself
+        // called C:\...\a.tx. It went unnoticed because that same call, being
+        // recursive, made the real parent on the way past.
+        await mkdir(dirname(item.destPath), { recursive: true })
         await this.download(connectionId, item.sourcePath, item.destPath, (t, total) =>
           onProgress?.(t, total, item.sourcePath)
         )
