@@ -29,8 +29,10 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
 
 - Encrypted local vault (AES-256-GCM, master password via scrypt), with a lock button, `⌘L`,
   and an idle auto-lock whose delay is set in Settings → Security — fifteen minutes by default,
-  and able to be turned off, since the right answer depends on the room rather than on the
-  application; the master password can be rotated without losing secrets.
+  anything from a minute to eight hours, and able to be turned off entirely, since the right
+  answer depends on the room rather than on the application, and eight hours is there because a
+  working day is the span people actually asked not to be interrupted across; the master
+  password can be rotated without losing secrets.
   Deleting a host, a group, a repository or a local override takes its stored credential with it,
   rather than leaving it in the vault
 - **Inheritance**: a session leaves fields unset to take them from its group, a group from its
@@ -83,6 +85,11 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
   terminal, not the app
 - Search (`⌘F`), zoom (`⌘+` / `⌘−` / `⌘0`, moving the host's own size when it has one),
   copy-on-select, right-click paste
+- **On a Mac, `Ctrl` belongs to the shell.** Every shortcut here is on `⌘` alone, so `Ctrl+C`,
+  `Ctrl+D`, `Ctrl+K`, `Ctrl+W` and `Ctrl+L` reach the far end and mean what readline says they
+  mean. On Windows and Linux the shortcuts sit on `Ctrl` themselves and still take those keys —
+  there is no second modifier free on those platforms, and choosing one without being able to
+  try it is worse than saying so here
 - Colour-coded sessions, restored workspace and tab layout on launch, activity marks on
   background tabs and workspaces, and a green dot on hosts that already have a terminal open
 - **Export and import** everything to one file to move machines or keep a backup; credentials
@@ -291,8 +298,10 @@ paths have only ever been exercised by unit tests or by hand on a local stand-in
 - **The FreeRDP client itself.** It replaced the WebAssembly one on the strength of a
   side-by-side comparison against one host over one link, which is what the picture is for —
   and everything below the picture is new: input, the resize channel, the certificate question,
-  the gateway. Built and proven on macOS; the Windows and Linux builds are not written yet, so
-  a desktop pane on those platforms does not open at all until they are
+  the gateway. Built and proven on macOS. Windows builds in CI and ships complete — client,
+  FreeRDP, OpenSSL, the codecs and the Visual C++ runtime — but no desktop pane has been opened
+  on it yet: the build is proven, the session is not. Linux has no client build, so a desktop
+  pane there says the client is missing rather than opening
 - **The RD Gateway.** One real gateway, one account, one machine behind it: a desktop opens and
   works. That is one deployment and not a claim about gateways in general — the settings that
   decide whether a sign-in is accepted live on the server, and this one's are not every one's.
@@ -305,7 +314,8 @@ paths have only ever been exercised by unit tests or by hand on a local stand-in
 - keyboard-interactive (2FA) authentication
 - Port forwarding of every kind
 - Per-session logging to file
-- The Windows and Linux builds: CI produces them, nobody has installed them
+- The Windows and Linux packages. CI produces all three on every tag; nobody has installed
+  either of those two
 
 **Deliberately not doing**
 
@@ -379,8 +389,8 @@ actually uses in beside it, rewrites the absolute Homebrew paths to `@rpath`, an
 it touched — an unsigned Mach-O with a stale signature is refused outright on Apple Silicon, and
 the symptom is a build that works only on the machine that made it.
 
-On Windows, with Visual Studio 2022 and its C++ workload, plus CMake, Ninja and Git on the
-path:
+On Windows, with Visual Studio and its C++ workload — 2017 or newer, whichever is installed —
+plus CMake and Git on the path:
 
 ```
 npm run build:freerdp:win
@@ -399,12 +409,18 @@ repair. It refuses to continue if the client has not been built, because a relea
 has a desktop pane that cannot open and the failure would reach whoever installed it rather than
 whoever built it.
 
-**The Windows script has never been run.** It is written from the macOS one and from FreeRDP's
-own build documentation, and the macOS one took five real failures to get right — a missing
-tool, a missing SDL package, ffmpeg arriving uninvited, an Opus header one directory away from
-where its own pkg-config file said, and a CMake package whose name is not the name of the
-directory holding it. Expect the same kind of thing here, and expect the script to print the
-failing lines itself when it happens.
+**The Windows script runs in CI on every tag**, and reaching that took its own five failures,
+much like the five the macOS one took: em-dashes that PowerShell 5.1 reads as Windows-1252
+until the file carries a UTF-8 BOM; CMake defaulting to the MinGW gcc that happens to sit on a
+runner's `PATH`; a generator written down as `Visual Studio 17 2022` on an image that had moved
+to Visual Studio 18, where CMake answers that it can find no Visual Studio at all; and a Visual
+C++ runtime taken from the redistributable of a toolset older than the compiler doing the work.
+
+The last two share a lesson, and it is written into the script: **it names no version.** vswhere
+says which Visual Studio is installed, CMake's own list of generators supplies the matching
+name, and the runtime comes from the newest redistributable rather than a folder named after a
+year. A Visual Studio newer than the CMake beside it now says exactly that, instead of claiming
+no Visual Studio exists.
 
 Linux is not written yet.
 
@@ -484,8 +500,8 @@ worth having when something is wrong and it is not clear which side is at fault:
 real host with the same code and no application around it. Packaging never includes it, so it is
 `npm run build:freerdp:mac` on its own that wants them.
 
-**Windows** — produces an NSIS installer and a portable `.exe` for x64. Needs Visual Studio 2022
-with the C++ workload, plus CMake and Git on `PATH`:
+**Windows** — produces an NSIS installer and a portable `.exe` for x64. Needs Visual Studio with
+the C++ workload — 2017 or newer, whichever is installed — plus CMake and Git on `PATH`:
 
 ```
 npm install
@@ -498,6 +514,10 @@ script fetches its own into `resources/freerdp/vcpkg/`.
 The Visual C++ runtime is copied in beside the desktop client, from the redistributable that
 ships with Visual Studio. Without it the portable build starts on a machine that has never had
 Visual Studio and cannot open a desktop pane — which is the machine a portable build exists for.
+
+The one taken is the newest installed, which is the one matching the compiler that did the work.
+A runtime older than its own toolset is the single direction that is not allowed to work, and it
+fails on a machine with no Visual Studio — again, the only machine this exists for.
 
 **Linux** — produces an AppImage and a `.deb`:
 
@@ -551,8 +571,11 @@ unpublished, and the in-app updater ignores drafts, so nothing is offered to any
 somebody looks at what was built and presses Publish.
 
 Each runner compiles the desktop client for itself before packaging — that is the slow part,
-half an hour the first time, and it is cached on the FreeRDP version so later runs skip it. The
-shim is rebuilt every time regardless, because it is seconds and it is ours.
+half an hour the first time. It is cached on the FreeRDP version and on that platform's own
+build recipe, so editing the Windows script no longer throws away the macOS cache. vcpkg's
+packages are cached separately and more loosely: what they hold does not depend on how FreeRDP
+is built afterwards, so they survive a change of recipe that the build itself must not. The shim
+is rebuilt every time regardless, because it is seconds and it is ours.
 
 macOS ships Apple Silicon only and Windows x64 only, because the client is built by the runner
 that packages it and those are the architectures the runners are. Adding the other two means a
