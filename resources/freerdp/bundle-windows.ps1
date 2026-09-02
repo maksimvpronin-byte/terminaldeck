@@ -65,14 +65,29 @@ if (Test-Path $vswhere) {
   $vs = & $vswhere -latest -products * -property installationPath
   $redist = Join-Path $vs "VC\Redist\MSVC"
   if ($vs -and (Test-Path $redist)) {
+    # Not a named toolset directory. "Microsoft.VC143.CRT" is Visual Studio
+    # 2022's; on a machine with Visual Studio 18 that folder still exists, one
+    # redistributable behind, so naming it quietly picked up 14.44 to carry
+    # binaries that 14.51 had compiled — a runtime older than the compiler,
+    # which is the one direction that is not allowed to work. Take the newest
+    # version directory, and whatever CRT folder is inside it.
     $crt = Get-ChildItem $redist -Directory |
-      Sort-Object Name -Descending |
-      ForEach-Object { Join-Path $_.FullName "$arch\Microsoft.VC143.CRT" } |
-      Where-Object { Test-Path $_ } |
-      Select-Object -First 1
+      Where-Object { $_.Name -match '^\d+\.\d+' } |
+      Sort-Object { [version]$_.Name } -Descending |
+      ForEach-Object {
+        Get-ChildItem (Join-Path $_.FullName $arch) -Directory -Filter 'Microsoft.VC*.CRT' `
+          -ErrorAction SilentlyContinue | Sort-Object Name -Descending
+      } |
+      Select-Object -First 1 -ExpandProperty FullName
     if ($crt) {
       Step "Copying the Visual C++ runtime from $crt"
-      Copy-Item (Join-Path $crt '*.dll') -Destination $bin -Force
+      # Only what is not already here. CMake installed the runtime that the
+      # compiler doing the building ships with, and that one is right by
+      # definition; the redistributable fills in the rest of the set.
+      foreach ($dll in Get-ChildItem (Join-Path $crt '*.dll')) {
+        $to = Join-Path $bin $dll.Name
+        if (-not (Test-Path $to)) { Copy-Item $dll.FullName -Destination $to }
+      }
     } else {
       Write-Host "warning: no VC++ runtime found under $redist — a machine without the redistributable will not run the desktop client" -ForegroundColor Yellow
     }
