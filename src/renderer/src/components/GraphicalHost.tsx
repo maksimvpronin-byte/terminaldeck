@@ -32,12 +32,19 @@ export default function GraphicalHost({
   host,
   port,
   sessionId,
+  credentialId,
   paneVisible
 }: {
   protocol: Protocol
   host?: string
   port?: number
   sessionId?: string
+  /**
+   * A stored account this pane signs in as, in place of the host's own login.
+   * Only ever an id: what it stands for is resolved in the main process, and no
+   * password reaches this component whichever login is used.
+   */
+  credentialId?: string
   /** False while another tab is in front: a window over a hidden pane would
    *  sit on top of whatever replaced it. */
   paneVisible: boolean
@@ -143,7 +150,7 @@ export default function GraphicalHost({
     let alive = true
 
     window.td.rdp
-      .credentials(sessionId)
+      .credentials(sessionId, credentialId)
       .then((stored) => {
         if (!alive) return
         setUsername(stored.username)
@@ -158,7 +165,7 @@ export default function GraphicalHost({
     // goes over RPC and can take seconds or never answer, and a new session
     // must not wait on the optional half of the choice.
     window.td.rdp
-      .listSessions(sessionId)
+      .listSessions(sessionId, credentialId)
       .then((found) => {
         if (!alive) return
         setSessions(shadowable(found.sessions))
@@ -174,7 +181,7 @@ export default function GraphicalHost({
     return () => {
       alive = false
     }
-  }, [protocol, sessionId, host, target])
+  }, [protocol, sessionId, credentialId, host, target])
 
   /** A new desktop of our own, in this pane. */
   function connectFresh(): void {
@@ -204,6 +211,7 @@ export default function GraphicalHost({
         control={joined.control}
         noPrompt={skipPrompt}
         profileId={sessionId}
+        credentialId={credentialId}
         visible={paneVisible}
         onClose={() => setJoined(null)}
       />
@@ -232,6 +240,7 @@ export default function GraphicalHost({
         <RemoteScreen
           key={attempt}
           sessionId={sessionId}
+          credentialId={credentialId}
           look={look}
           password={lastTyped.current}
           onPhase={setPhase}

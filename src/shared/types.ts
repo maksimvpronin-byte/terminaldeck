@@ -42,6 +42,47 @@ export interface AuthDefaults {
   followTerminalCwd?: boolean
 }
 
+/**
+ * A login kept on its own, so it can be offered to any host on the day it is
+ * needed rather than written into one.
+ *
+ * The point is the connection nobody planned for: a host is saved as the
+ * account it is normally reached with, and once in a while it has to be reached
+ * as somebody else — a domain administrator, a service account, root. Editing
+ * the host to do that changes what every later connection uses and has to be
+ * undone afterwards, which is how a saved host quietly ends up holding the
+ * wrong login.
+ *
+ * So this is not part of the inheritance chain and never resolves into one. It
+ * is picked at the moment of connecting and applies to that session alone: the
+ * four fields below replace what the chain worked out for the host, and
+ * everything else — port, jump host, on-connect commands, the gateway — is
+ * still the host's own.
+ *
+ * The secret lives in the vault under `secretRef`, exactly as a host's does;
+ * this record holds a reference and no password.
+ */
+export interface Credential {
+  id: string
+  /** What it is called in the menus: "domain admin", "root", "svc-backup". */
+  name: string
+  /** `user`, `DOMAIN\\user` or `user@domain` — whatever the far end takes. */
+  username: string
+  authMethod: AuthMethod
+  /** Used when authMethod is 'privateKey'. */
+  privateKeyPath?: string
+  /**
+   * Reference id into the vault for the password or the key passphrase.
+   *
+   * Absent means nothing is saved, and the connection asks — which is a
+   * deliberate way to keep an account: the name and the login are remembered,
+   * the password is typed each time.
+   */
+  secretRef?: string
+  createdAt: number
+  updatedAt: number
+}
+
 /** How a desktop's resolution is decided. */
 export type RdpResolution = 'fit' | 'fixed'
 
@@ -375,6 +416,7 @@ export interface ImportSummary {
   collections: number
   inventorySources: number
   inventoryOverrides: number
+  credentials: number
   secrets: number
 }
 

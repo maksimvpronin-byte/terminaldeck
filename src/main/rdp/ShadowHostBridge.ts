@@ -23,6 +23,12 @@ export interface ShadowRequest {
   /** The saved connection this came from, so the host's credentials can be
    *  looked up. Not the Windows session number above. */
   profileId?: string
+  /**
+   * A stored account to authenticate the viewer as, in place of the host's own
+   * login. The password is still resolved in the main process and never comes
+   * back through here.
+   */
+  credentialId?: string
 }
 
 /** What the viewer needs to be the host's user rather than this machine's. */

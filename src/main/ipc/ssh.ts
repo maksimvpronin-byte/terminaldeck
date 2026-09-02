@@ -8,6 +8,7 @@ import { remoteMonitor } from '../ssh/RemoteMonitor'
 import { sftpManager } from '../ssh/SFTPManager'
 import { sshManager } from '../ssh/SSHManager'
 import { readSshConfigHosts } from '../ssh/sshConfig'
+import { credentialStore } from '../store/CredentialStore'
 import { sessionStore } from '../store/SessionStore'
 import { focusedWin } from './win'
 
@@ -23,14 +24,30 @@ export function registerSshHandlers(): void {
   // --- SSH ---
   ipcMain.handle(
     IPC.sshConnect,
-    async (_e, sessionId: string, cols: number, rows: number) => {
+    async (
+      _e,
+      sessionId: string,
+      cols: number,
+      rows: number,
+      /**
+       * A stored login to use in place of the host's own, for this session
+       * only. Nothing is written back: the host keeps the account it is saved
+       * with, however many times it is reached as somebody else.
+       */
+      credentialId?: string
+    ) => {
       // Inventory hosts live in their own store and aren't saved as sessions.
       const profile =
         sessionStore.getAll().sessions.find((s) => s.id === sessionId) ??
         inventoryStore.findSession(sessionId)
       if (!profile) throw new Error('Unknown session')
+      // An id that names nothing is refused rather than quietly ignored: the
+      // account was asked for, and connecting as the host's own instead is a
+      // different connection from the one somebody chose.
+      const credential = credentialId ? credentialStore.find(credentialId) : undefined
+      if (credentialId && !credential) throw new Error('That saved account no longer exists')
       const win = focusedWin()
-      const connectionId = await sshManager.connectProfile(win, profile, cols, rows)
+      const connectionId = await sshManager.connectProfile(win, profile, cols, rows, credential)
       // Bring the profile's tunnels up automatically; a failure here (busy port,
       // server refusing a remote bind) must not take the shell down with it.
       for (const rule of profile.portForwards) {

@@ -37,6 +37,11 @@ interface PointerImage {
 interface Props {
   /** The saved host. Where it is reached, and as whom, is settled in main. */
   sessionId: string
+  /**
+   * A stored account to sign in as instead of the host's own login. Named, not
+   * resolved: the password stays in the main process either way.
+   */
+  credentialId?: string
   look: RdpView | null
   /** Typed in the pane, for a host with nothing saved. */
   password?: string
@@ -78,6 +83,7 @@ function asPixels(bytes: Uint8Array): Uint8ClampedArray<ArrayBuffer> {
 
 export default function RemoteScreen({
   sessionId,
+  credentialId,
   look,
   password,
   onPhase,
@@ -351,7 +357,8 @@ export default function RemoteScreen({
           width: size?.width ?? 1280,
           height: size?.height ?? 800,
           scale: size ? Math.min(500, Math.max(100, Math.round(size.factor * 100))) : undefined,
-          password
+          password,
+          credentialId
         })
         if (!alive) {
           void window.td.rdp.desktopStop(id)
@@ -619,12 +626,35 @@ export default function RemoteScreen({
       tell({ a: 'focus', flags: 0 })
     }
 
+    /**
+     * The keys the main process had to take before this window could see them.
+     *
+     * Two reasons it has to, and both are things this end cannot reach. Chromium
+     * zooms the whole interface on Ctrl with `+`, `-` or `0`; and a menu
+     * accelerator — ⌘W for Close Window, ⌘R, ⌘Q — is answered before the page
+     * is told anything at all. While a session is full screen the main process
+     * takes every combination for that reason and hands it back here, where it
+     * goes to the far end like any other key.
+     *
+     * The modifier itself was never taken, so it is already down over there and
+     * the pair arrives as the combination it was typed as.
+     *
+     * Every mounted pane hears this; only the one actually holding the screen
+     * acts on it.
+     */
+    const stopForwarded = window.td.ui.onForwardKey((code) => {
+      if (document.fullscreenElement !== fullscreenTarget(container)) return
+      sendKey(code, true)
+      sendKey(code, false)
+    })
+
     container.addEventListener('keydown', onKeyDown)
     container.addEventListener('keyup', onKeyUp)
     container.addEventListener('blur', releaseAll, true)
     window.addEventListener('blur', releaseAll)
 
     return () => {
+      stopForwarded()
       container.removeEventListener('keydown', onKeyDown)
       container.removeEventListener('keyup', onKeyUp)
       container.removeEventListener('blur', releaseAll, true)
@@ -651,20 +681,46 @@ export default function RemoteScreen({
     ).keyboard
     const target = fullscreenTarget(container)
 
+    /**
+     * Whether this pane is the one holding the screen.
+     *
+     * `fullscreenchange` is a document event, so every mounted session hears
+     * every one of them — including the ones about somebody else. Without this,
+     * two desktops side by side and one of them full screen means the other's
+     * handler runs too, decides it is not full screen, and releases the
+     * keyboard its neighbour is holding. Which of the two wins comes down to
+     * the order they happened to mount in.
+     *
+     * So each pane answers only for its own transitions.
+     */
+    let holding = false
+
     const onChange = (): void => {
-      if (document.fullscreenElement === target) {
+      const held = document.fullscreenElement === target
+      if (held === holding) return
+      holding = held
+
+      if (held) {
         // Named rather than blanket, so the window cannot swallow keys nobody
         // meant to give it.
         void keyboard?.lock(['AltLeft', 'AltRight', 'Tab', 'Escape', 'MetaLeft', 'MetaRight'])
       } else {
         keyboard?.unlock()
       }
+      // And the main process is told, so the keys it claims before this window
+      // sees them are handed over rather than acted on here.
+      window.td.ui.setKeyboardCapture(held)
     }
 
     document.addEventListener('fullscreenchange', onChange)
     return () => {
       document.removeEventListener('fullscreenchange', onChange)
-      keyboard?.unlock()
+      // A pane closed while full screen leaves nothing behind to say so, and a
+      // claim left standing would go on taking keys for a session that is gone.
+      if (holding) {
+        keyboard?.unlock()
+        window.td.ui.setKeyboardCapture(false)
+      }
     }
   }, [])
 

@@ -1,3 +1,4 @@
+import { registerKeyboardCapture } from '../keyboardCapture'
 import { registerAppHandlers } from './app'
 import { registerInventoryHandlers } from './inventory'
 import { registerRdpHandlers } from './rdp'
@@ -26,4 +27,5 @@ export function registerIpcHandlers(): void {
   registerSftpHandlers()
   registerRdpHandlers()
   registerAppHandlers()
+  registerKeyboardCapture()
 }

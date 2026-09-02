@@ -1,6 +1,7 @@
 import type { TerminalSettings } from '../settings'
 import type { PaneNode, PaneTarget } from '../paneTree'
 import type {
+  Credential,
   HostCollection,
   InventoryOverride,
   InventorySource,
@@ -129,6 +130,15 @@ export interface CollectionsSlice {
   openCollection: (id: string) => void
 }
 
+export interface CredentialsSlice {
+  /** Logins saved on their own, offered to any host when connecting. */
+  credentials: Credential[]
+  loadCredentials: () => Promise<void>
+  /** `secret`: a string stores it, undefined keeps what is there, null forgets it. */
+  upsertCredential: (credential: Credential, secret?: string | null) => Promise<void>
+  removeCredential: (id: string) => Promise<void>
+}
+
 export interface SnippetsSlice {
   snippets: Snippet[]
   loadSnippets: () => Promise<void>
@@ -208,4 +218,5 @@ export type AppState = VaultSlice &
   InventorySlice &
   SnippetsSlice &
   CollectionsSlice &
+  CredentialsSlice &
   WorkspaceSlice

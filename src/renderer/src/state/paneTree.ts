@@ -2,7 +2,15 @@ import { nanoid } from 'nanoid'
 import type { QuickConnectParams } from '../../../shared/types'
 
 export type PaneTarget =
-  | { kind: 'session'; sessionId: string }
+  /**
+   * A saved host. `credentialId` names a stored login used in place of the
+   * host's own, and belongs to the pane rather than to the host: reconnecting
+   * this pane signs in as that account again, while the host itself is
+   * untouched and every other pane opens as whoever it was saved as.
+   *
+   * It is an id and no secret, so it is safe in a restored layout.
+   */
+  | { kind: 'session'; sessionId: string; credentialId?: string }
   | { kind: 'quick'; params: QuickConnectParams }
 
 export type PaneNode =

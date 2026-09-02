@@ -5,6 +5,7 @@ import { join } from 'path'
 import type { BrowserWindow } from 'electron'
 import { deriveKey, decrypt, type EncryptedPayload } from '../vault/crypto'
 import type {
+  Credential,
   HostCollection,
   InventoryOverride,
   InventorySource,
@@ -42,6 +43,7 @@ const { vault } = await import('../vault/Vault')
 const { sessionStore } = await import('./SessionStore')
 const { snippetStore } = await import('./SnippetStore')
 const { collectionStore } = await import('./CollectionStore')
+const { credentialStore } = await import('./CredentialStore')
 const { inventoryStore } = await import('../inventory/InventoryStore')
 const { exportToFile, importFromFile } = await import('./Backup')
 
@@ -109,11 +111,22 @@ const override: InventoryOverride = {
   secretRef: 'secret-override'
 }
 
+const credential: Credential = {
+  id: 'credential-1',
+  name: 'domain admin',
+  username: 'CORP\\admin',
+  authMethod: 'password',
+  secretRef: 'secret-credential',
+  createdAt: 1,
+  updatedAt: 2
+}
+
 const SECRETS = {
   'secret-group': 'group password',
   'secret-session': 'hunter2',
   'secret-source': 'repo password',
-  'secret-override': 'пароль-🔐'
+  'secret-override': 'пароль-🔐',
+  'secret-credential': 'the administrator password'
 }
 
 function populate(): void {
@@ -123,6 +136,7 @@ function populate(): void {
   collectionStore.save(collection)
   inventoryStore.saveSource(source)
   inventoryStore.saveOverride(override)
+  credentialStore.save(credential)
   for (const [ref, value] of Object.entries(SECRETS)) vault.setSecret(ref, value)
 }
 
@@ -133,6 +147,7 @@ function clearStores(): void {
   for (const c of [...collectionStore.list()]) collectionStore.remove(c.id)
   for (const s of [...inventoryStore.sources()]) inventoryStore.removeSource(s.id)
   for (const o of [...inventoryStore.overrides()]) inventoryStore.clearOverride(o.nodeId)
+  for (const c of [...credentialStore.list()]) credentialStore.remove(c.id)
 }
 
 /** A detached copy, so a later mutation of the stores cannot change it under us. */
@@ -148,7 +163,8 @@ function snapshot(): Record<string, unknown> {
     snippets: snippetStore.list(),
     collections: collectionStore.list(),
     sources: inventoryStore.sources(),
-    overrides: inventoryStore.overrides()
+    overrides: inventoryStore.overrides(),
+    credentials: credentialStore.list()
   }
 }
 
@@ -255,7 +271,8 @@ describe('backup import', () => {
       collections: 1,
       inventorySources: 1,
       inventoryOverrides: 1,
-      secrets: 4
+      credentials: 1,
+      secrets: 5
     })
     expect(snapshot()).toEqual(before)
     // Re-encrypted on the way in: the same secrets, under the new master password.

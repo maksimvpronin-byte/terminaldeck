@@ -4,9 +4,10 @@ import { existsSync, mkdirSync } from 'fs'
 import { writeFile } from 'fs/promises'
 import { IPC } from '../../shared/ipc-channels'
 import { resolveAuth } from '../../shared/authResolution'
+import { applyCredential } from '../../shared/credentials'
 import { protocolOf } from '../../shared/protocols'
 import { resolveRdp } from '../../shared/rdpResolution'
-import type { RdpView, SessionGroup, SessionProfile } from '../../shared/types'
+import type { ResolvedAuth, RdpView, SessionGroup, SessionProfile } from '../../shared/types'
 import { splitLogin } from '../../shared/rdpLogin'
 import { qualifyUser } from '../../shared/winSessions'
 import { inventoryStore } from '../inventory/InventoryStore'
@@ -17,6 +18,7 @@ import {
 } from '../rdp/FreeRdpBridge'
 import { type PaneRect, type ShadowRequest, shadowHostBridge } from '../rdp/ShadowHostBridge'
 import { listSessions, shadowSession } from '../rdp/WinSessions'
+import { credentialStore } from '../store/CredentialStore'
 import { sessionStore } from '../store/SessionStore'
 import { vault } from '../vault/Vault'
 import { focusedWin } from './win'
@@ -34,17 +36,15 @@ import { focusedWin } from './win'
  */
 function shadowCredentials(
   profileId: string | undefined,
-  host: string
+  host: string,
+  credentialId?: string
 ): { username: string; password: string } | undefined {
   if (!profileId) return undefined
 
-  const profile =
-    sessionStore.getAll().sessions.find((s) => s.id === profileId) ??
-    inventoryStore.findSession(profileId)
-  if (!profile) return undefined
+  const found = findHost(profileId)
+  if (!found) return undefined
 
-  const groups = [...sessionStore.getAll().groups, ...inventoryStore.allGroups()]
-  const auth = resolveAuth(profile, profile.groupId, groups)
+  const auth = authFor(found.profile, found.groups, credentialId)
   const password = auth.secretRef ? vault.getSecret(auth.secretRef) : undefined
   if (!auth.username || !password) return undefined
 
@@ -68,19 +68,50 @@ function findHost(
 }
 
 /**
+ * Who a desktop signs in as: the host's resolved login, or a stored account
+ * chosen in its place for this session alone.
+ *
+ * Every desktop handler asks the same question and three of them asked it in
+ * their own words, which is how the account would have reached the session and
+ * not the gateway, or the session and not the listing of who is logged on.
+ *
+ * An id that names nothing is refused rather than falling back to the host's
+ * own login: signing in as somebody else because the account was deleted is a
+ * connection nobody asked for.
+ */
+function authFor(
+  profile: SessionProfile,
+  groups: SessionGroup[],
+  credentialId?: string
+): ResolvedAuth {
+  const auth = resolveAuth(profile, profile.groupId, groups)
+  if (!credentialId) return auth
+  const credential = credentialStore.find(credentialId)
+  if (!credential) throw new Error('That saved account no longer exists')
+  return applyCredential(auth, credential)
+}
+
+/**
  * The gateway for one host, in the form the desktop client takes it.
  *
  * There were two of these until the loopback gateway's handler went: one
  * answering in the shape this application's own gateway wanted, one in the
  * shape the client wants. Only the second has a caller now.
  */
-function desktopGateway(profile: SessionProfile, groups: SessionGroup[]): DesktopGateway | undefined {
+function desktopGateway(
+  profile: SessionProfile,
+  groups: SessionGroup[],
+  /** What the session itself signs in with, account and all. */
+  auth: ResolvedAuth
+): DesktopGateway | undefined {
   const rdp = resolveRdp(profile, profile.groupId, groups)
   if (!rdp.gatewayHost) return undefined
 
   // A gateway with no login of its own is given the host's, which is what
-  // "use my connection credentials" means in every other client.
-  const auth = resolveAuth(profile, profile.groupId, groups)
+  // "use my connection credentials" means in every other client — and when an
+  // account was chosen for this session, that account is what the host's login
+  // now is, so the gateway is offered it too rather than a login the session
+  // itself is not using.
   const secretRef = rdp.gatewayUsername ? rdp.gatewaySecretRef : auth.secretRef
   const login = splitLogin(rdp.gatewayUsername || auth.username || '')
 
@@ -120,6 +151,8 @@ export function registerRdpHandlers(): void {
         height: number
         scale?: number
         password?: string
+        /** A stored account to sign in as instead, for this session alone. */
+        credentialId?: string
       }
     ) => {
       const win = focusedWin()
@@ -130,7 +163,7 @@ export function registerRdpHandlers(): void {
       if (protocolOf(found.profile) !== 'rdp') throw new Error('That host is not an RDP host')
 
       const rdp = resolveRdp(found.profile, found.profile.groupId, found.groups)
-      const auth = resolveAuth(found.profile, found.profile.groupId, found.groups)
+      const auth = authFor(found.profile, found.groups, request.credentialId)
       const login = splitLogin(auth.username ?? '')
       const stored = auth.secretRef ? vault.getSecret(auth.secretRef) : undefined
 
@@ -152,7 +185,7 @@ export function registerRdpHandlers(): void {
           // What the vault holds, or what was typed when it holds nothing.
           password: stored ?? request.password ?? ''
         },
-        desktopGateway(found.profile, found.groups)
+        desktopGateway(found.profile, found.groups, auth)
       )
     }
   )
@@ -229,15 +262,12 @@ export function registerRdpHandlers(): void {
    * authenticates where it draws — CredSSP happens in the WebAssembly module —
    * and there is no way to do that from here without implementing CredSSP too.
    */
-  ipcMain.handle(IPC.rdpCredentials, (_e, sessionId: string) => {
-    const profile =
-      sessionStore.getAll().sessions.find((s) => s.id === sessionId) ??
-      inventoryStore.findSession(sessionId)
-    if (!profile) throw new Error('Unknown session')
-    if (protocolOf(profile) !== 'rdp') throw new Error('That host is not an RDP host')
+  ipcMain.handle(IPC.rdpCredentials, (_e, sessionId: string, credentialId?: string) => {
+    const found = findHost(sessionId)
+    if (!found) throw new Error('Unknown session')
+    if (protocolOf(found.profile) !== 'rdp') throw new Error('That host is not an RDP host')
 
-    const groups = [...sessionStore.getAll().groups, ...inventoryStore.allGroups()]
-    const auth = resolveAuth(profile, profile.groupId, groups)
+    const auth = authFor(found.profile, found.groups, credentialId)
     return {
       username: auth.username,
       // Empty rather than absent when nothing is stored: the window then asks,
@@ -255,7 +285,11 @@ export function registerRdpHandlers(): void {
   ipcMain.handle(IPC.shadowStart, (_e, request: ShadowRequest) => {
     const win = focusedWin()
     if (!win) throw new Error('No window to draw into')
-    return shadowHostBridge.start(win, request, shadowCredentials(request.profileId, request.host))
+    return shadowHostBridge.start(
+      win,
+      request,
+      shadowCredentials(request.profileId, request.host, request.credentialId)
+    )
   })
   ipcMain.on(IPC.shadowPlace, (_e, id: string, rect: PaneRect) =>
     shadowHostBridge.place(id, rect)
@@ -265,17 +299,18 @@ export function registerRdpHandlers(): void {
   )
   ipcMain.handle(IPC.shadowStop, (_e, id: string) => shadowHostBridge.stop(id))
 
-  ipcMain.handle(IPC.rdpListSessions, (_e, sessionId: string) => {
-    const profile =
-      sessionStore.getAll().sessions.find((s) => s.id === sessionId) ??
-      inventoryStore.findSession(sessionId)
-    if (!profile) throw new Error('Unknown session')
+  ipcMain.handle(IPC.rdpListSessions, (_e, sessionId: string, credentialId?: string) => {
+    const found = findHost(sessionId)
+    if (!found) throw new Error('Unknown session')
 
-    const groups = [...sessionStore.getAll().groups, ...inventoryStore.allGroups()]
-    const auth = resolveAuth(profile, profile.groupId, groups)
+    // Asked as whoever this pane is connecting as: a host outside this
+    // machine's domain answers the query for one account and refuses it for
+    // another, and the pane offering to join a session it cannot reach is a
+    // worse answer than an empty list.
+    const auth = authFor(found.profile, found.groups, credentialId)
     const password = auth.secretRef ? vault.getSecret(auth.secretRef) : undefined
     return listSessions(
-      profile.host,
+      found.profile.host,
       password ? { username: auth.username, password } : undefined
     )
   })

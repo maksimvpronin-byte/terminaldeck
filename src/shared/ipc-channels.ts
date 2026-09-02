@@ -40,6 +40,14 @@ export const IPC = {
   snippetsSave: 'snippets:save',
   snippetsDelete: 'snippets:delete',
 
+  /**
+   * Logins saved on their own, offered to any host at the moment of connecting.
+   * Metadata only — the password itself stays in the vault.
+   */
+  credentialsList: 'credentials:list',
+  credentialsSave: 'credentials:save',
+  credentialsDelete: 'credentials:delete',
+
   // Collections
   collectionsList: 'collections:list',
   collectionsSave: 'collections:save',
@@ -163,6 +171,16 @@ export const IPC = {
 
   /** main -> renderer: terminal font zoom, intercepted before Chromium's page zoom */
   uiZoom: 'ui:zoom',
+  /**
+   * renderer -> main: whether a full-screen desktop owns the keyboard.
+   *
+   * The main process has to claim the zoom keys before Chromium can act on
+   * them, which puts it in front of a session that should be receiving every
+   * key. This is how it learns to hand them over instead.
+   */
+  uiKeyboardCapture: 'ui:keyboardCapture',
+  /** main -> renderer: a key main had to claim, for the session to send on. */
+  uiForwardKey: 'ui:forwardKey',
 
   // Session logs
   logsReveal: 'logs:reveal',

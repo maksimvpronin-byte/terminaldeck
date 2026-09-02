@@ -5,8 +5,10 @@ import { vault } from '../vault/Vault'
 import { sessionStore } from './SessionStore'
 import { snippetStore } from './SnippetStore'
 import { collectionStore } from './CollectionStore'
+import { credentialStore } from './CredentialStore'
 import { inventoryStore } from '../inventory/InventoryStore'
 import type {
+  Credential,
   ImportSummary,
   InventoryOverride,
   InventorySource,
@@ -26,6 +28,11 @@ interface BackupFile {
   collections: HostCollection[]
   inventorySources: InventorySource[]
   inventoryOverrides: InventoryOverride[]
+  /**
+   * Logins saved on their own. Absent from a file written before they existed,
+   * which is why every reader here treats the list as optional.
+   */
+  credentials?: Credential[]
   /** Present only when secrets were included; encrypted under its own password. */
   secrets?: { salt: string; payload: EncryptedPayload }
 }
@@ -53,7 +60,8 @@ export async function exportToFile(
     snippets: snippetStore.list(),
     collections: collectionStore.list(),
     inventorySources: inventoryStore.sources(),
-    inventoryOverrides: inventoryStore.overrides()
+    inventoryOverrides: inventoryStore.overrides(),
+    credentials: credentialStore.list()
   }
 
   if (includeSecrets && password) {
@@ -65,7 +73,8 @@ export async function exportToFile(
         ...backup.groups,
         ...backup.sessions,
         ...backup.inventorySources,
-        ...backup.inventoryOverrides
+        ...backup.inventoryOverrides,
+        ...(backup.credentials ?? [])
       ]
         .map((item) => item.secretRef)
         .filter((ref): ref is string => Boolean(ref))
@@ -117,6 +126,7 @@ export async function importFromFile(
     collections: 0,
     inventorySources: 0,
     inventoryOverrides: 0,
+    credentials: 0,
     secrets: 0
   }
 
@@ -164,6 +174,10 @@ export async function importFromFile(
   for (const override of parsed.inventoryOverrides ?? []) {
     inventoryStore.saveOverride(override)
     summary.inventoryOverrides++
+  }
+  for (const credential of parsed.credentials ?? []) {
+    credentialStore.save(credential)
+    summary.credentials++
   }
 
   return summary

@@ -21,6 +21,7 @@ export default function ShadowView({
   control,
   noPrompt,
   profileId,
+  credentialId,
   visible,
   onClose
 }: {
@@ -31,6 +32,8 @@ export default function ShadowView({
   /** The saved connection, so the viewer can be started as the host's user
    *  rather than as whoever is signed in to this machine. */
   profileId?: string
+  /** A stored account to start the viewer as, in place of the host's own. */
+  credentialId?: string
   /** False while another tab is in front, or the pane is otherwise hidden. */
   visible: boolean
   onClose: () => void
@@ -46,7 +49,7 @@ export default function ShadowView({
     let stopEvents: (() => void) | undefined
 
     window.td.rdp
-      .shadowStart({ host, sessionId: session.id, control, noPrompt, profileId })
+      .shadowStart({ host, sessionId: session.id, control, noPrompt, profileId, credentialId })
       .then((id) => {
         if (!alive) {
           // Unmounted while starting; the host must not be left holding a

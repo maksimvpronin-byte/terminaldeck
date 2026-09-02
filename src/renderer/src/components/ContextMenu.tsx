@@ -35,6 +35,19 @@ export default function ContextMenu({ x, y, items, onClose }: Props): JSX.Elemen
     }
   }, [onClose])
 
+  /**
+   * What the rows are, as one string.
+   *
+   * A menu can be replaced by another one in the same place — choosing "Connect
+   * as…" opens the list of accounts where the host menu stood — and the second
+   * is regularly a different height from the first. The nudge below is measured
+   * from the height, so it has to be taken again when the rows change; without
+   * this the accounts list is placed by the arithmetic done for the menu it
+   * replaced, and near the bottom of the screen that puts half of it off the
+   * edge.
+   */
+  const rows = items.map((item) => item.label).join('\u0000')
+
   // Nudge back inside the window when opened near an edge.
   useLayoutEffect(() => {
     const el = ref.current
@@ -43,7 +56,11 @@ export default function ContextMenu({ x, y, items, onClose }: Props): JSX.Elemen
     const left = x + rect.width > window.innerWidth ? Math.max(4, x - rect.width) : x
     const top = y + rect.height > window.innerHeight ? Math.max(4, y - rect.height) : y
     setPos({ left, top })
-  }, [x, y])
+    // `rows` is a trigger rather than an input: nothing in here reads it, and
+    // what it stands for — the menu's height — is read from the DOM, which the
+    // rule cannot see changing. `items` itself would be a new array on every
+    // render, and this would never stop measuring.
+  }, [x, y, rows])
 
   return (
     <div

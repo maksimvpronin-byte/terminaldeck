@@ -1679,11 +1679,24 @@ textarea:focus {
   gap: 8px;
   margin-top: 6px;
 }
+/* Wraps, because the row outgrew the card the moment a sixth tab was added.
+   The card is a fixed 460px and does not scroll sideways, so a row that does
+   not fit is a row with its last tab sliced off by the edge — which is what
+   "Резервная копия" was, while "Учётные записи" beside it had been squeezed
+   onto two lines to make room. Neither is a width worth tuning: the labels are
+   translated, and a row that fits in English is not one that fits in Russian.
+   A second line costs twenty pixels and is right in every language. */
 .settings-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   border-bottom: 1px solid var(--border);
   padding-bottom: 8px;
+}
+/* Whole words on one line each. Wrapping settles which tabs share a row; this
+   is what stops a tab that has a row to itself still breaking its own label. */
+.settings-tabs button {
+  white-space: nowrap;
 }
 .settings-tabs button.active {
   background: var(--accent-dim);
@@ -1823,6 +1836,40 @@ textarea:focus {
 .known-host-row button {
   grid-column: 2;
   grid-row: 1 / span 2;
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+/* The saved accounts, shaped like the trusted-host rows above but carrying two
+   actions instead of one. Those rows put their single button in a column of its
+   own spanning both lines; a second button dropped into the same cell would sit
+   on top of the first, so the pair share one cell and lay themselves out in it. */
+.credential-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 8px;
+  align-items: center;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+.credential-name {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.credential-who {
+  grid-column: 1;
+  font-size: 10px;
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+.credential-actions {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  display: flex;
+  gap: 6px;
+}
+.credential-actions button {
   padding: 2px 8px;
   font-size: 11px;
 }

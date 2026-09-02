@@ -6,11 +6,12 @@ import { createSessionsSlice } from './slices/sessions'
 import { createInventorySlice } from './slices/inventory'
 import { createSnippetsSlice } from './slices/snippets'
 import { createCollectionsSlice } from './slices/collections'
+import { createCredentialsSlice } from './slices/credentials'
 import { createWorkspaceSlice } from './slices/workspace'
 import type { AppState } from './slices/types'
 
 export type { PaneNode, PaneTarget } from './paneTree'
-export type { AppState, Workspace, WorkspaceTab, OpenMode } from './slices/types'
+export type { AppState, OpenMode, OpenRequest, Workspace, WorkspaceTab } from './slices/types'
 export {
   activeTab,
   activeWorkspace,
@@ -39,6 +40,7 @@ export const useStore = create<AppState>()((...a) => ({
   ...createInventorySlice(...a),
   ...createSnippetsSlice(...a),
   ...createCollectionsSlice(...a),
+  ...createCredentialsSlice(...a),
   ...createWorkspaceSlice(...a)
 }))
 

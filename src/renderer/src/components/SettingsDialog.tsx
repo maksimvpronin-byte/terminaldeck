@@ -2,20 +2,34 @@ import { useState } from 'react'
 import { useStore } from '../state/store'
 import { FONT_CHOICES, THEME_GROUPS, DEFAULT_SETTINGS, themeOf } from '../state/settings'
 import SecuritySettings from './SecuritySettings'
+import CredentialsSettings from './CredentialsSettings'
 import BackupSettings from './BackupSettings'
 import Hint from './Hint'
 import ModalBackdrop from './ModalBackdrop'
 import { keyHint } from '../state/keys'
 import { LANGUAGES, useT, type Language } from '../i18n'
 
-export default function SettingsDialog({ onClose }: { onClose: () => void }): JSX.Element {
+export type SettingsTab =
+  | 'general'
+  | 'terminal'
+  | 'files'
+  | 'accounts'
+  | 'security'
+  | 'backup'
+
+export default function SettingsDialog({
+  initialTab,
+  onClose
+}: {
+  /** Which page to open on, for the menus that come here to do one thing. */
+  initialTab?: SettingsTab
+  onClose: () => void
+}): JSX.Element {
   const settings = useStore((s) => s.settings)
   const updateSettings = useStore((s) => s.updateSettings)
   const preview = themeOf(settings)
   const t = useT()
-  const [tab, setTab] = useState<'general' | 'terminal' | 'files' | 'security' | 'backup'>(
-    'general'
-  )
+  const [tab, setTab] = useState<SettingsTab>(initialTab ?? 'general')
 
   async function pickEditor(): Promise<void> {
     const path = await window.td.dialogs.pickOpenPath()
@@ -45,6 +59,12 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
           </button>
           <button className={tab === 'files' ? 'active' : ''} onClick={() => setTab('files')}>
             {t('Files')}
+          </button>
+          <button
+            className={tab === 'accounts' ? 'active' : ''}
+            onClick={() => setTab('accounts')}
+          >
+            {t('Accounts')}
           </button>
           <button
             className={tab === 'security' ? 'active' : ''}
@@ -84,6 +104,7 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }): JS
           </>
         )}
 
+        {tab === 'accounts' && <CredentialsSettings />}
         {tab === 'security' && <SecuritySettings />}
         {tab === 'backup' && <BackupSettings />}
 

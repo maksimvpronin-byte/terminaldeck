@@ -12,6 +12,10 @@ import {
 import InventorySourceDialog from './InventorySourceDialog'
 import InventoryOverrideDialog from './InventoryOverrideDialog'
 import ContextMenu, { type MenuItem } from './ContextMenu'
+import SettingsDialog, { type SettingsTab } from './SettingsDialog'
+import MultiConnectDialog from './MultiConnectDialog'
+import { connectMenuItems } from './connectMenu'
+import { paneTitle } from '../state/connect'
 import { useT, type Translate } from '../i18n'
 import { RefreshIcon } from './icons'
 import Hint from './Hint'
@@ -58,6 +62,7 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
   const selectOnlyHost = useStore((s) => s.selectOnlyHost)
   const selectHostRange = useStore((s) => s.selectHostRange)
   const openMany = useStore((s) => s.openMany)
+  const credentials = useStore((s) => s.credentials)
   const workspaces = useStore((s) => s.workspaces)
   const connected = new Set(
     allRoots({ workspaces }).flatMap(collectConnectedSessionIds)
@@ -67,6 +72,12 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
   const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsed)
   const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null)
   const [overriding, setOverriding] = useState<SessionProfile | SessionGroup | null>(null)
+  /** Which page Settings should open on, or null while it is closed. */
+  const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null)
+  /** The host being opened several times over, once that has been asked for. */
+  const [multiConnecting, setMultiConnecting] = useState<
+    { id: string; name: string; color?: string } | null
+  >(null)
 
   useEffect(() => {
     loadInventory()
@@ -138,11 +149,21 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
     return t('hosts: {hosts}, groups: {groups}', { hosts, groups })
   }
 
-  function connect(host: SessionProfile, colour?: string): void {
-    openTab(host.name, { kind: 'session', sessionId: host.id }, colour)
+  /**
+   * Opens the host in a tab. An account named here applies to that tab alone;
+   * an inventory host is read from a repository and nothing about this is
+   * written back, to the repo or to the local override.
+   */
+  function connect(host: SessionProfile, colour?: string, credentialId?: string): void {
+    const credential = credentials.find((c) => c.id === credentialId)
+    openTab(
+      paneTitle(host.name, credential),
+      { kind: 'session', sessionId: host.id, credentialId },
+      colour
+    )
   }
 
-  function hostMenu(host: SessionProfile, colour?: string): MenuItem[] {
+  function hostMenu(host: SessionProfile, atX: number, atY: number, colour?: string): MenuItem[] {
     const state = useStore.getState()
     const activeTab = currentTab(state)
     const auth = resolveAuth(host, host.groupId, allGroups)
@@ -164,6 +185,15 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
             colour
           )
       },
+      ...connectMenuItems({
+        t,
+        credentials,
+        connectAs: (credentialId) => connect(host, colour, credentialId),
+        showMenu: (items) => setMenu({ x: atX, y: atY, items }),
+        manageAccounts: () => setSettingsTab('accounts'),
+        openMultiConnect: () =>
+          setMultiConnecting({ id: host.id, name: host.name, color: colour })
+      }),
       {
         label: t('Copy {address}', {
           address: `${auth.username ? `${auth.username}@` : ''}${host.host}`
@@ -348,7 +378,11 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
         onContextMenu={(e) => {
           e.preventDefault()
           e.stopPropagation()
-          setMenu({ x: e.clientX, y: e.clientY, items: hostMenu(host, dotColour) })
+          setMenu({
+            x: e.clientX,
+            y: e.clientY,
+            items: hostMenu(host, e.clientX, e.clientY, dotColour)
+          })
         }}
       >
         <span className="name">
@@ -509,6 +543,12 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
           groups={allGroups}
           onClose={() => setOverriding(null)}
         />
+      )}
+      {settingsTab && (
+        <SettingsDialog initialTab={settingsTab} onClose={() => setSettingsTab(null)} />
+      )}
+      {multiConnecting && (
+        <MultiConnectDialog host={multiConnecting} onClose={() => setMultiConnecting(null)} />
       )}
       {menu && (
         <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />

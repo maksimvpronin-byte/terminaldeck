@@ -10,6 +10,7 @@ export default function BackupSettings(): JSX.Element {
   const loadSnippets = useStore((s) => s.loadSnippets)
   const loadInventory = useStore((s) => s.loadInventory)
   const loadCollections = useStore((s) => s.loadCollections)
+  const loadCredentials = useStore((s) => s.loadCredentials)
 
   // Off by default: an export leaves the machine and the OS account that
   // protects the vault, so including credentials must be a deliberate choice.
@@ -50,7 +51,13 @@ export default function BackupSettings(): JSX.Element {
         importPassword || undefined
       )
       if (!summary) return
-      await Promise.all([loadStore(), loadSnippets(), loadInventory(), loadCollections()])
+      await Promise.all([
+        loadStore(),
+        loadSnippets(),
+        loadInventory(),
+        loadCollections(),
+        loadCredentials()
+      ])
       setImportPassword('')
       // One sentence rather than five fragments: the numbers land where each
       // language puts them, and a plural rule that differs is one entry to fix.
@@ -65,6 +72,12 @@ export default function BackupSettings(): JSX.Element {
             repositories: summary.inventorySources
           }
         ) +
+          // Two clauses of their own rather than more placeholders in the
+          // sentence above: both are regularly zero, and "0 saved accounts" is
+          // a line about something that did not happen.
+          (summary.credentials > 0
+            ? t(', {accounts} saved accounts', { accounts: summary.credentials })
+            : '') +
           (summary.secrets > 0
             ? t(', and {secrets} credentials', { secrets: summary.secrets })
             : '')

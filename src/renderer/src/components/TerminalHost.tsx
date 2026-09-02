@@ -137,7 +137,10 @@ export default function TerminalHost({
         const tgt = targetRef.current
         const result =
           tgt.kind === 'session'
-            ? await window.td.ssh.connect(tgt.sessionId, cols, rows)
+            ? // The account travels with the pane, so a reconnect signs in as
+              // whoever this pane was opened as rather than reverting to the
+              // host's own login.
+              await window.td.ssh.connect(tgt.sessionId, cols, rows, tgt.credentialId)
             : await window.td.ssh.quickConnect(tgt.params, cols, rows)
         // The pane was torn down (or reconnected) while we were connecting — React
         // remounts effects in StrictMode, so without this both attempts would end up

@@ -5,8 +5,14 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import type { Readable } from 'stream'
 import { app, BrowserWindow } from 'electron'
-import type { SessionProfile, QuickConnectParams, ResolvedAuth } from '../../shared/types'
+import type {
+  Credential,
+  SessionProfile,
+  QuickConnectParams,
+  ResolvedAuth
+} from '../../shared/types'
 import { resolveAuth as resolveAuthChain } from '../../shared/authResolution'
+import { applyCredential } from '../../shared/credentials'
 import { IPC } from '../../shared/ipc-channels'
 import { OSC7_SHELL_SETUP, scanOsc7 } from '../../shared/osc7'
 import { EchoSuppressor } from './echoSuppressor'
@@ -167,10 +173,22 @@ const COMMON_CONNECT: Partial<ConnectConfig> = {
   tryKeyboard: true
 }
 
-/** Connects to `profile`, hopping through its jump-host chain if configured. Resolves with the final connected Client and the list of every client opened along the way (for cleanup). */
+/**
+ * Connects to `profile`, hopping through its jump-host chain if configured.
+ * Resolves with the final connected Client and the list of every client opened
+ * along the way (for cleanup).
+ *
+ * A chosen account applies to the destination and to nothing else. The machines
+ * in between are somebody's jump hosts, reached as whoever they are configured
+ * to be reached as — connecting to a server as a domain administrator says
+ * nothing about who you are on the bastion you pass through, and offering that
+ * account there would mostly fail, sometimes lock it out, and never be what was
+ * asked for.
+ */
 async function connectChain(
   win: BrowserWindow,
-  profile: SessionProfile
+  profile: SessionProfile,
+  credential?: Credential
 ): Promise<{ target: Client; chain: Client[] }> {
   // Each hop carries its own inherited settings, resolved once up front.
   const hops: Array<{ profile: SessionProfile; auth: ResolvedAuth }> = []
@@ -178,7 +196,18 @@ async function connectChain(
   const seen = new Set<string>()
   while (cursor && !seen.has(cursor.id)) {
     seen.add(cursor.id)
-    const auth = effectiveAuth(cursor)
+    /*
+     * The first turn of this loop is the destination itself; every later one is
+     * a hop on the way to it.
+     *
+     * The annotation is not decoration. Comparing `cursor` against `profile`
+     * makes this line depend on `cursor`'s narrowed type, which is decided by
+     * the assignment at the foot of the loop — which reads `auth`, which is
+     * this line. Stating the type breaks the circle; without it the compiler
+     * gives up and calls `auth` an `any`.
+     */
+    const auth: ResolvedAuth =
+      cursor === profile ? applyCredential(effectiveAuth(cursor), credential) : effectiveAuth(cursor)
     hops.unshift({ profile: cursor, auth })
     cursor = auth.jumpHostId
       ? sessionStore.getAll().sessions.find((s) => s.id === auth.jumpHostId)
@@ -299,11 +328,13 @@ class SSHManager {
     win: BrowserWindow,
     profile: SessionProfile,
     cols: number,
-    rows: number
+    rows: number,
+    /** A login chosen for this session alone, in place of the host's own. */
+    credential?: Credential
   ): Promise<string> {
     const connectionId = randomUUID()
     try {
-      const { target, chain } = await connectChain(win, profile)
+      const { target, chain } = await connectChain(win, profile, credential)
       await this.openShell(win, connectionId, target, chain, cols, rows, profile)
       return connectionId
     } catch (err) {

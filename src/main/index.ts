@@ -2,6 +2,7 @@ import { app, shell, BrowserWindow, Menu, type MenuItemConstructorOptions } from
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { registerIpcHandlers } from './ipc/handlers'
+import { desktopHoldsKeyboard, releaseKeyboard } from './keyboardCapture'
 import { installCertificateVerifier } from './rdp/CertificateTrust'
 import { freeRdpBridge } from './rdp/FreeRdpBridge'
 import { remoteEdit } from './ssh/RemoteEdit'
@@ -37,6 +38,25 @@ function buildApplicationMenu(): void {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
 }
 
+/**
+ * The keys that only ever say something is being held down.
+ *
+ * Never taken from a full-screen session: the combination is what carries the
+ * meaning, and a session told about the `W` but not about the Ctrl in front of
+ * it has been told the wrong thing.
+ */
+const HELD_MODIFIERS = new Set([
+  'ControlLeft',
+  'ControlRight',
+  'MetaLeft',
+  'MetaRight',
+  'AltLeft',
+  'AltRight',
+  'ShiftLeft',
+  'ShiftRight',
+  'CapsLock'
+])
+
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
     width: 1280,
@@ -59,6 +79,10 @@ function createWindow(): void {
     mainWindow.show()
   })
 
+  // A window that has just loaded is holding no session, whatever the one
+  // before it was doing. See releaseKeyboard.
+  mainWindow.webContents.on('did-finish-load', releaseKeyboard)
+
   // Chromium zooms the page on Cmd/Ctrl with +, - or 0 on its own, quite apart
   // from the menu, and swallows the keys before the renderer sees them. Claiming
   // them here is the only place early enough; the renderer then resizes the
@@ -66,6 +90,31 @@ function createWindow(): void {
   mainWindow.webContents.setVisualZoomLevelLimits(1, 1)
   mainWindow.webContents.on('before-input-event', (event, input) => {
     if (input.type !== 'keyDown' || !(input.control || input.meta)) return
+
+    /**
+     * A full-screen desktop owns the keyboard, and this is the only place that
+     * can actually give it to one.
+     *
+     * The window can stop its own shortcuts and does, but a menu accelerator
+     * never reaches the window at all — ⌘W is "Close Window" on a Mac, ⌘R
+     * reloads, ⌘Q quits — and preventing the default here is documented to
+     * stop the page events *and* the menu shortcuts. So the key is taken and
+     * handed to the session over a channel of its own, which is the same trick
+     * the zoom keys below have always needed.
+     *
+     * Two things are deliberately left alone. A modifier key itself goes
+     * through untouched, or the far end would never learn that Ctrl is down
+     * and every combination would arrive as a bare letter. And anything with
+     * Alt held goes through too: those are not menu accelerators, and the
+     * window turns Ctrl+Alt+End into the far side's Ctrl+Alt+Del — which it
+     * cannot do for a key it never sees.
+     */
+    if (desktopHoldsKeyboard() && !input.alt && !HELD_MODIFIERS.has(input.code)) {
+      event.preventDefault()
+      mainWindow.webContents.send(IPC.uiForwardKey, input.code)
+      return
+    }
+
     const direction =
       input.key === '=' || input.key === '+'
         ? 'in'

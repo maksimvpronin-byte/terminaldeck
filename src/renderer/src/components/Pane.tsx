@@ -45,6 +45,8 @@ export default function Pane({
   // protocol should take effect in its open panes, not only in the next one.
   // Quick-connect has no profile and is SSH by definition.
   const sessionId = node.target.kind === 'session' ? node.target.sessionId : null
+  /** A stored account chosen for this pane, in place of the host's own login. */
+  const credentialId = node.target.kind === 'session' ? node.target.credentialId : undefined
   const protocol = useStore((s) =>
     sessionId ? protocolOf(s.sessions.find((x) => x.id === sessionId)) : 'ssh'
   )
@@ -220,6 +222,7 @@ export default function Pane({
             host={host}
             port={port}
             sessionId={sessionId ?? undefined}
+            credentialId={credentialId}
             paneVisible={isActiveTab}
           />
         )}

@@ -17,8 +17,11 @@ import GroupDialog from './GroupDialog'
 import InventoryTree from './InventoryTree'
 import CollectionsPanel from './CollectionsPanel'
 import CollectionDialog from './CollectionDialog'
-import SettingsDialog from './SettingsDialog'
+import SettingsDialog, { type SettingsTab } from './SettingsDialog'
+import MultiConnectDialog from './MultiConnectDialog'
 import ContextMenu, { type MenuItem } from './ContextMenu'
+import { connectMenuItems } from './connectMenu'
+import { paneTitle } from '../state/connect'
 import { keyHint } from '../state/keys'
 import { useT } from '../i18n'
 import {
@@ -70,6 +73,7 @@ export default function Sidebar({
   const openSelectedHosts = useStore((s) => s.openSelectedHosts)
   const openMany = useStore((s) => s.openMany)
   const collections = useStore((s) => s.collections)
+  const credentials = useStore((s) => s.credentials)
   const addToCollection = useStore((s) => s.addToCollection)
   const workspaces = useStore((s) => s.workspaces)
 
@@ -81,7 +85,10 @@ export default function Sidebar({
   const [editingSession, setEditingSession] = useState<SessionProfile | undefined | 'new'>(undefined)
   const [showQuickConnect, setShowQuickConnect] = useState(false)
   const [showImport, setShowImport] = useState(false)
-  const [showSettings, setShowSettings] = useState(false)
+  /** Which page Settings should open on, or null while it is closed. */
+  const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null)
+  /** The host being opened several times over, once that has been asked for. */
+  const [multiConnecting, setMultiConnecting] = useState<SessionProfile | null>(null)
   const [query, setQuery] = useState('')
   const [groupDialog, setGroupDialog] = useState<
     { group?: SessionGroup; parentId: string | null } | null
@@ -111,8 +118,18 @@ export default function Sidebar({
     })
   }
 
-  function connect(session: SessionProfile): void {
-    openTab(session.name, { kind: 'session', sessionId: session.id }, session.color)
+  /**
+   * Opens the host in a tab. An account named here is used for that tab alone —
+   * it travels on the pane, so a reconnect keeps it, and the saved host is not
+   * touched by any of it.
+   */
+  function connect(session: SessionProfile, credentialId?: string): void {
+    const credential = credentials.find((c) => c.id === credentialId)
+    openTab(
+      paneTitle(session.name, credential),
+      { kind: 'session', sessionId: session.id, credentialId },
+      session.color
+    )
   }
 
   /** user@host as it will actually be used, inheritance included. */
@@ -264,7 +281,7 @@ export default function Sidebar({
     else if (item.kind === 'group') await moveGroup(item.id, targetGroupId)
   }
 
-  function sessionMenu(s: SessionProfile): MenuItem[] {
+  function sessionMenu(s: SessionProfile, atX: number, atY: number): MenuItem[] {
     const state = useStore.getState()
     const activeTab = currentTab(state)
     // Right-clicking inside a selection acts on the whole of it; right-clicking
@@ -290,6 +307,16 @@ export default function Sidebar({
           )
         }
       },
+      // The account list opens as a second menu where the first one stood, so
+      // the choice is made in the place the eye is already looking.
+      ...connectMenuItems({
+        t,
+        credentials,
+        connectAs: (credentialId) => connect(s, credentialId),
+        showMenu: (items) => setMenu({ x: atX, y: atY, items }),
+        manageAccounts: () => setSettingsTab('accounts'),
+        openMultiConnect: () => setMultiConnecting(s)
+      }),
       {
         label: t('Duplicate'),
         separated: true,
@@ -386,7 +413,7 @@ export default function Sidebar({
         onContextMenu={(e) => {
           e.preventDefault()
           e.stopPropagation()
-          setMenu({ x: e.clientX, y: e.clientY, items: sessionMenu(s) })
+          setMenu({ x: e.clientX, y: e.clientY, items: sessionMenu(s, e.clientX, e.clientY) })
         }}
         key={s.id}
         style={{ paddingLeft }}
@@ -653,7 +680,7 @@ export default function Sidebar({
         <button className="icon-button" title={keyHint(t('Shortcuts and features (⌘/)'))} onClick={onOpenHelp}>
           ?
         </button>
-        <button className="icon-button" title={t("Settings")} onClick={() => setShowSettings(true)}>
+        <button className="icon-button" title={t("Settings")} onClick={() => setSettingsTab('general')}>
           ⚙
         </button>
         <button className="icon-button" title={keyHint(t('Lock vault (⌘L)'))} onClick={() => lockVault()}>
@@ -669,7 +696,16 @@ export default function Sidebar({
       )}
       {showQuickConnect && <QuickConnectDialog onClose={() => setShowQuickConnect(false)} />}
       {showImport && <ImportSshConfigDialog onClose={() => setShowImport(false)} />}
-      {showSettings && <SettingsDialog onClose={() => setShowSettings(false)} />}
+      {settingsTab && (
+        <SettingsDialog initialTab={settingsTab} onClose={() => setSettingsTab(null)} />
+      )}
+
+      {multiConnecting && (
+        <MultiConnectDialog
+          host={multiConnecting}
+          onClose={() => setMultiConnecting(null)}
+        />
+      )}
 
       {collecting && (
         <CollectionDialog

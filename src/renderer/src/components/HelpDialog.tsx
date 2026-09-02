@@ -83,6 +83,10 @@ const SECTIONS: Section[] = [
       { keys: 'Ctrl+Alt+End', what: 'Ctrl+Alt+Del on the far side; this machine keeps the real one' },
       { keys: 'F11', what: 'Full screen, which is the only way Alt+Tab reaches the far side' },
       { what: 'Hold Escape to leave full screen: while there, it belongs to the session' },
+      { what: 'Full screen also hands over every shortcut this app owns, ⌘W and Ctrl+W included' },
+      { what: 'So a key aimed at the far machine cannot close a tab on this one instead' },
+      { what: 'Nothing is held back: F11 and holding Escape are the way out, and neither is a shortcut' },
+      { what: 'In a window rather than full screen the app keeps its shortcuts as before' },
       { what: 'The pane toolbar hides there, so the desktop is the size of the display' },
       { what: 'Push the pointer against the very top of the screen and hold it to bring the toolbar back' },
       { what: 'A watched session cannot take Alt+Tab even full screen — Windows draws it' },
@@ -97,7 +101,7 @@ const SECTIONS: Section[] = [
       { what: 'How much larger is per host; nothing about the far machine is changed' },
       { what: 'Or tell the session the density and it draws itself larger, sharply' },
       { keys: '⌘ as Ctrl', what: 'Optional, per host: ⌘C and ⌘V then work as they do on Windows' },
-      { what: 'While it is on, this app’s own ⌘ shortcuts do not fire over a focused desktop' },
+      { what: '⌘Q and ⌘Tab stay with macOS in a window, and go to the session in full screen' },
       { what: 'A certificate the machine cannot verify is asked about once, then remembered' },
       { what: 'Settings → Security lists what was trusted by hand, and forgets it on request' },
       { what: 'The far end’s sound plays here, and can be turned off per host or group' },
@@ -144,6 +148,34 @@ const SECTIONS: Section[] = [
       { what: '"Log session output to file" keeps a transcript per connection under the logs folder' },
       { keys: '⌘L', what: 'Lock the vault; it also locks itself after the delay set in Settings → Security' },
       { what: 'Settings → Backup moves everything to another machine, credentials optional' }
+    ]
+  },
+  {
+    title: 'Saved accounts',
+    rows: [
+      { what: 'Settings → Accounts keeps logins that belong to no host in particular' },
+      { what: 'Give each one a name, a username, and a password, a key or the agent' },
+      { what: 'Leave the password empty to be asked for it every time it is used' },
+      { what: 'Right-click a host and choose “Connect as…” to reach it as one of them' },
+      { what: 'That applies to the new tab alone; the host keeps the login it is saved with' },
+      { what: 'The pane is named after the account, so a window signed in as somebody else says so' },
+      { what: 'Reconnecting a pane signs in as the same account again' },
+      { what: 'Only who you are is replaced: the port, jump host and gateway stay the host’s own' },
+      { what: 'A gateway set to use the host’s credentials is offered the chosen account too' },
+      { what: 'The jump hosts on the way are still reached as they are configured to be' },
+      { what: 'Works the same for a desktop and for an inventory host' },
+      { what: 'Passwords live in the vault, exactly as a host’s does' },
+      { what: 'Accounts travel with a backup; their passwords only if credentials are included' }
+    ]
+  },
+  {
+    title: 'Opening a host several times',
+    rows: [
+      { what: 'Right-click a host and choose “Connect several times…”' },
+      { what: 'Say how many windows, as which account, and where they should land' },
+      { what: 'Separate tabs, tiled into one tab, or a workspace of their own' },
+      { what: 'Each window is a connection of its own, numbered so they can be told apart' },
+      { what: 'Twenty at once is the limit — every one of them is a real login on the far end' }
     ]
   },
   {

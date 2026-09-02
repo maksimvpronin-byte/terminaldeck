@@ -9,6 +9,23 @@ function clampFontSize(size: number): number {
 }
 
 /**
+ * Whether a remote desktop is full screen, and so owns every key on the board.
+ *
+ * Asked of the DOM rather than kept as state, because the DOM is where the
+ * answer already is and a flag would be one more thing to leave stale when a
+ * pane closes with the screen still held.
+ *
+ * `fullscreenTarget` puts the *pane* full screen rather than the picture inside
+ * it, so what is asked is whether the full-screen element contains a session's
+ * canvas. A terminal has no way to get here — the button is only drawn for a
+ * desktop, and F11 is only handled by one.
+ */
+function desktopHoldsKeyboard(): boolean {
+  const full = document.fullscreenElement
+  return full !== null && full.querySelector('.graphical-screen') !== null
+}
+
+/**
  * Window-level shortcuts. Registered in the capture phase so they win over
  * xterm.js, which otherwise swallows the keystroke into the remote shell.
  */
@@ -38,6 +55,26 @@ export function useShortcuts(actions: {
        */
       const mod = IS_MAC ? e.metaKey : e.ctrlKey
       if (!mod) return
+
+      /**
+       * A full-screen desktop takes the whole keyboard, this app included.
+       *
+       * The capture phase is what makes this necessary rather than merely
+       * tidy. These handlers run before the session's own, so every shortcut
+       * below was being taken out of a full-screen desktop — Ctrl+W closed the
+       * tab the desktop was in instead of closing a window on the far machine,
+       * which is a keystroke aimed at one computer landing on another.
+       *
+       * Nothing is reserved, deliberately: an exception list is how the
+       * surprise comes back. The two ways out do not pass through here — F11
+       * is handled by the session itself before it forwards anything, and
+       * holding Escape is the browser's own release of the locked keyboard.
+       *
+       * Checked after the modifier, not before: this reads the DOM, and a
+       * session being typed into sends far more unmodified keys than modified
+       * ones.
+       */
+      if (desktopHoldsKeyboard()) return
 
       const state = useStore.getState()
       const current = activeTab(state)

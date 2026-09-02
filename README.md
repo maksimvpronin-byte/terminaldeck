@@ -48,6 +48,18 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
   opening move. Read from local configuration only and **never from an inventory repository**,
   since that would hand command execution to anyone able to commit there
 - Password prompt when nothing is stored, and **keyboard-interactive** support for 2FA
+- **Saved accounts** (Settings → Accounts): logins kept on their own, belonging to no host and to
+  no group. Right-click any host — saved or from an inventory — and **Connect as…** reaches it as
+  one of them. That applies to the new tab alone: nothing is written back, so the host keeps the
+  login it is saved with and every other connection to it is unaffected. The choice travels on the
+  pane, so reconnecting signs in as the same account again, and the pane is named after it so a
+  window signed in as somebody else says so.
+  Only *who you are* is replaced — the port, the jump host, the on-connect commands and the
+  gateway all stay the host's own. A gateway set to use the host's credentials is offered the
+  chosen account too; the jump hosts on the way are still reached as they are configured to be.
+  An account with no password saved is a deliberate arrangement rather than an incomplete one: the
+  name and the login are remembered and the password is asked for each time. Works for desktops as
+  well as shells, and passwords live in the vault exactly as a host's do
 - Import hosts from `~/.ssh/config`, including `ProxyJump` links
 
 ### Terminals
@@ -76,6 +88,10 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
   prompt, never as a button on the row
 - Hosts are **sorted by hand**: drag one onto the upper or lower edge of another to drop it into
   that gap, in its group or into a different one, and the order is kept between launches
+- **Connect several times…** in the same right-click menu opens one host in as many windows as
+  you ask for, under whichever saved account you pick, as separate tabs, tiled into one tab, or
+  in a workspace of their own. Each is a connection of its own and is numbered so they can be
+  told apart; twenty at once is the limit, since every one of them is a real login on the far end
 - **Host palette** (`⌘P`) searching saved sessions and inventories together; tick several hosts
   in the tree with `⌘`/`⇧` click and open them as tabs or tiled in one
 - **Appearance profiles**: font, size, colour theme, cursor and scrollback are set globally in
@@ -178,9 +194,17 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
   own rather than the display less a toolbar — which matters beyond the room it frees, since a
   size no monitor has is the one that cannot land pixel for pixel. F11 enters and leaves, and
   holding Escape leaves; while there, Alt+Tab reaches the far side
+- **Full screen hands the whole keyboard to the session.** Every shortcut this application owns
+  stands down while a desktop is full screen — `⌘W`/`Ctrl+W`, the tab and workspace numbers, the
+  snippet and host palettes, the vault lock, the zoom keys, and on a Mac the menu accelerators
+  that never reached the window at all, `⌘W` for Close Window among them. A key aimed at the far
+  machine landing on this one is the whole failure being avoided, and an exception list is how
+  that comes back, so there is none: the two ways out are F11 and holding Escape, neither of
+  which passes through the shortcut handling. In a window rather than full screen nothing
+  changes — the app's shortcuts still fire, so the tabs stay reachable from the keyboard
 - **Send ⌘ as Ctrl**, per host and off by default. Copy and paste then land where they do on
-  Windows. While it is on and the desktop has the keyboard, this app's own ⌘ shortcuts do not
-  fire; ⌘Q and ⌘Tab still belong to macOS
+  Windows. ⌘Q and ⌘Tab still belong to macOS unless the session is full screen, where ⌘Q is
+  forwarded like anything else and ⌘Tab is held by the browser's keyboard lock
 - **The picture comes from a real RDP client, in a process of its own.** It is
   [FreeRDP](https://github.com/FreeRDP/FreeRDP) 3.31, built from source and shipped inside the
   application as a small program called `td-rdp`: it connects, decodes, and writes the
@@ -656,6 +680,7 @@ Where things are kept, all under the OS user-data directory:
 | `sessions.json` | Saved hosts and groups (no secrets) |
 | `snippets.json` | Command library |
 | `collections.json` | Saved sets of hosts (references only, no secrets) |
+| `credentials.json` | Saved accounts — names and vault references, no secrets |
 | `inventories.json` | Inventory sources and local overrides |
 | `known_hosts.json` | Trusted host fingerprints |
 | `inventory-repos/` | Read-only git mirrors |

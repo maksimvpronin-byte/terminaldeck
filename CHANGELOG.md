@@ -6,6 +6,111 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## Unreleased
+
+### Added
+
+- **Saved accounts, and a way to reach a host as somebody else.** Settings →
+  Accounts keeps logins that belong to no host and to no group: a name, a
+  username, and a password, a key file or the agent. Right-click any host —
+  saved or from an inventory — and "Connect as…" lists them.
+
+  What makes this worth having is what it deliberately does *not* do. It writes
+  nothing back. The host keeps the login it is saved with, every other
+  connection to it is unaffected, and there is nothing to undo afterwards —
+  which is the whole failure mode of the alternative, where a host is edited for
+  one connection and quietly keeps the administrator's login for the next
+  fortnight. The choice rides on the pane instead, so reconnecting signs in as
+  the same account again and the pane is named after it, because a window signed
+  in as somebody else is otherwise indistinguishable from one that is not.
+
+  Only *who you are* is replaced: the port, the jump host, the on-connect
+  commands and the RD Gateway stay the host's own. Two consequences were decided
+  rather than fallen into. A gateway configured to use the host's credentials is
+  offered the chosen account, since that is what "my connection credentials" now
+  means for this session. The jump hosts on the way are not — a bastion is
+  reached as whoever it is configured to be reached as, and offering a domain
+  administrator to every hop would mostly fail and occasionally lock the account
+  out.
+
+  An account with no password saved is a supported arrangement, not a
+  half-finished one: the name and the login are remembered and the password is
+  asked for each time. That case is also why the four fields are replaced
+  together rather than layered onto the host's own settings — layering would let
+  an account with no password fall back to the host's, offering one account's
+  name with another account's password, which fails as "permission denied" and
+  gives nothing to look at that says why.
+
+  Works for desktops as well as shells. Passwords live in the vault exactly as a
+  host's do, `credentials.json` holds nothing but names and references, and
+  accounts travel with a backup export — their passwords only when credentials
+  are included in it.
+
+- **"Connect several times…"**, in the same menu: one host, as many windows as
+  you ask for, under whichever account you pick, opened as separate tabs, tiled
+  into one tab, or in a workspace of their own. Each is a connection of its own
+  and is numbered so they can be told apart. Twenty at once is the cap — every
+  one of them is a real shell and a real authentication attempt on the far end,
+  and a mistyped three hundred against a host that locks an account after five
+  failures is a bad afternoon.
+
+### Fixed
+
+- **A key pressed at a full-screen remote desktop now reaches that desktop.**
+  Ctrl+W closed the tab the session was sitting in instead of closing a window
+  on the far machine — a keystroke aimed at one computer landing on another, and
+  every other shortcut behaved the same way. The window's own handlers run in
+  the capture phase, ahead of the session, and knew nothing about full screen.
+
+  There were two layers to this and only the first was obvious. Beyond the
+  window's shortcuts sit the application menu's accelerators, which never reach
+  the window at all: on a Mac ⌘W is Close Window, ⌘R reloads and ⌘Q quits. Those
+  are taken in the main process now — the one place early enough — and handed to
+  the session over a channel of their own, which is the same route the zoom keys
+  have always had to take.
+
+  Nothing is reserved while a desktop is full screen, deliberately: an exception
+  list is how the surprise comes back. The two ways out are not shortcuts and
+  are unaffected — F11 is handled by the session before it forwards anything,
+  and holding Escape is the browser releasing the locked keyboard. A modifier
+  key itself is never taken, or the far end would learn about the `W` and not
+  about the Ctrl in front of it; nor is anything with Alt held, since the window
+  turns Ctrl+Alt+End into the far side's Ctrl+Alt+Del and cannot do that for a
+  key it never sees. In a window rather than full screen nothing changes.
+
+- **The help and the README said ⌘ shortcuts already stood down over a focused
+  desktop while "send ⌘ as Ctrl" was on.** They did not; nothing in the code
+  ever did that. Both now describe what happens, which is that full screen hands
+  the keyboard over and a window does not.
+
+- **The line that sets up directory tracking no longer appears on screen.**
+  Connecting to a host with "follow the terminal's directory" on left three
+  hundred characters of shell nobody typed sitting above the first prompt —
+  `__td7(){ printf '\033]7;...`. There is a whole class whose only job is to
+  take that back out of the stream, and it was matching the bytes exactly and
+  contiguously.
+
+  They are not contiguous. The echo is not the pty copying input back: it is
+  the shell's line editor drawing it, and a line longer than the pane is drawn
+  across several rows with bytes of the editor's own at each wrap — a space and
+  a carriage return at the right margin, sometimes a cursor move. At three
+  hundred characters the setup line wraps in any ordinary pane, so the search
+  found nothing and the suppressor sat there suppressing nothing. Every one of
+  its eight tests fed it a single unbroken line.
+
+  It now walks the two in step and skips what a redraw is entitled to insert,
+  taking an exact byte as itself first so a space in the echo is matched rather
+  than swallowed as padding. Anything else — an ordinary character where the
+  echo has a different one — still fails the match, and a screenful with no
+  echo in it is still released rather than held.
+
+- **A context menu replaced by another one in the same place is measured
+  again.** The nudge that keeps a menu inside the window is taken from its
+  height, and it was taken once; a second menu opening where the first stood —
+  which is what choosing "Connect as…" does — was placed by the arithmetic done
+  for the menu it replaced, and near the bottom of the screen that put half of
+  it off the edge.
+
 ## 0.6.0
 
 Numbered as a minor release rather than the patch it started as. It began with

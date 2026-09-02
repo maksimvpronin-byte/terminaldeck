@@ -12,6 +12,7 @@ import type {
   UpdateState,
   Snippet,
   HostCollection,
+  Credential,
   AuthPromptRequest,
   InventorySource,
   InventoryOverride,
@@ -117,6 +118,17 @@ const api = {
     save: (snippet: Snippet): Promise<Snippet> => ipcRenderer.invoke(IPC.snippetsSave, snippet),
     remove: (id: string): Promise<void> => ipcRenderer.invoke(IPC.snippetsDelete, id)
   },
+  /**
+   * Logins saved on their own, offered to any host at the moment of connecting.
+   * Metadata only in both directions — the password goes in and stays in.
+   */
+  credentials: {
+    list: (): Promise<Credential[]> => ipcRenderer.invoke(IPC.credentialsList),
+    /** `secret`: a string stores it, undefined keeps what is there, null forgets it. */
+    save: (credential: Credential, secret?: string | null): Promise<Credential> =>
+      ipcRenderer.invoke(IPC.credentialsSave, credential, secret),
+    remove: (id: string): Promise<void> => ipcRenderer.invoke(IPC.credentialsDelete, id)
+  },
   collections: {
     list: (): Promise<HostCollection[]> => ipcRenderer.invoke(IPC.collectionsList),
     save: (collection: HostCollection): Promise<HostCollection> =>
@@ -125,8 +137,18 @@ const api = {
     reorder: (ids: string[]): Promise<void> => ipcRenderer.invoke(IPC.collectionsReorder, ids)
   },
   ssh: {
-    connect: (sessionId: string, cols: number, rows: number): Promise<{ connectionId: string }> =>
-      ipcRenderer.invoke(IPC.sshConnect, sessionId, cols, rows),
+    /**
+     * Opens a shell on a saved host. `credentialId` names a stored login to use
+     * in place of the host's own, for this session and no other — nothing is
+     * written back to the host.
+     */
+    connect: (
+      sessionId: string,
+      cols: number,
+      rows: number,
+      credentialId?: string
+    ): Promise<{ connectionId: string }> =>
+      ipcRenderer.invoke(IPC.sshConnect, sessionId, cols, rows, credentialId),
     quickConnect: (
       params: QuickConnectParams,
       cols: number,
@@ -181,16 +203,25 @@ const api = {
     /** How this host's desktop should be drawn: size, and keyboard behaviour. */
     settings: (sessionId: string): Promise<RdpView> =>
       ipcRenderer.invoke(IPC.rdpSettings, sessionId),
-    /** The stored login for one host; the password is empty when none is saved. */
-    credentials: (sessionId: string): Promise<{ username: string; password: string }> =>
-      ipcRenderer.invoke(IPC.rdpCredentials, sessionId),
+    /**
+     * The stored login for one host, or for the account chosen in its place;
+     * the password is empty when none is saved.
+     */
+    credentials: (
+      sessionId: string,
+      credentialId?: string
+    ): Promise<{ username: string; password: string }> =>
+      ipcRenderer.invoke(IPC.rdpCredentials, sessionId, credentialId),
     /**
      * Who is logged on to a host, by host id: the query needs that host's own
      * login, which main resolves without handing it here. Never rejects; says
      * why it found nobody.
      */
-    listSessions: (sessionId: string): Promise<{ sessions: WinSession[]; problem?: string }> =>
-      ipcRenderer.invoke(IPC.rdpListSessions, sessionId),
+    listSessions: (
+      sessionId: string,
+      credentialId?: string
+    ): Promise<{ sessions: WinSession[]; problem?: string }> =>
+      ipcRenderer.invoke(IPC.rdpListSessions, sessionId, credentialId),
     /**
      * Shows a shadow session inside a pane. The picture belongs to a window
      * this app positions rather than draws, so the pane has to keep reporting
@@ -204,6 +235,8 @@ const api = {
       /** The saved connection, so the main process can find the host's
        *  credentials. The password never comes back through here. */
       profileId?: string
+      /** A stored account to authenticate the viewer as instead. */
+      credentialId?: string
     }): Promise<string> => ipcRenderer.invoke(IPC.shadowStart, request),
     shadowPlace: (
       id: string,
@@ -237,6 +270,8 @@ const api = {
       scale?: number
       /** Typed here, for a host that has nothing saved. */
       password?: string
+      /** A stored account to sign in as instead of the host's own. */
+      credentialId?: string
     }): Promise<string> => ipcRenderer.invoke(IPC.desktopStart, request),
     /**
      * Anything the pane has to say to a running desktop: a key, the mouse, a
@@ -433,6 +468,20 @@ const api = {
       const listener = (_e: unknown, direction: 'in' | 'out' | 'reset'): void => cb(direction)
       ipcRenderer.on(IPC.uiZoom, listener)
       return () => ipcRenderer.removeListener(IPC.uiZoom, listener)
+    },
+    /**
+     * Says whether a full-screen desktop owns the keyboard.
+     *
+     * The main process claims a few keys before this window sees them, so it
+     * has to be told; it then hands them over rather than acting on them.
+     */
+    setKeyboardCapture: (held: boolean): void =>
+      ipcRenderer.send(IPC.uiKeyboardCapture, held),
+    /** A key main had to claim, arriving as its `code`, for the session to send. */
+    onForwardKey: (cb: (code: string) => void): (() => void) => {
+      const listener = (_e: unknown, code: string): void => cb(code)
+      ipcRenderer.on(IPC.uiForwardKey, listener)
+      return () => ipcRenderer.removeListener(IPC.uiForwardKey, listener)
     }
   },
   clipboard: {
