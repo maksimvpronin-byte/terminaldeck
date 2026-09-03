@@ -14,10 +14,16 @@ on:
   workflow_dispatch:
 
 # A quick series of pushes should leave one run to read, not a queue of them.
-# Keyed on the branch rather than the ref, so a pull request from a branch in
-# this repository does not run the same commit twice alongside its push.
+#
+# Keyed on the branch name, which both events have to be made to say: a push
+# reports `refs/heads/foo` in `github.ref` while a pull request reports `foo` in
+# `head_ref`, so keying on either of those verbatim puts the two in different
+# groups and the run this was written to prevent — the same commit built twice,
+# once for the push and once for the pull request from a branch in this
+# repository — happened anyway, quietly, for as long as the comment here said it
+# did not. `ref_name` is `github.ref` with the `refs/heads/` already off.
 concurrency:
-  group: checks-${{ github.head_ref || github.ref }}
+  group: checks-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 
 permissions:
@@ -56,3 +62,13 @@ jobs:
       # difference actually bites, not before.
       - name: Tests
         run: npm test
+
+      # The bundle only — electron-vite, not electron-builder, so this is
+      # seconds rather than the twenty minutes a packaged Windows build takes.
+      # It is here because it fails on things the type-checker accepts: an
+      # import Rollup cannot resolve, an asset path that does not survive the
+      # build, a renderer entry that no longer exists. Until this step, the
+      # first time a commit was bundled at all was after its tag had been
+      # pushed, on the runner that was about to publish it.
+      - name: Build
+        run: npm run build

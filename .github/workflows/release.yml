@@ -154,8 +154,19 @@ jobs:
             echo "APPLE_TEAM_ID=$APPLE_TEAM_ID" >> "$GITHUB_ENV"
           fi
 
+      # Publishing only from a tag, and the flag says so rather than the
+      # workflow trusting that nobody presses Run workflow.
+      #
+      # `--publish always` uploads to the release named for the version in
+      # package.json, whether or not this run was tagged — so a manual run from
+      # a branch did not skip the tag check so much as walk around it: it built
+      # whatever that branch held and added the artifacts to the release for the
+      # version already sitting there, which by then is one the updater is
+      # handing out. A dispatched run is a build, and now proves itself as one.
       - name: Build and publish
-        run: npm run ${{ matrix.script }} -- --publish always
+        run: >
+          npm run ${{ matrix.script }} --
+          --publish ${{ startsWith(github.ref, 'refs/tags/v') && 'always' || 'never' }}
         env:
           # Provided by Actions; lets electron-builder upload to the release.
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
