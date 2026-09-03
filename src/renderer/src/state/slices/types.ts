@@ -4,6 +4,7 @@ import type {
   Credential,
   GitFolderPreview,
   GitFolderTree,
+  GitRepo,
   HostCollection,
   InventoryOverride,
   InventorySource,
@@ -128,6 +129,11 @@ export interface InventorySlice {
 export interface GitFoldersSlice {
   gitFolderTrees: GitFolderTree[]
   gitFolderOverrides: InventoryOverride[]
+  /**
+   * Repositories already in use, so a second folder on the same inventory is
+   * chosen from a list rather than typed out again.
+   */
+  gitRepos: GitRepo[]
   /** Folders whose repository is being read right now. */
   gitFolderSyncing: string[]
   /** Why the last attempt to read a folder's repository failed, if it did. */
@@ -146,6 +152,7 @@ export interface GitFoldersSlice {
     gatewaySecret?: string | null
   ) => Promise<void>
   clearGitFolderOverride: (nodeId: string) => Promise<void>
+  forgetGitRepo: (url: string, branch?: string) => Promise<void>
 }
 
 export interface CollectionsSlice {

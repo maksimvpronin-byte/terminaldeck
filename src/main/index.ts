@@ -111,7 +111,16 @@ function createWindow(): void {
      */
     if (desktopHoldsKeyboard() && !input.alt && !HELD_MODIFIERS.has(input.code)) {
       event.preventDefault()
-      mainWindow.webContents.send(IPC.uiForwardKey, input.code)
+      // With the modifiers that were down, because this keystroke is one the
+      // window will never see: it is how the session learns that its idea of
+      // what is held still matches the keyboard.
+      mainWindow.webContents.send(IPC.uiForwardKey, {
+        code: input.code,
+        control: input.control,
+        shift: input.shift,
+        alt: input.alt,
+        meta: input.meta
+      })
       return
     }
 

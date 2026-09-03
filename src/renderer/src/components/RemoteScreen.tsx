@@ -2,7 +2,8 @@ import { useEffect, useRef } from 'react'
 import { desktopSizeFor, type DesktopSize } from '../../../shared/desktopSize'
 import { buttonEvent, PTR, wheelFlags, wheelUnits } from '../../../shared/rdpInput'
 import { rdpKeyFor, substituteCommand, unicodeKey } from '../../../shared/rdpScancodes'
-import type { RdpView } from '../../../shared/types'
+import { modifierFixes } from '../../../shared/modifierSync'
+import type { ForwardedKey, RdpView } from '../../../shared/types'
 
 /**
  * A desktop, drawn from the pixels a client in another process decoded.
@@ -90,6 +91,12 @@ export default function RemoteScreen({
   onMeasured
 }: Props): JSX.Element {
   const containerRef = useRef<HTMLDivElement | null>(null)
+  /**
+   * What the far end has been told to hold, so a release that never arrives can
+   * be noticed and made good. A ref rather than a local of the keyboard effect
+   * because the mouse needs it too — see `syncModifiers`.
+   */
+  const heldRef = useRef<Set<string>>(new Set())
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   /** The live session, once the main process has given it a name. */
   const idRef = useRef<string | null>(null)
@@ -132,6 +139,57 @@ export default function RemoteScreen({
   function desired(): DesktopSize | null {
     const rect = containerRef.current?.getBoundingClientRect()
     return desktopSizeFor(lookRef.current, rect ?? null, window.devicePixelRatio)
+  }
+
+  /** One key, as the far end wants it: a scancode and whether it is going down. */
+  function sendKey(code: string, down: boolean): boolean {
+    const key = rdpKeyFor(code)
+    if (!key) return false
+    tell({ a: 'key', code: key.code, down, ext: key.extended === true })
+    return true
+  }
+
+  /**
+   * Makes the far end's modifiers agree with this keyboard's, from any event
+   * that can be asked about them — a key, or the mouse.
+   *
+   * The mouse is the half that was missing, and it is the half you notice. A
+   * stuck Ctrl was repaired by the next keystroke, which is fine right up until
+   * the next thing you do is click: on a desktop that is most of what you do,
+   * and every click until you happen to type is a Ctrl-click, selecting instead
+   * of opening. `MouseEvent` answers `getModifierState` exactly as a key event
+   * does, so the same repair works from there and costs a comparison per move.
+   */
+  function syncModifiers(
+    event: { getModifierState(state: string): boolean },
+    options: { ignore?: string | null; press?: boolean } = {}
+  ): void {
+    const fixes = modifierFixes({
+      held: heldRef.current,
+      down: (state) => event.getModifierState(state),
+      commandAsControl: lookRef.current?.commandAsControl === true,
+      ignore: options.ignore,
+      press: options.press
+    })
+    for (const fix of fixes) {
+      if (!sendKey(fix.code, fix.down)) continue
+      if (fix.down) heldRef.current.add(fix.code)
+      else heldRef.current.delete(fix.code)
+    }
+  }
+
+  /** A forwarded key's modifiers, shaped like the events' own `getModifierState`. */
+  function modifierStateOf(key: ForwardedKey): { getModifierState(state: string): boolean } {
+    return {
+      getModifierState: (state) =>
+        state === 'Control'
+          ? key.control
+          : state === 'Shift'
+            ? key.shift
+            : state === 'Alt'
+              ? key.alt
+              : state === 'Meta' && key.meta
+    }
   }
 
   /** Says a thing to the running session, or nothing if there is not one. */
@@ -533,75 +591,19 @@ export default function RemoteScreen({
     const container = containerRef.current
     if (!container) return
 
-    /**
-     * What is held down, so it can be released if the focus leaves.
-     *
-     * A modifier whose key-up never arrived is held over there indefinitely,
-     * and every subsequent letter is a shortcut. That happens whenever a key is
-     * still down as the window loses focus — ⌘Tab, most often.
+    /*
+     * What is held down lives on a ref, and the repair that keeps it honest is
+     * `syncModifiers` in the component body — the mouse handlers need both, and
+     * they are not inside this effect.
      */
-    const held = new Set<string>()
-
-    const sendKey = (code: string, down: boolean): boolean => {
-      const key = rdpKeyFor(code)
-      if (!key) return false
-      tell({
-        a: 'key',
-        code: key.code,
-        down,
-        ext: key.extended === true
-      })
-      return true
-    }
-
-    /**
-     * The modifiers, and the state each one answers to.
-     *
-     * Both sides of a pair map to the same state: `getModifierState('Control')`
-     * is true while either Ctrl is down, so a hand moving from one to the other
-     * leaves both marked held for a moment. Sending one release too few is the
-     * failure this exists to prevent; sending one too many costs nothing, since
-     * a key released twice over there is already released.
-     */
-    const MODIFIERS: Array<[code: string, state: string]> = [
-      ['ControlLeft', 'Control'],
-      ['ControlRight', 'Control'],
-      ['ShiftLeft', 'Shift'],
-      ['ShiftRight', 'Shift'],
-      ['AltLeft', 'Alt'],
-      ['AltRight', 'Alt'],
-      ['MetaLeft', 'Meta'],
-      ['MetaRight', 'Meta']
-    ]
-
-    /**
-     * Puts the far end's idea of the modifiers back in step with this one's.
-     *
-     * A key-up that never arrives leaves a modifier held over there for good,
-     * and every letter typed afterwards is a shortcut — on a remote machine
-     * running this very application, a `k` opens the snippet palette. It is
-     * lost whenever the focus moves between the press and the release, which
-     * the handlers below cannot forward, and this application moves it itself:
-     * its own palettes take the focus the moment they open.
-     *
-     * `blur` releases everything and covers the common case. This covers the
-     * rest, and needs no event to fire at all: every keystroke carries the true
-     * state of every modifier, so the next key pressed after a loss corrects it.
-     * That is the same repair as pressing Ctrl by hand, which is what people
-     * were doing, without their having to notice that it was needed.
-     */
-    const reconcileModifiers = (event: KeyboardEvent): void => {
-      for (const [code, state] of MODIFIERS) {
-        if (held.has(code) && !event.getModifierState(state)) {
-          held.delete(code)
-          sendKey(code, false)
-        }
-      }
-    }
+    const held = heldRef.current
 
     const onKeyDown = (event: KeyboardEvent): void => {
       if (!container.contains(document.activeElement)) return
-      reconcileModifiers(event)
+      const code = substituteCommand(event.code, lookRef.current?.commandAsControl === true)
+      // Every key carries the truth about every modifier, so the one this event
+      // is about is left alone and the rest are made to agree.
+      syncModifiers(event, { ignore: code })
 
       // Full screen belongs to the pane, and the toolbar button means the same
       // thing; see `.pane:fullscreen` in styles.css.
@@ -626,6 +628,12 @@ export default function RemoteScreen({
         event.stopPropagation()
         for (const code of ['ControlLeft', 'AltLeft', 'Delete']) sendKey(code, true)
         for (const code of ['Delete', 'AltLeft', 'ControlLeft']) sendKey(code, false)
+        // The pair above put Ctrl and Alt up over there while the hand is still
+        // on both. Saying so keeps the record honest, and the next event presses
+        // them again — rather than this end believing they are down and never
+        // sending them.
+        held.delete('ControlLeft')
+        held.delete('AltLeft')
         return
       }
       if (event.altKey && !event.ctrlKey && event.key === 'Home') {
@@ -636,7 +644,6 @@ export default function RemoteScreen({
         return
       }
 
-      const code = substituteCommand(event.code, lookRef.current?.commandAsControl === true)
       event.preventDefault()
       event.stopPropagation()
 
@@ -663,6 +670,14 @@ export default function RemoteScreen({
       event.stopPropagation()
       held.delete(code)
       sendKey(code, false)
+      /*
+       * And again afterwards, because a release can be the thing that puts the
+       * two ends out of step rather than the thing that fixes it. With ⌘ acting
+       * as Ctrl, letting go of ⌘ while the real Ctrl is still held sends the one
+       * Ctrl-up both keys share, and the far end stops holding a key the hand
+       * has not left.
+       */
+      syncModifiers(event, { ignore: code })
     }
 
     /** Everything still down goes up, because nothing else will report it. */
@@ -688,10 +703,23 @@ export default function RemoteScreen({
      * Every mounted pane hears this; only the one actually holding the screen
      * acts on it.
      */
-    const stopForwarded = window.td.ui.onForwardKey((code) => {
+    const stopForwarded = window.td.ui.onForwardKey((key) => {
       if (document.fullscreenElement !== fullscreenTarget(container)) return
-      sendKey(code, true)
-      sendKey(code, false)
+      /*
+       * The modifiers first, from the state this keystroke carried.
+       *
+       * In full screen this is the only news the session gets about a
+       * combination: the letter of every Ctrl-something is taken before the
+       * window sees it, so the reconciliation that runs on an ordinary key
+       * press never runs on the keys a full-screen desktop is actually made of.
+       * That is why a Ctrl left holding over there could sit through a whole
+       * session of Ctrl+C and Ctrl+V without anything noticing — and why a Ctrl
+       * that had been released too early made those two arrive as a bare
+       * letter.
+       */
+      syncModifiers(modifierStateOf(key), { ignore: key.code })
+      sendKey(key.code, true)
+      sendKey(key.code, false)
     })
 
     container.addEventListener('keydown', onKeyDown)
@@ -706,8 +734,16 @@ export default function RemoteScreen({
       container.removeEventListener('blur', releaseAll, true)
       window.removeEventListener('blur', releaseAll)
     }
-    // Once. The keyboard is bound to the element, not to any value, and what it
-    // reads about the host it reads through a ref.
+    /* Once. The keyboard is bound to the element, not to any value, and what it
+       reads about the host it reads through a ref.
+
+       `sendKey` and `syncModifiers` are declared in the component body and are
+       therefore new functions on every render, so listing them would tear the
+       listeners down and rebuild them on each one — in the middle of a keystroke,
+       between the press and the release. They read the session, the host's
+       settings and what is held through refs, so the copies captured here behave
+       exactly as this render's would. */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   /**
@@ -813,6 +849,14 @@ export default function RemoteScreen({
   const onMouse = (event: React.MouseEvent, down: boolean | null): void => {
     const at = pointOf(event)
     if (!at) return
+    /*
+     * The mouse says what the modifiers are doing as readily as a key does, and
+     * it is the one that gets asked on a desktop: a Ctrl left holding over there
+     * turns every click into a Ctrl-click, and until this the repair only ever
+     * came from the next keystroke — which, while you are clicking, does not
+     * come at all.
+     */
+    syncModifiers(event)
 
     if (down === null) {
       tell({ a: 'mouse', flags: PTR.move, x: at.x, y: at.y })

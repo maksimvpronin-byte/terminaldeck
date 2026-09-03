@@ -420,6 +420,27 @@ export interface GitFolderData {
   trees: GitFolderTree[]
   /** Local changes layered over repository nodes, addressed by node id. */
   overrides: InventoryOverride[]
+  /** Repositories that have been used, so the next folder can pick one. */
+  repos?: GitRepo[]
+}
+
+/**
+ * A repository the application knows about, apart from any folder using it.
+ *
+ * A repository is not a property of one folder. The same inventory holds the
+ * production hosts and the staging ones in two files, and wanting each in a
+ * folder of its own is the ordinary case — so it is kept where a second folder
+ * can be pointed at it without the address being typed again, and where it goes
+ * on being offered after the folder that introduced it is deleted.
+ *
+ * The address and the branch identify it: they are what decides which working
+ * copy on disk it is, and folders that agree on both share one clone.
+ */
+export interface GitRepo {
+  url: string
+  branch?: string
+  /** Last time a folder synced from it, for ordering the list by usefulness. */
+  usedAt: number
 }
 
 /** One repository group as the sync dialog lists it. */
@@ -462,6 +483,25 @@ export interface SessionStoreData {
 export interface VaultStatus {
   exists: boolean
   unlocked: boolean
+}
+
+/**
+ * A key the main process had to take before the window could see it, and the
+ * modifiers that were down as it did.
+ *
+ * The modifiers travel with it because the window never saw this keystroke at
+ * all: in a full-screen session every combination is taken here, so the only
+ * key events that reach the session are the modifiers themselves. Without this,
+ * the one thing that keeps the far end's modifiers honest — every event
+ * carrying the truth about all of them — was blind for exactly the keystrokes a
+ * full-screen desktop is made of.
+ */
+export interface ForwardedKey {
+  code: string
+  control: boolean
+  shift: boolean
+  alt: boolean
+  meta: boolean
 }
 
 export interface QuickConnectParams {

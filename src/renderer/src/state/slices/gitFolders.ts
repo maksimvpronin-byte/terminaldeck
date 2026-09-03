@@ -15,12 +15,17 @@ export const createGitFoldersSlice: StateCreator<AppState, [], [], GitFoldersSli
 ) => ({
   gitFolderTrees: [],
   gitFolderOverrides: [],
+  gitRepos: [],
   gitFolderSyncing: [],
   gitFolderErrors: {},
 
   loadGitFolders: async () => {
     const data = await window.td.gitFolder.list()
-    set({ gitFolderTrees: data.trees, gitFolderOverrides: data.overrides })
+    set({
+      gitFolderTrees: data.trees,
+      gitFolderOverrides: data.overrides,
+      gitRepos: data.repos ?? []
+    })
   },
 
   previewGitFolder: async (groupId) => {
@@ -58,6 +63,11 @@ export const createGitFoldersSlice: StateCreator<AppState, [], [], GitFoldersSli
 
   clearGitFolderOverride: async (nodeId) => {
     await window.td.gitFolder.clearOverride(nodeId)
+    await get().loadGitFolders()
+  },
+
+  forgetGitRepo: async (url, branch) => {
+    await window.td.gitFolder.forgetRepo(url, branch)
     await get().loadGitFolders()
   }
 })

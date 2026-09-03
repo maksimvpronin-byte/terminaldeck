@@ -37,6 +37,11 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   nothing is ever pushed
 - **One repository per folder**, and the folder can hold your own sessions and subfolders as
   well — a sync never touches those
+- A repository is **remembered once it has synced**, and offered in a list to every folder made
+  afterwards. One inventory usually describes several environments in several files, so the second
+  folder on it is a choice from that list plus its own paths — production out of one file, staging
+  out of another. Folders that agree on the address and the branch **share one clone**: it is
+  fetched once, and the working copy goes when the last folder reading it does
 - **Nothing happens on its own.** What the last sync took is written to disk, so the folder shows
   its hosts on the first frame after the window opens, without going near the network. Going to
   git is **Sync with git…** on the folder, or the ⟳ button on its row
@@ -669,6 +674,25 @@ The workflow checks the tag against `package.json` before building and fails on 
 type-checks and runs the tests before anything is packaged.
 Record what changed in [CHANGELOG.md](CHANGELOG.md) as part of the release commit.
 
+## Installing a release on macOS
+
+The macOS build is signed **ad-hoc**, which is what a build with no certificate can do for itself:
+it makes the application runnable, and nothing more. On the first launch macOS says the developer
+cannot be verified — open **System Settings → Privacy & Security**, where the blocked application
+is named, and press **Open Anyway**. From then on it opens normally.
+
+Without even that ad-hoc signature — which is how every build before 0.9.0 shipped — macOS reports
+the download as *"TerminalDeck is damaged and can't be opened"* and offers to move it to the Trash.
+Nothing is damaged: on Apple Silicon the kernel refuses to run an executable that carries no
+signature at all, and that is the message it produces. An older DMG can be opened after:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/TerminalDeck.app && codesign --force --deep --sign - /Applications/TerminalDeck.app
+```
+
+The real answer to both is a Developer ID certificate and notarization, below — which is also what
+macOS auto-update needs.
+
 ## Code signing and notarization
 
 Unsigned builds run locally but are unpleasant to distribute: macOS Gatekeeper blocks them and
@@ -692,6 +716,10 @@ delete the `mac.notarize: false` line in [electron-builder.yml](electron-builder
 electron-builder 26 the Apple environment variables are what turn notarization on, and that line is
 the one thing that overrides them — it is there so that a build with no secrets doesn't fail at the
 notarization step.
+
+Until those secrets exist, [resources/adhoc-sign.js](resources/adhoc-sign.js) signs the bundle
+ad-hoc after packing — it does nothing at all once `CSC_LINK` is set, so a real signature is never
+overwritten by a worthless one.
 
 Entitlements live in [resources/entitlements.mac.plist](resources/entitlements.mac.plist) and are
 required under the hardened runtime: Electron needs the JIT entitlements, and the app needs

@@ -1,6 +1,7 @@
 import { app } from 'electron'
-import { readFileSync } from 'fs'
-import { dirname, join, relative } from 'path'
+import { createHash } from 'crypto'
+import { existsSync, readFileSync, rmSync } from 'fs'
+import { basename, dirname, join, relative } from 'path'
 import { parse } from 'yaml'
 import type {
   GitFolderData,
@@ -8,6 +9,7 @@ import type {
   GitFolderPreview,
   GitFolderPreviewGroup,
   GitFolderTree,
+  GitRepo,
   InventoryOverride,
   SessionGroup,
   SessionProfile
@@ -38,6 +40,25 @@ function reposRoot(): string {
   return join(app.getPath('userData'), 'git-folder-repos')
 }
 
+/**
+ * Where a repository is checked out, which is decided by the repository and not
+ * by the folder reading it.
+ *
+ * Two folders on the same inventory — production out of one file, staging out
+ * of another — are the ordinary case, and keying the checkout by folder cloned
+ * the same repository once per folder: the disk twice over, the fetch twice
+ * over, and two working copies to disagree with each other. Keyed by what
+ * actually decides the contents, they share one.
+ *
+ * Hashed rather than made readable: an address is not a filename, and the
+ * characters in one that are meaningful to a path are exactly the interesting
+ * ones.
+ */
+function checkoutFor(url: string, branch?: string): string {
+  const key = createHash('sha1').update(`${url}\n${branch ?? ''}`).digest('hex').slice(0, 16)
+  return join(reposRoot(), key)
+}
+
 /** The whole repository as parsed, before the chosen groups are cut out of it. */
 interface ParsedRepo {
   tree: GitFolderTree
@@ -56,6 +77,24 @@ class GitFolderStore {
    * copy after they have answered would parse a tree that nobody was shown.
    */
   private pending = new Map<string, ParsedRepo>()
+  /**
+   * One git command at a time per working copy.
+   *
+   * A sync fetches, resets and cleans; two folders sharing a repository can ask
+   * for that at the same moment, and the second would be reading files the
+   * first is in the middle of replacing.
+   */
+  private busy = new Map<string, Promise<unknown>>()
+
+  private queue<T>(dir: string, work: () => Promise<T>): Promise<T> {
+    const next = (this.busy.get(dir) ?? Promise.resolve()).then(work, work)
+    // Kept whether it succeeded or not, so a failure does not wedge the queue.
+    this.busy.set(
+      dir,
+      next.catch(() => undefined)
+    )
+    return next
+  }
 
   constructor() {
     this.data = this.load()
@@ -63,7 +102,12 @@ class GitFolderStore {
 
   private load(): GitFolderData {
     const parsed = readJson<Partial<GitFolderData>>(dataPath(), () => ({}))
-    return { version: 1, trees: parsed.trees ?? [], overrides: parsed.overrides ?? [] }
+    return {
+      version: 1,
+      trees: parsed.trees ?? [],
+      overrides: parsed.overrides ?? [],
+      repos: parsed.repos ?? []
+    }
   }
 
   private persist(): void {
@@ -78,6 +122,31 @@ class GitFolderStore {
     return this.data.overrides
   }
 
+  /** Repositories that have been used, most recently used first. */
+  repos(): GitRepo[] {
+    return [...(this.data.repos ?? [])].sort((a, b) => b.usedAt - a.usedAt)
+  }
+
+  /**
+   * Notes a repository as one to offer next time. Called on a successful sync
+   * rather than on save, so what is offered is what has actually been read.
+   */
+  private rememberRepo(url: string, branch?: string): void {
+    const repos = this.data.repos ?? []
+    const found = repos.find((r) => r.url === url && (r.branch ?? '') === (branch ?? ''))
+    if (found) found.usedAt = Date.now()
+    else repos.push({ url, branch, usedAt: Date.now() })
+    this.data.repos = repos
+  }
+
+  /** Drops a saved repository. Any folder still reading it is left alone. */
+  forgetRepo(url: string, branch?: string): void {
+    this.data.repos = (this.data.repos ?? []).filter(
+      (r) => !(r.url === url && (r.branch ?? '') === (branch ?? ''))
+    )
+    this.persist()
+  }
+
   /** The folder as it is saved, and its link, or nothing if it has none. */
   private linkOf(groupId: string): { folder: SessionGroup; link: GitFolderLink } | undefined {
     const folder = sessionStore.getAll().groups.find((g) => g.id === groupId)
@@ -90,7 +159,21 @@ class GitFolderStore {
 
   /** Reads the repository into our shapes, without deciding anything about it. */
   private async read(folderId: string, link: GitFolderLink): Promise<ParsedRepo> {
-    const dir = await syncRepo(reposRoot(), folderId, link.repoUrl, link.branch)
+    const checkout = checkoutFor(link.repoUrl, link.branch)
+    // One at a time per working copy: a sync resets and cleans it, and two
+    // folders sharing a repository can ask at the same moment.
+    const dir = await this.queue(checkout, () =>
+      syncRepo(reposRoot(), basename(checkout), link.repoUrl, link.branch)
+    )
+    /*
+     * The clone this folder had to itself, before checkouts were shared. Left
+     * behind it is a whole repository per folder that nothing will ever read
+     * again — and on an inventory of any size that is the largest thing this
+     * application keeps.
+     */
+    const mine = join(reposRoot(), folderId)
+    if (existsSync(mine)) rmSync(mine, { recursive: true, force: true })
+
     const files = resolveInventoryFiles(dir, link.paths)
 
     const tree: GitFolderTree = { groupId: folderId, groups: [], sessions: [], memberships: {} }
@@ -221,6 +304,9 @@ class GitFolderStore {
 
     this.data.trees = [...this.data.trees.filter((t) => t.groupId !== folderId), tree]
     this.dropOrphanedOverrides(folderId, forgetSecret)
+    // Noted on a successful sync rather than on save, so what is offered to the
+    // next folder is a repository that has actually been read.
+    this.rememberRepo(found.link.repoUrl, found.link.branch)
     this.persist()
 
     this.saveLink(found.folder, {
@@ -263,6 +349,7 @@ class GitFolderStore {
    * and every local setting addressed to a node of it.
    */
   forget(folderId: string, forgetSecret: (override: InventoryOverride) => void): void {
+    this.dropCheckout(folderId)
     const prefix = gitNodePrefix(folderId)
     for (const override of this.data.overrides.filter((o) => o.nodeId.startsWith(prefix))) {
       forgetSecret(override)
@@ -271,6 +358,30 @@ class GitFolderStore {
     this.data.trees = this.data.trees.filter((t) => t.groupId !== folderId)
     this.pending.delete(folderId)
     this.persist()
+  }
+
+  /**
+   * The working copy, once nothing is reading it any more.
+   *
+   * Shared, so it goes only when the last folder pointing at that repository
+   * does — otherwise untying one folder would take the checkout out from under
+   * its neighbour. The saved repository itself stays in the list: it is there
+   * to be picked again, and re-cloning is what picking it means.
+   */
+  private dropCheckout(folderId: string): void {
+    const link = this.linkOf(folderId)?.link
+    if (!link) return
+    const shared = sessionStore
+      .getAll()
+      .groups.some(
+        (g) =>
+          g.id !== folderId &&
+          g.git?.repoUrl === link.repoUrl &&
+          (g.git.branch ?? '') === (link.branch ?? '')
+      )
+    if (shared) return
+    const dir = checkoutFor(link.repoUrl, link.branch)
+    if (existsSync(dir)) rmSync(dir, { recursive: true, force: true })
   }
 
   saveOverride(override: InventoryOverride): void {

@@ -45,6 +45,13 @@ export default function GroupDialog({
   const groups = useStore((s) => s.groups)
   const settings = useStore((s) => s.settings)
   const upsertGroup = useStore((s) => s.upsertGroup)
+  /**
+   * Repositories already in use. The same inventory regularly holds production
+   * in one file and staging in another, so the second folder on it should be a
+   * choice from this list and a different path — not the address typed again,
+   * subtly differently, into a second clone.
+   */
+  const gitRepos = useStore((s) => s.gitRepos)
   const t = useT()
 
   const [group, setGroup] = useState<SessionGroup>(
@@ -309,6 +316,11 @@ export default function GroupDialog({
                   'Nothing is fetched on its own: use “Sync with git…” on the folder, and choose there which groups to take. What was taken last time is kept on this machine and shown as soon as the window opens.'
                 )}
               </p>
+              <p>
+                {t(
+                  'Several folders can read one repository: it is cloned once, and each folder takes its own paths out of it — production from one inventory file, staging from another. A repository is offered in the list here after its first successful sync.'
+                )}
+              </p>
             </Hint>
           </summary>
 
@@ -323,6 +335,43 @@ export default function GroupDialog({
 
           {linked && (
             <>
+              {gitRepos.length > 0 && (
+                <label>
+                  {t('Repository')}
+                  <select
+                    value={
+                      gitRepos.some(
+                        (r) =>
+                          r.url === link?.repoUrl && (r.branch ?? '') === (link?.branch ?? '')
+                      )
+                        ? `${link?.repoUrl}\n${link?.branch ?? ''}`
+                        : ''
+                    }
+                    onChange={(e) => {
+                      if (!e.target.value) return
+                      const [url, branch] = e.target.value.split('\n')
+                      setLink((g) => ({
+                        includedGroups: [],
+                        ...g,
+                        repoUrl: url,
+                        branch: branch || undefined,
+                        // The paths are the folder's own: pointing a second
+                        // folder at the same repository is how you take a
+                        // different inventory file out of it.
+                        paths: g?.paths ?? []
+                      }))
+                    }}
+                  >
+                    <option value="">{t('Another repository…')}</option>
+                    {gitRepos.map((repo) => (
+                      <option key={`${repo.url}\n${repo.branch ?? ''}`} value={`${repo.url}\n${repo.branch ?? ''}`}>
+                        {repo.branch ? `${repo.url} · ${repo.branch}` : repo.url}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
               <label>
                 {t('Repository URL')}
                 <input

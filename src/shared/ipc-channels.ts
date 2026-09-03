@@ -38,6 +38,7 @@ export const IPC = {
   gitFolderList: 'gitFolder:list',
   gitFolderPreview: 'gitFolder:preview',
   gitFolderApply: 'gitFolder:apply',
+  gitFolderForgetRepo: 'gitFolder:forgetRepo',
   gitFolderSaveOverride: 'gitFolder:saveOverride',
   gitFolderClearOverride: 'gitFolder:clearOverride',
 

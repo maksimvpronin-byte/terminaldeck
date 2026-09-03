@@ -17,8 +17,10 @@ import type {
   InventorySource,
   InventoryOverride,
   InventoryTree,
+  ForwardedKey,
   GitFolderPreview,
   GitFolderTree,
+  GitRepo,
   ImportSummary,
   TransferPlan,
   TransferDecisions,
@@ -117,8 +119,14 @@ const api = {
    * folder shows changes until `apply` is called.
    */
   gitFolder: {
-    list: (): Promise<{ trees: GitFolderTree[]; overrides: InventoryOverride[] }> =>
-      ipcRenderer.invoke(IPC.gitFolderList),
+    list: (): Promise<{
+      trees: GitFolderTree[]
+      overrides: InventoryOverride[]
+      repos: GitRepo[]
+    }> => ipcRenderer.invoke(IPC.gitFolderList),
+    /** Drops a repository from the list offered to the next folder. */
+    forgetRepo: (url: string, branch?: string): Promise<void> =>
+      ipcRenderer.invoke(IPC.gitFolderForgetRepo, url, branch),
     preview: (groupId: string): Promise<GitFolderPreview> =>
       ipcRenderer.invoke(IPC.gitFolderPreview, groupId),
     apply: (groupId: string, includedGroups: string[]): Promise<GitFolderTree> =>
@@ -503,8 +511,8 @@ const api = {
     setKeyboardCapture: (held: boolean): void =>
       ipcRenderer.send(IPC.uiKeyboardCapture, held),
     /** A key main had to claim, arriving as its `code`, for the session to send. */
-    onForwardKey: (cb: (code: string) => void): (() => void) => {
-      const listener = (_e: unknown, code: string): void => cb(code)
+    onForwardKey: (cb: (key: ForwardedKey) => void): (() => void) => {
+      const listener = (_e: unknown, key: ForwardedKey): void => cb(key)
       ipcRenderer.on(IPC.uiForwardKey, listener)
       return () => ipcRenderer.removeListener(IPC.uiForwardKey, listener)
     }

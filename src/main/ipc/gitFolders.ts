@@ -18,8 +18,13 @@ function forgetBoth(override: InventoryOverride): void {
 export function registerGitFolderHandlers(): void {
   ipcMain.handle(IPC.gitFolderList, () => ({
     trees: gitFolderStore.trees(),
-    overrides: gitFolderStore.overrides()
+    overrides: gitFolderStore.overrides(),
+    repos: gitFolderStore.repos()
   }))
+
+  ipcMain.handle(IPC.gitFolderForgetRepo, (_e, url: string, branch?: string) =>
+    gitFolderStore.forgetRepo(url, branch)
+  )
 
   // Reads the repository and says what taking it would mean. Nothing is written
   // until the window comes back with an answer.

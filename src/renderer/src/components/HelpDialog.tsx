@@ -247,6 +247,8 @@ const SECTIONS: Section[] = [
     title: 'A Sessions folder tied to git',
     rows: [
       { what: 'Edit any folder on the Sessions tab and point it at a repository' },
+      { what: 'A repository used once is offered to every folder made afterwards' },
+      { what: 'Two folders on one repository share a clone and read their own paths from it' },
       { what: 'Its hosts land in the folder as one list, however deeply the inventory nests them' },
       { what: 'They sit beside your own sessions, which can stay in the same folder' },
       { what: 'A host named by several Ansible groups appears once — it is one host' },

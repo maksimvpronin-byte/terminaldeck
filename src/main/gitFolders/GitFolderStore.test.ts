@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, vi } from 'vitest'
 import { execFileSync } from 'child_process'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'fs'
+import { mkdtempSync, mkdirSync, readdirSync, writeFileSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import type { InventoryOverride, SessionGroup } from '../../shared/types'
@@ -176,11 +176,51 @@ describe('a Sessions folder mirroring a repository', () => {
     expect(preview.included).toEqual(['all', 'all/prod'])
   })
 
+  it('remembers the repository, so the next folder can be pointed at it', () => {
+    expect(gitFolderStore.repos().map((r) => r.url)).toEqual([repo])
+  })
+
+  it('reads one repository from two folders through a single checkout', async () => {
+    sessionStore.saveGroup({
+      id: 'folder-2',
+      name: 'Dev',
+      parentId: null,
+      git: { repoUrl: repo, paths: ['hosts.yml'], includedGroups: [] }
+    })
+
+    const preview = await gitFolderStore.preview('folder-2')
+    // The other folder takes a different part of the same inventory.
+    gitFolderStore.apply('folder-2', ['all/dev'], forget)
+
+    expect(preview.groups.map((g) => g.path)).toEqual(['all', 'all/prod', 'all/dev'])
+    expect(gitFolderStore.treeOf('folder-2')?.sessions.map((s) => s.name)).toEqual(['dev1'])
+    // The first folder is untouched by the second's sync.
+    expect(gitFolderStore.treeOf(FOLDER)?.sessions.map((s) => s.name).sort()).toEqual([
+      'db1',
+      'web1'
+    ])
+    // One clone between them, and one entry in the list rather than two.
+    expect(readdirSync(join(userData, 'git-folder-repos'))).toHaveLength(1)
+    expect(gitFolderStore.repos()).toHaveLength(1)
+  })
+
+  it('keeps the checkout while another folder is still reading it', () => {
+    // Deleting a folder forgets it and then removes the group, in that order —
+    // which is what tells the next `forget` whether anyone is left.
+    gitFolderStore.forget('folder-2', forget)
+    expect(readdirSync(join(userData, 'git-folder-repos'))).toHaveLength(1)
+    sessionStore.deleteGroup('folder-2')
+  })
+
   it('empties the folder and forgets its settings when it is untied', () => {
     gitFolderStore.forget(FOLDER, forget)
 
     expect(gitFolderStore.treeOf(FOLDER)).toBeUndefined()
     expect(gitFolderStore.overrides()).toEqual([])
     expect(forgotten).toContain(gitHostId(FOLDER, 'web1'))
+    // The last folder reading it has gone, so the working copy goes too. The
+    // saved repository stays: it is there to be picked again.
+    expect(readdirSync(join(userData, 'git-folder-repos'))).toEqual([])
+    expect(gitFolderStore.repos().map((r) => r.url)).toEqual([repo])
   })
 })

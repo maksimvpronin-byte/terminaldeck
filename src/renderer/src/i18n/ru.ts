@@ -804,4 +804,8 @@ export const ru: Record<string, string> = {
   "Nothing on disk changes until you press Apply; Cancel leaves the folder as it was": "До нажатия «Применить» на диске ничего не меняется; «Отмена» оставляет папку как была",
   "Read-only, like the Inventory tab: nothing is ever pushed back": "Только чтение, как и вкладка «Инвентарь»: обратно никогда ничего не отправляется",
   "A backup carries the repository and the chosen groups, not the mirrored hosts": "Резервная копия несёт репозиторий и выбранные группы, но не сами отражённые хосты",
+  "Several folders can read one repository: it is cloned once, and each folder takes its own paths out of it — production from one inventory file, staging from another. A repository is offered in the list here after its first successful sync.": "Один репозиторий могут читать несколько папок: он клонируется один раз, и каждая папка берёт из него свои пути — продакшн из одного файла инвентаря, стенд из другого. Репозиторий появляется в списке здесь после первой удачной синхронизации.",
+  "Another repository…": "Другой репозиторий…",
+  "A repository used once is offered to every folder made afterwards": "Однажды использованный репозиторий предлагается всем папкам, созданным потом",
+  "Two folders on one repository share a clone and read their own paths from it": "Две папки на одном репозитории делят клон и читают из него свои пути",
 }

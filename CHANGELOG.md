@@ -6,6 +6,68 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.9.0
+
+### Added
+
+- **A repository is remembered, and folders share it.** Pointing a folder at an
+  inventory once puts that repository in a list, and every folder made
+  afterwards can be pointed at it without the address being typed again — with
+  paths of its own, which is the point: one inventory holds production in one
+  file and staging in another, and each wants a folder. Folders that agree on
+  the address and the branch now share a single working copy, where before each
+  cloned the whole repository for itself; the clone is removed when the last
+  folder reading it goes, and the saved repository stays, since it is there to
+  be chosen again.
+
+### Fixed
+
+- **The macOS download is no longer reported as damaged.** electron-builder
+  skips signing entirely when no certificate is configured, and on Apple Silicon
+  the kernel will not run an executable that carries no signature at all — so
+  the DMG downloaded from a release opened onto *"TerminalDeck is damaged and
+  can't be opened. You should move it to the Trash."* The disk image was fine;
+  the application inside it was unsigned. The build now signs the bundle ad-hoc
+  when there is no certificate, which is all a free build can do for itself:
+  Gatekeeper still asks, but it asks the ordinary question with **Open Anyway**
+  behind it instead of telling people to throw a working download away. The hook
+  stands aside the moment a real certificate is configured. macOS auto-update
+  still needs a Developer ID signature and still will not work without one.
+
+- **A stuck Ctrl is now cleared by the mouse as well as by the keyboard.** The
+  repair added in 0.7.2 runs on the next keystroke, which is fine until the
+  next thing you do is click — and on a desktop that is most of what you do.
+  Every click until you happened to type was a Ctrl-click: selecting instead of
+  opening, dragging a copy instead of moving. A mouse event answers
+  `getModifierState` exactly as a key event does, so the same reconciliation now
+  runs from the mouse, and a modifier nobody is holding survives at most one
+  click.
+
+- **⌘ as Ctrl and the repair no longer contradict each other.** With the
+  substitution on, a held ⌘ is a held Ctrl on the far side while
+  `getModifierState('Control')` is false here — so the check added in 0.7.2
+  released the Ctrl that ⌘ had just pressed, and ⌘C arrived over there as a bare
+  `c`. The reconciliation now reads the modifiers the way the substitution sends
+  them, and letting go of ⌘ while the real Ctrl is still held no longer releases
+  Ctrl on the far machine.
+
+- **A full-screen session finally takes part in any of this.** While a desktop
+  is full screen the main process takes every combination before the window sees
+  it, and hands on only the letter — so the letter of every `Ctrl+C` and
+  `Ctrl+V` never reached the code that keeps the two ends' modifiers in step,
+  and the only key events the session saw were the modifiers themselves. The
+  repair was therefore close to dead in the one mode a remote desktop is
+  actually used in. A forwarded key now carries the modifiers that were down
+  when it was taken, and the session reconciles from those before sending it: a
+  Ctrl held over there and nowhere else is released by the very next `Ctrl+C`,
+  and one released too early is pressed again so that `Ctrl+C` is not delivered
+  as a bare `c`.
+
+- **A modifier held through a `blur` is pressed again rather than only
+  released.** Coming back to a session with a finger still on Ctrl left this end
+  holding it and the far end not, so the first Ctrl-click after switching
+  windows was a plain click. The repair now works in both directions.
+
 ## 0.8.0
 
 ### Added

@@ -1,4 +1,9 @@
 appId: com.terminaldeck.app
+# Runs after the .app is assembled and before the disk image is made from it.
+# It signs the bundle ad-hoc when no certificate is configured — see the file
+# for why an unsigned build does not merely warn on Apple Silicon, it refuses to
+# start, and is reported as a damaged download.
+afterPack: resources/adhoc-sign.js
 productName: TerminalDeck
 publish:
   provider: github
