@@ -27,6 +27,12 @@ interface Props {
   node: SessionProfile | SessionGroup
   /** Every inventory group, for working out what the node inherits. */
   groups: SessionGroup[]
+  /**
+   * Which store the settings belong to: an Inventory source's, or a Sessions
+   * folder mirroring a repository. The question the dialog asks is the same
+   * either way; only where the answer is kept differs.
+   */
+  scope?: 'inventory' | 'gitFolder'
   onClose: () => void
 }
 
@@ -34,10 +40,22 @@ function isHost(node: SessionProfile | SessionGroup): node is SessionProfile {
   return 'host' in node
 }
 
-export default function InventoryOverrideDialog({ node, groups, onClose }: Props): JSX.Element {
-  const existing = useStore((s) => s.inventoryOverrides.find((o) => o.nodeId === node.id))
-  const saveInventoryOverride = useStore((s) => s.saveInventoryOverride)
-  const clearInventoryOverride = useStore((s) => s.clearInventoryOverride)
+export default function InventoryOverrideDialog({
+  node,
+  groups,
+  scope = 'inventory',
+  onClose
+}: Props): JSX.Element {
+  const fromGit = scope === 'gitFolder'
+  const existing = useStore((s) =>
+    (fromGit ? s.gitFolderOverrides : s.inventoryOverrides).find((o) => o.nodeId === node.id)
+  )
+  const saveOverride = useStore((s) =>
+    fromGit ? s.saveGitFolderOverride : s.saveInventoryOverride
+  )
+  const clearOverride = useStore((s) =>
+    fromGit ? s.clearGitFolderOverride : s.clearInventoryOverride
+  )
   const sessions = useStore((s) => s.sessions)
   const settings = useStore((s) => s.settings)
   const t = useT()
@@ -149,11 +167,11 @@ export default function InventoryOverrideDialog({ node, groups, onClose }: Props
     // An override with nothing in it would still mark the host as customised.
     // Clearing it drops the credential too, so forgetting one is not lost here.
     if (!hasContent) {
-      if (existing) await clearInventoryOverride(node.id)
+      if (existing) await clearOverride(node.id)
       onClose()
       return
     }
-    await saveInventoryOverride(
+    await saveOverride(
       toSave,
       secretToSave(auth.shownMethod, forgetSecret, secret),
       gatewaySecret || (forgetGatewaySecret ? null : undefined)
@@ -162,7 +180,7 @@ export default function InventoryOverrideDialog({ node, groups, onClose }: Props
   }
 
   async function reset(): Promise<void> {
-    await clearInventoryOverride(node.id)
+    await clearOverride(node.id)
     onClose()
   }
 

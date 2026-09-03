@@ -9,6 +9,7 @@ export default function BackupSettings(): JSX.Element {
   const loadStore = useStore((s) => s.loadStore)
   const loadSnippets = useStore((s) => s.loadSnippets)
   const loadInventory = useStore((s) => s.loadInventory)
+  const loadGitFolders = useStore((s) => s.loadGitFolders)
   const loadCollections = useStore((s) => s.loadCollections)
   const loadCredentials = useStore((s) => s.loadCredentials)
 
@@ -55,6 +56,7 @@ export default function BackupSettings(): JSX.Element {
         loadStore(),
         loadSnippets(),
         loadInventory(),
+        loadGitFolders(),
         loadCollections(),
         loadCredentials()
       ])

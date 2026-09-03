@@ -12,6 +12,7 @@ import { collectionStore } from '../store/CollectionStore'
 import { credentialStore } from '../store/CredentialStore'
 import { sessionStore } from '../store/SessionStore'
 import { snippetStore } from '../store/SnippetStore'
+import { forgetGitFolder } from './gitFolders'
 import { applySecret, forgetSecret, forgetSecretAt } from './secrets'
 import { focusedWin } from './win'
 
@@ -49,6 +50,11 @@ export function registerStoreHandlers(): void {
     (_e, group: SessionGroup, secret?: string | null, gatewaySecret?: string | null) => {
       applySecret(group, 'secretRef', secret)
       applySecret(group, 'gatewaySecretRef', gatewaySecret)
+      // Untying a folder from its repository empties it: the hosts it showed
+      // were the repository's, and the settings kept for them addressed nodes
+      // that no longer exist.
+      const had = sessionStore.getAll().groups.find((g) => g.id === group.id)?.git
+      if (had && !group.git) forgetGitFolder(group.id)
       return sessionStore.saveGroup(group)
     }
   )
@@ -60,6 +66,10 @@ export function registerStoreHandlers(): void {
       forgetSecret(group)
       forgetSecretAt(group, 'gatewaySecretRef')
     }
+    // A folder tied to git takes its mirrored tree with it, and the local
+    // settings and passwords kept for the hosts in it: nothing else can address
+    // those nodes once the folder is gone.
+    if (group?.git) forgetGitFolder(id)
     return sessionStore.deleteGroup(id)
   })
 

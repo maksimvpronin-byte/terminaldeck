@@ -85,11 +85,16 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
         })
         continue
       }
-      // Otherwise it came from an inventory; its colour may be overridden locally.
-      for (const tree of s.inventoryTrees) {
+      // Otherwise it came from a repository — an Inventory source, or a folder
+      // on this tab mirroring one; its colour may be overridden locally.
+      const fromRepo = [
+        ...s.inventoryTrees.map((tree) => ({ tree, overrides: s.inventoryOverrides })),
+        ...s.gitFolderTrees.map((tree) => ({ tree, overrides: s.gitFolderOverrides }))
+      ]
+      for (const { tree, overrides } of fromRepo) {
         const host = tree.sessions.find((x) => x.id === id)
         if (!host) continue
-        const override = s.inventoryOverrides.find((o) => o.nodeId === id)
+        const override = overrides.find((o) => o.nodeId === id)
         items.push({
           title: host.name,
           target: { kind: 'session', sessionId: id },

@@ -18,12 +18,17 @@ export interface ParsedInventory {
 /** Vars as they appear in an inventory, group_vars or host_vars file. */
 export type AnsibleVars = Record<string, unknown>
 
-export function groupId(sourceId: string, path: string): string {
-  return `inv:${sourceId}:g:${path}`
+/**
+ * Ids carry where a node came from, so a local override still addresses the same
+ * host after the next sync. `prefix` says which kind of source that is: an
+ * Inventory repository, or a Sessions folder tied to git.
+ */
+export function groupId(sourceId: string, path: string, prefix = 'inv'): string {
+  return `${prefix}:${sourceId}:g:${path}`
 }
 
-export function hostId(sourceId: string, name: string): string {
-  return `inv:${sourceId}:h:${name}`
+export function hostId(sourceId: string, name: string, prefix = 'inv'): string {
+  return `${prefix}:${sourceId}:h:${name}`
 }
 
 function str(value: unknown): string | undefined {
@@ -69,7 +74,8 @@ interface RawGroup {
 export function parseAnsibleInventory(
   doc: unknown,
   sourceId: string,
-  lookupVars: (kind: 'group' | 'host', name: string) => AnsibleVars = () => ({})
+  lookupVars: (kind: 'group' | 'host', name: string) => AnsibleVars = () => ({}),
+  prefix = 'inv'
 ): ParsedInventory {
   const groups: SessionGroup[] = []
   const hosts: SessionProfile[] = []
@@ -89,18 +95,18 @@ export function parseAnsibleInventory(
 
   const walk = (name: string, raw: RawGroup | null, parentPath: string | null): void => {
     const path = parentPath ? `${parentPath}/${name}` : name
-    const id = groupId(sourceId, path)
+    const id = groupId(sourceId, path, prefix)
     const vars = { ...lookupVars('group', name), ...(raw?.vars ?? {}) }
 
     groups.push({
       id,
       name,
-      parentId: parentPath ? groupId(sourceId, parentPath) : null,
+      parentId: parentPath ? groupId(sourceId, parentPath, prefix) : null,
       ...varsToAuth(vars)
     })
 
     for (const [hostName, inlineVars] of Object.entries(raw?.hosts ?? {})) {
-      const key = hostId(sourceId, hostName)
+      const key = hostId(sourceId, hostName, prefix)
       const entry = seen.get(key) ?? { name: hostName, claims: [] }
       entry.claims.push({ id, depth: path.split('/').length, name, vars: inlineVars ?? {} })
       seen.set(key, entry)

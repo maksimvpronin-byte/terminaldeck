@@ -33,6 +33,8 @@ export default function CollectionsPanel({ query }: { query: string }): JSX.Elem
   useStore((s) => s.sessions)
   useStore((s) => s.inventoryTrees)
   useStore((s) => s.inventoryOverrides)
+  useStore((s) => s.gitFolderTrees)
+  useStore((s) => s.gitFolderOverrides)
 
   const [editing, setEditing] = useState<HostCollection | 'new' | undefined>(undefined)
   const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsed)

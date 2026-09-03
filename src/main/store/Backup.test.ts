@@ -271,6 +271,7 @@ describe('backup import', () => {
       collections: 1,
       inventorySources: 1,
       inventoryOverrides: 1,
+      gitFolderOverrides: 0,
       credentials: 1,
       secrets: 5
     })

@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 import { IPC } from '../../shared/ipc-channels'
 import type { PortForwardRule, QuickConnectParams } from '../../shared/types'
+import { gitFolderStore } from '../gitFolders/GitFolderStore'
 import { inventoryStore } from '../inventory/InventoryStore'
 import { portForwardManager } from '../ssh/PortForwardManager'
 import { remoteEdit } from '../ssh/RemoteEdit'
@@ -36,10 +37,13 @@ export function registerSshHandlers(): void {
        */
       credentialId?: string
     ) => {
-      // Inventory hosts live in their own store and aren't saved as sessions.
+      // Hosts from a repository live in their own store and aren't saved as
+      // sessions — whether they came from an Inventory source or from a folder
+      // on the Sessions tab that mirrors one.
       const profile =
         sessionStore.getAll().sessions.find((s) => s.id === sessionId) ??
-        inventoryStore.findSession(sessionId)
+        inventoryStore.findSession(sessionId) ??
+        gitFolderStore.findSession(sessionId)
       if (!profile) throw new Error('Unknown session')
       // An id that names nothing is refused rather than quietly ignored: the
       // account was asked for, and connecting as the host's own instead is a

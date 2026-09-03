@@ -6,9 +6,51 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
-## Unreleased
+## 0.8.0
+
+### Added
+
+- **A folder on the Sessions tab can be tied to a git repository.** Edit any
+  folder, give it a repository holding an Ansible inventory, and its hosts stand
+  in the tree beside the ones saved by hand — in the same folder, which can go
+  on holding your own sessions and subfolders too.
+
+  Two things separate this from the Inventory tab. The first is *when the
+  network is touched*: what a sync took is written to disk, so the folder shows
+  its hosts on the first frame after the window opens and never fetches on its
+  own — syncing is **Sync with git…** on the folder, or the ⟳ on its row. The
+  Inventory tab kept its parsed tree in memory only, which is why it was empty
+  after every launch until somebody pressed sync.
+
+  The second is *what a sync takes*. Every sync asks, before anything on disk
+  changes: the previous choice is ticked, groups that appeared since last time
+  arrive ticked and marked new, a subgroup unticked on purpose stays unticked,
+  and ticking a group takes its subgroups. A sync then brings the folder to what
+  the repository says now — what has left the repository leaves the folder, and
+  the dialog says what is about to go, including how many of those hosts hold
+  local settings, since those and any password saved for them go with them.
+
+  The hosts land in the folder as one flat list, however deeply the inventory
+  nests them, and a host named by three groups appears once rather than three
+  times. The repository's groups are still read and still kept — they are where
+  a host's settings and `group_vars` come from — but they are not drawn as
+  folders of their own: an inventory nests for reasons that have to do with
+  playbooks rather than with looking a machine up.
+
+  Read-only, like the Inventory tab: nothing is ever pushed. Local settings on a
+  mirrored host or group are kept outside the repository and re-applied after
+  every sync, and a backup carries the repository, the branch and the chosen
+  groups rather than the mirrored tree.
 
 ### Fixed
+
+- **A repository whose address was edited is no longer synced from the old
+  one.** A checkout is keyed by the source rather than by its address, and
+  `git fetch origin` asks the working copy where origin is — which nothing had
+  ever told that the answer had changed. Editing the URL of an inventory that
+  had been cloned once went on fetching the previous repository for ever, and
+  reported success each time: the hosts simply stayed as they were. The remote
+  is now re-pointed when it differs.
 
 - **The help says which key reaches the far side on a Mac.** It said "Alt+Tab",
   which on a Mac is read as the app switcher — and the app switcher is `⌘Tab`,

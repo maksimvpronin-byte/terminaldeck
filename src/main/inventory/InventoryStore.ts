@@ -1,6 +1,6 @@
 import { app } from 'electron'
-import { join, dirname, extname, relative } from 'path'
-import { readFileSync, existsSync, readdirSync, statSync } from 'fs'
+import { join, dirname, relative } from 'path'
+import { readFileSync } from 'fs'
 import { parse } from 'yaml'
 import type {
   InventoryData,
@@ -8,11 +8,11 @@ import type {
   InventorySource,
   InventoryTree
 } from '../../shared/types'
-import { parseAnsibleInventory, type AnsibleVars } from './ansible'
+import { parseAnsibleInventory } from './ansible'
+import { noInventoryFound, readVarsFor, resolveInventoryFiles } from './files'
 import { syncRepo, headRevision } from './GitRepo'
 import { applyOverride, withoutBlanks } from '../../shared/overrides'
 import { readJson, writeJson } from '../store/jsonFile'
-import { insideCheckout } from './checkout'
 
 function configPath(): string {
   return join(app.getPath('userData'), 'inventories.json')
@@ -20,57 +20,6 @@ function configPath(): string {
 
 function reposRoot(): string {
   return join(app.getPath('userData'), 'inventory-repos')
-}
-
-function isYaml(file: string): boolean {
-  return ['.yml', '.yaml'].includes(extname(file).toLowerCase())
-}
-
-/** Reads `<dir>/<name>.yml` or every *.yml under `<dir>/<name>/`, as Ansible does. */
-function readVarsFor(baseDir: string, kind: 'group_vars' | 'host_vars', name: string): AnsibleVars {
-  const candidates: string[] = []
-  const flat = join(baseDir, kind, `${name}.yml`)
-  const flatYaml = join(baseDir, kind, `${name}.yaml`)
-  const nested = join(baseDir, kind, name)
-
-  if (existsSync(flat)) candidates.push(flat)
-  if (existsSync(flatYaml)) candidates.push(flatYaml)
-  if (existsSync(nested) && statSync(nested).isDirectory()) {
-    for (const f of readdirSync(nested)) {
-      if (isYaml(f)) candidates.push(join(nested, f))
-    }
-  }
-
-  let vars: AnsibleVars = {}
-  for (const file of candidates) {
-    try {
-      const parsed = parse(readFileSync(file, 'utf8'))
-      if (parsed && typeof parsed === 'object') vars = { ...vars, ...(parsed as AnsibleVars) }
-    } catch {
-      // A broken vars file shouldn't sink the whole inventory.
-    }
-  }
-  return vars
-}
-
-/** Every inventory file a configured path points at. */
-function resolveInventoryFiles(repoDir: string, paths: string[]): string[] {
-  const files: string[] = []
-  for (const rel of paths.length > 0 ? paths : ['.']) {
-    const target = join(repoDir, rel)
-    if (!insideCheckout(repoDir, target)) continue
-    if (!existsSync(target)) continue
-    if (statSync(target).isDirectory()) {
-      for (const f of readdirSync(target)) {
-        const full = join(target, f)
-        // Only the directory itself; group_vars/ and host_vars/ are read separately.
-        if (isYaml(f) && statSync(full).isFile()) files.push(full)
-      }
-    } else if (isYaml(target)) {
-      files.push(target)
-    }
-  }
-  return files
 }
 
 class InventoryStore {
@@ -204,10 +153,7 @@ class InventoryStore {
       source.lastError = undefined
       source.lastFiles = files.map((f) => relative(dir, f))
       if (files.length === 0) {
-        source.lastError =
-          `No .yml or .yaml files found at: ${source.paths.join(', ') || '(repo root)'}. ` +
-          'A directory is read one level deep, and an inventory in INI format ' +
-          '(often just named "hosts", with no extension) is not read at all.'
+        source.lastError = noInventoryFound(source.paths)
       }
       this.persist()
       return tree

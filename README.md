@@ -25,6 +25,41 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
 - YAML inventories only: `.yml` and `.yaml`, with a directory read one level deep
 - Local per-host and per-group tweaks are stored separately and re-applied after every sync
 
+### A Sessions folder tied to git
+
+The Inventory tab is a place of its own. This is the same idea inside the ordinary tree: any
+folder you make on the **Sessions** tab can mirror an Ansible inventory out of a repository, and
+the hosts it brings in stand in the tree beside the ones you saved by hand.
+
+- Edit a folder, tick **Mirror an inventory from a git repository**, and give it a URL, a branch
+  and the paths to read — the same reader the Inventory tab uses, so `children`, inline `vars`,
+  `group_vars/` and `host_vars/` mean the same things. Read-only through the system git;
+  nothing is ever pushed
+- **One repository per folder**, and the folder can hold your own sessions and subfolders as
+  well — a sync never touches those
+- **Nothing happens on its own.** What the last sync took is written to disk, so the folder shows
+  its hosts on the first frame after the window opens, without going near the network. Going to
+  git is **Sync with git…** on the folder, or the ⟳ button on its row
+- Every sync **asks which groups to take**, before anything on disk changes: the previous choice
+  is ticked, groups that appeared since last time are ticked and marked *new*, and a subgroup you
+  untick stays unticked rather than being offered again as a discovery. Ticking a group takes its
+  subgroups
+- A sync brings the folder to what the repository says now, so **a group or host that has left it
+  leaves the folder** — the dialog lists what is about to go, and how many of those hosts hold
+  local settings, because those and any password saved for them go with them
+- Hosts land in the folder as **one flat list**, however deeply the inventory nests them, and a
+  host named by several Ansible groups appears once. The groups themselves are read and kept but
+  not drawn: they are where a host's connection settings and `group_vars` come from, not where it
+  is filed. Which groups a host came from is what the sync dialog is for
+- Hosts arrive as **derived nodes with local settings layered on top**, exactly as on the
+  Inventory tab: right-click one for *Local settings…*, and what you set there survives every
+  later sync. Their connection settings inherit through the repository's groups and on up into
+  the folder you made, so a login set on the folder covers everything under it
+- A backup carries the repository, the branch, the chosen groups and your local settings — not
+  the mirrored tree, which one sync on the new machine rebuilds
+- Untying the folder, or deleting it, removes the mirrored hosts along with the local settings and
+  passwords kept for them; the repository itself is untouched
+
 ### Credentials
 
 - Encrypted local vault (AES-256-GCM, master password via scrypt), with a lock button, `⌘L`,

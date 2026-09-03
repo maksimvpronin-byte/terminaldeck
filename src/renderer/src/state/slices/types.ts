@@ -2,6 +2,8 @@ import type { TerminalSettings } from '../settings'
 import type { PaneNode, PaneTarget } from '../paneTree'
 import type {
   Credential,
+  GitFolderPreview,
+  GitFolderTree,
   HostCollection,
   InventoryOverride,
   InventorySource,
@@ -116,6 +118,36 @@ export interface InventorySlice {
   clearInventoryOverride: (nodeId: string) => Promise<void>
 }
 
+/**
+ * Folders on the Sessions tab that mirror an Ansible inventory out of git.
+ *
+ * Separate from the inventory slice because the two answer different questions:
+ * an Inventory source is a place of its own in the sidebar, while these hang
+ * inside the ordinary tree, under a folder somebody made.
+ */
+export interface GitFoldersSlice {
+  gitFolderTrees: GitFolderTree[]
+  gitFolderOverrides: InventoryOverride[]
+  /** Folders whose repository is being read right now. */
+  gitFolderSyncing: string[]
+  /** Why the last attempt to read a folder's repository failed, if it did. */
+  gitFolderErrors: Record<string, string>
+  loadGitFolders: () => Promise<void>
+  /**
+   * Pulls the repository and returns what taking it would mean. Nothing the
+   * folder shows changes until `applyGitFolder` is called with an answer;
+   * undefined means the repository could not be read.
+   */
+  previewGitFolder: (groupId: string) => Promise<GitFolderPreview | undefined>
+  applyGitFolder: (groupId: string, includedGroups: string[]) => Promise<void>
+  saveGitFolderOverride: (
+    override: InventoryOverride,
+    secret?: string | null,
+    gatewaySecret?: string | null
+  ) => Promise<void>
+  clearGitFolderOverride: (nodeId: string) => Promise<void>
+}
+
 export interface CollectionsSlice {
   collections: HostCollection[]
   loadCollections: () => Promise<void>
@@ -216,6 +248,7 @@ export type AppState = VaultSlice &
   SettingsSlice &
   SessionsSlice &
   InventorySlice &
+  GitFoldersSlice &
   SnippetsSlice &
   CollectionsSlice &
   CredentialsSlice &

@@ -17,6 +17,8 @@ import type {
   InventorySource,
   InventoryOverride,
   InventoryTree,
+  GitFolderPreview,
+  GitFolderTree,
   ImportSummary,
   TransferPlan,
   TransferDecisions,
@@ -106,6 +108,29 @@ const api = {
       ipcRenderer.invoke(IPC.inventorySaveOverride, override, secret, gatewaySecret),
     clearOverride: (nodeId: string): Promise<void> =>
       ipcRenderer.invoke(IPC.inventoryClearOverride, nodeId)
+  },
+  /**
+   * A Sessions folder that mirrors an inventory out of git.
+   *
+   * Reading the repository and taking what it found are two calls on purpose:
+   * everything between them is the choice made in the dialog, and nothing the
+   * folder shows changes until `apply` is called.
+   */
+  gitFolder: {
+    list: (): Promise<{ trees: GitFolderTree[]; overrides: InventoryOverride[] }> =>
+      ipcRenderer.invoke(IPC.gitFolderList),
+    preview: (groupId: string): Promise<GitFolderPreview> =>
+      ipcRenderer.invoke(IPC.gitFolderPreview, groupId),
+    apply: (groupId: string, includedGroups: string[]): Promise<GitFolderTree> =>
+      ipcRenderer.invoke(IPC.gitFolderApply, groupId, includedGroups),
+    saveOverride: (
+      override: InventoryOverride,
+      secret?: string | null,
+      gatewaySecret?: string | null
+    ): Promise<void> =>
+      ipcRenderer.invoke(IPC.gitFolderSaveOverride, override, secret, gatewaySecret),
+    clearOverride: (nodeId: string): Promise<void> =>
+      ipcRenderer.invoke(IPC.gitFolderClearOverride, nodeId)
   },
   backup: {
     exportToFile: (includeSecrets: boolean, password?: string): Promise<string | undefined> =>

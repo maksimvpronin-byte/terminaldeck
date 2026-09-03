@@ -6,6 +6,7 @@ import { sessionStore } from './SessionStore'
 import { snippetStore } from './SnippetStore'
 import { collectionStore } from './CollectionStore'
 import { credentialStore } from './CredentialStore'
+import { gitFolderStore } from '../gitFolders/GitFolderStore'
 import { inventoryStore } from '../inventory/InventoryStore'
 import type {
   Credential,
@@ -28,6 +29,14 @@ interface BackupFile {
   collections: HostCollection[]
   inventorySources: InventorySource[]
   inventoryOverrides: InventoryOverride[]
+  /**
+   * Local settings for hosts a Sessions folder mirrors out of git. The folder
+   * itself, its repository and the groups chosen from it travel in `groups` —
+   * they are part of the folder. The mirrored tree does not: it is a copy of
+   * something the repository still has, and one sync on the new machine is
+   * cheaper than carrying a stale one around.
+   */
+  gitFolderOverrides?: InventoryOverride[]
   /**
    * Logins saved on their own. Absent from a file written before they existed,
    * which is why every reader here treats the list as optional.
@@ -61,6 +70,7 @@ export async function exportToFile(
     collections: collectionStore.list(),
     inventorySources: inventoryStore.sources(),
     inventoryOverrides: inventoryStore.overrides(),
+    gitFolderOverrides: gitFolderStore.overrides(),
     credentials: credentialStore.list()
   }
 
@@ -74,6 +84,7 @@ export async function exportToFile(
         ...backup.sessions,
         ...backup.inventorySources,
         ...backup.inventoryOverrides,
+        ...(backup.gitFolderOverrides ?? []),
         ...(backup.credentials ?? [])
       ]
         .map((item) => item.secretRef)
@@ -126,6 +137,7 @@ export async function importFromFile(
     collections: 0,
     inventorySources: 0,
     inventoryOverrides: 0,
+    gitFolderOverrides: 0,
     credentials: 0,
     secrets: 0
   }
@@ -174,6 +186,10 @@ export async function importFromFile(
   for (const override of parsed.inventoryOverrides ?? []) {
     inventoryStore.saveOverride(override)
     summary.inventoryOverrides++
+  }
+  for (const override of parsed.gitFolderOverrides ?? []) {
+    gitFolderStore.saveOverride(override)
+    summary.gitFolderOverrides++
   }
   for (const credential of parsed.credentials ?? []) {
     credentialStore.save(credential)

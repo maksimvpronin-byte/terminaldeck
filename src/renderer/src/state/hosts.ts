@@ -22,6 +22,8 @@ export interface FoundHost {
   groups: SessionGroup[]
   /** Came from a repository, so edits are stored as an override, not in place. */
   fromInventory: boolean
+  /** The Sessions folder it was mirrored into, when that is where it came from. */
+  gitFolderId?: string
 }
 
 /**
@@ -36,9 +38,22 @@ export function inventoryGroups(state: AppState): SessionGroup[] {
 }
 
 /**
- * Finds a host by id in either tree. Saved sessions win over inventory ones —
- * ids come from different generators, so a clash is not expected, and picking a
- * deterministic side beats depending on iteration order.
+ * Groups mirrored into Sessions folders, with local overrides applied.
+ *
+ * Handed out together with the saved groups rather than instead of them: the
+ * chain from a mirrored host runs up through the repository's groups and then
+ * into the folder somebody made, which is an ordinary saved group.
+ */
+export function gitFolderGroups(state: AppState): SessionGroup[] {
+  return state.gitFolderTrees.flatMap((tree) =>
+    tree.groups.map((g) => applyOverride(g, state.gitFolderOverrides.find((o) => o.nodeId === g.id)))
+  )
+}
+
+/**
+ * Finds a host by id in any of the trees. Saved sessions win — ids come from
+ * different generators, so a clash is not expected, and picking a deterministic
+ * side beats depending on iteration order.
  */
 export function findHost(state: AppState, id: string): FoundHost | undefined {
   const saved = state.sessions.find((s) => s.id === id)
@@ -51,6 +66,18 @@ export function findHost(state: AppState, id: string): FoundHost | undefined {
       host: applyOverride(raw, state.inventoryOverrides.find((o) => o.nodeId === id)),
       groups: inventoryGroups(state),
       fromInventory: true
+    }
+  }
+
+  for (const tree of state.gitFolderTrees) {
+    const raw = tree.sessions.find((s) => s.id === id)
+    if (!raw) continue
+    return {
+      host: applyOverride(raw, state.gitFolderOverrides.find((o) => o.nodeId === id)),
+      // Both halves: the repository's groups, and the saved folder above them.
+      groups: [...state.groups, ...gitFolderGroups(state)],
+      fromInventory: true,
+      gitFolderId: tree.groupId
     }
   }
   return undefined

@@ -223,6 +223,35 @@ label {
   padding-right: 8px;
   line-height: 1.4;
 }
+/* The group list in a folder's sync dialog: long enough to need its own scroll,
+   and indented so the inventory's own nesting is readable. */
+.sync-group-list {
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 6px 8px;
+}
+.sync-group-list .checkbox-row {
+  gap: 6px;
+  align-items: center;
+  padding: 2px 0;
+}
+/* The second icon on a folder that mirrors a repository, a shade quieter than
+   the folder itself: it says where the contents come from, not what this is. */
+.git-mark {
+  margin-left: 2px;
+  opacity: 0.75;
+}
+.badge-new {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  padding: 0 4px;
+}
 .inventory-warning {
   margin: 8px;
   padding: 8px;
@@ -890,6 +919,14 @@ label {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
   /* It explains what is under the pointer; it must never be under it itself. */
   pointer-events: none;
+}
+/* A bubble long enough to hold several paragraphs needs them apart; the reset
+   leaves paragraphs with no margin at all, so they ran together as one block. */
+.hint-bubble p {
+  margin: 0 0 8px;
+}
+.hint-bubble p:last-child {
+  margin-bottom: 0;
 }
 
 /* --- remote monitoring strip --- */

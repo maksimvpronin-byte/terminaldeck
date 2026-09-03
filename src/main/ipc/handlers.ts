@@ -1,5 +1,6 @@
 import { registerKeyboardCapture } from '../keyboardCapture'
 import { registerAppHandlers } from './app'
+import { registerGitFolderHandlers } from './gitFolders'
 import { registerInventoryHandlers } from './inventory'
 import { registerRdpHandlers } from './rdp'
 import { registerSftpHandlers } from './sftp'
@@ -23,6 +24,7 @@ export function registerIpcHandlers(): void {
   registerVaultHandlers()
   registerStoreHandlers()
   registerInventoryHandlers()
+  registerGitFolderHandlers()
   registerSshHandlers()
   registerSftpHandlers()
   registerRdpHandlers()

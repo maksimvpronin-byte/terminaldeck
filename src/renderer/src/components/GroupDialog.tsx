@@ -1,6 +1,12 @@
 import { useState } from 'react'
 import { nanoid } from 'nanoid'
-import type { AppearanceDefaults, AuthDefaults, RdpDefaults, SessionGroup } from '../../../shared/types'
+import type {
+  AppearanceDefaults,
+  AuthDefaults,
+  GitFolderLink,
+  RdpDefaults,
+  SessionGroup
+} from '../../../shared/types'
 import { authFieldsState, secretToSave } from '../../../shared/authFields'
 import { isSet } from '../../../shared/overrides'
 import {
@@ -22,9 +28,20 @@ interface Props {
   initial?: SessionGroup
   parentId?: string | null
   onClose: () => void
+  /**
+   * Called when saving has just tied this folder to a repository. The folder is
+   * empty at that moment and syncing is the obvious next step, so the caller
+   * offers it rather than leaving a folder that says "never synced".
+   */
+  onLinked?: (groupId: string) => void
 }
 
-export default function GroupDialog({ initial, parentId = null, onClose }: Props): JSX.Element {
+export default function GroupDialog({
+  initial,
+  parentId = null,
+  onClose,
+  onLinked
+}: Props): JSX.Element {
   const groups = useStore((s) => s.groups)
   const settings = useStore((s) => s.settings)
   const upsertGroup = useStore((s) => s.upsertGroup)
@@ -33,6 +50,14 @@ export default function GroupDialog({ initial, parentId = null, onClose }: Props
   const [group, setGroup] = useState<SessionGroup>(
     initial ?? { id: nanoid(), name: '', parentId }
   )
+  /**
+   * The repository this folder mirrors, while it is being edited. Held apart
+   * from the group so unticking the box does not throw away what was typed
+   * before the dialog is saved.
+   */
+  const [link, setLink] = useState<GitFolderLink | undefined>(initial?.git)
+  const [linked, setLinked] = useState(Boolean(initial?.git))
+  const [pathsInput, setPathsInput] = useState((initial?.git?.paths ?? []).join(', '))
   const [secret, setSecret] = useState('')
   const [forgetSecret, setForgetSecret] = useState(false)
   const [gatewaySecret, setGatewaySecret] = useState('')
@@ -94,17 +119,37 @@ export default function GroupDialog({ initial, parentId = null, onClose }: Props
     if (path) set('privateKeyPath', path)
   }
 
+  function setGit<K extends keyof GitFolderLink>(key: K, value: GitFolderLink[K]): void {
+    setLink((g) => ({ repoUrl: '', paths: [], includedGroups: [], ...g, [key]: value }))
+  }
+
   async function submit(): Promise<void> {
     if (!group.name.trim()) {
       setError('Name is required')
       return
     }
+    if (linked && !link?.repoUrl.trim()) {
+      setError('A repository address is required')
+      return
+    }
+    const paths = pathsInput
+      .split(',')
+      .map((p) => p.trim())
+      .filter(Boolean)
+    // What was chosen from this repository, and what it held, are carried
+    // through untouched: editing the branch is not an answer to which groups to
+    // take, and the next sync asks that question anyway.
+    const git: GitFolderLink | undefined =
+      linked && link ? { ...link, paths, includedGroups: link.includedGroups ?? [] } : undefined
+    const wasLinked = Boolean(initial?.git)
+
     await upsertGroup(
-      group,
+      { ...group, git },
       secretToSave(auth.shownMethod, forgetSecret, secret),
       gatewaySecret || (forgetGatewaySecret ? null : undefined)
     )
     onClose()
+    if (git && !wasLinked) onLinked?.(group.id)
   }
 
   const secretHint =
@@ -241,6 +286,79 @@ export default function GroupDialog({ initial, parentId = null, onClose }: Props
           />
           {t('SFTP panel follows the terminal’s directory')}
         </label>
+
+        <details className="settings-section" open={linked && !initial}>
+          <summary>
+            <Hint label={t('Inventory from git')}>
+              {/* Every word about this lives here rather than under the fields.
+                  It is worth having and worth reading once; left on the page it
+                  was two paragraphs of grey text between the address and the
+                  next section, which is most of what the dialog showed. */}
+              <p>
+                {t(
+                  'This folder can mirror an Ansible inventory out of a repository. The hosts it brings in are shown alongside anything you put in the folder yourself, and are refreshed only when you ask for it.'
+                )}
+              </p>
+              <p>
+                {t(
+                  'Cloned read-only through your system git, so your existing SSH keys or credential helper are used and nothing is ever pushed back. A path may be a file or a directory of *.yml files, read one level deep; leave it empty to scan the repository root.'
+                )}
+              </p>
+              <p>
+                {t(
+                  'Nothing is fetched on its own: use “Sync with git…” on the folder, and choose there which groups to take. What was taken last time is kept on this machine and shown as soon as the window opens.'
+                )}
+              </p>
+            </Hint>
+          </summary>
+
+          <label className="checkbox-row" style={{ flexDirection: 'row' }}>
+            <input
+              type="checkbox"
+              checked={linked}
+              onChange={(e) => setLinked(e.target.checked)}
+            />
+            {t('Mirror an inventory from a git repository')}
+          </label>
+
+          {linked && (
+            <>
+              <label>
+                {t('Repository URL')}
+                <input
+                  value={link?.repoUrl ?? ''}
+                  placeholder="git@github.com:org/infra.git"
+                  onChange={(e) => setGit('repoUrl', e.target.value)}
+                />
+              </label>
+              <div className="form-row">
+                <label style={{ flex: 1 }}>
+                  {t('Branch')}
+                  <input
+                    value={link?.branch ?? ''}
+                    placeholder={t('default branch')}
+                    onChange={(e) => setGit('branch', e.target.value || undefined)}
+                  />
+                </label>
+                <label style={{ flex: 2 }}>
+                  {t('Inventory paths (comma separated)')}
+                  <input
+                    value={pathsInput}
+                    placeholder="inventories/prod/hosts.yml"
+                    onChange={(e) => setPathsInput(e.target.value)}
+                  />
+                </label>
+              </div>
+            </>
+          )}
+          {!linked && initial?.git && (
+            <p className="settings-note">
+              {t(
+                'Saving now unties this folder: the hosts it mirrored disappear, along with the local settings and passwords kept for them. The repository itself is untouched.'
+              )}
+            </p>
+          )}
+        </details>
 
         <details className="settings-section">
           <summary>

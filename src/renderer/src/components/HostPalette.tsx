@@ -25,6 +25,8 @@ export default function HostPalette({ onClose }: { onClose: () => void }): JSX.E
   const groups = useStore((s) => s.groups)
   const trees = useStore((s) => s.inventoryTrees)
   const overrides = useStore((s) => s.inventoryOverrides)
+  const gitTrees = useStore((s) => s.gitFolderTrees)
+  const gitOverrides = useStore((s) => s.gitFolderOverrides)
   const openTab = useStore((s) => s.openTab)
   const openMany = useStore((s) => s.openMany)
 
@@ -66,8 +68,28 @@ export default function HostPalette({ onClose }: { onClose: () => void }): JSX.E
         })
       }
     }
+    // Hosts a Sessions folder mirrors out of git. Their path runs through the
+    // folder somebody made, so the saved groups are part of the chain here.
+    const folderGroups = [...groups, ...gitTrees.flatMap((tree) => tree.groups)]
+    for (const tree of gitTrees) {
+      for (const raw of tree.sessions) {
+        const host: SessionProfile = applyOverride(
+          raw,
+          gitOverrides.find((x) => x.nodeId === raw.id)
+        )
+        const auth = resolveAuth(host, host.groupId, folderGroups)
+        out.push({
+          id: host.id,
+          title: host.name,
+          path: groupPath(host.groupId, folderGroups),
+          address: auth.username ? `${auth.username}@${host.host}` : host.host,
+          color: host.color,
+          target: { kind: 'session', sessionId: host.id }
+        })
+      }
+    }
     return out
-  }, [sessions, groups, trees, overrides])
+  }, [sessions, groups, trees, overrides, gitTrees, gitOverrides])
 
   const matches = useMemo(() => {
     const needle = query.trim().toLowerCase()

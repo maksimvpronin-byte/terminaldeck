@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { nanoid } from 'nanoid'
 import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from 'react'
-import type { SessionGroup, SessionProfile } from '../../../shared/types'
+import type { GitFolderPreview, SessionGroup, SessionProfile } from '../../../shared/types'
 import { resolveAuth } from '../../../shared/authResolution'
+import { applyOverride } from '../../../shared/overrides'
+import { isGitNode } from '../../../shared/gitFolders'
 import {
   useStore,
   collectConnectedSessionIds,
@@ -14,6 +16,8 @@ import SessionDialog from './SessionDialog'
 import QuickConnectDialog from './QuickConnectDialog'
 import ImportSshConfigDialog from './ImportSshConfigDialog'
 import GroupDialog from './GroupDialog'
+import GitFolderSyncDialog from './GitFolderSyncDialog'
+import InventoryOverrideDialog from './InventoryOverrideDialog'
 import InventoryTree from './InventoryTree'
 import CollectionsPanel from './CollectionsPanel'
 import CollectionDialog from './CollectionDialog'
@@ -23,6 +27,7 @@ import ContextMenu, { type MenuItem } from './ContextMenu'
 import { connectMenuItems } from './connectMenu'
 import { paneTitle } from '../state/connect'
 import { keyHint } from '../state/keys'
+import { ago } from '../state/syncStatus'
 import { useT } from '../i18n'
 import {
   SIDEBAR_MAX,
@@ -72,8 +77,14 @@ export default function Sidebar({
      how wide this is, and it is written on every frame of a drag. */
   const [width, setWidth] = useState(loadSidebarWidth)
   const fullscreen = useAnythingFullscreen()
-  const groups = useStore((s) => s.groups)
-  const sessions = useStore((s) => s.sessions)
+  const savedGroups = useStore((s) => s.groups)
+  const savedSessions = useStore((s) => s.sessions)
+  const gitTrees = useStore((s) => s.gitFolderTrees)
+  const gitOverrides = useStore((s) => s.gitFolderOverrides)
+  const gitSyncing = useStore((s) => s.gitFolderSyncing)
+  const gitErrors = useStore((s) => s.gitFolderErrors)
+  const previewGitFolder = useStore((s) => s.previewGitFolder)
+  const clearGitFolderOverride = useStore((s) => s.clearGitFolderOverride)
   const removeGroup = useStore((s) => s.removeGroup)
   const removeSession = useStore((s) => s.removeSession)
   const upsertSession = useStore((s) => s.upsertSession)
@@ -98,6 +109,52 @@ export default function Sidebar({
   const connected = new Set(
     allRoots({ workspaces }).flatMap(collectConnectedSessionIds)
   )
+
+  /**
+   * The tree as it is shown: what is saved here, plus what the folders tied to
+   * git are mirroring, with each node's local settings laid over it.
+   *
+   * They are merged rather than drawn separately because they are one tree —
+   * a mirrored host sits in a folder somebody made, inherits from it, and is
+   * selected, coloured and opened by exactly the same code. What separates them
+   * is what may be *done* to them, and that is asked node by node below.
+   */
+  function withGitOverride<T extends { id: string }>(node: T): T {
+    return applyOverride(node, gitOverrides.find((o) => o.nodeId === node.id))
+  }
+  const groups: SessionGroup[] = [
+    ...savedGroups,
+    ...gitTrees.flatMap((tree) => tree.groups).map(withGitOverride)
+  ]
+  const sessions: SessionProfile[] = [
+    ...savedSessions,
+    ...gitTrees.flatMap((tree) =>
+      tree.sessions.map(withGitOverride).sort((a, b) => a.name.localeCompare(b.name))
+    )
+  ]
+
+  /**
+   * Mirrored hosts sit in the folder itself, as one list, however the inventory
+   * nests them.
+   *
+   * The repository's groups are still read and still kept — they are where a
+   * host's connection settings come from, and `group_vars` would be lost with
+   * them — but they are not drawn. An Ansible inventory nests four levels deep
+   * for reasons that have to do with playbooks rather than with looking a
+   * machine up, and a host named by three groups would otherwise appear three
+   * times in the tree while being one host. Which groups a host came from is a
+   * question the sync dialog answers.
+   */
+  const mirroredIn = new Map<string, Set<string>>(
+    gitTrees.map((tree) => [tree.groupId, new Set(tree.sessions.map((s) => s.id))])
+  )
+  function hostsIn(groupId: string, list: SessionProfile[]): SessionProfile[] {
+    // A repository's own group is not a place in this tree: its hosts are
+    // listed once, in the folder, and asking it for them would list them twice.
+    if (isGitNode(groupId)) return []
+    const mirrored = mirroredIn.get(groupId)
+    return list.filter((s) => s.groupId === groupId || mirrored?.has(s.id))
+  }
 
   const [editingSession, setEditingSession] = useState<SessionProfile | undefined | 'new'>(undefined)
   const [showQuickConnect, setShowQuickConnect] = useState(false)
@@ -124,6 +181,12 @@ export default function Sidebar({
   const [tab, setTab] = useState<'sessions' | 'inventory'>('sessions')
   /** Hosts waiting to be put into a brand new collection. */
   const [collecting, setCollecting] = useState<string[] | null>(null)
+  /** A folder's sync, once its repository has been read and before it is taken. */
+  const [syncing, setSyncing] = useState<{ folder: SessionGroup; preview: GitFolderPreview } | null>(
+    null
+  )
+  /** The mirrored host whose local settings are being edited. */
+  const [overriding, setOverriding] = useState<SessionProfile | SessionGroup | null>(null)
 
   function toggleCollapsed(groupId: string): void {
     setCollapsed((prev) => {
@@ -168,10 +231,10 @@ export default function Sidebar({
   function flattenOrder(parentId: string | null): string[] {
     const out: string[] = []
     for (const g of groups
-      .filter((x) => x.parentId === parentId)
+      .filter((x) => x.parentId === parentId && !isGitNode(x.id))
       .filter((g) => !needle || groupHasMatch(g.id))) {
       if (needle === '' && collapsed.has(g.id)) continue
-      out.push(...visible.filter((s) => s.groupId === g.id).map((s) => s.id))
+      out.push(...hostsIn(g.id, visible).map((s) => s.id))
       out.push(...flattenOrder(g.id))
     }
     return out
@@ -196,20 +259,23 @@ export default function Sidebar({
    * — and it lives in the context menu only, never as a button on the row.
    */
   async function deleteSessions(ids: string[]): Promise<void> {
-    const names = ids
+    // A mirrored host is not ours to delete: it exists because the repository
+    // names it, and the way to be rid of it is to untick its group on a sync.
+    const doomed = ids.filter((id) => !isGitNode(id))
+    const names = doomed
       .map((id) => sessions.find((s) => s.id === id)?.name)
       .filter((n): n is string => Boolean(n))
     if (names.length === 0) return
     const what =
       names.length === 1 ? `“${names[0]}”` : `${names.length} hosts:\n\n${names.join('\n')}`
     if (!window.confirm(`Delete ${what}?\n\nThis cannot be undone.`)) return
-    for (const id of ids) await removeSession(id)
+    for (const id of doomed) await removeSession(id)
     clearHostSelection()
   }
 
   /** A group survives filtering if it, or any descendant, still holds a match. */
   function groupHasMatch(groupId: string): boolean {
-    if (visible.some((s) => s.groupId === groupId)) return true
+    if (hostsIn(groupId, visible).length > 0) return true
     return groups.filter((g) => g.parentId === groupId).some((g) => groupHasMatch(g.id))
   }
 
@@ -241,6 +307,9 @@ export default function Sidebar({
 
   function allowDrop(e: ReactDragEvent, targetId: string | null): void {
     if (!e.dataTransfer.types.includes(DRAG_MIME)) return
+    // The contents of a mirrored group are the repository's; a host dropped in
+    // would vanish at the next sync without ever having been moved.
+    if (targetId && isGitNode(targetId)) return
     e.preventDefault()
     e.stopPropagation()
     e.dataTransfer.dropEffect = 'move'
@@ -261,6 +330,8 @@ export default function Sidebar({
    */
   function allowReorder(e: ReactDragEvent, target: SessionProfile): void {
     if (!dragItem || dragItem.kind !== 'session' || dragItem.id === target.id) return
+    // Mirrored hosts sit in the order the inventory gives them.
+    if (isGitNode(target.id) || isGitNode(dragItem.id)) return
     if (!e.dataTransfer.types.includes(DRAG_MIME)) return
     e.preventDefault()
     e.stopPropagation()
@@ -306,6 +377,10 @@ export default function Sidebar({
     const targets = selectedHostIds.includes(s.id)
       ? selectedHostIds.filter((id) => sessions.some((x) => x.id === id))
       : [s.id]
+    // A host the repository describes is not edited in place: what is set on it
+    // is kept here, outside the repository, and re-applied after every sync.
+    const mirrored = isGitNode(s.id)
+    const deletable = targets.filter((id) => !isGitNode(id))
     return [
       { label: t('Connect'), onSelect: () => connect(s) },
       {
@@ -334,6 +409,25 @@ export default function Sidebar({
         manageAccounts: () => setSettingsTab('accounts'),
         openMultiConnect: () => setMultiConnecting(s)
       }),
+      ...(mirrored
+        ? [
+            {
+              label: t('Local settings…'),
+              separated: true,
+              onSelect: () => setOverriding(s)
+            },
+            {
+              label: t('Reset local settings'),
+              disabled: !gitOverrides.some((o) => o.nodeId === s.id),
+              onSelect: () => clearGitFolderOverride(s.id)
+            },
+            {
+              label: `Copy ${addressOf(s)}`,
+              onSelect: () => window.td.clipboard.write(addressOf(s))
+            }
+          ]
+        : []),
+      ...(mirrored ? [] : [
       {
         label: t('Duplicate'),
         separated: true,
@@ -357,11 +451,13 @@ export default function Sidebar({
         onSelect: () => window.td.clipboard.write(addressOf(s))
       },
       {
-        label: targets.length > 1 ? `Delete ${targets.length} hosts…` : t('Delete…'),
+        label: deletable.length > 1 ? `Delete ${deletable.length} hosts…` : t('Delete…'),
         danger: true,
         separated: true,
-        onSelect: () => deleteSessions(targets)
+        disabled: deletable.length === 0,
+        onSelect: () => deleteSessions(deletable)
       }
+      ])
     ]
   }
 
@@ -383,6 +479,8 @@ export default function Sidebar({
 
   function groupMenu(groupId: string): MenuItem[] {
     const group = groups.find((g) => g.id === groupId)
+    // The subtree includes the repository's own groups, invisible as they are,
+    // so a mirrored host is found through the group it hangs off.
     const inGroup = groupSubtree(groupId)
     const hosts = sessions.filter((s) => s.groupId && inGroup.has(s.groupId))
     return [
@@ -400,9 +498,19 @@ export default function Sidebar({
             group?.name
           )
       },
+      ...(group?.git
+        ? [
+            {
+              label: t('Sync with git…'),
+              separated: true,
+              disabled: gitSyncing.includes(groupId),
+              onSelect: () => startSync(group)
+            }
+          ]
+        : []),
       {
         label: t('Edit group…'),
-        separated: true,
+        separated: !group?.git,
         disabled: !group,
         onSelect: () => group && setGroupDialog({ group, parentId: group.parentId })
       },
@@ -413,17 +521,41 @@ export default function Sidebar({
         danger: true,
         separated: true,
         onSelect: () => {
-          // The hosts survive — they move up to the parent — so the prompt says so.
-          const moved = sessions.filter((s) => s.groupId === groupId).length
-          const note = moved > 0 ? `\n\nIts ${moved} host(s) move up a level; nothing is lost.` : ''
-          if (window.confirm(`Delete the group “${group?.name ?? ''}”?${note}`)) removeGroup(groupId)
+          // Saved hosts survive — they move up to the parent — so the prompt
+          // says so. Mirrored ones do not: they exist because this folder
+          // mirrors a repository, and go with it.
+          const moved = savedSessions.filter((s) => s.groupId === groupId).length
+          const note =
+            moved > 0 ? `\n\nIts ${moved} host(s) move up a level; nothing is lost.` : ''
+          const mirroredCount = group?.git
+            ? (gitTrees.find((tree) => tree.groupId === groupId)?.sessions.length ?? 0)
+            : 0
+          const gitNote =
+            mirroredCount > 0
+              ? `\n\nThe ${mirroredCount} host(s) mirrored from git go with it, along with the local settings and passwords kept for them.`
+              : ''
+          if (window.confirm(`Delete the group “${group?.name ?? ''}”?${note}${gitNote}`)) {
+            removeGroup(groupId)
+          }
         }
       }
     ]
   }
 
+  /**
+   * Reads a folder's repository, then asks what to take from it.
+   *
+   * Two steps with the dialog between them: until it is answered nothing on disk
+   * has changed, so cancelling leaves the folder showing exactly what it showed.
+   */
+  async function startSync(folder: SessionGroup): Promise<void> {
+    const preview = await previewGitFolder(folder.id)
+    if (preview) setSyncing({ folder, preview })
+  }
+
   function renderSession(s: SessionProfile, paddingLeft: number): JSX.Element {
     const edge = dropEdge?.id === s.id ? ` drop-${dropEdge.place}` : ''
+    const mirrored = isGitNode(s.id)
     return (
       <div
         className={`tree-item ${selectedHostIds.includes(s.id) ? 'selected' : ''}${edge}`}
@@ -434,7 +566,7 @@ export default function Sidebar({
         }}
         key={s.id}
         style={{ paddingLeft }}
-        draggable
+        draggable={!mirrored}
         onDragStart={(e) => startDrag(e, { kind: 'session', id: s.id }, s.name)}
         onDragEnd={endDrag}
         onDragOver={(e) => allowReorder(e, s)}
@@ -442,7 +574,11 @@ export default function Sidebar({
         onDrop={(e) => handleReorderDrop(e, s)}
         onClick={(e) => onSessionClick(e, s)}
         onDoubleClick={() => connect(s)}
-        title={t("Double-click to connect · drag to sort or to move between groups")}
+        title={
+          mirrored
+            ? t('From the repository this folder mirrors · double-click to connect')
+            : t("Double-click to connect · drag to sort or to move between groups")
+        }
       >
         <span className="name">
           <span
@@ -462,9 +598,11 @@ export default function Sidebar({
             to destroy a host. Deleting is in the context menu, behind a prompt. */}
         <div className="actions">
           <button
+            title={mirrored ? t('Settings kept here, over what the repository says') : undefined}
             onClick={(e) => {
               e.stopPropagation()
-              setEditingSession(s)
+              if (mirrored) setOverriding(s)
+              else setEditingSession(s)
             }}
           >
             Edit
@@ -476,14 +614,17 @@ export default function Sidebar({
 
   function renderGroups(parentId: string | null, depth: number): JSX.Element[] {
     return groups
-      .filter((g) => g.parentId === parentId)
+      // Only folders somebody made: what a repository describes is placed flat
+      // inside the folder that mirrors it, not redrawn as a tree of its own.
+      .filter((g) => g.parentId === parentId && !isGitNode(g.id))
       .filter((g) => !needle || groupHasMatch(g.id))
       .map((g) => {
         // While filtering, stay expanded — matches must not hide inside a closed group.
         const isCollapsed = needle === '' && collapsed.has(g.id)
         const childCount =
-          visible.filter((s) => s.groupId === g.id).length +
-          groups.filter((x) => x.parentId === g.id).length
+          hostsIn(g.id, visible).length +
+          groups.filter((x) => x.parentId === g.id && !isGitNode(x.id)).length
+        const isSyncing = gitSyncing.includes(g.id)
 
         return (
           <div className="tree-group" key={g.id}>
@@ -502,12 +643,39 @@ export default function Sidebar({
                 e.stopPropagation()
                 setMenu({ x: e.clientX, y: e.clientY, items: groupMenu(g.id) })
               }}
+              /* A folder tied to a repository is still a folder, and keeps the
+                 folder's own icon; the link beside it is the difference. What a
+                 sync last did is here rather than on a line of its own under
+                 every such folder — three lines of grey text per folder is what
+                 the tree looked like, and it is a thing you go and look at, not
+                 a thing you read past. */
+              title={
+                g.git
+                  ? `${isSyncing ? t('Reading the repository…') : ago(t, g.git.lastSyncedAt)}` +
+                    (g.git.lastRevision ? ` · ${g.git.lastRevision}` : '') +
+                    ` · ${g.git.branch || t('default branch')}` +
+                    ` · ${g.git.repoUrl}`
+                  : undefined
+              }
             >
               <span className="tree-group-title name">
-                <span className="chevron">{isCollapsed ? '▸' : '▾'}</span> 📁 {g.name}
+                <span className="chevron">{isCollapsed ? '▸' : '▾'}</span> 📁
+                {g.git && <span className="git-mark">🔗</span>} {g.name}
                 {isCollapsed && childCount > 0 && <span className="child-count">{childCount}</span>}
               </span>
               <div className="actions">
+                {g.git && (
+                  <button
+                    title={t('Sync with git…')}
+                    disabled={isSyncing}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      startSync(g)
+                    }}
+                  >
+                    {isSyncing ? '…' : '⟳'}
+                  </button>
+                )}
                 <button
                   title={t("New subgroup")}
                   onClick={(e) => {
@@ -519,11 +687,17 @@ export default function Sidebar({
                 </button>
               </div>
             </div>
+            {/* Only when a sync went wrong. That is not a caption to read past:
+                the folder goes on showing what it already had, and without this
+                a failed sync looks exactly like one that changed nothing. */}
+            {g.git && !isSyncing && (gitErrors[g.id] ?? g.git.lastError) && (
+              <div className="inventory-error" style={{ paddingLeft: 20 + depth * 12 }}>
+                {gitErrors[g.id] ?? g.git.lastError}
+              </div>
+            )}
             {!isCollapsed && (
               <>
-                {visible
-                  .filter((s) => s.groupId === g.id)
-                  .map((s) => renderSession(s, 20 + depth * 12))}
+                {hostsIn(g.id, visible).map((s) => renderSession(s, 20 + depth * 12))}
                 {renderGroups(g.id, depth + 1)}
               </>
             )}
@@ -757,6 +931,31 @@ export default function Sidebar({
           initial={groupDialog.group}
           parentId={groupDialog.parentId}
           onClose={() => setGroupDialog(null)}
+          // A folder that has just been tied to a repository is empty; the sync
+          // that fills it is offered rather than left to be found.
+          onLinked={(id) => {
+            const folder = useStore.getState().groups.find((g) => g.id === id)
+            if (folder) startSync(folder)
+          }}
+        />
+      )}
+
+      {syncing && (
+        <GitFolderSyncDialog
+          folderName={syncing.folder.name}
+          preview={syncing.preview}
+          onClose={() => setSyncing(null)}
+        />
+      )}
+
+      {/* The same dialog the Inventory tab uses, pointed at this folder's own
+          store of local settings — the question it answers is identical. */}
+      {overriding && (
+        <InventoryOverrideDialog
+          node={overriding}
+          groups={groups}
+          scope="gitFolder"
+          onClose={() => setOverriding(null)}
         />
       )}
     </div>

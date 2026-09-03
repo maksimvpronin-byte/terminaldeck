@@ -271,6 +271,43 @@ export interface SessionGroup extends AuthDefaults, AppearanceDefaults, RdpDefau
   id: string
   name: string
   parentId: string | null
+  /**
+   * Set when this folder mirrors an Ansible inventory out of a git repository.
+   * The hosts it shows are rebuilt from the repository; the folder itself, and
+   * anything else put inside it by hand, stay ordinary saved entries.
+   */
+  git?: GitFolderLink
+}
+
+/**
+ * A Sessions folder tied to a git repository.
+ *
+ * The link lives on the folder rather than in a store of its own, so it travels
+ * with the group through a backup, a rename or a move — and so a folder that has
+ * one is told apart from a folder that has not by looking at the folder.
+ */
+export interface GitFolderLink {
+  repoUrl: string
+  branch?: string
+  /** Paths inside the repo to read; a directory pulls in its *.yml files. */
+  paths: string[]
+  /**
+   * Every group path taken from the repository, e.g. `all/prod`. Ticking a
+   * group ticks its descendants, so this is the flat list of what was agreed
+   * to, not the clicks that produced it.
+   */
+  includedGroups: string[]
+  /**
+   * Every group path the repository held at the last sync, chosen or not. It is
+   * what makes "new" mean new: a subgroup left unticked on purpose is not
+   * offered again as a discovery on the next sync.
+   */
+  knownGroups?: string[]
+  lastSyncedAt?: number
+  lastRevision?: string
+  lastError?: string
+  /** Repo-relative paths the last sync actually parsed. */
+  lastFiles?: string[]
 }
 
 export interface PortForwardRule {
@@ -362,6 +399,60 @@ export interface InventoryTree {
   memberships: Record<string, string[]>
 }
 
+/**
+ * What a folder's last sync kept: the same shapes the manual tree uses, so the
+ * sidebar draws a repository host and a saved host with the same code.
+ *
+ * Unlike an inventory tree this is written to disk. A folder shows its hosts the
+ * moment the window opens, and going to git is something you ask for.
+ */
+export interface GitFolderTree {
+  /** The local folder these nodes hang under. */
+  groupId: string
+  groups: SessionGroup[]
+  sessions: SessionProfile[]
+  /** Host id to every group of this tree that names it, in Ansible's order. */
+  memberships: Record<string, string[]>
+}
+
+export interface GitFolderData {
+  version: 1
+  trees: GitFolderTree[]
+  /** Local changes layered over repository nodes, addressed by node id. */
+  overrides: InventoryOverride[]
+}
+
+/** One repository group as the sync dialog lists it. */
+export interface GitFolderPreviewGroup {
+  /** Path within the inventory, e.g. `all/prod`. Its identity across syncs. */
+  path: string
+  name: string
+  parentPath: string | null
+  /** Hosts this group names itself, before any parent's are counted. */
+  hostCount: number
+  /** Not in the repository the last time this folder was synced. */
+  isNew: boolean
+}
+
+/**
+ * What a sync found, before anything is written. Nothing on disk changes until
+ * the choice made in front of this is applied.
+ */
+export interface GitFolderPreview {
+  groupId: string
+  groups: GitFolderPreviewGroup[]
+  /** Previously chosen paths that the repository still has. */
+  included: string[]
+  /** Chosen before, gone from the repository now — these are about to go. */
+  removedGroups: string[]
+  /** Hosts that will disappear with them, and whether they hold local settings. */
+  removedHosts: { id: string; name: string; hasLocalSettings: boolean }[]
+  revision?: string
+  files: string[]
+  /** Set when the repository was read but held no inventory file at all. */
+  warning?: string
+}
+
 export interface SessionStoreData {
   version: 1
   groups: SessionGroup[]
@@ -416,6 +507,8 @@ export interface ImportSummary {
   collections: number
   inventorySources: number
   inventoryOverrides: number
+  /** Local settings for hosts mirrored into a Sessions folder from git. */
+  gitFolderOverrides: number
   credentials: number
   secrets: number
 }

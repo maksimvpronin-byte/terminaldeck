@@ -81,6 +81,17 @@ export async function syncRepo(
     return dir
   }
 
+  /*
+   * The checkout is keyed by the source, not by the address, so an address that
+   * has been edited since the clone would otherwise go on fetching the old
+   * remote for ever: `fetch origin` asks the working copy where origin is, and
+   * nothing had ever told it the answer had changed. A sync of the wrong
+   * repository reports success and leaves the hosts as they were, which is the
+   * hardest kind of failure to notice.
+   */
+  const origin = (await git(['remote', 'get-url', 'origin'], dir).catch(() => '')).trim()
+  if (origin !== repoUrl) await git(['remote', 'set-url', 'origin', repoUrl], dir)
+
   // Discard local drift rather than fail on conflicts — this is a read-only mirror.
   await git(['fetch', '--depth', '1', '--', 'origin', branch ?? 'HEAD'], dir)
   await git(['reset', '--hard', 'FETCH_HEAD'], dir)

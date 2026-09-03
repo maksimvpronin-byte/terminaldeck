@@ -242,6 +242,26 @@ const SECTIONS: Section[] = [
       { what: 'Work on another branch will not appear until you name it or merge it' },
       { what: 'Local tweaks to a host survive the next sync' }
     ]
+  },
+  {
+    title: 'A Sessions folder tied to git',
+    rows: [
+      { what: 'Edit any folder on the Sessions tab and point it at a repository' },
+      { what: 'Its hosts land in the folder as one list, however deeply the inventory nests them' },
+      { what: 'They sit beside your own sessions, which can stay in the same folder' },
+      { what: 'A host named by several Ansible groups appears once — it is one host' },
+      { what: 'The groups are still read: they are where a host’s settings and group_vars come from' },
+      { what: 'Nothing is fetched on its own — the folder is read from disk when the window opens' },
+      { what: 'Sync with git… on the folder, or the ⟳ button on its row, goes to the repository' },
+      { what: 'Every sync asks which groups to take; ticking a group takes its subgroups' },
+      { what: 'Groups that appeared since last time arrive ticked and marked new' },
+      { what: 'A subgroup you untick stays unticked — it is not offered again as new' },
+      { what: 'What has left the repository leaves the folder, and the dialog says what goes' },
+      { what: 'Local settings and passwords kept for a host that goes are deleted with it' },
+      { what: 'Nothing on disk changes until you press Apply; Cancel leaves the folder as it was' },
+      { what: 'Read-only, like the Inventory tab: nothing is ever pushed back' },
+      { what: 'A backup carries the repository and the chosen groups, not the mirrored hosts' }
+    ]
   }
 ]
 

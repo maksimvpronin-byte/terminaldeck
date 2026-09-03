@@ -17,6 +17,12 @@ export default function MainLayout(): JSX.Element {
   // Loaded up front, not just when the Inventory tab is opened: the host
   // palette searches inventory hosts too.
   const loadInventory = useStore((s) => s.loadInventory)
+  /**
+   * What the folders tied to git already hold, read from disk. This is the one
+   * place they are loaded, and it does not go near the network: a folder shows
+   * its hosts on the first frame, and syncing is asked for.
+   */
+  const loadGitFolders = useStore((s) => s.loadGitFolders)
   // Needed from the Inventory tab too, where the collections section is not on
   // screen but the selection bar still offers to add hosts to an existing one.
   const loadCollections = useStore((s) => s.loadCollections)
@@ -35,9 +41,10 @@ export default function MainLayout(): JSX.Element {
   useEffect(() => {
     loadSnippets()
     loadInventory()
+    loadGitFolders()
     loadCollections()
     loadCredentials()
-  }, [loadSnippets, loadInventory, loadCollections, loadCredentials])
+  }, [loadSnippets, loadInventory, loadGitFolders, loadCollections, loadCredentials])
 
   return (
     <div className="app-root">

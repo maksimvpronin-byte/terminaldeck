@@ -256,7 +256,10 @@ async function zoomHost(found: FoundHost, direction: 'in' | 'out' | 'reset'): Pr
       ? undefined
       : clampFontSize((found.host.fontSize ?? state.settings.fontSize) + (direction === 'in' ? 1 : -1))
 
-  if (found.fromInventory) {
+  if (found.gitFolderId) {
+    const existing = state.gitFolderOverrides.find((o) => o.nodeId === found.host.id)
+    await state.saveGitFolderOverride({ ...existing, nodeId: found.host.id, fontSize: size })
+  } else if (found.fromInventory) {
     const existing = state.inventoryOverrides.find((o) => o.nodeId === found.host.id)
     await state.saveInventoryOverride({ ...existing, nodeId: found.host.id, fontSize: size })
   } else {

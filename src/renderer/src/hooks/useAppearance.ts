@@ -27,6 +27,8 @@ export function useAppearance(
   const groups = useStore((s) => s.groups)
   const trees = useStore((s) => s.inventoryTrees)
   const overrides = useStore((s) => s.inventoryOverrides)
+  const gitTrees = useStore((s) => s.gitFolderTrees)
+  const gitOverrides = useStore((s) => s.gitFolderOverrides)
   const collections = useStore((s) => s.collections)
 
   return useMemo(() => {
@@ -46,5 +48,16 @@ export function useAppearance(
     // subscriptions above are what make this recompute. The rule sees them as
     // unused dependencies; removing them would freeze the look at mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target, viaCollectionId, settings, sessions, groups, trees, overrides, collections])
+  }, [
+    target,
+    viaCollectionId,
+    settings,
+    sessions,
+    groups,
+    trees,
+    overrides,
+    gitTrees,
+    gitOverrides,
+    collections
+  ])
 }

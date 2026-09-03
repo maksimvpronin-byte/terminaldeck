@@ -17,6 +17,7 @@ import { IPC } from '../../shared/ipc-channels'
 import { OSC7_SHELL_SETUP, scanOsc7 } from '../../shared/osc7'
 import { EchoSuppressor } from './echoSuppressor'
 import { sessionStore } from '../store/SessionStore'
+import { gitFolderStore } from '../gitFolders/GitFolderStore'
 import { inventoryStore } from '../inventory/InventoryStore'
 import { vault } from '../vault/Vault'
 import { makeHostVerifier } from './hostVerifier'
@@ -84,8 +85,13 @@ function agentSockForPlatform(): string | undefined {
 
 /** Collapses a profile's own settings with everything inherited from its groups. */
 function effectiveAuth(profile: SessionProfile): ResolvedAuth {
-  // Inventory hosts hang off groups derived from a repository, not the saved ones.
-  const groups = [...sessionStore.getAll().groups, ...inventoryStore.allGroups()]
+  // A host from a repository hangs off groups derived from it — an Inventory
+  // source's, or those a Sessions folder mirrors — rather than off saved ones.
+  const groups = [
+    ...sessionStore.getAll().groups,
+    ...inventoryStore.allGroups(),
+    ...gitFolderStore.allGroups()
+  ]
   return resolveAuthChain(profile, profile.groupId, groups)
 }
 

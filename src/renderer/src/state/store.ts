@@ -4,6 +4,7 @@ import { createVaultSlice } from './slices/vault'
 import { createSettingsSlice } from './slices/settings'
 import { createSessionsSlice } from './slices/sessions'
 import { createInventorySlice } from './slices/inventory'
+import { createGitFoldersSlice } from './slices/gitFolders'
 import { createSnippetsSlice } from './slices/snippets'
 import { createCollectionsSlice } from './slices/collections'
 import { createCredentialsSlice } from './slices/credentials'
@@ -38,6 +39,7 @@ export const useStore = create<AppState>()((...a) => ({
   ...createSettingsSlice(...a),
   ...createSessionsSlice(...a),
   ...createInventorySlice(...a),
+  ...createGitFoldersSlice(...a),
   ...createSnippetsSlice(...a),
   ...createCollectionsSlice(...a),
   ...createCredentialsSlice(...a),

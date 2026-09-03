@@ -16,7 +16,8 @@ import SettingsDialog, { type SettingsTab } from './SettingsDialog'
 import MultiConnectDialog from './MultiConnectDialog'
 import { connectMenuItems } from './connectMenu'
 import { paneTitle } from '../state/connect'
-import { useT, type Translate } from '../i18n'
+import { useT } from '../i18n'
+import { ago } from '../state/syncStatus'
 import { RefreshIcon } from './icons'
 import Hint from './Hint'
 
@@ -29,18 +30,6 @@ function loadCollapsed(): Set<string> {
   } catch {
     return new Set()
   }
-}
-
-/** Outside the component, so the phrase book is handed in rather than hooked. */
-function ago(t: Translate, ts?: number): string {
-  if (!ts) return t('never synced')
-  const mins = Math.round((Date.now() - ts) / 60000)
-  if (mins < 1) return t('synced just now')
-  if (mins < 60) return t('synced {count}m ago', { count: mins })
-  const hours = Math.round(mins / 60)
-  return hours < 24
-    ? t('synced {count}h ago', { count: hours })
-    : t('synced {count}d ago', { count: Math.round(hours / 24) })
 }
 
 export default function InventoryTree({ query }: { query: string }): JSX.Element {

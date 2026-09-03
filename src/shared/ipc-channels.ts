@@ -31,6 +31,16 @@ export const IPC = {
   inventoryClearOverride: 'inventory:clearOverride',
   inventoryGitAvailable: 'inventory:gitAvailable',
 
+  /**
+   * A Sessions folder mirroring an inventory out of git: reading the repository,
+   * then taking what was agreed to in the dialog that read produced.
+   */
+  gitFolderList: 'gitFolder:list',
+  gitFolderPreview: 'gitFolder:preview',
+  gitFolderApply: 'gitFolder:apply',
+  gitFolderSaveOverride: 'gitFolder:saveOverride',
+  gitFolderClearOverride: 'gitFolder:clearOverride',
+
   // Backup
   backupExport: 'backup:export',
   backupImport: 'backup:import',
