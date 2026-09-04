@@ -69,7 +69,20 @@ function createWindow(): void {
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false,
+      /*
+       * The window draws other people's data — terminal output, file names over
+       * SFTP, an inventory out of somebody's repository — and it draws it in
+       * Chromium. Should any of that ever manage to run code inside the page,
+       * this is the difference between a compromised tab and a compromised
+       * machine: without the sandbox the preload sits next to that page with
+       * Node in hand, able to read any file and start any program.
+       *
+       * The cost is that the preload can no longer do those things either, so
+       * the two it did — reading the account name and the clipboard — are asked
+       * of the main process instead. That is the whole of what turning this on
+       * required; the bridge it exposes is otherwise unchanged.
+       */
+      sandbox: true,
       contextIsolation: true,
       nodeIntegration: false
     }
@@ -163,6 +176,44 @@ function createWindow(): void {
     })()
     if (scheme === 'http:' || scheme === 'https:') shell.openExternal(details.url)
     return { action: 'deny' }
+  })
+
+  /**
+   * The window shows this application and nothing else, ever.
+   *
+   * Every power the page has — the vault, SSH, the file system through SFTP —
+   * is reachable through the bridge by whatever is loaded in it, and the bridge
+   * cannot tell one page from another. So the page is not allowed to become
+   * another page: `setWindowOpenHandler` above already refuses to open one, and
+   * this refuses to navigate this one, which is the same door from the other
+   * side. Nothing in the interface asks to navigate — there are no anchors, and
+   * the router is the tab strip — so anything that does is not us.
+   *
+   * A webview would be a page of our own with a bridge of its own; there are
+   * none, and this makes sure a stray tag cannot introduce one.
+   */
+  const devOrigin =
+    is.dev && process.env['ELECTRON_RENDERER_URL']
+      ? new URL(process.env['ELECTRON_RENDERER_URL']).origin
+      : undefined
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    // In development the page is served over HTTP and a full reload navigates
+    // to it again; the origin is compared rather than the address, since the
+    // reload can carry a path or a query the original did not.
+    const origin = ((): string | undefined => {
+      try {
+        return new URL(url).origin
+      } catch {
+        return undefined
+      }
+    })()
+    if (devOrigin && origin === devOrigin) return
+    event.preventDefault()
+    console.error(`[security] refused to navigate the window to ${url}`)
+  })
+  mainWindow.webContents.on('will-attach-webview', (event) => {
+    event.preventDefault()
+    console.error('[security] refused to attach a webview')
   })
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {

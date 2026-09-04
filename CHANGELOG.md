@@ -6,6 +6,33 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## Unreleased
+
+### Security
+
+- **The window's preload runs sandboxed.** The interface draws other people's
+  data — terminal output, file names over SFTP, an inventory out of somebody's
+  repository — and it draws it in Chromium. Should any of that ever manage to
+  run code inside the page, the sandbox is the difference between a compromised
+  tab and a compromised machine: without it the preload sits beside that page
+  with Node in hand, able to read any file and start any program. It cost two
+  small moves — the account name and the clipboard are now asked of the main
+  process, synchronously, so no caller changed.
+
+- **The window refuses to navigate anywhere.** Opening a new window was already
+  refused; navigating this one was not, and every power the page holds — the
+  vault, SSH, the file system through SFTP — is reachable through a bridge that
+  cannot tell one page from another. Nothing in the interface navigates, so
+  anything that tries is not us. A webview is refused for the same reason.
+
+- **No stored password crosses into the window any more.** The channel that
+  answered "who does this host sign in as" returned the password along with the
+  name, from the days when the client authenticated in the window. The client
+  moved into the main process; the pane went on calling this and went on using
+  exactly one bit of the answer — whether the password was empty — so the secret
+  made the crossing for nobody. It now answers with that bit. It was the only
+  place a stored secret left the main process.
+
 ## 0.10.0
 
 ### Added

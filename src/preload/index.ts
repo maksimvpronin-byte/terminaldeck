@@ -1,5 +1,4 @@
-import { contextBridge, ipcRenderer, webUtils, clipboard } from 'electron'
-import { userInfo } from 'os'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { IPC } from '../shared/ipc-channels'
 import type {
   SessionProfile,
@@ -240,14 +239,15 @@ const api = {
     settings: (sessionId: string): Promise<RdpView> =>
       ipcRenderer.invoke(IPC.rdpSettings, sessionId),
     /**
-     * The stored login for one host, or for the account chosen in its place;
-     * the password is empty when none is saved.
+     * Whose name this host signs in as, and whether a password is saved for it.
+     * A boolean, never the password: the client authenticates in the main
+     * process, so nothing here needs the secret and nothing here is given it.
      */
-    credentials: (
+    login: (
       sessionId: string,
       credentialId?: string
-    ): Promise<{ username: string; password: string }> =>
-      ipcRenderer.invoke(IPC.rdpCredentials, sessionId, credentialId),
+    ): Promise<{ username: string; hasPassword: boolean }> =>
+      ipcRenderer.invoke(IPC.rdpLogin, sessionId, credentialId),
     /**
      * Who is logged on to a host, by host id: the query needs that host's own
      * login, which main resolves without handing it here. Never rejects; says
@@ -526,12 +526,12 @@ const api = {
    * `ssh somehost` follows. Read here so a dialog can show what will be used
    * instead of demanding that it be typed.
    */
-  localUsername: userInfo().username,
+  localUsername: ipcRenderer.sendSync(IPC.appLocalUsername) as string,
   clipboard: {
     // Electron's own clipboard rather than navigator.clipboard: the packaged app
     // is served from file://, which is not a secure context, so the web API fails.
-    read: (): string => clipboard.readText(),
-    write: (text: string): void => clipboard.writeText(text)
+    read: (): string => ipcRenderer.sendSync(IPC.clipboardRead) as string,
+    write: (text: string): void => ipcRenderer.send(IPC.clipboardWrite, text)
   },
   logs: {
     reveal: (): Promise<string> => ipcRenderer.invoke(IPC.logsReveal)

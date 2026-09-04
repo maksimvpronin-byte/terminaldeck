@@ -107,10 +107,17 @@ export const IPC = {
   sftpProgress: 'sftp:progress',
 
   /**
-   * The stored login for one host, for a client that signs in from the window.
-   * Scoped to a single session on purpose — see the handler.
+   * Who one host signs in as, and whether a password is saved for it — the
+   * answer being a boolean, not the password.
+   *
+   * It used to return the password itself, from the days when the client
+   * authenticated in the window. The client moved into the main process and
+   * authenticates there; the window kept calling this and kept using one bit of
+   * the answer, so the secret crossed the boundary for nobody. What is left is
+   * what the pane actually asks: whose name to show, and whether to ask for a
+   * password before starting.
    */
-  rdpCredentials: 'rdp:credentials',
+  rdpLogin: 'rdp:login',
   /**
    * The desktop settings for one host — size, keyboard — resolved through the
    * inheritance chain. The gateway is deliberately not among them: the window
@@ -193,6 +200,18 @@ export const IPC = {
   uiKeyboardCapture: 'ui:keyboardCapture',
   /** main -> renderer: a key main had to claim, for the session to send on. */
   uiForwardKey: 'ui:forwardKey',
+
+  /**
+   * The two things a sandboxed preload cannot do for itself.
+   *
+   * Both are answered synchronously — `sendSync` — because both are read where
+   * an answer is needed at once: the account name as the bridge is built, and
+   * the clipboard in the middle of a paste. One blocking round trip on a
+   * keystroke is cheaper than reshaping every caller around a promise.
+   */
+  appLocalUsername: 'app:localUsername',
+  clipboardRead: 'clipboard:read',
+  clipboardWrite: 'clipboard:write',
 
   // Session logs
   logsReveal: 'logs:reveal',

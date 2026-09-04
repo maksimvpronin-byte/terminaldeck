@@ -1,6 +1,6 @@
-import { app, dialog, ipcMain, shell } from 'electron'
+import { app, clipboard, dialog, ipcMain, shell } from 'electron'
 import { join } from 'path'
-import { homedir } from 'os'
+import { homedir, userInfo } from 'os'
 import { existsSync, mkdirSync } from 'fs'
 import { IPC } from '../../shared/ipc-channels'
 import { focusedWin } from './win'
@@ -8,6 +8,25 @@ import { focusedWin } from './win'
 /** Whatever belongs to the application rather than to a connection: files and folders. */
 
 export function registerAppHandlers(): void {
+  /*
+   * What the window cannot reach for itself now that its preload is sandboxed.
+   *
+   * Neither is a new power: the preload read both directly, with Node and the
+   * clipboard module in hand, which is exactly what the sandbox takes away. They
+   * are answered synchronously so no caller had to be rewritten around a
+   * promise — the account name is read once as the bridge is built, and the
+   * clipboard in the middle of a paste, where an answer is wanted at once.
+   */
+  ipcMain.on(IPC.appLocalUsername, (event) => {
+    event.returnValue = userInfo().username
+  })
+  ipcMain.on(IPC.clipboardRead, (event) => {
+    event.returnValue = clipboard.readText()
+  })
+  ipcMain.on(IPC.clipboardWrite, (_event, text: string) => {
+    clipboard.writeText(text)
+  })
+
   // --- Session logs ---
   ipcMain.handle(IPC.logsReveal, async () => {
     const dir = join(app.getPath('userData'), 'logs')

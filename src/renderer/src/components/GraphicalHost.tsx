@@ -155,19 +155,20 @@ export default function GraphicalHost({
   /**
    * Who this host logs in as, and whether it has a password saved.
    *
-   * Only whether — the password itself stays in the main process now, and the
-   * pane asks for one only when there is none to use.
+   * Only whether, and now only whether travels: the answer used to carry the
+   * password itself, of which this read one bit — its length — while the client
+   * had long since moved its authentication into the main process.
    */
   useEffect(() => {
     if (protocol !== 'rdp' || !sessionId || !host) return
     let alive = true
 
     window.td.rdp
-      .credentials(sessionId, credentialId)
+      .login(sessionId, credentialId)
       .then((stored) => {
         if (!alive) return
         setUsername(stored.username)
-        setHasStoredPassword(stored.password.length > 0)
+        setHasStoredPassword(stored.hasPassword)
         setPhase({ at: 'choosing' })
       })
       .catch((err: Error) => {

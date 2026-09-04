@@ -262,16 +262,16 @@ export function registerRdpHandlers(): void {
   })
 
   /**
-   * The login for one host, resolved through the same inheritance chain SSH
-   * uses, so a group can state it once.
+   * Who a host signs in as, and whether it has a password saved — whether, and
+   * not what.
    *
-   * This is the only place a stored secret leaves the main process, and it is
-   * deliberately narrow: it answers for one named host and returns nothing else,
-   * so the window cannot walk the vault. It exists because an RDP client
-   * authenticates where it draws — CredSSP happens in the WebAssembly module —
-   * and there is no way to do that from here without implementing CredSSP too.
+   * The pane shows the name and needs to know if it must ask for a password
+   * before it can start; those are the only two things the window ever did with
+   * the answer. The password itself has no business here: the client
+   * authenticates in this process, and a secret that crosses to the window is a
+   * secret in a place that cannot keep it.
    */
-  ipcMain.handle(IPC.rdpCredentials, (_e, sessionId: string, credentialId?: string) => {
+  ipcMain.handle(IPC.rdpLogin, (_e, sessionId: string, credentialId?: string) => {
     const found = findHost(sessionId)
     if (!found) throw new Error('Unknown session')
     if (protocolOf(found.profile) !== 'rdp') throw new Error('That host is not an RDP host')
@@ -279,9 +279,7 @@ export function registerRdpHandlers(): void {
     const auth = authFor(found.profile, found.groups, credentialId)
     return {
       username: auth.username,
-      // Empty rather than absent when nothing is stored: the window then asks,
-      // which is also the path for people who deliberately save no password.
-      password: auth.secretRef ? vault.getSecret(auth.secretRef) ?? '' : ''
+      hasPassword: Boolean(auth.secretRef && vault.getSecret(auth.secretRef))
     }
   })
 
