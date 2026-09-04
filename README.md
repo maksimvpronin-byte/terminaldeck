@@ -388,7 +388,12 @@ paths have only ever been exercised by unit tests or by hand on a local stand-in
   When a session will not start, `TERMINALDECK_RDP_TRACE=1` reports each step it took
 - **Host-to-host copying.** The planner is unit-tested, but the transfer itself — two SFTP
   channels piped together — has never run against two real servers, only been reasoned about
-- Jump host / ProxyJump, including for inventory hosts
+- Jump host / ProxyJump **for an inventory host**. A saved host through a saved bastion has now
+  been run against a real pair — a Windows workstation with no route to the far machine at all,
+  reaching it through a Linux jump host and signing in there with a key. What that run also
+  showed is worth writing down: the two machines authenticate separately, and the far one is
+  offered whatever this application holds for *it* — passing through a bastion is a tunnel, not
+  a session, exactly as `ssh -J` behaves
 - Inventory sync from a *remote* repository — only a local `file://` clone has been run, so
   authentication through SSH keys and credential helpers is untested
 - keyboard-interactive (2FA) authentication
