@@ -51,7 +51,12 @@ function computeLayout(
       rect: { left: rect.left + wa, top: rect.top, width: DIVIDER_PX, height: rect.height },
       parentRect: rect
     })
-    computeLayout(a, { left: rect.left, top: rect.top, width: wa, height: rect.height }, leaves, dividers)
+    computeLayout(
+      a,
+      { left: rect.left, top: rect.top, width: wa, height: rect.height },
+      leaves,
+      dividers
+    )
     computeLayout(
       b,
       { left: rect.left + wa + DIVIDER_PX, top: rect.top, width: wb, height: rect.height },
@@ -68,7 +73,12 @@ function computeLayout(
       rect: { left: rect.left, top: rect.top + ha, width: rect.width, height: DIVIDER_PX },
       parentRect: rect
     })
-    computeLayout(a, { left: rect.left, top: rect.top, width: rect.width, height: ha }, leaves, dividers)
+    computeLayout(
+      a,
+      { left: rect.left, top: rect.top, width: rect.width, height: ha },
+      leaves,
+      dividers
+    )
     computeLayout(
       b,
       { left: rect.left, top: rect.top + ha + DIVIDER_PX, width: rect.width, height: hb },
@@ -78,7 +88,13 @@ function computeLayout(
   }
 }
 
-export default function SplitContainer({ tabId, node }: { tabId: string; node: PaneNode }): JSX.Element {
+export default function SplitContainer({
+  tabId,
+  node
+}: {
+  tabId: string
+  node: PaneNode
+}): JSX.Element {
   const resizeSplit = useStore((s) => s.resizeSplit)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
@@ -100,7 +116,12 @@ export default function SplitContainer({ tabId, node }: { tabId: string; node: P
   const leaves: LeafLayout[] = []
   const dividers: DividerLayout[] = []
   if (size.width > 0 && size.height > 0) {
-    computeLayout(node, { left: 0, top: 0, width: size.width, height: size.height }, leaves, dividers)
+    computeLayout(
+      node,
+      { left: 0, top: 0, width: size.width, height: size.height },
+      leaves,
+      dividers
+    )
   }
 
   function onDragStart(divider: DividerLayout, e: React.MouseEvent): void {

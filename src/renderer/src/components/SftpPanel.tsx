@@ -236,7 +236,10 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
   // The host's setting decided how this connection started; ask what it is now.
   useEffect(() => {
     if (!connectionId) return
-    window.td.ssh.getFollowCwd(connectionId).then(setFollowing).catch(() => undefined)
+    window.td.ssh
+      .getFollowCwd(connectionId)
+      .then(setFollowing)
+      .catch(() => undefined)
   }, [connectionId])
 
   async function toggleFollow(): Promise<void> {
@@ -406,7 +409,11 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
       // the save dialog returned, and is checked against that name.
       await runTransfer(
         entry.isDirectory
-          ? await window.td.sftp.planDownload(connectionId, entry.path, `${localPath}/${entry.name}`)
+          ? await window.td.sftp.planDownload(
+              connectionId,
+              entry.path,
+              `${localPath}/${entry.name}`
+            )
           : await window.td.sftp.planDownload(connectionId, entry.path, localPath, true)
       )
     } catch (err) {
@@ -614,9 +621,7 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
         className="sftp-resize"
         title={t('Drag to resize the panel')}
         onMouseDown={(e) =>
-          startDrag(e, width, -1, PANEL_MIN, PANEL_MAX, setWidth, (final) =>
-            savePanelWidth(final)
-          )
+          startDrag(e, width, -1, PANEL_MIN, PANEL_MAX, setWidth, (final) => savePanelWidth(final))
         }
       />
       <div className="sftp-path" onClick={(e) => e.stopPropagation()}>
@@ -760,7 +765,11 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
                 />
               ) : (
                 <>
-                  <span className={`name kind-${kindOf(e)}`} style={col(columns.name)} title={e.name}>
+                  <span
+                    className={`name kind-${kindOf(e)}`}
+                    style={col(columns.name)}
+                    title={e.name}
+                  >
                     {e.isDirectory ? '📁' : '📄'} {e.name}
                     {editing.has(e.path) && (
                       <span

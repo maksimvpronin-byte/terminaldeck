@@ -50,10 +50,7 @@ export default function MainLayout(): JSX.Element {
     <div className="app-root">
       <UpdateBanner />
       <div className="app-shell">
-        <Sidebar
-          onOpenSnippets={() => setPaletteOpen(true)}
-          onOpenHelp={() => setHelpOpen(true)}
-        />
+        <Sidebar onOpenSnippets={() => setPaletteOpen(true)} onOpenHelp={() => setHelpOpen(true)} />
         <Workspace />
       </div>
       {paletteOpen && <SnippetPalette onClose={() => setPaletteOpen(false)} />}

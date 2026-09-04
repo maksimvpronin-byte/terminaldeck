@@ -30,7 +30,10 @@ export interface WidthDrag {
   persist: (final: number) => void
 }
 
-export function startWidthDrag(down: { clientX: number; preventDefault(): void; stopPropagation(): void }, drag: WidthDrag): void {
+export function startWidthDrag(
+  down: { clientX: number; preventDefault(): void; stopPropagation(): void },
+  drag: WidthDrag
+): void {
   down.preventDefault()
   down.stopPropagation()
 

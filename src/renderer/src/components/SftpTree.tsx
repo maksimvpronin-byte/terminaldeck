@@ -30,9 +30,7 @@ export default function SftpTree({
       setLoading((cur) => new Set(cur).add(dir))
       try {
         const list = await window.td.sftp.list(connectionId, dir)
-        const dirs = list
-          .filter((e) => e.isDirectory)
-          .sort((a, b) => a.name.localeCompare(b.name))
+        const dirs = list.filter((e) => e.isDirectory).sort((a, b) => a.name.localeCompare(b.name))
         setChildren((cur) => new Map(cur).set(dir, dirs))
         setFailed((cur) => {
           if (!cur.has(dir)) return cur

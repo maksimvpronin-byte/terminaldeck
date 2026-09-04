@@ -32,7 +32,10 @@ describe('Remote Assistance RC_CTL protocol', () => {
   })
 
   it('disconnects on an unexpected message', () => {
-    const result = nextRemoteAssistanceV2Messages('await-version-info', REMOTE_ASSISTANCE_MESSAGE_TYPES.token)
+    const result = nextRemoteAssistanceV2Messages(
+      'await-version-info',
+      REMOTE_ASSISTANCE_MESSAGE_TYPES.token
+    )
     expect(result).toEqual({ state: 'failed', send: [REMOTE_ASSISTANCE_MESSAGE_TYPES.disconnect] })
   })
 

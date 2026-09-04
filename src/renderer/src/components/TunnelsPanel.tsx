@@ -82,7 +82,9 @@ export default function TunnelsPanel({ connectionId, sessionId }: Props): JSX.El
       <div className="side-panel-list">
         {rules.length === 0 && (
           <div className="side-panel-empty">
-            {t('No forwarding rules. Rules saved on a session start automatically when it connects.')}
+            {t(
+              'No forwarding rules. Rules saved on a session start automatically when it connects.'
+            )}
           </div>
         )}
         {rules.map((r) => {
@@ -111,7 +113,9 @@ export default function TunnelsPanel({ connectionId, sessionId }: Props): JSX.El
         <div className="tunnel-draft">
           <select
             value={draft.type}
-            onChange={(e) => setDraft({ ...draft, type: e.target.value as PortForwardRule['type'] })}
+            onChange={(e) =>
+              setDraft({ ...draft, type: e.target.value as PortForwardRule['type'] })
+            }
           >
             <option value="local">{t('Local')}</option>
             <option value="remote">{t('Remote')}</option>

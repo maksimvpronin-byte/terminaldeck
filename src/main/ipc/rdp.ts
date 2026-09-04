@@ -12,11 +12,7 @@ import { splitLogin } from '../../shared/rdpLogin'
 import { qualifyUser } from '../../shared/winSessions'
 import { gitFolderStore } from '../gitFolders/GitFolderStore'
 import { inventoryStore } from '../inventory/InventoryStore'
-import {
-  type DesktopGateway,
-  type DesktopRequest,
-  freeRdpBridge
-} from '../rdp/FreeRdpBridge'
+import { type DesktopGateway, type DesktopRequest, freeRdpBridge } from '../rdp/FreeRdpBridge'
 import { type PaneRect, type ShadowRequest, shadowHostBridge } from '../rdp/ShadowHostBridge'
 import { listSessions, shadowSession } from '../rdp/WinSessions'
 import { credentialStore } from '../store/CredentialStore'
@@ -131,7 +127,7 @@ function desktopGateway(
     // "same credentials" flag rather than sending the pair twice.
     username: rdp.gatewayUsername ? login.username : undefined,
     domain: rdp.gatewayUsername ? login.domain : undefined,
-    password: rdp.gatewayUsername && secretRef ? vault.getSecret(secretRef) ?? '' : undefined,
+    password: rdp.gatewayUsername && secretRef ? (vault.getSecret(secretRef) ?? '') : undefined,
     bypassLocal: rdp.gatewayBypassLocal
   }
 }
@@ -298,9 +294,7 @@ export function registerRdpHandlers(): void {
       shadowCredentials(request.profileId, request.host, request.credentialId)
     )
   })
-  ipcMain.on(IPC.shadowPlace, (_e, id: string, rect: PaneRect) =>
-    shadowHostBridge.place(id, rect)
-  )
+  ipcMain.on(IPC.shadowPlace, (_e, id: string, rect: PaneRect) => shadowHostBridge.place(id, rect))
   ipcMain.on(IPC.shadowVisible, (_e, id: string, visible: boolean) =>
     shadowHostBridge.setVisible(id, visible)
   )
@@ -326,5 +320,4 @@ export function registerRdpHandlers(): void {
     (_e, host: string, sessionId: number, options: { control: boolean; skipPrompt: boolean }) =>
       shadowSession(host, sessionId, options)
   )
-
 }

@@ -88,22 +88,14 @@ export interface SessionsSlice {
    * Drops a session immediately before or after another one, joining that
    * session's group on the way. This is how the tree is sorted by hand.
    */
-  reorderSession: (
-    sessionId: string,
-    targetId: string,
-    place: 'before' | 'after'
-  ) => Promise<void>
+  reorderSession: (sessionId: string, targetId: string, place: 'before' | 'after') => Promise<void>
   moveGroup: (groupId: string, parentId: string | null) => Promise<void>
   /**
    * Drops a folder immediately before or after another one, joining that
    * folder's parent on the way. This is how the tree is sorted by hand, and it
    * is the same gesture hosts have always had.
    */
-  reorderGroup: (
-    groupId: string,
-    targetId: string,
-    place: 'before' | 'after'
-  ) => Promise<void>
+  reorderGroup: (groupId: string, targetId: string, place: 'before' | 'after') => Promise<void>
 }
 
 export interface InventorySlice {
@@ -221,12 +213,7 @@ export interface WorkspaceSlice {
   moveTabToWorkspace: (tabId: string, workspaceId: string) => void
 
   /** Opens a tab in the current workspace, creating one if there is none. */
-  openTab: (
-    title: string,
-    target: PaneTarget,
-    color?: string,
-    viaCollectionId?: string
-  ) => string
+  openTab: (title: string, target: PaneTarget, color?: string, viaCollectionId?: string) => string
   /** Opens several hosts at once — see OpenMode. */
   openMany: (items: OpenRequest[], mode: OpenMode, workspaceTitle?: string) => void
   closeTab: (tabId: string) => void

@@ -53,9 +53,7 @@ describe('resolveAuth', () => {
   })
 
   it('keeps an explicit false for booleans rather than inheriting true', () => {
-    const withForward: SessionGroup[] = [
-      { id: 'g', name: 'g', parentId: null, agentForward: true }
-    ]
+    const withForward: SessionGroup[] = [{ id: 'g', name: 'g', parentId: null, agentForward: true }]
     expect(resolveAuth({ agentForward: false }, 'g', withForward).agentForward).toBe(false)
     expect(resolveAuth({}, 'g', withForward).agentForward).toBe(true)
   })
@@ -175,7 +173,7 @@ describe('onConnectCommand', () => {
     expect(resolveAuth({}, 'plain', withCommands).onConnectCommand).toBe('cd /srv')
   })
 
-  it("lets a host state its own", () => {
+  it('lets a host state its own', () => {
     expect(resolveAuth({ onConnectCommand: 'tmux a' }, 'prod', withCommands).onConnectCommand).toBe(
       'tmux a'
     )

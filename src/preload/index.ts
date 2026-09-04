@@ -44,14 +44,12 @@ export type DesktopCursor =
 const api = {
   vault: {
     status: (): Promise<VaultStatus> => ipcRenderer.invoke(IPC.vaultStatus),
-    create: (password: string): Promise<VaultStatus> => ipcRenderer.invoke(IPC.vaultCreate, password),
+    create: (password: string): Promise<VaultStatus> =>
+      ipcRenderer.invoke(IPC.vaultCreate, password),
     unlock: (password: string): Promise<{ ok: boolean; error?: string; status?: VaultStatus }> =>
       ipcRenderer.invoke(IPC.vaultUnlock, password),
     lock: (): Promise<VaultStatus> => ipcRenderer.invoke(IPC.vaultLock),
-    changePassword: (
-      current: string,
-      next: string
-    ): Promise<{ ok: boolean; error?: string }> =>
+    changePassword: (current: string, next: string): Promise<{ ok: boolean; error?: string }> =>
       ipcRenderer.invoke(IPC.vaultChangePassword, current, next)
   },
   knownHosts: {
@@ -64,8 +62,7 @@ const api = {
   knownCertificates: {
     list: (): Promise<Array<{ host: string; fingerprint: string }>> =>
       ipcRenderer.invoke(IPC.knownCertificatesList),
-    remove: (host: string): Promise<void> =>
-      ipcRenderer.invoke(IPC.knownCertificatesRemove, host)
+    remove: (host: string): Promise<void> => ipcRenderer.invoke(IPC.knownCertificatesRemove, host)
   },
   store: {
     load: (): Promise<SessionStoreData> => ipcRenderer.invoke(IPC.storeLoad),
@@ -100,8 +97,7 @@ const api = {
     }> => ipcRenderer.invoke(IPC.inventoryList),
     saveSource: (source: InventorySource): Promise<InventorySource> =>
       ipcRenderer.invoke(IPC.inventorySaveSource, source),
-    removeSource: (id: string): Promise<void> =>
-      ipcRenderer.invoke(IPC.inventoryRemoveSource, id),
+    removeSource: (id: string): Promise<void> => ipcRenderer.invoke(IPC.inventoryRemoveSource, id),
     sync: (id: string): Promise<InventoryTree> => ipcRenderer.invoke(IPC.inventorySync, id),
     syncAll: (): Promise<void> => ipcRenderer.invoke(IPC.inventorySyncAll),
     saveOverride: (
@@ -323,10 +319,7 @@ const api = {
     desktopStop: (id: string): Promise<void> => ipcRenderer.invoke(IPC.desktopStop, id),
     /** Writes what the client said about itself where it can be read. */
     desktopLog: (id: string): Promise<string> => ipcRenderer.invoke(IPC.desktopLog, id),
-    onDesktopEvent: (
-      id: string,
-      cb: (p: Record<string, unknown>) => void
-    ): (() => void) => {
+    onDesktopEvent: (id: string, cb: (p: Record<string, unknown>) => void): (() => void) => {
       const channel = `${IPC.desktopEvent}:${id}`
       const listener = (_e: unknown, p: Record<string, unknown>): void => cb(p)
       ipcRenderer.on(channel, listener)
@@ -393,8 +386,7 @@ const api = {
       connectionId: string,
       remotePath: string,
       localDir: string
-    ): Promise<void> =>
-      ipcRenderer.invoke(IPC.sftpDownloadDir, connectionId, remotePath, localDir),
+    ): Promise<void> => ipcRenderer.invoke(IPC.sftpDownloadDir, connectionId, remotePath, localDir),
     uploadPath: (connectionId: string, localPath: string, remoteParent: string): Promise<void> =>
       ipcRenderer.invoke(IPC.sftpUploadPath, connectionId, localPath, remoteParent),
     planUpload: (
@@ -463,7 +455,8 @@ const api = {
   monitor: {
     start: (connectionId: string): Promise<void> =>
       ipcRenderer.invoke(IPC.monitorStart, connectionId),
-    stop: (connectionId: string): Promise<void> => ipcRenderer.invoke(IPC.monitorStop, connectionId),
+    stop: (connectionId: string): Promise<void> =>
+      ipcRenderer.invoke(IPC.monitorStop, connectionId),
     /** `null` arrives when the poll gave up, so the strip can say so. */
     onStats: (connectionId: string, cb: (stats: RemoteStats | null) => void): (() => void) => {
       const channel = `${IPC.monitorStats}:${connectionId}`
@@ -477,7 +470,8 @@ const api = {
       ipcRenderer.invoke(IPC.pfStart, connectionId, rule),
     stop: (connectionId: string, ruleId: string): Promise<void> =>
       ipcRenderer.invoke(IPC.pfStop, connectionId, ruleId),
-    status: (connectionId: string): Promise<string[]> => ipcRenderer.invoke(IPC.pfStatus, connectionId)
+    status: (connectionId: string): Promise<string[]> =>
+      ipcRenderer.invoke(IPC.pfStatus, connectionId)
   },
   updates: {
     getState: (): Promise<UpdateState> => ipcRenderer.invoke(IPC.updateGetState),
@@ -511,8 +505,7 @@ const api = {
      * The main process claims a few keys before this window sees them, so it
      * has to be told; it then hands them over rather than acting on them.
      */
-    setKeyboardCapture: (held: boolean): void =>
-      ipcRenderer.send(IPC.uiKeyboardCapture, held),
+    setKeyboardCapture: (held: boolean): void => ipcRenderer.send(IPC.uiKeyboardCapture, held),
     /** A key main had to claim, arriving as its `code`, for the session to send. */
     onForwardKey: (cb: (key: ForwardedKey) => void): (() => void) => {
       const listener = (_e: unknown, key: ForwardedKey): void => cb(key)

@@ -41,7 +41,10 @@ export interface RecordReader {
   readonly broken: boolean
 }
 
-export function createRecordReader(onRecord: OnRecord, onBroken?: (why: string) => void): RecordReader {
+export function createRecordReader(
+  onRecord: OnRecord,
+  onBroken?: (why: string) => void
+): RecordReader {
   /**
    * What has arrived and not yet been used, kept as the chunks it arrived in.
    *
@@ -179,12 +182,20 @@ export function readCursor(payload: Buffer): CursorImage | null {
  * be escaped because three are structural, and a password is exactly the field
  * most likely to contain them.
  */
-export function encodeCommand(fields: Record<string, string | number | boolean | undefined>): string {
+export function encodeCommand(
+  fields: Record<string, string | number | boolean | undefined>
+): string {
   let out = ''
   for (const [key, value] of Object.entries(fields)) {
     if (value === undefined) continue
     const text =
-      typeof value === 'boolean' ? (value ? '1' : '0') : typeof value === 'number' ? String(value) : value
+      typeof value === 'boolean'
+        ? value
+          ? '1'
+          : '0'
+        : typeof value === 'number'
+          ? String(value)
+          : value
     out += `${key}\t${text.replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/\t/g, '\\t')}\n`
   }
   return `${out}\n`

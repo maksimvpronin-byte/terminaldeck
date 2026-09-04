@@ -55,8 +55,8 @@ export default class ErrorBoundary extends Component<Props, State> {
       <div className="crash-screen">
         <h1>TerminalDeck hit an error and stopped drawing</h1>
         <p>
-          Your SSH sessions are gone with the window, but nothing on disk has been touched —
-          saved hosts, inventories and the vault are all intact.
+          Your SSH sessions are gone with the window, but nothing on disk has been touched — saved
+          hosts, inventories and the vault are all intact.
         </p>
         <pre className="crash-details">{this.report()}</pre>
         <div className="crash-actions">
@@ -71,8 +71,8 @@ export default class ErrorBoundary extends Component<Props, State> {
           If it crashes again straight away, the saved layout may be at fault. Reloading with a
           clean layout is the quickest way to find out:
           <br />
-          <code>localStorage.removeItem(&apos;terminaldeck.layout&apos;)</code> in the console
-          (View → Toggle Developer Tools), then reload.
+          <code>localStorage.removeItem(&apos;terminaldeck.layout&apos;)</code> in the console (View
+          → Toggle Developer Tools), then reload.
         </p>
       </div>
     )

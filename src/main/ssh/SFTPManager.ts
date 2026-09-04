@@ -462,9 +462,7 @@ class SFTPManager {
   ): Promise<TransferItem[]> {
     const info = await this.statPath(connectionId, remotePath)
     if (!info) return []
-    return [
-      { sourcePath: remotePath, destPath, sourceSize: info.size, sourceMtime: info.mtime }
-    ]
+    return [{ sourcePath: remotePath, destPath, sourceSize: info.size, sourceMtime: info.mtime }]
   }
 
   async planUpload(
@@ -556,9 +554,7 @@ class SFTPManager {
     destParent: string
   ): Promise<TransferPlan> {
     const source = await this.statPath(srcConnectionId, srcPath)
-    const destDir = source?.isDirectory
-      ? joinRemote(destParent, baseNameOf(srcPath))
-      : destParent
+    const destDir = source?.isDirectory ? joinRemote(destParent, baseNameOf(srcPath)) : destParent
     const items = await this.remoteTree(srcConnectionId, srcPath, destDir, joinRemote)
 
     const found = new Map<string, DestInfo | null>()

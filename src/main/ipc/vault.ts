@@ -36,7 +36,6 @@ export function registerVaultHandlers(): void {
     }
   })
 
-
   // --- Trusted host keys ---
   ipcMain.handle(IPC.knownHostsList, () =>
     Object.entries(knownHosts.all()).map(([host, fingerprint]) => ({ host, fingerprint }))
@@ -48,5 +47,4 @@ export function registerVaultHandlers(): void {
   ipcMain.handle(IPC.knownCertificatesRemove, (_e, host: string) =>
     trustedCertificates.removeByKey(host)
   )
-
 }

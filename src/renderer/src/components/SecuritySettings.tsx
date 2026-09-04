@@ -56,8 +56,7 @@ function TrustedDialog({
   const needle = query.trim().toLowerCase()
   const found = needle
     ? entries.filter(
-        (e) =>
-          e.host.toLowerCase().includes(needle) || e.fingerprint.toLowerCase().includes(needle)
+        (e) => e.host.toLowerCase().includes(needle) || e.fingerprint.toLowerCase().includes(needle)
       )
     : entries
   const shown = found.slice(0, SHOWN)

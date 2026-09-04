@@ -27,8 +27,12 @@ export function deriveKey(password: string, saltB64: string): Promise<Buffer> {
   const salt = Buffer.from(saltB64, 'base64')
   const maxmem = 128 * SCRYPT_N * SCRYPT_R * 2
   return new Promise((resolve, reject) => {
-    scrypt(password, salt, KEY_LEN, { N: SCRYPT_N, r: SCRYPT_R, p: SCRYPT_P, maxmem }, (err, key) =>
-      err ? reject(err) : resolve(key)
+    scrypt(
+      password,
+      salt,
+      KEY_LEN,
+      { N: SCRYPT_N, r: SCRYPT_R, p: SCRYPT_P, maxmem },
+      (err, key) => (err ? reject(err) : resolve(key))
     )
   })
 }

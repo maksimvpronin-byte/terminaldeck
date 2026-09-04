@@ -272,8 +272,10 @@ export function assertCryptoIsStandard(): void {
   if (ntowf.toString('hex') !== '0c868a403bfd7a93a3001ef22ef02e3f') {
     throw new Error('This build computes HMAC-MD5 incorrectly, so NTLM cannot work here')
   }
-  if (rc4(Buffer.from('0102030405', 'hex'), Buffer.alloc(16)).toString('hex') !==
-    'b2396305f03dc027ccc3524a0a1118a8') {
+  if (
+    rc4(Buffer.from('0102030405', 'hex'), Buffer.alloc(16)).toString('hex') !==
+    'b2396305f03dc027ccc3524a0a1118a8'
+  ) {
     throw new Error('This build computes RC4 incorrectly, so NTLM cannot work here')
   }
   cryptoChecked = true
@@ -416,7 +418,12 @@ export function splitIdentity(username: string, password: string, workstation: s
   }
   const at = username.indexOf('@')
   if (at >= 0) {
-    return { domain: username.slice(at + 1), username: username.slice(0, at), password, workstation }
+    return {
+      domain: username.slice(at + 1),
+      username: username.slice(0, at),
+      password,
+      workstation
+    }
   }
   return { domain: '', username, password, workstation }
 }

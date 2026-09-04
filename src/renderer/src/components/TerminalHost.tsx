@@ -332,7 +332,10 @@ export default function TerminalHost({
               }
             }}
           />
-          <button title={t('Previous (⇧⏎)')} onClick={() => searchRef.current?.findPrevious(needle)}>
+          <button
+            title={t('Previous (⇧⏎)')}
+            onClick={() => searchRef.current?.findPrevious(needle)}
+          >
             ↑
           </button>
           <button title={t('Next (⏎)')} onClick={() => searchRef.current?.findNext(needle)}>

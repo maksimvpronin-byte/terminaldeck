@@ -35,11 +35,7 @@ export interface Frame {
  * mistake for a request of its own. The mask is therefore taken from the
  * caller, which passes the platform's random source.
  */
-export function encodeFrame(
-  opcode: Opcode,
-  payload: Uint8Array,
-  mask: Uint8Array
-): Uint8Array {
+export function encodeFrame(opcode: Opcode, payload: Uint8Array, mask: Uint8Array): Uint8Array {
   if (mask.length !== 4) throw new Error('A WebSocket mask is four bytes')
 
   const length = payload.length

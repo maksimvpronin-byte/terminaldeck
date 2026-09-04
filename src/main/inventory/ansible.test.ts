@@ -6,9 +6,10 @@ const SRC = 'src1'
 
 describe('varsToAuth', () => {
   it('maps the connection vars we understand', () => {
-    expect(
-      varsToAuth({ ansible_user: 'deploy', ansible_port: 2222 })
-    ).toEqual({ username: 'deploy', port: 2222 })
+    expect(varsToAuth({ ansible_user: 'deploy', ansible_port: 2222 })).toEqual({
+      username: 'deploy',
+      port: 2222
+    })
   })
 
   it('accepts the ansible_ssh_* aliases', () => {
@@ -258,7 +259,10 @@ all:
           ansible_host: 10.0.0.1
 `)
     const { hosts, memberships } = parseAnsibleInventory(nested, SRC)
-    expect(memberships[hostId(SRC, 'solo')]).toEqual([groupId(SRC, 'all'), groupId(SRC, 'all/zone')])
+    expect(memberships[hostId(SRC, 'solo')]).toEqual([
+      groupId(SRC, 'all'),
+      groupId(SRC, 'all/zone')
+    ])
     expect(hosts.find((h) => h.name === 'solo')?.groupId).toBe(groupId(SRC, 'all/zone'))
   })
 
@@ -326,4 +330,3 @@ all:
     ).toEqual({ username: 'deploy' })
   })
 })
-

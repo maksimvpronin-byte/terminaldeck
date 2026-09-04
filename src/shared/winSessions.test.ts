@@ -70,7 +70,6 @@ describe('shadowable', () => {
   })
 })
 
-
 describe('qualifyUser', () => {
   it('points a bare name at the host, not at this machine', () => {
     // The whole point: Windows reads an unqualified name as a local account of

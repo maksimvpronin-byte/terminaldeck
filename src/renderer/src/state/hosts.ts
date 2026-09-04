@@ -33,7 +33,12 @@ export interface FoundHost {
  */
 export function inventoryGroups(state: AppState): SessionGroup[] {
   return state.inventoryTrees.flatMap((tree) =>
-    tree.groups.map((g) => applyOverride(g, state.inventoryOverrides.find((o) => o.nodeId === g.id)))
+    tree.groups.map((g) =>
+      applyOverride(
+        g,
+        state.inventoryOverrides.find((o) => o.nodeId === g.id)
+      )
+    )
   )
 }
 
@@ -46,7 +51,12 @@ export function inventoryGroups(state: AppState): SessionGroup[] {
  */
 export function gitFolderGroups(state: AppState): SessionGroup[] {
   return state.gitFolderTrees.flatMap((tree) =>
-    tree.groups.map((g) => applyOverride(g, state.gitFolderOverrides.find((o) => o.nodeId === g.id)))
+    tree.groups.map((g) =>
+      applyOverride(
+        g,
+        state.gitFolderOverrides.find((o) => o.nodeId === g.id)
+      )
+    )
   )
 }
 
@@ -63,7 +73,10 @@ export function findHost(state: AppState, id: string): FoundHost | undefined {
     const raw = tree.sessions.find((s) => s.id === id)
     if (!raw) continue
     return {
-      host: applyOverride(raw, state.inventoryOverrides.find((o) => o.nodeId === id)),
+      host: applyOverride(
+        raw,
+        state.inventoryOverrides.find((o) => o.nodeId === id)
+      ),
       groups: inventoryGroups(state),
       fromInventory: true
     }
@@ -73,7 +86,10 @@ export function findHost(state: AppState, id: string): FoundHost | undefined {
     const raw = tree.sessions.find((s) => s.id === id)
     if (!raw) continue
     return {
-      host: applyOverride(raw, state.gitFolderOverrides.find((o) => o.nodeId === id)),
+      host: applyOverride(
+        raw,
+        state.gitFolderOverrides.find((o) => o.nodeId === id)
+      ),
       // Both halves: the repository's groups, and the saved folder above them.
       groups: [...state.groups, ...gitFolderGroups(state)],
       fromInventory: true,

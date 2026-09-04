@@ -252,10 +252,7 @@ describe('running a transfer plan', () => {
     attach('conn', stubSession(calls, { '/srv/a.txt': { size: 1024 } }))
     const dest = join(localDir, 'nested', 'deeper', 'a.txt')
 
-    const result = await sftpManager.runPlan(
-      'conn',
-      plan('download', [item('/srv/a.txt', dest)])
-    )
+    const result = await sftpManager.runPlan('conn', plan('download', [item('/srv/a.txt', dest)]))
 
     expect(result).toEqual({ written: 1, skipped: 0 })
     expect(existsSync(join(localDir, 'nested', 'deeper'))).toBe(true)

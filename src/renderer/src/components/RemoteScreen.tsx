@@ -213,10 +213,7 @@ export default function RemoteScreen({
     if (!canvas || !container || !sizeRef.current.width) return
 
     const rect = container.getBoundingClientRect()
-    const fit = Math.min(
-      rect.width / sizeRef.current.width,
-      rect.height / sizeRef.current.height
-    )
+    const fit = Math.min(rect.width / sizeRef.current.width, rect.height / sizeRef.current.height)
 
     /**
      * One desktop pixel per device pixel, whenever that is what nearly fits.
@@ -424,9 +421,10 @@ export default function RemoteScreen({
         }
         idRef.current = id
         askedRef.current = size ? `${size.width}×${size.height}` : ''
-        scaleRef.current = size && look?.sendDensity
-          ? Math.min(500, Math.max(100, Math.round(size.factor * 100)))
-          : 0
+        scaleRef.current =
+          size && look?.sendDensity
+            ? Math.min(500, Math.max(100, Math.round(size.factor * 100)))
+            : 0
         onMeasuredRef.current(size ? measuredRef.current() : '')
 
         stopSubscriptions = [
@@ -468,9 +466,15 @@ export default function RemoteScreen({
                 )
               }
             } else if (what === 'failed') {
-              onPhaseRef.current({ at: 'failed', reason: String(event.detail || 'Could not connect') })
+              onPhaseRef.current({
+                at: 'failed',
+                reason: String(event.detail || 'Could not connect')
+              })
             } else if (what === 'closed' || what === 'ended') {
-              onPhaseRef.current({ at: 'closed', reason: String(event.detail || 'The session ended') })
+              onPhaseRef.current({
+                at: 'closed',
+                reason: String(event.detail || 'The session ended')
+              })
             } else if (what === 'logon') {
               // The host's own explanation, which is usually the real one.
               onPhaseRef.current({ at: 'failed', reason: String(event.detail ?? '') })
@@ -759,7 +763,9 @@ export default function RemoteScreen({
     if (!container) return
 
     const keyboard = (
-      navigator as Navigator & { keyboard?: { lock(keys?: string[]): Promise<void>; unlock(): void } }
+      navigator as Navigator & {
+        keyboard?: { lock(keys?: string[]): Promise<void>; unlock(): void }
+      }
     ).keyboard
     const target = fullscreenTarget(container)
 

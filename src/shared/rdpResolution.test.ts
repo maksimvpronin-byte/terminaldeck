@@ -82,7 +82,9 @@ describe('resolveRdp', () => {
   })
 
   it('inherits the pixel budget, and lets a host state its own', () => {
-    const capped: SessionGroup[] = [{ id: 'r', name: 'Slow link', parentId: null, pixelBudget: 1.5 }]
+    const capped: SessionGroup[] = [
+      { id: 'r', name: 'Slow link', parentId: null, pixelBudget: 1.5 }
+    ]
     expect(resolveRdp({}, 'r', capped).pixelBudget).toBe(1.5)
     expect(resolveRdp({ pixelBudget: 8 }, 'r', capped).pixelBudget).toBe(8)
     expect(resolveRdp({}, null, capped).pixelBudget).toBe(RDP_FALLBACK.pixelBudget)
@@ -97,7 +99,7 @@ describe('resolveRdp', () => {
     expect(resolveRdp({ inheritRdp: false }, 'work', groups).gatewayHost).toBeUndefined()
   })
 
-  it('stops at a group that opted out, but keeps that group\'s own values', () => {
+  it("stops at a group that opted out, but keeps that group's own values", () => {
     // 'lan' opts out, so nothing above it applies — and it names no gateway.
     expect(resolveRdp({}, 'lan', groups).gatewayHost).toBeUndefined()
   })
@@ -108,7 +110,9 @@ describe('rdpInheritedFrom', () => {
     expect(rdpInheritedFrom({}, 'desks', groups, 'gatewayHost')?.name).toBe('Work')
   })
 
-  it('says nothing when the value is the host\'s own', () => {
-    expect(rdpInheritedFrom({ gatewayHost: 'mine' }, 'desks', groups, 'gatewayHost')).toBeUndefined()
+  it("says nothing when the value is the host's own", () => {
+    expect(
+      rdpInheritedFrom({ gatewayHost: 'mine' }, 'desks', groups, 'gatewayHost')
+    ).toBeUndefined()
   })
 })

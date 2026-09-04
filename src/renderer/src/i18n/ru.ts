@@ -6,233 +6,358 @@
  * screen at a time without leaving machine names on any of them.
  */
 export const ru: Record<string, string> = {
-  "Collections": "Наборы",
-  "Workspaces": "Рабочие области",
-  "Tabs and panes": "Вкладки и панели",
-  "Terminal": "Терминал",
-  "Remote desktops": "Удалённые рабочие столы",
-  "Appearance": "Оформление",
-  "Sessions": "Сессии",
-  "Running commands everywhere": "Команды сразу везде",
-  "Files (SFTP)": "Файлы (SFTP)",
-  "Inventory from git": "Инвентарь из git",
-  "Your own sets of hosts, under the groups in the Sessions tab": "Ваши собственные наборы хостов — под группами на вкладке «Сессии»",
-  "A named set that outlives the workspace you opened them in": "Именованный набор, который переживает рабочую область, где вы их открыли",
-  "Tick hosts in either tab, then press Collect to save them as a set": "Отметьте хосты на любой вкладке и нажмите «Собрать», чтобы сохранить набор",
-  "Or right-click a workspace above and choose “Save as collection…”": "Или правый клик по рабочей области сверху и «Сохранить как набор…»",
-  "Close the workspace freely — Open brings the whole set back": "Рабочую область можно спокойно закрывать — «Открыть» вернёт весь набор",
-  "Saving under a name that already exists offers to add to it or replace it": "Сохранение под существующим именем предложит дополнить набор или заменить его",
-  "Independent of groups: one host can sit in as many collections as you like": "Не связано с группами: хост может входить в сколько угодно наборов",
-  "A collection carries a colour and a terminal theme for the hosts in it": "Набор несёт цвет и тему терминала для входящих в него хостов",
-  "A host with settings of its own keeps them; otherwise the set overrules its group": "Хост со своими настройками сохраняет их; иначе набор перебивает группу",
-  "Its look applies where you see it: under the set, or opened from it": "Оформление действует там, где вы его видите: под набором или открытым из него",
-  "So one host in two sets looks different depending on which you came through": "Поэтому один хост в двух наборах выглядит по-разному — смотря откуда вы пришли",
-  "Opened from the ordinary tree, no set applies and its groups decide": "Открытый из обычного дерева, он не относится ни к какому набору — решают группы",
-  "Being in a collection changes no credentials; those still come from the group": "Членство в наборе не меняет учётных данных — они по-прежнему от группы",
-  "A host deleted or gone from an inventory is listed as missing, not dropped": "Удалённый или исчезнувший из инвентаря хост помечается как отсутствующий, а не выбрасывается",
-  "The top strip holds workspaces; each has its own row of tabs beneath it": "Верхняя полоса — рабочие области; у каждой свой ряд вкладок под ней",
-  "“+” makes an empty one — double-click a workspace to rename it": "«+» создаёт пустую; двойной клик по области переименовывает её",
-  "Right-click a group or a repository to open everything in a new workspace": "Правый клик по группе или репозиторию открывает всё в новой рабочей области",
-  "Drag a tab onto a workspace to move it there; its terminal stays connected": "Перетащите вкладку на другую область — терминал не разорвёт соединение",
-  "Jump to that workspace": "Перейти к этой рабочей области",
-  "Closing a workspace closes every terminal in it": "Закрытие области закрывает все терминалы в ней",
-  "A dot on a workspace means new output arrived in one of its tabs": "Точка на области означает новый вывод в одной из её вкладок",
-  "Go to a host by name, across saved sessions and inventories": "Переход к хосту по имени — по сохранённым сессиям и инвентарям сразу",
-  "In that list, mark several hosts to open at once": "В этом списке можно отметить несколько хостов и открыть разом",
-  "Opens the marked hosts tiled in one tab instead of separate tabs": "Открывает отмеченные хосты плиткой в одной вкладке, а не по отдельности",
-  "Opens the marked hosts in a workspace of their own": "Открывает отмеченные хосты в отдельной рабочей области",
-  "New tab with the same host as the focused pane": "Новая вкладка с тем же хостом, что и в активной панели",
-  "Close the focused pane, or the tab when it is the last one": "Закрыть активную панель, а если она последняя — вкладку",
-  "Jump to that tab within the current workspace": "Перейти к этой вкладке в текущей рабочей области",
-  "Split the pane to the right": "Разделить панель вправо",
-  "Split the pane downwards": "Разделить панель вниз",
-  "Drag a host or a whole tab onto a pane to place them side by side": "Перетащите хост или целую вкладку на панель, чтобы поставить их рядом",
-  "The edge you drop nearest decides which half the new pane takes": "Ближайший край при отпускании решает, какую половину займёт новая панель",
-  "Use ⇱ in a pane toolbar to move it back out into its own tab": "Кнопка ⇱ на панели возвращает её в отдельную вкладку",
-  "Drag the divider between panes to resize them": "Тяните разделитель между панелями, чтобы менять их размер",
-  "A dot on a background tab means new output arrived there": "Точка на фоновой вкладке означает, что там появился новый вывод",
-  "Search the scrollback; ⏎ and ⇧⏎ step through matches": "Поиск по истории; ⏎ и ⇧⏎ переходят по совпадениям",
-  "Font size up, down, and back to default": "Размер шрифта больше, меньше и обратно к исходному",
-  "Zoom moves the global size, or the host’s own if it has one set": "Масштаб меняет общий размер — или размер хоста, если у него задан свой",
-  "Copy the selection, and paste": "Копировать выделенное и вставить",
-  "Selecting text copies it straight away; right-click pastes": "Выделение сразу копирует текст, правый клик вставляет",
-  "Both of those are switchable in Settings if you prefer a menu": "Оба поведения переключаются в настройках, если вам привычнее меню",
-  "Ctrl+Alt+Del on the far side; this machine keeps the real one": "Ctrl+Alt+Del на той стороне; настоящее сочетание остаётся этой машине",
-  "Full screen, which is the only way Alt+Tab reaches the far side": "Полный экран — единственный способ передать Alt+Tab на ту сторону",
-  "Hold Escape to leave full screen: while there, it belongs to the session": "Удерживайте Escape для выхода из полного экрана: там он принадлежит сессии",
-  "A watched session cannot take Alt+Tab even full screen — Windows draws it": "Наблюдаемая сессия не получит Alt+Tab даже в полном экране — её рисует Windows",
-  "The desktop takes the size of the pane, so dragging a split resizes it": "Рабочий стол принимает размер панели, поэтому перетаскивание разделителя меняет его",
-  "A joined session keeps its own size: Windows draws it, and will not scale it": "Присоединённая сессия сохраняет свой размер: её рисует Windows и не масштабирует",
-  "A host’s dialog holds a Desktop section: gateway, size, and the ⌘ key": "В диалоге хоста есть раздел «Рабочий стол»: шлюз, размер и клавиша ⌘",
-  "Set the gateway on the group and every RDP host in it goes through it": "Задайте шлюз на группе — и все RDP-хосты внутри пойдут через него",
-  "Fixed resolution pins the far end and scales it into the pane instead": "Фиксированное разрешение закрепляет размер на той стороне и вписывает его в панель",
-  "The size is counted in the screen’s pixels, so a desktop can be sharper than the pane": "Размер считается в пикселях экрана, поэтому стол может быть чётче самой панели",
-  "Past the pixel budget it asks for less than that rather than what was wanted": "За пределом бюджета пикселей запрашивается меньше, чем хотелось",
-  "Optional, per host: ⌘C and ⌘V then work as they do on Windows": "По желанию и для каждого хоста: ⌘C и ⌘V начинают работать как в Windows",
-  "A certificate the machine cannot verify is asked about once, then remembered": "О непроверяемом сертификате спрашивают один раз, дальше он запоминается",
-  "Settings → Security lists what was trusted by hand, and forgets it on request": "Настройки → «Безопасность» показывают доверенное вручную и позволяют забыть",
-  "Settings → Terminal holds the defaults every terminal starts from": "Настройки → «Терминал» задают значения, с которых стартует каждый терминал",
-  "A group, a repository or one host can override them under Appearance": "Группа, репозиторий или отдельный хост переопределяют их в разделе «Оформление»",
-  "Font, size, theme, cursor and scrollback each inherit or stand on their own": "Шрифт, размер, тема, курсор и история — каждое либо наследуется, либо своё",
-  "Each control names what it would inherit, and from which group": "Каждое поле сообщает, что унаследует и от какой группы",
-  "Untick \"Inherit appearance\" to ignore the groups and follow Settings instead": "Снимите «Наследовать оформление», чтобы игнорировать группы и следовать настройкам",
-  "Appearance and credentials are opted out of separately": "Оформление и учётные данные отключаются от наследования независимо",
-  "A host theme recolours its terminal only — the app keeps the Settings theme": "Тема хоста перекрашивает только его терминал — приложение сохраняет свою",
-  "Double-click a host to connect; a single click only selects it": "Двойной клик по хосту подключается; одиночный только выделяет",
-  "Right-click for connect, split, duplicate, edit and delete": "Правый клик — подключить, разделить, дублировать, изменить и удалить",
-  "Deleting lives in that menu alone, behind a prompt — no button to misclick": "Удаление живёт только в этом меню и с подтверждением — по кнопке не промахнуться",
-  "Tick a host as well, to open several at once": "Отметьте ещё хост, чтобы открыть несколько сразу",
-  "Tick everything between the last click and this one": "Отметить всё между прошлым кликом и этим",
-  "A bar appears with Open, for separate tabs, and Tile, for one tab": "Появляется полоса с «Открыть» — по вкладкам, и «Плиткой» — в одной вкладке",
-  "The selection spans both tabs, so saved and inventory hosts mix freely": "Выделение общее для обеих вкладок, сохранённые и инвентарные хосты смешиваются",
-  "Drag hosts and groups between groups, or onto empty space for the top level": "Перетаскивайте хосты и группы между группами или на пустое место — в верхний уровень",
-  "Drop a host onto the top or bottom edge of another to sort the list by hand": "Бросьте хост на верхний или нижний край другого, чтобы упорядочить список вручную",
-  "A line shows the gap it will land in; the order is kept between launches": "Линия показывает промежуток, куда он попадёт; порядок сохраняется между запусками",
-  "A group holds a shared login, key and port — hosts inside inherit them": "Группа хранит общий логин, ключ и порт — хосты внутри их наследуют",
-  "A blank field means inherit; untick \"Inherit\" on a host to stand alone": "Пустое поле означает наследование; снимите «Наследовать» на хосте, чтобы он стоял сам",
-  "“On connect” types commands into the shell as soon as it opens": "«При подключении» вводит команды в оболочку сразу после её открытия",
-  "It inherits too, so a whole group can start with sudo -i": "Это тоже наследуется, поэтому вся группа может начинать с sudo -i",
-  "Colour a host or group to tell production apart at a glance": "Пометьте хост или группу цветом, чтобы отличать продакшн с одного взгляда",
-  "A green dot marks a host that already has a terminal open": "Зелёная точка отмечает хост, у которого уже открыт терминал",
-  "Settings → Backup moves everything to another machine, credentials optional": "Настройки → «Резервная копия» переносят всё на другую машину, пароли по желанию",
-  "Snippet palette: ⏎ runs, ⇧⏎ drops it on the prompt unrun": "Палитра сниппетов: ⏎ выполняет, ⇧⏎ кладёт в строку не запуская",
-  "Broadcast mirrors your typing into every terminal you tick": "Трансляция повторяет ваш ввод во всех отмеченных терминалах",
-  "The palette states where a command will land before you send it": "Палитра сообщает, куда попадёт команда, ещё до отправки",
-  "Open the SFTP panel from a pane toolbar": "Откройте панель SFTP с панели инструментов",
-  "The path box takes a typed path; ⏎ goes there, esc puts it back": "В строку пути можно вписать путь; ⏎ переходит, esc возвращает как было",
-  "~ and .. are resolved by the server, so they behave as in the shell": "~ и .. разрешает сервер, поэтому они ведут себя как в оболочке",
-  "Typing the path of a file opens its folder and selects it": "Путь к файлу открывает его папку и выделяет сам файл",
-  "Click a breadcrumb to jump, or ↑ to go up a level": "Клик по элементу пути переходит туда, ↑ поднимает на уровень выше",
-  "The ⇉ button in the path bar makes the panel follow the terminal’s cd": "Кнопка ⇉ в строке пути заставляет панель следовать за cd в терминале",
-  "It works on the live connection, so it takes effect at once, either way": "Работает на живом соединении, поэтому включается и выключается сразу",
-  "Turning it on types one setup line into the shell, hidden from the screen": "При включении в оболочку вводится одна настроечная строка, скрытая от экрана",
-  "The host or group setting only decides how a new connection starts": "Настройка хоста или группы решает только то, как начнётся новое соединение",
-  "Toggle one file, or extend the selection to a range": "Переключить один файл или растянуть выделение до диапазона",
-  "Double-click opens a folder or downloads a file": "Двойной клик открывает папку или скачивает файл",
-  "Right-click to download, rename, delete, or make a folder": "Правый клик — скачать, переименовать, удалить или создать папку",
-  "\"Edit locally\" opens a file in your editor and uploads it on every save": "«Править локально» открывает файл в вашем редакторе и загружает при каждом сохранении",
-  "Pick that editor in Settings → Files; otherwise the system default is used": "Редактор выбирается в «Настройки → Файлы», иначе берётся системный",
-  "Drag files or folders in from Finder to upload them": "Перетащите файлы или папки из Finder, чтобы загрузить их",
-  "Anything that would overwrite is listed first, both ways, and asked about": "Всё, что будет перезаписано, сначала показывают — в обе стороны — и спрашивают",
-  "Every clash starts on Skip; nothing is remembered between transfers": "Каждое совпадение начинается с «Пропустить»; между передачами ничего не запоминается",
-  "A folder where a file must go is refused rather than replaced": "Папка на месте файла вызывает отказ, а не замену",
-  "Compare in a clash shows the diff before you decide to replace it": "«Сравнить» в конфликте показывает различия до решения о замене",
-  "Right-click a remote file to compare it against any local one": "Правый клик по удалённому файлу сравнивает его с любым локальным",
-  "Binary files and anything past 2 MB are not diffed, and say so": "Двоичные файлы и всё больше 2 МБ не сравниваются и сообщают об этом",
-  "The listing re-reads itself every few seconds, so changes made in the shell show up": "Список перечитывается каждые несколько секунд, поэтому изменения из оболочки видны",
-  "Add a repository holding an Ansible inventory to get its hosts here": "Добавьте репозиторий с инвентарём Ansible, чтобы его хосты появились здесь",
-  "Cloned read-only through your own git, so your keys and helpers are used": "Клонируется только на чтение вашим же git, поэтому работают ваши ключи и помощники",
-  "Ansible groups, group_vars and host_vars become groups and connection settings": "Группы Ansible, group_vars и host_vars становятся группами и настройками подключения",
-  "A host in several groups is shown under each, marked ×2 — it is one host": "Хост в нескольких группах показан под каждой с пометкой ×2 — это один хост",
-  "Its settings come from one of them: the deepest, alphabetically last": "Настройки берутся из одной: самой глубокой и последней по алфавиту",
-  "Credentials set on the repository are inherited by every host in it": "Учётные данные репозитория наследует каждый его хост",
-  "A source follows one branch — empty means the default, usually main": "Источник следует одной ветке — пусто означает ветку по умолчанию, обычно main",
-  "The line under a repository states the branch, revision and what was read": "Строка под репозиторием сообщает ветку, ревизию и что именно было прочитано",
-  "Work on another branch will not appear until you name it or merge it": "Работа в другой ветке не появится, пока вы её не укажете или не вольёте",
-  "Local tweaks to a host survive the next sync": "Локальные правки хоста переживают следующую синхронизацию",
-  "Settings": "Настройки",
-  "Language": "Язык",
-  "Applies at once, and to this window only — nothing is sent anywhere.": "Применяется сразу и только к этому окну — никуда ничего не отправляется.",
-  "Files": "Файлы",
-  "Security": "Безопасность",
-  "Backup": "Резервная копия",
-  "External editor": "Внешний редактор",
-  "Used by “Edit locally” in the SFTP panel. Leave empty to hand the file to whatever the system opens it with — on Windows that is often Notepad, or nothing at all.": "Используется пунктом «Править локально» в панели SFTP. Оставьте пустым, чтобы файл открывался тем, чем его открывает система — в Windows это часто «Блокнот», а иногда ничто.",
-  "Command": "Команда",
-  "Browse…": "Обзор…",
-  "is replaced by the path; without it the path is appended. Give the full path to the program — a windowed app does not inherit the PATH from your shell, so a bare code or subl may not be found.": "заменяется на путь; без него путь дописывается в конец. Указывайте полный путь к программе — оконное приложение не наследует PATH из вашей оболочки, поэтому просто code или subl может не найтись.",
-  "The defaults every terminal starts from. A group or a single host can override any of this in its own dialog, under Appearance.": "Значения, с которых стартует каждый терминал. Группа или отдельный хост может переопределить любое из них в своём диалоге, в разделе «Оформление».",
-  "Font": "Шрифт",
-  "Font size": "Размер шрифта",
-  "Smaller (⌘−)": "Меньше (⌘−)",
-  "Larger (⌘+)": "Больше (⌘+)",
-  "Scrollback (lines)": "История (строк)",
-  "Colour theme": "Цветовая тема",
-  "Cursor style": "Вид курсора",
-  "Block": "Прямоугольник",
-  "Underline": "Подчёркивание",
-  "Bar": "Полоса",
-  "Blinking cursor": "Мигающий курсор",
-  "Copy to clipboard as soon as text is selected": "Копировать в буфер сразу при выделении текста",
-  "Right-click in a terminal": "Правый клик в терминале",
-  "Paste clipboard": "Вставить из буфера",
-  "Open context menu": "Открыть контекстное меню",
-  "Reset to defaults": "Сбросить к исходным",
-  "Done": "Готово",
-  "Shortcuts and features": "Сочетания клавиш и возможности",
-  "On Windows and Linux read ⌘ as Ctrl.": "В Windows и Linux читайте ⌘ как Ctrl.",
-  "Connect": "Подключиться",
-  "Reconnect": "Переподключиться",
-  "Connect in split": "Подключиться в разделении",
-  "Duplicate": "Дублировать",
-  "Delete…": "Удалить…",
-  "Delete group…": "Удалить группу…",
-  "Edit group…": "Изменить группу…",
-  "New subgroup…": "Новая подгруппа…",
-  "New session here": "Новая сессия здесь",
-  "New collection…": "Новый набор…",
-  "Filter hosts…": "Фильтр хостов…",
-  "Filter inventory…": "Фильтр инвентаря…",
-  "Lock vault (⌘L)": "Заблокировать хранилище (⌘L)",
-  "Shortcuts and features (⌘/)": "Сочетания клавиш и возможности (⌘/)",
-  "Snippets (⌘K)": "Сниппеты (⌘K)",
-  "A new workspace with a tab per host": "Новая рабочая область, по вкладке на хост",
-  "All tiled in one tab": "Всё плиткой в одной вкладке",
-  "Clear": "Очистить",
-  "Connected": "Подключено",
-  "Does not inherit settings from its group": "Не наследует настройки группы",
-  "Double-click to connect · drag to sort or to move between groups": "Двойной клик — подключиться · перетаскивание — порядок или перенос между группами",
-  "Each in its own tab, in the current workspace": "Каждый в своей вкладке, в текущей рабочей области",
-  "Import from ~/.ssh/config": "Импорт из ~/.ssh/config",
-  "New subgroup": "Новая подгруппа",
-  "Save these hosts as a collection you can reopen later": "Сохранить эти хосты набором, чтобы открыть их позже",
-  "Close pane (⌘W)": "Закрыть панель (⌘W)",
-  "Split down (⌘⇧D)": "Разделить вниз (⌘⇧D)",
-  "Split right (⌘D)": "Разделить вправо (⌘D)",
-  "A Retina desktop is drawn the usual size by asking for fewer, larger pixels": "На Retina стол обычного размера получается из меньшего числа крупных пикселей",
-  "How much larger is per host; nothing about the far machine is changed": "Насколько крупнее — задаётся на хосте; на дальней машине ничего не меняется",
-  "Or tell the session the density and it draws itself larger, sharply": "Или сообщите сессии плотность — она нарисует себя крупнее и резко",
-  "Full screen (F11) — hold Escape to leave": "Полный экран (F11) — удерживайте Escape для выхода",
-  "Include this terminal in broadcast": "Включить этот терминал в трансляцию",
-  "Move this pane to its own tab": "Вынести панель в отдельную вкладку",
-  "Toggle SFTP browser": "Показать или скрыть файловый браузер",
-  "Toggle port forwarding": "Показать или скрыть проброс портов",
-  "Toggle remote monitoring": "Показать или скрыть мониторинг",
-  "Close workspace": "Закрыть рабочую область",
-  "Rename…": "Переименовать…",
-  "Save as collection…": "Сохранить как набор…",
-  "Select a session on the left, or quick-connect above.": "Выберите сессию слева или подключитесь быстро сверху.",
-  "All": "Все",
-  "None": "Нет",
-  "Close this workspace and everything in it": "Закрыть эту рабочую область и всё в ней",
-  "Double-click to rename; right-click to save it; drop a tab here to move it": "Двойной клик — переименовать, правый — сохранить, бросьте вкладку сюда, чтобы перенести",
-  "Drag onto a pane to view side by side, or onto a workspace to move it": "Перетащите на панель, чтобы поставить рядом, или на область, чтобы перенести",
-  "Mirror typing to every open pane, in every workspace": "Повторять ввод во всех открытых панелях, во всех рабочих областях",
-  "New output in this workspace": "Новый вывод в этой рабочей области",
-  "New output since you last looked": "Новый вывод с момента, когда вы смотрели",
-  "New workspace": "Новая рабочая область",
-  "Inventory": "Инвентарь",
-  "Quick connect…": "Быстрое подключение…",
-  "Snippets": "Сниппеты",
-  "Broadcast": "Трансляция",
-  "A gateway says where a machine lives rather than who you are on it, so it is usually stated once on a group and left blank below. Blank reaches the host directly.": "Шлюз говорит, где машина живёт, а не кто вы на ней, поэтому его обычно задают один раз на группе, а ниже оставляют пустым. Пусто — подключение к хосту напрямую.",
-  "RD Gateway": "Шлюз RD",
-  "none — connect directly": "нет — подключаться напрямую",
-  "Port": "Порт",
-  "Gateway username": "Логин для шлюза",
-  "Gateway password": "Пароль для шлюза",
-  "the host's own login": "собственный логин хоста",
-  "(saved here)": "(сохранён здесь)",
-  "(blank uses the host's own)": "(пусто — берётся логин хоста)",
-  "On save the gateway password stored here is forgotten.": "При сохранении хранящийся здесь пароль шлюза будет забыт.",
-  "A gateway password is stored here, and the nearest value wins.": "Здесь хранится пароль шлюза, а побеждает ближайшее значение.",
-  "Keep it": "Оставить",
-  "Forget it": "Забыть",
-  "Reach private addresses directly, without the gateway": "К приватным адресам обращаться напрямую, минуя шлюз",
-  "Resolution": "Разрешение",
+  Collections: 'Наборы',
+  Workspaces: 'Рабочие области',
+  'Tabs and panes': 'Вкладки и панели',
+  Terminal: 'Терминал',
+  'Remote desktops': 'Удалённые рабочие столы',
+  Appearance: 'Оформление',
+  Sessions: 'Сессии',
+  'Running commands everywhere': 'Команды сразу везде',
+  'Files (SFTP)': 'Файлы (SFTP)',
+  'Inventory from git': 'Инвентарь из git',
+  'Your own sets of hosts, under the groups in the Sessions tab':
+    'Ваши собственные наборы хостов — под группами на вкладке «Сессии»',
+  'A named set that outlives the workspace you opened them in':
+    'Именованный набор, который переживает рабочую область, где вы их открыли',
+  'Tick hosts in either tab, then press Collect to save them as a set':
+    'Отметьте хосты на любой вкладке и нажмите «Собрать», чтобы сохранить набор',
+  'Or right-click a workspace above and choose “Save as collection…”':
+    'Или правый клик по рабочей области сверху и «Сохранить как набор…»',
+  'Close the workspace freely — Open brings the whole set back':
+    'Рабочую область можно спокойно закрывать — «Открыть» вернёт весь набор',
+  'Saving under a name that already exists offers to add to it or replace it':
+    'Сохранение под существующим именем предложит дополнить набор или заменить его',
+  'Independent of groups: one host can sit in as many collections as you like':
+    'Не связано с группами: хост может входить в сколько угодно наборов',
+  'A collection carries a colour and a terminal theme for the hosts in it':
+    'Набор несёт цвет и тему терминала для входящих в него хостов',
+  'A host with settings of its own keeps them; otherwise the set overrules its group':
+    'Хост со своими настройками сохраняет их; иначе набор перебивает группу',
+  'Its look applies where you see it: under the set, or opened from it':
+    'Оформление действует там, где вы его видите: под набором или открытым из него',
+  'So one host in two sets looks different depending on which you came through':
+    'Поэтому один хост в двух наборах выглядит по-разному — смотря откуда вы пришли',
+  'Opened from the ordinary tree, no set applies and its groups decide':
+    'Открытый из обычного дерева, он не относится ни к какому набору — решают группы',
+  'Being in a collection changes no credentials; those still come from the group':
+    'Членство в наборе не меняет учётных данных — они по-прежнему от группы',
+  'A host deleted or gone from an inventory is listed as missing, not dropped':
+    'Удалённый или исчезнувший из инвентаря хост помечается как отсутствующий, а не выбрасывается',
+  'The top strip holds workspaces; each has its own row of tabs beneath it':
+    'Верхняя полоса — рабочие области; у каждой свой ряд вкладок под ней',
+  '“+” makes an empty one — double-click a workspace to rename it':
+    '«+» создаёт пустую; двойной клик по области переименовывает её',
+  'Right-click a group or a repository to open everything in a new workspace':
+    'Правый клик по группе или репозиторию открывает всё в новой рабочей области',
+  'Drag a tab onto a workspace to move it there; its terminal stays connected':
+    'Перетащите вкладку на другую область — терминал не разорвёт соединение',
+  'Jump to that workspace': 'Перейти к этой рабочей области',
+  'Closing a workspace closes every terminal in it':
+    'Закрытие области закрывает все терминалы в ней',
+  'A dot on a workspace means new output arrived in one of its tabs':
+    'Точка на области означает новый вывод в одной из её вкладок',
+  'Go to a host by name, across saved sessions and inventories':
+    'Переход к хосту по имени — по сохранённым сессиям и инвентарям сразу',
+  'In that list, mark several hosts to open at once':
+    'В этом списке можно отметить несколько хостов и открыть разом',
+  'Opens the marked hosts tiled in one tab instead of separate tabs':
+    'Открывает отмеченные хосты плиткой в одной вкладке, а не по отдельности',
+  'Opens the marked hosts in a workspace of their own':
+    'Открывает отмеченные хосты в отдельной рабочей области',
+  'New tab with the same host as the focused pane':
+    'Новая вкладка с тем же хостом, что и в активной панели',
+  'Close the focused pane, or the tab when it is the last one':
+    'Закрыть активную панель, а если она последняя — вкладку',
+  'Jump to that tab within the current workspace':
+    'Перейти к этой вкладке в текущей рабочей области',
+  'Split the pane to the right': 'Разделить панель вправо',
+  'Split the pane downwards': 'Разделить панель вниз',
+  'Drag a host or a whole tab onto a pane to place them side by side':
+    'Перетащите хост или целую вкладку на панель, чтобы поставить их рядом',
+  'The edge you drop nearest decides which half the new pane takes':
+    'Ближайший край при отпускании решает, какую половину займёт новая панель',
+  'Use ⇱ in a pane toolbar to move it back out into its own tab':
+    'Кнопка ⇱ на панели возвращает её в отдельную вкладку',
+  'Drag the divider between panes to resize them':
+    'Тяните разделитель между панелями, чтобы менять их размер',
+  'A dot on a background tab means new output arrived there':
+    'Точка на фоновой вкладке означает, что там появился новый вывод',
+  'Search the scrollback; ⏎ and ⇧⏎ step through matches':
+    'Поиск по истории; ⏎ и ⇧⏎ переходят по совпадениям',
+  'Font size up, down, and back to default': 'Размер шрифта больше, меньше и обратно к исходному',
+  'Zoom moves the global size, or the host’s own if it has one set':
+    'Масштаб меняет общий размер — или размер хоста, если у него задан свой',
+  'Copy the selection, and paste': 'Копировать выделенное и вставить',
+  'Selecting text copies it straight away; right-click pastes':
+    'Выделение сразу копирует текст, правый клик вставляет',
+  'Both of those are switchable in Settings if you prefer a menu':
+    'Оба поведения переключаются в настройках, если вам привычнее меню',
+  'Ctrl+Alt+Del on the far side; this machine keeps the real one':
+    'Ctrl+Alt+Del на той стороне; настоящее сочетание остаётся этой машине',
+  'Full screen, which is the only way Alt+Tab reaches the far side':
+    'Полный экран — единственный способ передать Alt+Tab на ту сторону',
+  'Hold Escape to leave full screen: while there, it belongs to the session':
+    'Удерживайте Escape для выхода из полного экрана: там он принадлежит сессии',
+  'A watched session cannot take Alt+Tab even full screen — Windows draws it':
+    'Наблюдаемая сессия не получит Alt+Tab даже в полном экране — её рисует Windows',
+  'The desktop takes the size of the pane, so dragging a split resizes it':
+    'Рабочий стол принимает размер панели, поэтому перетаскивание разделителя меняет его',
+  'A joined session keeps its own size: Windows draws it, and will not scale it':
+    'Присоединённая сессия сохраняет свой размер: её рисует Windows и не масштабирует',
+  'A host’s dialog holds a Desktop section: gateway, size, and the ⌘ key':
+    'В диалоге хоста есть раздел «Рабочий стол»: шлюз, размер и клавиша ⌘',
+  'Set the gateway on the group and every RDP host in it goes through it':
+    'Задайте шлюз на группе — и все RDP-хосты внутри пойдут через него',
+  'Fixed resolution pins the far end and scales it into the pane instead':
+    'Фиксированное разрешение закрепляет размер на той стороне и вписывает его в панель',
+  'The size is counted in the screen’s pixels, so a desktop can be sharper than the pane':
+    'Размер считается в пикселях экрана, поэтому стол может быть чётче самой панели',
+  'Past the pixel budget it asks for less than that rather than what was wanted':
+    'За пределом бюджета пикселей запрашивается меньше, чем хотелось',
+  'Optional, per host: ⌘C and ⌘V then work as they do on Windows':
+    'По желанию и для каждого хоста: ⌘C и ⌘V начинают работать как в Windows',
+  'A certificate the machine cannot verify is asked about once, then remembered':
+    'О непроверяемом сертификате спрашивают один раз, дальше он запоминается',
+  'Settings → Security lists what was trusted by hand, and forgets it on request':
+    'Настройки → «Безопасность» показывают доверенное вручную и позволяют забыть',
+  'Settings → Terminal holds the defaults every terminal starts from':
+    'Настройки → «Терминал» задают значения, с которых стартует каждый терминал',
+  'A group, a repository or one host can override them under Appearance':
+    'Группа, репозиторий или отдельный хост переопределяют их в разделе «Оформление»',
+  'Font, size, theme, cursor and scrollback each inherit or stand on their own':
+    'Шрифт, размер, тема, курсор и история — каждое либо наследуется, либо своё',
+  'Each control names what it would inherit, and from which group':
+    'Каждое поле сообщает, что унаследует и от какой группы',
+  'Untick "Inherit appearance" to ignore the groups and follow Settings instead':
+    'Снимите «Наследовать оформление», чтобы игнорировать группы и следовать настройкам',
+  'Appearance and credentials are opted out of separately':
+    'Оформление и учётные данные отключаются от наследования независимо',
+  'A host theme recolours its terminal only — the app keeps the Settings theme':
+    'Тема хоста перекрашивает только его терминал — приложение сохраняет свою',
+  'Double-click a host to connect; a single click only selects it':
+    'Двойной клик по хосту подключается; одиночный только выделяет',
+  'Right-click for connect, split, duplicate, edit and delete':
+    'Правый клик — подключить, разделить, дублировать, изменить и удалить',
+  'Deleting lives in that menu alone, behind a prompt — no button to misclick':
+    'Удаление живёт только в этом меню и с подтверждением — по кнопке не промахнуться',
+  'Tick a host as well, to open several at once':
+    'Отметьте ещё хост, чтобы открыть несколько сразу',
+  'Tick everything between the last click and this one': 'Отметить всё между прошлым кликом и этим',
+  'A bar appears with Open, for separate tabs, and Tile, for one tab':
+    'Появляется полоса с «Открыть» — по вкладкам, и «Плиткой» — в одной вкладке',
+  'The selection spans both tabs, so saved and inventory hosts mix freely':
+    'Выделение общее для обеих вкладок, сохранённые и инвентарные хосты смешиваются',
+  'Drag hosts and groups between groups, or onto empty space for the top level':
+    'Перетаскивайте хосты и группы между группами или на пустое место — в верхний уровень',
+  'Drop a host onto the top or bottom edge of another to sort the list by hand':
+    'Бросьте хост на верхний или нижний край другого, чтобы упорядочить список вручную',
+  'A line shows the gap it will land in; the order is kept between launches':
+    'Линия показывает промежуток, куда он попадёт; порядок сохраняется между запусками',
+  'A group holds a shared login, key and port — hosts inside inherit them':
+    'Группа хранит общий логин, ключ и порт — хосты внутри их наследуют',
+  'A blank field means inherit; untick "Inherit" on a host to stand alone':
+    'Пустое поле означает наследование; снимите «Наследовать» на хосте, чтобы он стоял сам',
+  '“On connect” types commands into the shell as soon as it opens':
+    '«При подключении» вводит команды в оболочку сразу после её открытия',
+  'It inherits too, so a whole group can start with sudo -i':
+    'Это тоже наследуется, поэтому вся группа может начинать с sudo -i',
+  'Colour a host or group to tell production apart at a glance':
+    'Пометьте хост или группу цветом, чтобы отличать продакшн с одного взгляда',
+  'A green dot marks a host that already has a terminal open':
+    'Зелёная точка отмечает хост, у которого уже открыт терминал',
+  'Settings → Backup moves everything to another machine, credentials optional':
+    'Настройки → «Резервная копия» переносят всё на другую машину, пароли по желанию',
+  'Snippet palette: ⏎ runs, ⇧⏎ drops it on the prompt unrun':
+    'Палитра сниппетов: ⏎ выполняет, ⇧⏎ кладёт в строку не запуская',
+  'Broadcast mirrors your typing into every terminal you tick':
+    'Трансляция повторяет ваш ввод во всех отмеченных терминалах',
+  'The palette states where a command will land before you send it':
+    'Палитра сообщает, куда попадёт команда, ещё до отправки',
+  'Open the SFTP panel from a pane toolbar': 'Откройте панель SFTP с панели инструментов',
+  'The path box takes a typed path; ⏎ goes there, esc puts it back':
+    'В строку пути можно вписать путь; ⏎ переходит, esc возвращает как было',
+  '~ and .. are resolved by the server, so they behave as in the shell':
+    '~ и .. разрешает сервер, поэтому они ведут себя как в оболочке',
+  'Typing the path of a file opens its folder and selects it':
+    'Путь к файлу открывает его папку и выделяет сам файл',
+  'Click a breadcrumb to jump, or ↑ to go up a level':
+    'Клик по элементу пути переходит туда, ↑ поднимает на уровень выше',
+  'The ⇉ button in the path bar makes the panel follow the terminal’s cd':
+    'Кнопка ⇉ в строке пути заставляет панель следовать за cd в терминале',
+  'It works on the live connection, so it takes effect at once, either way':
+    'Работает на живом соединении, поэтому включается и выключается сразу',
+  'Turning it on types one setup line into the shell, hidden from the screen':
+    'При включении в оболочку вводится одна настроечная строка, скрытая от экрана',
+  'The host or group setting only decides how a new connection starts':
+    'Настройка хоста или группы решает только то, как начнётся новое соединение',
+  'Toggle one file, or extend the selection to a range':
+    'Переключить один файл или растянуть выделение до диапазона',
+  'Double-click opens a folder or downloads a file':
+    'Двойной клик открывает папку или скачивает файл',
+  'Right-click to download, rename, delete, or make a folder':
+    'Правый клик — скачать, переименовать, удалить или создать папку',
+  '"Edit locally" opens a file in your editor and uploads it on every save':
+    '«Править локально» открывает файл в вашем редакторе и загружает при каждом сохранении',
+  'Pick that editor in Settings → Files; otherwise the system default is used':
+    'Редактор выбирается в «Настройки → Файлы», иначе берётся системный',
+  'Drag files or folders in from Finder to upload them':
+    'Перетащите файлы или папки из Finder, чтобы загрузить их',
+  'Anything that would overwrite is listed first, both ways, and asked about':
+    'Всё, что будет перезаписано, сначала показывают — в обе стороны — и спрашивают',
+  'Every clash starts on Skip; nothing is remembered between transfers':
+    'Каждое совпадение начинается с «Пропустить»; между передачами ничего не запоминается',
+  'A folder where a file must go is refused rather than replaced':
+    'Папка на месте файла вызывает отказ, а не замену',
+  'Compare in a clash shows the diff before you decide to replace it':
+    '«Сравнить» в конфликте показывает различия до решения о замене',
+  'Right-click a remote file to compare it against any local one':
+    'Правый клик по удалённому файлу сравнивает его с любым локальным',
+  'Binary files and anything past 2 MB are not diffed, and say so':
+    'Двоичные файлы и всё больше 2 МБ не сравниваются и сообщают об этом',
+  'The listing re-reads itself every few seconds, so changes made in the shell show up':
+    'Список перечитывается каждые несколько секунд, поэтому изменения из оболочки видны',
+  'Add a repository holding an Ansible inventory to get its hosts here':
+    'Добавьте репозиторий с инвентарём Ansible, чтобы его хосты появились здесь',
+  'Cloned read-only through your own git, so your keys and helpers are used':
+    'Клонируется только на чтение вашим же git, поэтому работают ваши ключи и помощники',
+  'Ansible groups, group_vars and host_vars become groups and connection settings':
+    'Группы Ansible, group_vars и host_vars становятся группами и настройками подключения',
+  'A host in several groups is shown under each, marked ×2 — it is one host':
+    'Хост в нескольких группах показан под каждой с пометкой ×2 — это один хост',
+  'Its settings come from one of them: the deepest, alphabetically last':
+    'Настройки берутся из одной: самой глубокой и последней по алфавиту',
+  'Credentials set on the repository are inherited by every host in it':
+    'Учётные данные репозитория наследует каждый его хост',
+  'A source follows one branch — empty means the default, usually main':
+    'Источник следует одной ветке — пусто означает ветку по умолчанию, обычно main',
+  'The line under a repository states the branch, revision and what was read':
+    'Строка под репозиторием сообщает ветку, ревизию и что именно было прочитано',
+  'Work on another branch will not appear until you name it or merge it':
+    'Работа в другой ветке не появится, пока вы её не укажете или не вольёте',
+  'Local tweaks to a host survive the next sync':
+    'Локальные правки хоста переживают следующую синхронизацию',
+  Settings: 'Настройки',
+  Language: 'Язык',
+  'Applies at once, and to this window only — nothing is sent anywhere.':
+    'Применяется сразу и только к этому окну — никуда ничего не отправляется.',
+  Files: 'Файлы',
+  Security: 'Безопасность',
+  Backup: 'Резервная копия',
+  'External editor': 'Внешний редактор',
+  'Used by “Edit locally” in the SFTP panel. Leave empty to hand the file to whatever the system opens it with — on Windows that is often Notepad, or nothing at all.':
+    'Используется пунктом «Править локально» в панели SFTP. Оставьте пустым, чтобы файл открывался тем, чем его открывает система — в Windows это часто «Блокнот», а иногда ничто.',
+  Command: 'Команда',
+  'Browse…': 'Обзор…',
+  'is replaced by the path; without it the path is appended. Give the full path to the program — a windowed app does not inherit the PATH from your shell, so a bare code or subl may not be found.':
+    'заменяется на путь; без него путь дописывается в конец. Указывайте полный путь к программе — оконное приложение не наследует PATH из вашей оболочки, поэтому просто code или subl может не найтись.',
+  'The defaults every terminal starts from. A group or a single host can override any of this in its own dialog, under Appearance.':
+    'Значения, с которых стартует каждый терминал. Группа или отдельный хост может переопределить любое из них в своём диалоге, в разделе «Оформление».',
+  Font: 'Шрифт',
+  'Font size': 'Размер шрифта',
+  'Smaller (⌘−)': 'Меньше (⌘−)',
+  'Larger (⌘+)': 'Больше (⌘+)',
+  'Scrollback (lines)': 'История (строк)',
+  'Colour theme': 'Цветовая тема',
+  'Cursor style': 'Вид курсора',
+  Block: 'Прямоугольник',
+  Underline: 'Подчёркивание',
+  Bar: 'Полоса',
+  'Blinking cursor': 'Мигающий курсор',
+  'Copy to clipboard as soon as text is selected': 'Копировать в буфер сразу при выделении текста',
+  'Right-click in a terminal': 'Правый клик в терминале',
+  'Paste clipboard': 'Вставить из буфера',
+  'Open context menu': 'Открыть контекстное меню',
+  'Reset to defaults': 'Сбросить к исходным',
+  Done: 'Готово',
+  'Shortcuts and features': 'Сочетания клавиш и возможности',
+  'On Windows and Linux read ⌘ as Ctrl.': 'В Windows и Linux читайте ⌘ как Ctrl.',
+  Connect: 'Подключиться',
+  Reconnect: 'Переподключиться',
+  'Connect in split': 'Подключиться в разделении',
+  Duplicate: 'Дублировать',
+  'Delete…': 'Удалить…',
+  'Delete group…': 'Удалить группу…',
+  'Edit group…': 'Изменить группу…',
+  'New subgroup…': 'Новая подгруппа…',
+  'New session here': 'Новая сессия здесь',
+  'New collection…': 'Новый набор…',
+  'Filter hosts…': 'Фильтр хостов…',
+  'Filter inventory…': 'Фильтр инвентаря…',
+  'Lock vault (⌘L)': 'Заблокировать хранилище (⌘L)',
+  'Shortcuts and features (⌘/)': 'Сочетания клавиш и возможности (⌘/)',
+  'Snippets (⌘K)': 'Сниппеты (⌘K)',
+  'A new workspace with a tab per host': 'Новая рабочая область, по вкладке на хост',
+  'All tiled in one tab': 'Всё плиткой в одной вкладке',
+  Clear: 'Очистить',
+  Connected: 'Подключено',
+  'Does not inherit settings from its group': 'Не наследует настройки группы',
+  'Double-click to connect · drag to sort or to move between groups':
+    'Двойной клик — подключиться · перетаскивание — порядок или перенос между группами',
+  'Each in its own tab, in the current workspace':
+    'Каждый в своей вкладке, в текущей рабочей области',
+  'Import from ~/.ssh/config': 'Импорт из ~/.ssh/config',
+  'New subgroup': 'Новая подгруппа',
+  'Save these hosts as a collection you can reopen later':
+    'Сохранить эти хосты набором, чтобы открыть их позже',
+  'Close pane (⌘W)': 'Закрыть панель (⌘W)',
+  'Split down (⌘⇧D)': 'Разделить вниз (⌘⇧D)',
+  'Split right (⌘D)': 'Разделить вправо (⌘D)',
+  'A Retina desktop is drawn the usual size by asking for fewer, larger pixels':
+    'На Retina стол обычного размера получается из меньшего числа крупных пикселей',
+  'How much larger is per host; nothing about the far machine is changed':
+    'Насколько крупнее — задаётся на хосте; на дальней машине ничего не меняется',
+  'Or tell the session the density and it draws itself larger, sharply':
+    'Или сообщите сессии плотность — она нарисует себя крупнее и резко',
+  'Full screen (F11) — hold Escape to leave': 'Полный экран (F11) — удерживайте Escape для выхода',
+  'Include this terminal in broadcast': 'Включить этот терминал в трансляцию',
+  'Move this pane to its own tab': 'Вынести панель в отдельную вкладку',
+  'Toggle SFTP browser': 'Показать или скрыть файловый браузер',
+  'Toggle port forwarding': 'Показать или скрыть проброс портов',
+  'Toggle remote monitoring': 'Показать или скрыть мониторинг',
+  'Close workspace': 'Закрыть рабочую область',
+  'Rename…': 'Переименовать…',
+  'Save as collection…': 'Сохранить как набор…',
+  'Select a session on the left, or quick-connect above.':
+    'Выберите сессию слева или подключитесь быстро сверху.',
+  All: 'Все',
+  None: 'Нет',
+  'Close this workspace and everything in it': 'Закрыть эту рабочую область и всё в ней',
+  'Double-click to rename; right-click to save it; drop a tab here to move it':
+    'Двойной клик — переименовать, правый — сохранить, бросьте вкладку сюда, чтобы перенести',
+  'Drag onto a pane to view side by side, or onto a workspace to move it':
+    'Перетащите на панель, чтобы поставить рядом, или на область, чтобы перенести',
+  'Mirror typing to every open pane, in every workspace':
+    'Повторять ввод во всех открытых панелях, во всех рабочих областях',
+  'New output in this workspace': 'Новый вывод в этой рабочей области',
+  'New output since you last looked': 'Новый вывод с момента, когда вы смотрели',
+  'New workspace': 'Новая рабочая область',
+  Inventory: 'Инвентарь',
+  'Quick connect…': 'Быстрое подключение…',
+  Snippets: 'Сниппеты',
+  Broadcast: 'Трансляция',
+  'A gateway says where a machine lives rather than who you are on it, so it is usually stated once on a group and left blank below. Blank reaches the host directly.':
+    'Шлюз говорит, где машина живёт, а не кто вы на ней, поэтому его обычно задают один раз на группе, а ниже оставляют пустым. Пусто — подключение к хосту напрямую.',
+  'RD Gateway': 'Шлюз RD',
+  'none — connect directly': 'нет — подключаться напрямую',
+  Port: 'Порт',
+  'Gateway username': 'Логин для шлюза',
+  'Gateway password': 'Пароль для шлюза',
+  "the host's own login": 'собственный логин хоста',
+  '(saved here)': '(сохранён здесь)',
+  "(blank uses the host's own)": '(пусто — берётся логин хоста)',
+  'On save the gateway password stored here is forgotten.':
+    'При сохранении хранящийся здесь пароль шлюза будет забыт.',
+  'A gateway password is stored here, and the nearest value wins.':
+    'Здесь хранится пароль шлюза, а побеждает ближайшее значение.',
+  'Keep it': 'Оставить',
+  'Forget it': 'Забыть',
+  'Reach private addresses directly, without the gateway':
+    'К приватным адресам обращаться напрямую, минуя шлюз',
+  Resolution: 'Разрешение',
   '{value} from {source}': '{value} — из {source}',
-  'blinking': 'мигающий',
-  'steady': 'ровный',
+  blinking: 'мигающий',
+  steady: 'ровный',
   'This host has a passphrase of its own, and the nearest value wins: moving it into a group leaves the group’s unused.':
     'У этого хоста своя парольная фраза, и побеждает ближайшее значение: перенос её в группу оставит групповую невостребованной.',
   'This host has a password of its own, and the nearest value wins: moving it into a group leaves the group’s unused.':
@@ -277,538 +402,670 @@ export const ru: Record<string, string> = {
     'Наследовать настройки рабочего стола от родительской группы',
   'Applies to the RDP hosts in this group. A gateway stated here reaches every one of them, which is the point of putting it on a group rather than on each machine.':
     'Относится к RDP-хостам этой группы. Шлюз, указанный здесь, достаёт до каждого из них — ради этого его и задают на группе, а не на каждой машине.',
-  "Drag the inner edge of the host list or the file panel to widen it":
-    "Потяните за внутренний край списка хостов или файловой панели, чтобы расширить",
-  "Both remember their width in the window they were set in":
-    "Обе запоминают ширину в том окне, где её задали",
-  "\"Jump host\" reaches a machine through another one, as ProxyJump does":
-    "«Промежуточный хост» достаёт до машины через другую — как ProxyJump",
-  "The hop is made by this app, so nothing runs on the machine in between":
-    "Переход делает само приложение, поэтому на промежуточной машине ничего не выполняется",
-  "\"Forward SSH agent\" lets the far host ask this one to sign, whatever you logged in with":
-    "«Пробрасывать агент SSH» позволяет далёкому хосту просить подпись у этой машины — независимо от того, чем вы вошли",
-  "The key never travels; root on that host can use it while you are there, so pick hosts you trust":
-    "Ключ никуда не уезжает; но root на том хосте может им воспользоваться, пока вы там, — поэтому включайте для машин, которым доверяете",
-  "\"Log session output to file\" keeps a transcript per connection under the logs folder":
-    "«Записывать вывод сессии в файл» держит расшифровку каждого подключения в папке журналов",
-  "Tunnels and monitoring":
-    "Туннели и мониторинг",
-  "Tunnels in a pane toolbar forwards ports over that connection":
-    "«Туннели» в панели вкладки пробрасывают порты через это подключение",
-  "Local sends a port here to somewhere the host can reach":
-    "Локальный отправляет порт отсюда туда, куда достаёт хост",
-  "Remote does the opposite: a port on the host arrives here":
-    "Обратный делает наоборот: порт на хосте появляется здесь",
-  "Dynamic is a SOCKS proxy, for a browser to reach a whole network":
-    "Динамический — это прокси SOCKS, чтобы браузер достал до целой сети",
-  "A rule saved on a session starts by itself whenever that session connects":
-    "Правило, сохранённое на сессии, запускается само при каждом её подключении",
-  "\"Ad-hoc tunnel\" runs one for this connection only and is not saved":
-    "«Разовый туннель» работает только для этого подключения и не сохраняется",
-  "Monitor in the same toolbar shows load, memory, network, uptime and disks":
-    "«Монитор» в той же панели показывает загрузку, память, сеть, время работы и диски",
-  "It asks the host every three seconds and stops after three failures in a row":
-    "Он опрашивает хост каждые три секунды и останавливается после трёх неудач подряд",
-  "Nothing is installed there: it is one command on a channel of its own":
-    "Ничего туда не ставится: это одна команда на отдельном канале",
-  "Filter by host or fingerprint…": "Фильтр по хосту или отпечатку…",
-  "{found} of {total} match": "подходит {found} из {total}",
-  "{total} trusted": "доверено: {total}",
-  "{rest} more — narrow the filter to reach them":
-    "ещё {rest} — уточните фильтр, чтобы до них добраться",
-  "Review…": "Просмотреть…",
-  "General": "Общие",
-  "Inherit": "Наследовать",
-  "Fit the pane": "По размеру панели",
-  "Fixed size": "Фиксированный размер",
-  "Width": "Ширина",
-  "Height": "Высота",
-  "The desktop keeps this size and is scaled into the pane.": "Рабочий стол сохраняет этот размер и вписывается в панель масштабированием.",
-  "The far end is asked to match the pane whenever it is resized, so every pixel stays its own.": "При каждом изменении размера панели той стороне сообщают новый размер, поэтому каждый пиксель остаётся своим.",
-  "Most pixels to ask for": "Сколько пикселей запрашивать",
-  "Fewest — a slow link": "Меньше всего — медленный канал",
-  "Balanced": "Сбалансированно",
-  "As many as the screen has": "Столько, сколько у экрана",
+  'Drag the inner edge of the host list or the file panel to widen it':
+    'Потяните за внутренний край списка хостов или файловой панели, чтобы расширить',
+  'Both remember their width in the window they were set in':
+    'Обе запоминают ширину в том окне, где её задали',
+  '"Jump host" reaches a machine through another one, as ProxyJump does':
+    '«Промежуточный хост» достаёт до машины через другую — как ProxyJump',
+  'The hop is made by this app, so nothing runs on the machine in between':
+    'Переход делает само приложение, поэтому на промежуточной машине ничего не выполняется',
+  '"Forward SSH agent" lets the far host ask this one to sign, whatever you logged in with':
+    '«Пробрасывать агент SSH» позволяет далёкому хосту просить подпись у этой машины — независимо от того, чем вы вошли',
+  'The key never travels; root on that host can use it while you are there, so pick hosts you trust':
+    'Ключ никуда не уезжает; но root на том хосте может им воспользоваться, пока вы там, — поэтому включайте для машин, которым доверяете',
+  '"Log session output to file" keeps a transcript per connection under the logs folder':
+    '«Записывать вывод сессии в файл» держит расшифровку каждого подключения в папке журналов',
+  'Tunnels and monitoring': 'Туннели и мониторинг',
+  'Tunnels in a pane toolbar forwards ports over that connection':
+    '«Туннели» в панели вкладки пробрасывают порты через это подключение',
+  'Local sends a port here to somewhere the host can reach':
+    'Локальный отправляет порт отсюда туда, куда достаёт хост',
+  'Remote does the opposite: a port on the host arrives here':
+    'Обратный делает наоборот: порт на хосте появляется здесь',
+  'Dynamic is a SOCKS proxy, for a browser to reach a whole network':
+    'Динамический — это прокси SOCKS, чтобы браузер достал до целой сети',
+  'A rule saved on a session starts by itself whenever that session connects':
+    'Правило, сохранённое на сессии, запускается само при каждом её подключении',
+  '"Ad-hoc tunnel" runs one for this connection only and is not saved':
+    '«Разовый туннель» работает только для этого подключения и не сохраняется',
+  'Monitor in the same toolbar shows load, memory, network, uptime and disks':
+    '«Монитор» в той же панели показывает загрузку, память, сеть, время работы и диски',
+  'It asks the host every three seconds and stops after three failures in a row':
+    'Он опрашивает хост каждые три секунды и останавливается после трёх неудач подряд',
+  'Nothing is installed there: it is one command on a channel of its own':
+    'Ничего туда не ставится: это одна команда на отдельном канале',
+  'Filter by host or fingerprint…': 'Фильтр по хосту или отпечатку…',
+  '{found} of {total} match': 'подходит {found} из {total}',
+  '{total} trusted': 'доверено: {total}',
+  '{rest} more — narrow the filter to reach them':
+    'ещё {rest} — уточните фильтр, чтобы до них добраться',
+  'Review…': 'Просмотреть…',
+  General: 'Общие',
+  Inherit: 'Наследовать',
+  'Fit the pane': 'По размеру панели',
+  'Fixed size': 'Фиксированный размер',
+  Width: 'Ширина',
+  Height: 'Высота',
+  'The desktop keeps this size and is scaled into the pane.':
+    'Рабочий стол сохраняет этот размер и вписывается в панель масштабированием.',
+  'The far end is asked to match the pane whenever it is resized, so every pixel stays its own.':
+    'При каждом изменении размера панели той стороне сообщают новый размер, поэтому каждый пиксель остаётся своим.',
+  'Most pixels to ask for': 'Сколько пикселей запрашивать',
+  'Fewest — a slow link': 'Меньше всего — медленный канал',
+  Balanced: 'Сбалансированно',
+  'As many as the screen has': 'Столько, сколько у экрана',
   "Counted in the screen's own pixels, so a Retina pane can ask for up to four times the data. On an ordinary monitor nothing here changes anything.":
-    "Считается в собственных пикселях экрана, поэтому панель Retina может запросить вчетверо больше данных. На обычном мониторе тут ничего ни на что не влияет.",
-  "How the desktop is made the right size":
-    "Как рабочий стол приводится к нужному размеру",
-  "The far end lays itself out larger": "Та сторона сама рисует себя крупнее",
-  "Stretch the picture on this side": "Растягивать картинку здесь",
-  "As much as this display needs": "Насколько нужно этому экрану",
-  "Do not adjust — every pixel its own": "Не подгонять — каждый пиксель свой",
-  "Asking the far end is the only way to get the right size at full sharpness, and Windows 8.1 and later act on it; older versions ignore it and the desktop stays as it was. Stretching here always works and costs sharpness.":
-    "Попросить ту сторону — единственный способ получить нужный размер при полной резкости; Windows 8.1 и новее это учитывают, старее игнорируют, и рабочий стол остаётся как был. Растягивание здесь работает всегда и стоит резкости.",
-  "Played by the desktop client itself, so it costs this side nothing and the link something.":
-    "Проигрывает сам клиент рабочего стола: этой стороне бесплатно, каналу — нет.",
-  "Play the remote sound here": "Проигрывать звук удалённой машины здесь",
-  "The far end’s sound plays here, and can be turned off per host or group":
-    "Звук той стороны слышен здесь; выключается для хоста или для всей группы",
-  "The picture is decoded by a client of its own, so H.264 hosts are drawn as such":
-    "Картинку разбирает отдельный клиент, поэтому хосты с H.264 так и рисуются",
-  "Nothing types the password into the window: the client signs in outside it":
-    "Пароль не попадает в окно: клиент входит в систему за его пределами",
-  "Copying files between the two sides is not back yet — see the release notes":
-    "Обмен файлами между сторонами пока не вернулся — см. заметки к выпуску",
-  "Send ⌘ as Ctrl": "Отправлять ⌘ как Ctrl",
-  "Copy and paste then land where they do on Windows. While the desktop has the keyboard this app's own ⌘ shortcuts do not fire; ⌘Q and ⌘Tab still belong to macOS.": "Тогда копирование и вставка окажутся там же, где в Windows. Пока клавиатура у рабочего стола, собственные сочетания приложения с ⌘ не срабатывают; ⌘Q и ⌘Tab по-прежнему принадлежат macOS.",
-  "Could not connect": "Не удалось подключиться",
-  "Session ended": "Сессия завершена",
-  "Try again": "Повторить",
-  "Not a desktop": "Это не рабочий стол",
-  "Negotiating with the server.": "Согласование с сервером.",
-  "Reading the login for this host.": "Читаю логин для этого хоста.",
-  "Or join a session already open": "Или присоединиться к уже открытой сессии",
-  "Nobody is logged on to that host right now.": "Сейчас на этом хосте никого нет.",
-  "The person at the far end is asked to allow it.": "У человека на той стороне спросят разрешения.",
-  "Watch without touching": "Наблюдать, не вмешиваясь",
-  "Watch and take the keyboard and mouse": "Наблюдать и забрать клавиатуру с мышью",
-  "Password": "Пароль",
-  "Cancel": "Отмена",
-  "Save": "Сохранить",
-  "no host": "нет хоста",
-  "New session": "Новая сессия",
-  "looking…": "ищу…",
-  "Join without asking the person there": "Присоединиться, не спрашивая человека там",
-  "A joined session opens in a window of its own — Windows draws it, not this app.": "Присоединённая сессия открывается в отдельном окне — его рисует Windows, а не это приложение.",
-  "The host allows this only where its policy says so; where it does not, the connection is refused rather than falling back to asking.": "Хост разрешает это только там, где так говорит его политика; где не разрешает — подключение отклоняется, а не переходит к вопросу.",
-  "Password for": "Пароль для",
-  "No password is saved for this host. Save one in its dialog to stop being asked.": "Для этого хоста пароль не сохранён. Сохраните его в диалоге хоста, чтобы больше не спрашивали.",
-  "Connecting to": "Подключение к",
-  "Name and host are required": "Нужно указать имя и хост",
-  "(saved on this host — it overrides the group)": "(сохранён на этом хосте — перебивает группу)",
-  "(leave blank to keep existing)": "(оставьте пустым, чтобы сохранить прежний)",
-  "Edit session": "Изменить сессию",
-  "Name": "Имя",
-  "Protocol": "Протокол",
-  "Host": "Хост",
-  "Inherit connection settings from the group": "Наследовать настройки подключения от группы",
-  "Username": "Логин",
-  "Auth method": "Способ входа",
-  "Private key": "Закрытый ключ",
-  "Private key file": "Файл закрытого ключа",
-  "Passphrase": "Парольная фраза",
-  "SSH agent": "Агент SSH",
-  "From the inventory": "Из инвентаря",
-  "SFTP panel follows the terminal’s directory": "Панель SFTP следует за каталогом терминала",
-  "Keeps the SFTP panel on the directory the shell is in. Types one setup line into the shell on connect so it reports where it is; its echo is hidden. Off by default: it lets the host move the file browser. The ⇉ button in the panel switches it at any time.": "Держит панель SFTP в том каталоге, где находится оболочка. При подключении вводит в неё одну настроечную строку, чтобы она сообщала своё положение; её эхо скрыто. По умолчанию выключено: это позволяет хосту двигать файловый браузер. Кнопка ⇉ в панели переключает это в любой момент.",
-  "Log session output to file": "Записывать вывод сессии в файл",
-  "Jump host (ProxyJump)": "Промежуточный хост (ProxyJump)",
-  "On connect": "При подключении",
-  "e.g. sudo -i": "например, sudo -i",
-  "Typed into the shell as soon as it is ready, so you see it run and": "Вводится в оболочку сразу, как она готова, поэтому вы видите выполнение, и",
-  "sticks. One command per line, run in order. It repeats on every reconnect.": "сохраняет действие. По одной команде в строке, выполняются по порядку. Повторяется при каждом переподключении.",
-  "Group": "Группа",
-  "(no group)": "(без группы)",
-  "Colour": "Цвет",
-  "No colour": "Без цвета",
-  "Tags (comma separated)": "Метки (через запятую)",
-  "Desktop": "Рабочий стол",
-  "Inherit appearance from the group": "Наследовать оформление от группы",
-  "Inherit desktop settings from the group": "Наследовать настройки рабочего стола от группы",
-  "Port forwards": "Проброс портов",
-  "+ Add": "+ Добавить",
-  "Local": "Локальный",
-  "Remote": "Удалённый",
-  "Dynamic (SOCKS)": "Динамический (SOCKS)",
-  "src host": "адрес источника",
-  "src port": "порт источника",
-  "dst host": "адрес назначения",
-  "dst port": "порт назначения",
+    'Считается в собственных пикселях экрана, поэтому панель Retina может запросить вчетверо больше данных. На обычном мониторе тут ничего ни на что не влияет.',
+  'How the desktop is made the right size': 'Как рабочий стол приводится к нужному размеру',
+  'The far end lays itself out larger': 'Та сторона сама рисует себя крупнее',
+  'Stretch the picture on this side': 'Растягивать картинку здесь',
+  'As much as this display needs': 'Насколько нужно этому экрану',
+  'Do not adjust — every pixel its own': 'Не подгонять — каждый пиксель свой',
+  'Asking the far end is the only way to get the right size at full sharpness, and Windows 8.1 and later act on it; older versions ignore it and the desktop stays as it was. Stretching here always works and costs sharpness.':
+    'Попросить ту сторону — единственный способ получить нужный размер при полной резкости; Windows 8.1 и новее это учитывают, старее игнорируют, и рабочий стол остаётся как был. Растягивание здесь работает всегда и стоит резкости.',
+  'Played by the desktop client itself, so it costs this side nothing and the link something.':
+    'Проигрывает сам клиент рабочего стола: этой стороне бесплатно, каналу — нет.',
+  'Play the remote sound here': 'Проигрывать звук удалённой машины здесь',
+  'The far end’s sound plays here, and can be turned off per host or group':
+    'Звук той стороны слышен здесь; выключается для хоста или для всей группы',
+  'The picture is decoded by a client of its own, so H.264 hosts are drawn as such':
+    'Картинку разбирает отдельный клиент, поэтому хосты с H.264 так и рисуются',
+  'Nothing types the password into the window: the client signs in outside it':
+    'Пароль не попадает в окно: клиент входит в систему за его пределами',
+  'Copying files between the two sides is not back yet — see the release notes':
+    'Обмен файлами между сторонами пока не вернулся — см. заметки к выпуску',
+  'Send ⌘ as Ctrl': 'Отправлять ⌘ как Ctrl',
+  "Copy and paste then land where they do on Windows. While the desktop has the keyboard this app's own ⌘ shortcuts do not fire; ⌘Q and ⌘Tab still belong to macOS.":
+    'Тогда копирование и вставка окажутся там же, где в Windows. Пока клавиатура у рабочего стола, собственные сочетания приложения с ⌘ не срабатывают; ⌘Q и ⌘Tab по-прежнему принадлежат macOS.',
+  'Could not connect': 'Не удалось подключиться',
+  'Session ended': 'Сессия завершена',
+  'Try again': 'Повторить',
+  'Not a desktop': 'Это не рабочий стол',
+  'Negotiating with the server.': 'Согласование с сервером.',
+  'Reading the login for this host.': 'Читаю логин для этого хоста.',
+  'Or join a session already open': 'Или присоединиться к уже открытой сессии',
+  'Nobody is logged on to that host right now.': 'Сейчас на этом хосте никого нет.',
+  'The person at the far end is asked to allow it.':
+    'У человека на той стороне спросят разрешения.',
+  'Watch without touching': 'Наблюдать, не вмешиваясь',
+  'Watch and take the keyboard and mouse': 'Наблюдать и забрать клавиатуру с мышью',
+  Password: 'Пароль',
+  Cancel: 'Отмена',
+  Save: 'Сохранить',
+  'no host': 'нет хоста',
+  'New session': 'Новая сессия',
+  'looking…': 'ищу…',
+  'Join without asking the person there': 'Присоединиться, не спрашивая человека там',
+  'A joined session opens in a window of its own — Windows draws it, not this app.':
+    'Присоединённая сессия открывается в отдельном окне — его рисует Windows, а не это приложение.',
+  'The host allows this only where its policy says so; where it does not, the connection is refused rather than falling back to asking.':
+    'Хост разрешает это только там, где так говорит его политика; где не разрешает — подключение отклоняется, а не переходит к вопросу.',
+  'Password for': 'Пароль для',
+  'No password is saved for this host. Save one in its dialog to stop being asked.':
+    'Для этого хоста пароль не сохранён. Сохраните его в диалоге хоста, чтобы больше не спрашивали.',
+  'Connecting to': 'Подключение к',
+  'Name and host are required': 'Нужно указать имя и хост',
+  '(saved on this host — it overrides the group)': '(сохранён на этом хосте — перебивает группу)',
+  '(leave blank to keep existing)': '(оставьте пустым, чтобы сохранить прежний)',
+  'Edit session': 'Изменить сессию',
+  Name: 'Имя',
+  Protocol: 'Протокол',
+  Host: 'Хост',
+  'Inherit connection settings from the group': 'Наследовать настройки подключения от группы',
+  Username: 'Логин',
+  'Auth method': 'Способ входа',
+  'Private key': 'Закрытый ключ',
+  'Private key file': 'Файл закрытого ключа',
+  Passphrase: 'Парольная фраза',
+  'SSH agent': 'Агент SSH',
+  'From the inventory': 'Из инвентаря',
+  'SFTP panel follows the terminal’s directory': 'Панель SFTP следует за каталогом терминала',
+  'Keeps the SFTP panel on the directory the shell is in. Types one setup line into the shell on connect so it reports where it is; its echo is hidden. Off by default: it lets the host move the file browser. The ⇉ button in the panel switches it at any time.':
+    'Держит панель SFTP в том каталоге, где находится оболочка. При подключении вводит в неё одну настроечную строку, чтобы она сообщала своё положение; её эхо скрыто. По умолчанию выключено: это позволяет хосту двигать файловый браузер. Кнопка ⇉ в панели переключает это в любой момент.',
+  'Log session output to file': 'Записывать вывод сессии в файл',
+  'Jump host (ProxyJump)': 'Промежуточный хост (ProxyJump)',
+  'On connect': 'При подключении',
+  'e.g. sudo -i': 'например, sudo -i',
+  'Typed into the shell as soon as it is ready, so you see it run and':
+    'Вводится в оболочку сразу, как она готова, поэтому вы видите выполнение, и',
+  'sticks. One command per line, run in order. It repeats on every reconnect.':
+    'сохраняет действие. По одной команде в строке, выполняются по порядку. Повторяется при каждом переподключении.',
+  Group: 'Группа',
+  '(no group)': '(без группы)',
+  Colour: 'Цвет',
+  'No colour': 'Без цвета',
+  'Tags (comma separated)': 'Метки (через запятую)',
+  Desktop: 'Рабочий стол',
+  'Inherit appearance from the group': 'Наследовать оформление от группы',
+  'Inherit desktop settings from the group': 'Наследовать настройки рабочего стола от группы',
+  'Port forwards': 'Проброс портов',
+  '+ Add': '+ Добавить',
+  Local: 'Локальный',
+  Remote: 'Удалённый',
+  'Dynamic (SOCKS)': 'Динамический (SOCKS)',
+  'src host': 'адрес источника',
+  'src port': 'порт источника',
+  'dst host': 'адрес назначения',
+  'dst port': 'порт назначения',
 
   // Update banner
-  "Version {version} is available.": "Доступна версия {version}.",
-  "Download": "Скачать",
-  "Later": "Позже",
-  "Downloading update… {percent}%": "Загрузка обновления… {percent}%",
-  "Version {version} is ready to install.": "Версия {version} готова к установке.",
-  "Restart now": "Перезапустить сейчас",
-  "On next quit": "При следующем выходе",
+  'Version {version} is available.': 'Доступна версия {version}.',
+  Download: 'Скачать',
+  Later: 'Позже',
+  'Downloading update… {percent}%': 'Загрузка обновления… {percent}%',
+  'Version {version} is ready to install.': 'Версия {version} готова к установке.',
+  'Restart now': 'Перезапустить сейчас',
+  'On next quit': 'При следующем выходе',
 
   // Credential prompts and quick connect
-  "Continue": "Продолжить",
-  "Quick connect": "Быстрое подключение",
-  "Host and username are required": "Нужно указать адрес и логин",
+  Continue: 'Продолжить',
+  'Quick connect': 'Быстрое подключение',
+  'Host and username are required': 'Нужно указать адрес и логин',
 
   // Security settings
-  "Goes to the shell, never to this app: Ctrl+C interrupts, Ctrl+D ends the session, Ctrl+K, Ctrl+W and Ctrl+L do what readline says":
-    "Уходит в оболочку, а не в приложение: Ctrl+C прерывает, Ctrl+D завершает сессию, Ctrl+K, Ctrl+W и Ctrl+L делают то, что положено readline",
-  "Lock the vault; it also locks itself after the delay set in Settings → Security":
-    "Заблокировать хранилище; оно и само блокируется через срок, заданный в Настройки → Безопасность",
-  "SFTP": "SFTP",
-  "Monitor": "Монитор",
-  "No saved sessions yet. Click \"+ Session\" to add one.":
-    "Сохранённых сессий пока нет. Нажмите «+ Session», чтобы добавить.",
-  "Move to top level": "Вынести на верхний уровень",
-  "Locking": "Блокировка",
-  "Lock after this long untouched": "Блокировать после бездействия",
-  "Never — stay unlocked": "Никогда — оставаться разблокированным",
-  "minutes": "мин",
-  "hours": "ч",
-  "Untouched means no typing, no pointer and no scrolling anywhere in the window, a terminal included. Locking closes nothing: sessions stay open and keep running, and the vault stops answering for stored passwords until the master password is given again.":
-    "Бездействие — это отсутствие набора, движения мыши и прокрутки во всём окне, включая терминал. Блокировка ничего не закрывает: сессии остаются открытыми и продолжают работать, а хранилище перестаёт выдавать сохранённые пароли, пока не введён мастер-пароль.",
-  "Master password": "Мастер-пароль",
-  "Every stored secret is re-encrypted under the new password. Nothing is lost, and the password itself is never written to disk.": "Все хранимые секреты перешифровываются под новый пароль. Ничего не теряется, а сам пароль никогда не пишется на диск.",
-  "Current password": "Текущий пароль",
-  "New password": "Новый пароль",
-  "Confirm": "Подтверждение",
-  "New password must be at least 8 characters": "Новый пароль должен быть не короче 8 символов",
-  "New passwords do not match": "Новые пароли не совпадают",
-  "Could not change the password": "Не удалось сменить пароль",
-  "Master password changed.": "Мастер-пароль изменён.",
-  "Change password": "Сменить пароль",
-  "Session logs": "Журналы сессий",
-  "Sessions with “Log session output to file” enabled write here. The transcript contains everything the terminal showed, so treat it as sensitive.": "Сюда пишут сессии, у которых включено «Записывать вывод сессии в файл». В записи есть всё, что показывал терминал, — обращайтесь с ней как с секретом.",
-  "Open logs folder": "Открыть папку журналов",
-  "Trusted host keys": "Доверенные ключи хостов",
-  "Removing an entry makes TerminalDeck ask again on the next connection. Do that when a server was legitimately rebuilt and its key changed.": "После удаления записи TerminalDeck спросит заново при следующем подключении. Делайте это, когда сервер законно пересобрали и его ключ сменился.",
-  "No hosts trusted yet.": "Доверенных хостов пока нет.",
-  "Forget": "Забыть",
-  "Trusted certificates": "Доверенные сертификаты",
-  "Desktop sessions only, and only certificates this machine could not verify on its own — a gateway or a host that issues its own. One signed by a public authority is checked against the system and never listed here, so a routine reissue changes nothing.": "Только для сессий рабочего стола и только для сертификатов, которые эта машина не смогла проверить сама, — шлюз или хост, выпускающий их себе сам. Сертификат от публичного центра проверяется системой и сюда не попадает, поэтому его плановый перевыпуск ничего не меняет.",
-  "No certificates trusted by hand.": "Сертификатов, доверенных вручную, нет.",
+  'Goes to the shell, never to this app: Ctrl+C interrupts, Ctrl+D ends the session, Ctrl+K, Ctrl+W and Ctrl+L do what readline says':
+    'Уходит в оболочку, а не в приложение: Ctrl+C прерывает, Ctrl+D завершает сессию, Ctrl+K, Ctrl+W и Ctrl+L делают то, что положено readline',
+  'Lock the vault; it also locks itself after the delay set in Settings → Security':
+    'Заблокировать хранилище; оно и само блокируется через срок, заданный в Настройки → Безопасность',
+  SFTP: 'SFTP',
+  Monitor: 'Монитор',
+  'No saved sessions yet. Click "+ Session" to add one.':
+    'Сохранённых сессий пока нет. Нажмите «+ Session», чтобы добавить.',
+  'Move to top level': 'Вынести на верхний уровень',
+  Locking: 'Блокировка',
+  'Lock after this long untouched': 'Блокировать после бездействия',
+  'Never — stay unlocked': 'Никогда — оставаться разблокированным',
+  minutes: 'мин',
+  hours: 'ч',
+  'Untouched means no typing, no pointer and no scrolling anywhere in the window, a terminal included. Locking closes nothing: sessions stay open and keep running, and the vault stops answering for stored passwords until the master password is given again.':
+    'Бездействие — это отсутствие набора, движения мыши и прокрутки во всём окне, включая терминал. Блокировка ничего не закрывает: сессии остаются открытыми и продолжают работать, а хранилище перестаёт выдавать сохранённые пароли, пока не введён мастер-пароль.',
+  'Master password': 'Мастер-пароль',
+  'Every stored secret is re-encrypted under the new password. Nothing is lost, and the password itself is never written to disk.':
+    'Все хранимые секреты перешифровываются под новый пароль. Ничего не теряется, а сам пароль никогда не пишется на диск.',
+  'Current password': 'Текущий пароль',
+  'New password': 'Новый пароль',
+  Confirm: 'Подтверждение',
+  'New password must be at least 8 characters': 'Новый пароль должен быть не короче 8 символов',
+  'New passwords do not match': 'Новые пароли не совпадают',
+  'Could not change the password': 'Не удалось сменить пароль',
+  'Master password changed.': 'Мастер-пароль изменён.',
+  'Change password': 'Сменить пароль',
+  'Session logs': 'Журналы сессий',
+  'Sessions with “Log session output to file” enabled write here. The transcript contains everything the terminal showed, so treat it as sensitive.':
+    'Сюда пишут сессии, у которых включено «Записывать вывод сессии в файл». В записи есть всё, что показывал терминал, — обращайтесь с ней как с секретом.',
+  'Open logs folder': 'Открыть папку журналов',
+  'Trusted host keys': 'Доверенные ключи хостов',
+  'Removing an entry makes TerminalDeck ask again on the next connection. Do that when a server was legitimately rebuilt and its key changed.':
+    'После удаления записи TerminalDeck спросит заново при следующем подключении. Делайте это, когда сервер законно пересобрали и его ключ сменился.',
+  'No hosts trusted yet.': 'Доверенных хостов пока нет.',
+  Forget: 'Забыть',
+  'Trusted certificates': 'Доверенные сертификаты',
+  'Desktop sessions only, and only certificates this machine could not verify on its own — a gateway or a host that issues its own. One signed by a public authority is checked against the system and never listed here, so a routine reissue changes nothing.':
+    'Только для сессий рабочего стола и только для сертификатов, которые эта машина не смогла проверить сама, — шлюз или хост, выпускающий их себе сам. Сертификат от публичного центра проверяется системой и сюда не попадает, поэтому его плановый перевыпуск ничего не меняет.',
+  'No certificates trusted by hand.': 'Сертификатов, доверенных вручную, нет.',
 
   // Export and import
-  "Export": "Экспорт",
-  "Export…": "Экспортировать…",
-  "Import": "Импорт",
-  "Import…": "Импортировать…",
-  "Writes sessions, groups, snippets and inventory sources to one file. Terminal appearance and trusted host keys stay on this machine.": "Записывает сессии, группы, сниппеты и источники инвентаря в один файл. Оформление терминала и доверенные ключи хостов остаются на этой машине.",
-  "Include saved credentials": "Включить сохранённые учётные данные",
-  "Password for the exported credentials": "Пароль для экспортируемых учётных данных",
-  "Use at least 12 characters — this file can be attacked offline": "Не меньше 12 символов — этот файл можно подбирать офлайн",
-  "Credentials are re-encrypted with AES-256-GCM under this password — the same scheme the vault uses — and never written in the clear. A separate password is used so the file can travel without handing over your master password.": "Учётные данные перешифровываются под этот пароль по AES-256-GCM — той же схемой, что и волт, — и никогда не пишутся в открытом виде. Пароль отдельный, чтобы файл можно было передать, не отдавая мастер-пароль.",
-  "Treat the file as a secret all the same. Unlike the vault it leaves this machine and the account protecting it, and can be attacked offline for as long as someone likes, so use a long password and delete the file once the move is done. Lose the password and those credentials are unrecoverable.": "И всё же обращайтесь с файлом как с секретом. В отличие от волта он покидает эту машину и защищающую её учётную запись, и подбирать его можно офлайн сколько угодно долго: возьмите длинный пароль и удалите файл, когда переезд закончен. Потеряете пароль — эти учётные данные не восстановить.",
-  "Entries are matched by id: an existing one is replaced, a new one is added, and nothing already here is deleted.": "Записи сопоставляются по идентификатору: существующая заменяется, новая добавляется, и ничего из уже имеющегося не удаляется.",
-  "Password, if the file contains credentials": "Пароль, если в файле есть учётные данные",
-  "Exported to {path}": "Экспортировано в {path}",
-  "Imported {sessions} sessions, {groups} groups, {snippets} snippets, {collections} collections, {repositories} repositories": "Импортировано: сессий — {sessions}, групп — {groups}, сниппетов — {snippets}, наборов — {collections}, репозиториев — {repositories}",
-  ", and {secrets} credentials": ", учётных данных — {secrets}",
+  Export: 'Экспорт',
+  'Export…': 'Экспортировать…',
+  Import: 'Импорт',
+  'Import…': 'Импортировать…',
+  'Writes sessions, groups, snippets and inventory sources to one file. Terminal appearance and trusted host keys stay on this machine.':
+    'Записывает сессии, группы, сниппеты и источники инвентаря в один файл. Оформление терминала и доверенные ключи хостов остаются на этой машине.',
+  'Include saved credentials': 'Включить сохранённые учётные данные',
+  'Password for the exported credentials': 'Пароль для экспортируемых учётных данных',
+  'Use at least 12 characters — this file can be attacked offline':
+    'Не меньше 12 символов — этот файл можно подбирать офлайн',
+  'Credentials are re-encrypted with AES-256-GCM under this password — the same scheme the vault uses — and never written in the clear. A separate password is used so the file can travel without handing over your master password.':
+    'Учётные данные перешифровываются под этот пароль по AES-256-GCM — той же схемой, что и волт, — и никогда не пишутся в открытом виде. Пароль отдельный, чтобы файл можно было передать, не отдавая мастер-пароль.',
+  'Treat the file as a secret all the same. Unlike the vault it leaves this machine and the account protecting it, and can be attacked offline for as long as someone likes, so use a long password and delete the file once the move is done. Lose the password and those credentials are unrecoverable.':
+    'И всё же обращайтесь с файлом как с секретом. В отличие от волта он покидает эту машину и защищающую её учётную запись, и подбирать его можно офлайн сколько угодно долго: возьмите длинный пароль и удалите файл, когда переезд закончен. Потеряете пароль — эти учётные данные не восстановить.',
+  'Entries are matched by id: an existing one is replaced, a new one is added, and nothing already here is deleted.':
+    'Записи сопоставляются по идентификатору: существующая заменяется, новая добавляется, и ничего из уже имеющегося не удаляется.',
+  'Password, if the file contains credentials': 'Пароль, если в файле есть учётные данные',
+  'Exported to {path}': 'Экспортировано в {path}',
+  'Imported {sessions} sessions, {groups} groups, {snippets} snippets, {collections} collections, {repositories} repositories':
+    'Импортировано: сессий — {sessions}, групп — {groups}, сниппетов — {snippets}, наборов — {collections}, репозиториев — {repositories}',
+  ', and {secrets} credentials': ', учётных данных — {secrets}',
 
   // The file browser
-  "Open": "Открыть",
-  "Download folder…": "Скачать папку…",
-  "Edit locally": "Редактировать локально",
-  "Compare with a local file…": "Сравнить с локальным файлом…",
-  "Delete": "Удалить",
-  "Delete {count} items": "Удалить объектов: {count}",
-  "Delete item?": "Удалить объект?",
-  "Delete {count} items?": "Удалить объектов: {count}?",
-  "This permanently removes the following from the remote host — it cannot be undone:": "Следующее будет безвозвратно удалено с удалённого хоста — отменить это нельзя:",
-  "New folder…": "Новая папка…",
-  "New folder name": "Имя новой папки",
-  "Upload file…": "Загрузить файл…",
-  "Upload folder…": "Загрузить папку…",
-  "Uploaded {name}": "Отправлено: {name}",
-  "Refresh": "Обновить",
-  "Up one level": "На уровень выше",
-  "Hide the folder tree": "Скрыть дерево папок",
-  "Show the folder tree": "Показать дерево папок",
-  "Following the terminal’s directory — click to stop": "Следует за каталогом терминала — нажмите, чтобы прекратить",
-  "Follow the terminal’s directory (sends a setup line to the shell)": "Следовать за каталогом терминала (отправляет настроечную строку в оболочку)",
-  "Drag to resize the panel": "Потяните, чтобы изменить ширину панели",
-  "Drag to resize the tree": "Потяните, чтобы изменить ширину дерева",
-  "Drag to resize {column}": "Потяните, чтобы изменить ширину столбца «{column}»",
-  "Double-click to open, or drag onto another host’s panel to copy": "Двойной щелчок — открыть; перетащите на панель другого хоста, чтобы скопировать",
-  "Double-click to download, or drag onto another host’s panel to copy": "Двойной щелчок — скачать; перетащите на панель другого хоста, чтобы скопировать",
-  "Open in a local editor; saves upload": "Открыт в локальном редакторе; сохранение отправит файл на хост",
-  "Mode {mode}": "Права {mode}",
+  Open: 'Открыть',
+  'Download folder…': 'Скачать папку…',
+  'Edit locally': 'Редактировать локально',
+  'Compare with a local file…': 'Сравнить с локальным файлом…',
+  Delete: 'Удалить',
+  'Delete {count} items': 'Удалить объектов: {count}',
+  'Delete item?': 'Удалить объект?',
+  'Delete {count} items?': 'Удалить объектов: {count}?',
+  'This permanently removes the following from the remote host — it cannot be undone:':
+    'Следующее будет безвозвратно удалено с удалённого хоста — отменить это нельзя:',
+  'New folder…': 'Новая папка…',
+  'New folder name': 'Имя новой папки',
+  'Upload file…': 'Загрузить файл…',
+  'Upload folder…': 'Загрузить папку…',
+  'Uploaded {name}': 'Отправлено: {name}',
+  Refresh: 'Обновить',
+  'Up one level': 'На уровень выше',
+  'Hide the folder tree': 'Скрыть дерево папок',
+  'Show the folder tree': 'Показать дерево папок',
+  'Following the terminal’s directory — click to stop':
+    'Следует за каталогом терминала — нажмите, чтобы прекратить',
+  'Follow the terminal’s directory (sends a setup line to the shell)':
+    'Следовать за каталогом терминала (отправляет настроечную строку в оболочку)',
+  'Drag to resize the panel': 'Потяните, чтобы изменить ширину панели',
+  'Drag to resize the tree': 'Потяните, чтобы изменить ширину дерева',
+  'Drag to resize {column}': 'Потяните, чтобы изменить ширину столбца «{column}»',
+  'Double-click to open, or drag onto another host’s panel to copy':
+    'Двойной щелчок — открыть; перетащите на панель другого хоста, чтобы скопировать',
+  'Double-click to download, or drag onto another host’s panel to copy':
+    'Двойной щелчок — скачать; перетащите на панель другого хоста, чтобы скопировать',
+  'Open in a local editor; saves upload':
+    'Открыт в локальном редакторе; сохранение отправит файл на хост',
+  'Mode {mode}': 'Права {mode}',
 
   // Inventory repositories
-  "Edit inventory source": "Изменить источник инвентаря",
-  "Add inventory source": "Добавить источник инвентаря",
-  "The repository is cloned read-only through your system git, so your existing SSH keys or credential helper are used and nothing is ever pushed back.": "Репозиторий клонируется только на чтение системным git, поэтому используются ваши ключи SSH и помощник для учётных данных, и обратно ничего никогда не отправляется.",
-  "Repository": "Репозиторий",
-  "Repository URL": "Адрес репозитория",
-  "Branch": "Ветка",
-  "default branch": "ветка по умолчанию",
-  "Inventory paths (comma separated)": "Пути к инвентарю (через запятую)",
-  "A path may be a file or a directory of *.yml files — a directory is read one level deep, and an inventory in INI format is not read at all. Leave empty to scan the repository root. Neighbouring group_vars/ and host_vars/ are read automatically.": "Путь может быть файлом или каталогом с *.yml — каталог читается на один уровень вглубь, а инвентарь в формате INI не читается вовсе. Оставьте пустым, чтобы просмотреть корень репозитория. Соседние group_vars/ и host_vars/ читаются автоматически.",
-  "Leaving Branch empty follows the repository’s default branch, usually main. Work committed to another branch will not appear here until you name that branch or merge it — the sync succeeds either way, so it looks like nothing changed.": "Пустое поле «Ветка» означает ветку репозитория по умолчанию, обычно main. Работа, закоммиченная в другую ветку, здесь не появится, пока вы не назовёте эту ветку или не вольёте её, — синхронизация в обоих случаях проходит успешно, поэтому выглядит так, будто ничего не изменилось.",
-  "Default connection settings": "Настройки подключения по умолчанию",
-  "Inherited by every host from this repository unless the inventory or the host itself says otherwise.": "Наследуются каждым хостом из этого репозитория, если инвентарь или сам хост не говорят иного.",
-  "Not set (password)": "Не задан (пароль)",
-  "Set this when the repository describes machines behind a bastion — every host from it will be reached through that session.": "Укажите, если репозиторий описывает машины за бастионом, — каждый хост из него будет достигаться через эту сессию.",
-  "Forward SSH agent to remote hosts": "Пробрасывать агент SSH на удалённые хосты",
-  "Run on every host from this repository, one command per line. Set here and nowhere else — it is never read from the inventory itself, because that would let anyone who can commit to the repository run commands on your machines.": "Выполняется на каждом хосте из этого репозитория, по одной команде в строке. Задаётся здесь и больше нигде — из самого инвентаря это никогда не читается, потому что иначе любой, кто может коммитить в репозиторий, запускал бы команды на ваших машинах.",
-  "Every host from this repository inherits it, so a whole environment can be told apart at a glance without touching a single host.": "Наследуется каждым хостом из этого репозитория, так что целое окружение отличается на глаз, а трогать отдельные хосты не нужно.",
-  "Syncing…": "Синхронизация…",
-  "Save and sync": "Сохранить и синхронизировать",
-  "Sync now": "Синхронизировать",
-  "Sync all sources": "Синхронизировать все источники",
-  "Remove source": "Удалить источник",
-  "Edit…": "Изменить…",
-  "Local settings…": "Локальные настройки…",
-  "Override locally…": "Переопределить локально…",
-  "Clear local override": "Сбросить локальное переопределение",
-  "Clear local settings": "Сбросить локальные настройки",
-  "Has local settings": "Есть локальные настройки",
-  "Has a local override": "Есть локальное переопределение",
-  "Copy {address}": "Скопировать {address}",
-  "Double-click to connect": "Двойной щелчок — подключиться",
-  "In {count} groups — the same host, shown under each. Its connection settings come from {group}.": "В {count} группах — это один и тот же хост, показанный под каждой. Настройки подключения берутся из {group}.",
-  "its group": "его группы",
-  "git was not found on this machine. Install it (or add it to PATH) to sync inventories.": "git на этой машине не найден. Установите его (или добавьте в PATH), чтобы синхронизировать инвентари.",
-  "No repositories yet. Add one to pull an Ansible inventory and get its hosts here.": "Репозиториев пока нет. Добавьте один, чтобы забрать инвентарь Ansible и получить его хосты здесь.",
-  "never synced": "не синхронизировался",
-  "synced just now": "синхронизирован только что",
-  "synced {count}m ago": "синхронизирован {count} мин назад",
-  "synced {count}h ago": "синхронизирован {count} ч назад",
-  "synced {count}d ago": "синхронизирован {count} дн назад",
-  "syncing…": "синхронизация…",
-  "not synced yet": "ещё не синхронизирован",
-  "no hosts found": "хостов не найдено",
-  "hosts: {hosts}, groups: {groups}": "хостов: {hosts}, групп: {groups}",
-  "read {count} files": "прочитано файлов: {count}",
+  'Edit inventory source': 'Изменить источник инвентаря',
+  'Add inventory source': 'Добавить источник инвентаря',
+  'The repository is cloned read-only through your system git, so your existing SSH keys or credential helper are used and nothing is ever pushed back.':
+    'Репозиторий клонируется только на чтение системным git, поэтому используются ваши ключи SSH и помощник для учётных данных, и обратно ничего никогда не отправляется.',
+  Repository: 'Репозиторий',
+  'Repository URL': 'Адрес репозитория',
+  Branch: 'Ветка',
+  'default branch': 'ветка по умолчанию',
+  'Inventory paths (comma separated)': 'Пути к инвентарю (через запятую)',
+  'A path may be a file or a directory of *.yml files — a directory is read one level deep, and an inventory in INI format is not read at all. Leave empty to scan the repository root. Neighbouring group_vars/ and host_vars/ are read automatically.':
+    'Путь может быть файлом или каталогом с *.yml — каталог читается на один уровень вглубь, а инвентарь в формате INI не читается вовсе. Оставьте пустым, чтобы просмотреть корень репозитория. Соседние group_vars/ и host_vars/ читаются автоматически.',
+  'Leaving Branch empty follows the repository’s default branch, usually main. Work committed to another branch will not appear here until you name that branch or merge it — the sync succeeds either way, so it looks like nothing changed.':
+    'Пустое поле «Ветка» означает ветку репозитория по умолчанию, обычно main. Работа, закоммиченная в другую ветку, здесь не появится, пока вы не назовёте эту ветку или не вольёте её, — синхронизация в обоих случаях проходит успешно, поэтому выглядит так, будто ничего не изменилось.',
+  'Default connection settings': 'Настройки подключения по умолчанию',
+  'Inherited by every host from this repository unless the inventory or the host itself says otherwise.':
+    'Наследуются каждым хостом из этого репозитория, если инвентарь или сам хост не говорят иного.',
+  'Not set (password)': 'Не задан (пароль)',
+  'Set this when the repository describes machines behind a bastion — every host from it will be reached through that session.':
+    'Укажите, если репозиторий описывает машины за бастионом, — каждый хост из него будет достигаться через эту сессию.',
+  'Forward SSH agent to remote hosts': 'Пробрасывать агент SSH на удалённые хосты',
+  'Run on every host from this repository, one command per line. Set here and nowhere else — it is never read from the inventory itself, because that would let anyone who can commit to the repository run commands on your machines.':
+    'Выполняется на каждом хосте из этого репозитория, по одной команде в строке. Задаётся здесь и больше нигде — из самого инвентаря это никогда не читается, потому что иначе любой, кто может коммитить в репозиторий, запускал бы команды на ваших машинах.',
+  'Every host from this repository inherits it, so a whole environment can be told apart at a glance without touching a single host.':
+    'Наследуется каждым хостом из этого репозитория, так что целое окружение отличается на глаз, а трогать отдельные хосты не нужно.',
+  'Syncing…': 'Синхронизация…',
+  'Save and sync': 'Сохранить и синхронизировать',
+  'Sync now': 'Синхронизировать',
+  'Sync all sources': 'Синхронизировать все источники',
+  'Remove source': 'Удалить источник',
+  'Edit…': 'Изменить…',
+  'Local settings…': 'Локальные настройки…',
+  'Override locally…': 'Переопределить локально…',
+  'Clear local override': 'Сбросить локальное переопределение',
+  'Clear local settings': 'Сбросить локальные настройки',
+  'Has local settings': 'Есть локальные настройки',
+  'Has a local override': 'Есть локальное переопределение',
+  'Copy {address}': 'Скопировать {address}',
+  'Double-click to connect': 'Двойной щелчок — подключиться',
+  'In {count} groups — the same host, shown under each. Its connection settings come from {group}.':
+    'В {count} группах — это один и тот же хост, показанный под каждой. Настройки подключения берутся из {group}.',
+  'its group': 'его группы',
+  'git was not found on this machine. Install it (or add it to PATH) to sync inventories.':
+    'git на этой машине не найден. Установите его (или добавьте в PATH), чтобы синхронизировать инвентари.',
+  'No repositories yet. Add one to pull an Ansible inventory and get its hosts here.':
+    'Репозиториев пока нет. Добавьте один, чтобы забрать инвентарь Ansible и получить его хосты здесь.',
+  'never synced': 'не синхронизировался',
+  'synced just now': 'синхронизирован только что',
+  'synced {count}m ago': 'синхронизирован {count} мин назад',
+  'synced {count}h ago': 'синхронизирован {count} ч назад',
+  'synced {count}d ago': 'синхронизирован {count} дн назад',
+  'syncing…': 'синхронизация…',
+  'not synced yet': 'ещё не синхронизирован',
+  'no hosts found': 'хостов не найдено',
+  'hosts: {hosts}, groups: {groups}': 'хостов: {hosts}, групп: {groups}',
+  'read {count} files': 'прочитано файлов: {count}',
 
   // Collections
-  "New collection": "Новый набор",
-  "Edit collection": "Изменить набор",
-  "Delete collection": "Удалить набор",
-  "Remove from collection": "Убрать из набора",
-  "A saved set of hosts, kept apart from the groups they live in — the same host can be in several. It survives closing the workspace, so you can reopen the whole set later.": "Сохранённый набор хостов, отдельный от групп, в которых они лежат, — один и тот же хост может быть в нескольких. Он переживает закрытие рабочей области, так что весь набор можно открыть заново.",
-  "e.g. Friday release": "например, пятничный релиз",
-  "Worn by every host in this set. A host that has settings of its own keeps them; a host that does not takes these instead of its group's.": "Носит каждый хост в этом наборе. Хост со своими настройками сохраняет их; хост без них берёт эти вместо групповых.",
-  "Empty for now — add hosts by ticking them in the tree and pressing Collect.": "Пока пусто — отметьте хосты в дереве и нажмите «Собрать».",
-  "Hosts: {count}": "Хостов: {count}",
-  " · {count} missing": " · отсутствует: {count}",
-  "{name} — no longer exists": "{name} — больше не существует",
-  "“{name}” already exists": "«{name}» уже существует",
-  "It holds {count} hosts. Saving again would otherwise leave you with two of them, so pick what to do — or change the name above to keep both.": "В нём хостов: {count}. Иначе после сохранения у вас окажется два таких набора, поэтому выберите, что делать, — или измените имя выше, чтобы оставить оба.",
-  "Another collection is already called “{name}”. Two with the same name are allowed, but hard to tell apart.": "Набор с именем «{name}» уже есть. Два одноимённых допустимы, но их трудно различать.",
-  "Replace its hosts": "Заменить его хосты",
-  "Add to it": "Добавить в него",
-  "Open in a new workspace ({count})": "Открыть в новой рабочей области ({count})",
-  "Open tiled in one tab": "Открыть плиткой в одной вкладке",
-  "Open every host in a new workspace": "Открыть все хосты в новой рабочей области",
-  "Double-click to open the whole set in a new workspace": "Двойной щелчок — открыть весь набор в новой рабочей области",
-  "Move up": "Выше",
-  "Move down": "Ниже",
-  "Your own sets of hosts, across any groups. Tick hosts above and press": "Ваши собственные наборы хостов, из любых групп. Отметьте хосты выше и нажмите",
-  "Collect": "Собрать",
-  ", or right-click a workspace and save it here.": ", либо щёлкните правой кнопкой по рабочей области и сохраните её сюда.",
+  'New collection': 'Новый набор',
+  'Edit collection': 'Изменить набор',
+  'Delete collection': 'Удалить набор',
+  'Remove from collection': 'Убрать из набора',
+  'A saved set of hosts, kept apart from the groups they live in — the same host can be in several. It survives closing the workspace, so you can reopen the whole set later.':
+    'Сохранённый набор хостов, отдельный от групп, в которых они лежат, — один и тот же хост может быть в нескольких. Он переживает закрытие рабочей области, так что весь набор можно открыть заново.',
+  'e.g. Friday release': 'например, пятничный релиз',
+  "Worn by every host in this set. A host that has settings of its own keeps them; a host that does not takes these instead of its group's.":
+    'Носит каждый хост в этом наборе. Хост со своими настройками сохраняет их; хост без них берёт эти вместо групповых.',
+  'Empty for now — add hosts by ticking them in the tree and pressing Collect.':
+    'Пока пусто — отметьте хосты в дереве и нажмите «Собрать».',
+  'Hosts: {count}': 'Хостов: {count}',
+  ' · {count} missing': ' · отсутствует: {count}',
+  '{name} — no longer exists': '{name} — больше не существует',
+  '“{name}” already exists': '«{name}» уже существует',
+  'It holds {count} hosts. Saving again would otherwise leave you with two of them, so pick what to do — or change the name above to keep both.':
+    'В нём хостов: {count}. Иначе после сохранения у вас окажется два таких набора, поэтому выберите, что делать, — или измените имя выше, чтобы оставить оба.',
+  'Another collection is already called “{name}”. Two with the same name are allowed, but hard to tell apart.':
+    'Набор с именем «{name}» уже есть. Два одноимённых допустимы, но их трудно различать.',
+  'Replace its hosts': 'Заменить его хосты',
+  'Add to it': 'Добавить в него',
+  'Open in a new workspace ({count})': 'Открыть в новой рабочей области ({count})',
+  'Open tiled in one tab': 'Открыть плиткой в одной вкладке',
+  'Open every host in a new workspace': 'Открыть все хосты в новой рабочей области',
+  'Double-click to open the whole set in a new workspace':
+    'Двойной щелчок — открыть весь набор в новой рабочей области',
+  'Move up': 'Выше',
+  'Move down': 'Ниже',
+  'Your own sets of hosts, across any groups. Tick hosts above and press':
+    'Ваши собственные наборы хостов, из любых групп. Отметьте хосты выше и нажмите',
+  Collect: 'Собрать',
+  ', or right-click a workspace and save it here.':
+    ', либо щёлкните правой кнопкой по рабочей области и сохраните её сюда.',
 
   // Tunnels and monitoring
-  "Tunnels": "Туннели",
-  "No forwarding rules. Rules saved on a session start automatically when it connects.": "Правил проброса нет. Правила, сохранённые в сессии, запускаются автоматически при подключении.",
-  "Stop": "Стоп",
-  "Start": "Старт",
-  "bind host": "адрес привязки",
-  "port": "порт",
-  "target host": "целевой адрес",
-  "Add": "Добавить",
-  "Ad-hoc tunnel": "Разовый туннель",
-  "Monitoring stopped — the host stopped answering": "Мониторинг остановлен — хост перестал отвечать",
-  "Reading…": "Чтение…",
-  "Logged in as": "Вошёл как",
-  "Processor load": "Загрузка процессора",
-  "Processor load over the last readings": "Загрузка процессора за последние замеры",
-  "Memory in use": "Занятая память",
-  "Sent by the host": "Отправлено хостом",
-  "Received by the host": "Получено хостом",
-  "Uptime": "Время работы",
-  "{mount} is {percent}% full": "{mount} заполнен на {percent}%",
+  Tunnels: 'Туннели',
+  'No forwarding rules. Rules saved on a session start automatically when it connects.':
+    'Правил проброса нет. Правила, сохранённые в сессии, запускаются автоматически при подключении.',
+  Stop: 'Стоп',
+  Start: 'Старт',
+  'bind host': 'адрес привязки',
+  port: 'порт',
+  'target host': 'целевой адрес',
+  Add: 'Добавить',
+  'Ad-hoc tunnel': 'Разовый туннель',
+  'Monitoring stopped — the host stopped answering':
+    'Мониторинг остановлен — хост перестал отвечать',
+  'Reading…': 'Чтение…',
+  'Logged in as': 'Вошёл как',
+  'Processor load': 'Загрузка процессора',
+  'Processor load over the last readings': 'Загрузка процессора за последние замеры',
+  'Memory in use': 'Занятая память',
+  'Sent by the host': 'Отправлено хостом',
+  'Received by the host': 'Получено хостом',
+  Uptime: 'Время работы',
+  '{mount} is {percent}% full': '{mount} заполнен на {percent}%',
 
   // Palettes
-  "Go to host…": "Перейти к хосту…",
-  "Selected: {count} — ⏎ tabs, ⇧⏎ tiled in one, ⌥⏎ a new workspace": "Выбрано: {count} — ⏎ вкладками, ⇧⏎ плиткой в одной, ⌥⏎ в новой рабочей области",
-  "Tab marks a host for opening several at once": "Tab отмечает хост, чтобы открыть несколько сразу",
-  "No hosts yet.": "Хостов пока нет.",
-  "Nothing matches “{query}”.": "Ничего не найдено по «{query}».",
-  "Edit snippet": "Изменить сниппет",
-  "New snippet": "Новый сниппет",
-  "Search snippets…": "Поиск сниппетов…",
-  "Broadcast is on — terminals it runs in: {count}": "Трансляция включена — терминалов, где выполнится: {count}",
-  "Runs in the focused terminal": "Выполнится в активном терминале",
-  "No snippets yet.": "Сниппетов пока нет.",
-  "Edit": "Изменить",
-  "⏎ run · ⇧⏎ paste without running · ↑↓ move · esc close": "⏎ выполнить · ⇧⏎ вставить без выполнения · ↑↓ перемещение · esc закрыть",
+  'Go to host…': 'Перейти к хосту…',
+  'Selected: {count} — ⏎ tabs, ⇧⏎ tiled in one, ⌥⏎ a new workspace':
+    'Выбрано: {count} — ⏎ вкладками, ⇧⏎ плиткой в одной, ⌥⏎ в новой рабочей области',
+  'Tab marks a host for opening several at once':
+    'Tab отмечает хост, чтобы открыть несколько сразу',
+  'No hosts yet.': 'Хостов пока нет.',
+  'Nothing matches “{query}”.': 'Ничего не найдено по «{query}».',
+  'Edit snippet': 'Изменить сниппет',
+  'New snippet': 'Новый сниппет',
+  'Search snippets…': 'Поиск сниппетов…',
+  'Broadcast is on — terminals it runs in: {count}':
+    'Трансляция включена — терминалов, где выполнится: {count}',
+  'Runs in the focused terminal': 'Выполнится в активном терминале',
+  'No snippets yet.': 'Сниппетов пока нет.',
+  Edit: 'Изменить',
+  '⏎ run · ⇧⏎ paste without running · ↑↓ move · esc close':
+    '⏎ выполнить · ⇧⏎ вставить без выполнения · ↑↓ перемещение · esc закрыть',
 
   // Importing from ~/.ssh/config
-  "Reading ~/.ssh/config…": "Чтение ~/.ssh/config…",
-  "No usable Host entries found in ~/.ssh/config.": "В ~/.ssh/config не найдено пригодных записей Host.",
-  "Selected hosts become TerminalDeck sessions. Passwords aren’t stored in ssh config, so key-based entries use their IdentityFile and the rest fall back to the SSH agent.": "Выбранные хосты станут сессиями TerminalDeck. Пароли в ssh config не хранятся, поэтому записи с ключом используют свой IdentityFile, а остальные откатываются на агент SSH.",
+  'Reading ~/.ssh/config…': 'Чтение ~/.ssh/config…',
+  'No usable Host entries found in ~/.ssh/config.':
+    'В ~/.ssh/config не найдено пригодных записей Host.',
+  'Selected hosts become TerminalDeck sessions. Passwords aren’t stored in ssh config, so key-based entries use their IdentityFile and the rest fall back to the SSH agent.':
+    'Выбранные хосты станут сессиями TerminalDeck. Пароли в ssh config не хранятся, поэтому записи с ключом используют свой IdentityFile, а остальные откатываются на агент SSH.',
 
   // Comparing two files
-  "Compare": "Сравнить",
-  "Close": "Закрыть",
-  "what is on the host now": "что на хосте сейчас",
-  "what would replace it": "что это заменит",
-  "Reading both sides…": "Чтение обеих сторон…",
-  "This is not a text file, so there is nothing to compare line by line.": "Это не текстовый файл, поэтому сравнивать построчно нечего.",
-  "One of the two is past the 2 MB comparison limit.": "Один из двух превышает предел сравнения в 2 МБ.",
-  "One of the two is no longer there.": "Одного из двух больше нет.",
-  "Cannot be compared.": "Сравнить не удаётся.",
-  "The text is identical — only the line endings differ (CRLF against LF). Nothing else has changed.": "Текст совпадает — различаются только концы строк (CRLF против LF). Больше ничего не изменилось.",
-  "added: {added}, removed: {removed}": "добавлено: {added}, удалено: {removed}",
-  " — too large to align precisely, so it is shown as replaced": " — слишком велико для точного сопоставления, поэтому показано как замена",
-  "unchanged lines: {count}": "неизменённых строк: {count}",
-  "{count} more rows not drawn": "ещё строк не отрисовано: {count}",
-  "The two files are identical.": "Файлы одинаковы.",
+  Compare: 'Сравнить',
+  Close: 'Закрыть',
+  'what is on the host now': 'что на хосте сейчас',
+  'what would replace it': 'что это заменит',
+  'Reading both sides…': 'Чтение обеих сторон…',
+  'This is not a text file, so there is nothing to compare line by line.':
+    'Это не текстовый файл, поэтому сравнивать построчно нечего.',
+  'One of the two is past the 2 MB comparison limit.':
+    'Один из двух превышает предел сравнения в 2 МБ.',
+  'One of the two is no longer there.': 'Одного из двух больше нет.',
+  'Cannot be compared.': 'Сравнить не удаётся.',
+  'The text is identical — only the line endings differ (CRLF against LF). Nothing else has changed.':
+    'Текст совпадает — различаются только концы строк (CRLF против LF). Больше ничего не изменилось.',
+  'added: {added}, removed: {removed}': 'добавлено: {added}, удалено: {removed}',
+  ' — too large to align precisely, so it is shown as replaced':
+    ' — слишком велико для точного сопоставления, поэтому показано как замена',
+  'unchanged lines: {count}': 'неизменённых строк: {count}',
+  '{count} more rows not drawn': 'ещё строк не отрисовано: {count}',
+  'The two files are identical.': 'Файлы одинаковы.',
 
   // Transfers that would overwrite something
-  "This transfer would overwrite itself": "Эта передача перезаписала бы саму себя",
-  "Two files in the batch land on the same destination. That normally means the local filesystem treats names as case-insensitive while the remote one does not. Whichever copied last would win and the other would be gone, so nothing is transferred.": "Два файла из пачки попадают в одно и то же место назначения. Обычно это значит, что локальная файловая система не различает регистр имён, а удалённая различает. Победил бы тот, что скопировался последним, а другой пропал бы, — поэтому не передаётся ничего.",
-  "Uploading over {count} existing files": "Отправка поверх существующих файлов: {count}",
-  "Downloading over {count} existing files": "Скачивание поверх существующих файлов: {count}",
-  "Copying over {count} existing files": "Копирование поверх существующих файлов: {count}",
-  "Other files written as normal: {count}. ": "Прочих файлов запишется как обычно: {count}. ",
-  "Nothing is overwritten unless you say so here, and nothing is remembered for next time.": "Ничего не перезаписывается, пока вы не скажете об этом здесь, и на следующий раз ничего не запоминается.",
-  "Skip all": "Пропустить все",
-  "Overwrite all": "Перезаписать все",
-  "Skip": "Пропустить",
-  "Overwrite": "Перезаписать",
-  "new": "новый",
-  "there now": "сейчас там",
-  "unknown": "неизвестно",
-  "See what is different before deciding": "Посмотреть, чем отличаются, прежде чем решать",
-  "Skipped either way": "Пропускаются в любом случае",
-  "a folder is already there — cannot be replaced by a file": "там уже папка — файлом её не заменить",
-  "a symlink is already there — not written through": "там уже символическая ссылка — сквозь неё не пишем",
-  "could not be read, so it is left alone": "не удалось прочитать, поэтому оставлено как есть",
-  "Transfer, replacing {count}": "Передать, заменив: {count}",
-  "Transfer, skipping all {count}": "Передать, пропустив все: {count}",
+  'This transfer would overwrite itself': 'Эта передача перезаписала бы саму себя',
+  'Two files in the batch land on the same destination. That normally means the local filesystem treats names as case-insensitive while the remote one does not. Whichever copied last would win and the other would be gone, so nothing is transferred.':
+    'Два файла из пачки попадают в одно и то же место назначения. Обычно это значит, что локальная файловая система не различает регистр имён, а удалённая различает. Победил бы тот, что скопировался последним, а другой пропал бы, — поэтому не передаётся ничего.',
+  'Uploading over {count} existing files': 'Отправка поверх существующих файлов: {count}',
+  'Downloading over {count} existing files': 'Скачивание поверх существующих файлов: {count}',
+  'Copying over {count} existing files': 'Копирование поверх существующих файлов: {count}',
+  'Other files written as normal: {count}. ': 'Прочих файлов запишется как обычно: {count}. ',
+  'Nothing is overwritten unless you say so here, and nothing is remembered for next time.':
+    'Ничего не перезаписывается, пока вы не скажете об этом здесь, и на следующий раз ничего не запоминается.',
+  'Skip all': 'Пропустить все',
+  'Overwrite all': 'Перезаписать все',
+  Skip: 'Пропустить',
+  Overwrite: 'Перезаписать',
+  new: 'новый',
+  'there now': 'сейчас там',
+  unknown: 'неизвестно',
+  'See what is different before deciding': 'Посмотреть, чем отличаются, прежде чем решать',
+  'Skipped either way': 'Пропускаются в любом случае',
+  'a folder is already there — cannot be replaced by a file':
+    'там уже папка — файлом её не заменить',
+  'a symlink is already there — not written through':
+    'там уже символическая ссылка — сквозь неё не пишем',
+  'could not be read, so it is left alone': 'не удалось прочитать, поэтому оставлено как есть',
+  'Transfer, replacing {count}': 'Передать, заменив: {count}',
+  'Transfer, skipping all {count}': 'Передать, пропустив все: {count}',
 
   // Appearance and the terminal's own chrome
-  "Cursor blink": "Мигание курсора",
-  "Blinking": "Мигает",
-  "Steady": "Не мигает",
-  "Back": "Назад",
-  "Copy": "Копировать",
-  "Paste": "Вставить",
-  "Select all": "Выделить всё",
-  "Find…": "Найти…",
-  "Previous (⇧⏎)": "Предыдущее (⇧⏎)",
-  "Next (⏎)": "Следующее (⏎)",
-  "Close (Esc)": "Закрыть (Esc)",
-  "Forward SSH agent to remote host": "Пробрасывать агент SSH на удалённый хост",
-  "Applies to this host’s terminals only. Anything left on “inherit” follows the group, and then Settings — so marking one production box red changes nothing else.": "Относится только к терминалам этого хоста. Всё, оставленное на «наследовать», следует за группой, а затем за настройками, — так что покрасив один боевой сервер в красный, вы не измените ничего больше.",
+  'Cursor blink': 'Мигание курсора',
+  Blinking: 'Мигает',
+  Steady: 'Не мигает',
+  Back: 'Назад',
+  Copy: 'Копировать',
+  Paste: 'Вставить',
+  'Select all': 'Выделить всё',
+  'Find…': 'Найти…',
+  'Previous (⇧⏎)': 'Предыдущее (⇧⏎)',
+  'Next (⏎)': 'Следующее (⏎)',
+  'Close (Esc)': 'Закрыть (Esc)',
+  'Forward SSH agent to remote host': 'Пробрасывать агент SSH на удалённый хост',
+  'Applies to this host’s terminals only. Anything left on “inherit” follows the group, and then Settings — so marking one production box red changes nothing else.':
+    'Относится только к терминалам этого хоста. Всё, оставленное на «наследовать», следует за группой, а затем за настройками, — так что покрасив один боевой сервер в красный, вы не измените ничего больше.',
 
   // Local settings on an inventory node
-  "Local settings for {name}": "Локальные настройки для {name}",
-  "Local settings for group {name}": "Локальные настройки для группы {name}",
-  "Kept outside the repository and re-applied after every sync, so pulling never discards them. Leave a field blank to keep what the inventory says.": "Хранятся вне репозитория и применяются заново после каждой синхронизации, так что обновление их не теряет. Оставьте поле пустым, чтобы сохранить то, что говорит инвентарь.",
-  "Everything in this group inherits what you set here.": "Всё в этой группе наследует то, что вы здесь зададите.",
-  "not set in the inventory": "в инвентаре не задано",
-  "From above ({name})": "Сверху ({name})",
-  "Set here and nowhere else: this is never read from the repository. It is arbitrary code run on every connection, and honouring it from a repo would hand command execution to anyone able to commit there.": "Задаётся здесь и больше нигде: из репозитория это никогда не читается. Это произвольный код, выполняемый при каждом подключении, и, беря его из репозитория, вы отдали бы запуск команд любому, кто может туда коммитить.",
-  "Use the repository’s colour": "Использовать цвет репозитория",
-  "Kept locally like everything else here, so a sync never takes it away.": "Хранится локально, как и всё здесь, поэтому синхронизация это не забирает.",
-  "Hosts in this group inherit it.": "Хосты в этой группе это наследуют.",
-  "Inherit appearance from the inventory groups": "Наследовать оформление от групп инвентаря",
-  "Kept locally, so a sync never takes it away — including a gateway the repository does not know about.": "Хранится локально, поэтому синхронизация это не забирает, — включая шлюз, о котором репозиторий не знает.",
-  "Inherit desktop settings from the inventory groups": "Наследовать настройки рабочего стола от групп инвентаря",
-  "Connects as": "Подключается как",
-  "(no user)": "(без пользователя)",
-  "using": "через",
-  "via {name}": "через {name}",
-  "a jump host": "промежуточный хост",
-  "Remove override": "Удалить переопределение",
+  'Local settings for {name}': 'Локальные настройки для {name}',
+  'Local settings for group {name}': 'Локальные настройки для группы {name}',
+  'Kept outside the repository and re-applied after every sync, so pulling never discards them. Leave a field blank to keep what the inventory says.':
+    'Хранятся вне репозитория и применяются заново после каждой синхронизации, так что обновление их не теряет. Оставьте поле пустым, чтобы сохранить то, что говорит инвентарь.',
+  'Everything in this group inherits what you set here.':
+    'Всё в этой группе наследует то, что вы здесь зададите.',
+  'not set in the inventory': 'в инвентаре не задано',
+  'From above ({name})': 'Сверху ({name})',
+  'Set here and nowhere else: this is never read from the repository. It is arbitrary code run on every connection, and honouring it from a repo would hand command execution to anyone able to commit there.':
+    'Задаётся здесь и больше нигде: из репозитория это никогда не читается. Это произвольный код, выполняемый при каждом подключении, и, беря его из репозитория, вы отдали бы запуск команд любому, кто может туда коммитить.',
+  'Use the repository’s colour': 'Использовать цвет репозитория',
+  'Kept locally like everything else here, so a sync never takes it away.':
+    'Хранится локально, как и всё здесь, поэтому синхронизация это не забирает.',
+  'Hosts in this group inherit it.': 'Хосты в этой группе это наследуют.',
+  'Inherit appearance from the inventory groups': 'Наследовать оформление от групп инвентаря',
+  'Kept locally, so a sync never takes it away — including a gateway the repository does not know about.':
+    'Хранится локально, поэтому синхронизация это не забирает, — включая шлюз, о котором репозиторий не знает.',
+  'Inherit desktop settings from the inventory groups':
+    'Наследовать настройки рабочего стола от групп инвентаря',
+  'Connects as': 'Подключается как',
+  '(no user)': '(без пользователя)',
+  using: 'через',
+  'via {name}': 'через {name}',
+  'a jump host': 'промежуточный хост',
+  'Remove override': 'Удалить переопределение',
 
   // Saved accounts, and opening one host several times over.
-  "Its own saved login": "Его собственная сохранённая учётная запись",
-  "No accounts saved yet": "Учётных записей пока нет",
-  "Manage accounts…": "Управление учётными записями…",
-  "Connect as…": "Подключиться с помощью другой учётной записи…",
-  "Connect several times…": "Подключиться несколько раз…",
-  "Accounts": "Учётные записи",
-  "Saved accounts": "Сохранённые учётные записи",
-  "Logins kept on their own, so a host can be reached as somebody else without being edited. Right-click a host and choose “Connect as…” to use one; nothing here changes what a host connects as by default.": "Логины сами по себе: к хосту можно подключиться под другим пользователем, не изменяя сам хост. Нажмите на хост правой кнопкой и выберите «Подключиться с помощью другой учётной записи…». Ничто здесь не меняет то, под кем хост подключается по умолчанию.",
-  "No accounts saved yet.": "Учётных записей пока нет.",
-  "asks for the password": "пароль спрашивается при подключении",
-  "Add an account": "Добавить учётную запись",
-  "New account": "Новая учётная запись",
-  "Edit account": "Изменить учётную запись",
-  "What it is called in the menus — “domain admin”, “root”, “svc-backup”.": "Как она называется в меню — «доменный админ», «root», «svc-backup».",
-  "Sent as typed. Either Windows spelling works — a NetBIOS domain and account, or a user principal name — and each is carried across the way the far end expects.": "Передаётся как введено. Подходит любая из двух записей Windows — домен NetBIOS с учётной записью или имя участника-пользователя (UPN); каждая передаётся так, как её ждёт та сторона.",
-  "A password is saved for this account": "Для этой учётной записи сохранён пароль",
-  "Nothing is saved — you will be asked when you connect": "Ничего не сохранено — пароль спросят при подключении",
-  "An account needs a name and a username": "Учётной записи нужны название и имя пользователя",
-  "Delete the account “{name}”?": "Удалить учётную запись «{name}»?",
-  "Its password is deleted with it. Sessions already open are not affected.": "Её пароль удаляется вместе с ней. На уже открытые сессии это не влияет.",
-  "Accounts are stored the way hosts are: the file holds a name and a reference, and the password itself lives in the vault. They travel with a backup export, and their passwords only when credentials are included in it.": "Учётные записи хранятся так же, как хосты: в файле лежат название и ссылка, а сам пароль — в хранилище. Они переносятся вместе с резервной копией, а их пароли — только если в неё включены учётные данные.",
-  "Connect several times": "Подключиться несколько раз",
-  "How many": "Сколько окон",
-  "Account": "Учётная запись",
-  "Applies to these windows only. The host keeps the login it is saved with, and every other connection to it is unaffected.": "Действует только для этих окон. Хост сохраняет свою учётную запись, остальные подключения к нему не меняются.",
-  "Open them": "Открыть",
-  "As separate tabs here": "Отдельными вкладками здесь",
-  "Tiled into one tab": "Плиткой в одной вкладке",
-  "In a workspace of their own": "В отдельной рабочей области",
-  "Each window is a connection of its own, so the host sees as many sessions as you ask for.": "Каждое окно — отдельное подключение, поэтому хост увидит столько сессий, сколько вы запросили.",
-  "Settings → Accounts keeps logins that belong to no host in particular": "«Настройки → Учётные записи» хранят логины, не привязанные ни к одному хосту",
-  "Give each one a name, a username, and a password, a key or the agent": "У каждой есть название, имя пользователя и пароль, ключ или агент",
-  "Leave the password empty to be asked for it every time it is used": "Оставьте пароль пустым — его будут спрашивать при каждом подключении",
-  "Right-click a host and choose “Connect as…” to reach it as one of them": "Правый клик по хосту и «Подключиться с помощью другой учётной записи…» — и вы под ней",
-  "That applies to the new tab alone; the host keeps the login it is saved with": "Это касается только новой вкладки; хост сохраняет свою учётную запись",
-  "The pane is named after the account, so a window signed in as somebody else says so": "Панель называется по учётной записи, поэтому видно, под кем открыто окно",
-  "Reconnecting a pane signs in as the same account again": "Переподключение панели снова входит под той же учётной записью",
-  "Only who you are is replaced: the port, jump host and gateway stay the host’s own": "Заменяется только то, кем вы входите: порт, промежуточный хост и шлюз остаются хостовыми",
-  "A gateway set to use the host’s credentials is offered the chosen account too": "Шлюзу, настроенному на учётные данные хоста, предлагается и выбранная запись",
-  "The jump hosts on the way are still reached as they are configured to be": "Промежуточные хосты по пути по-прежнему открываются так, как настроены",
-  "Works the same for a desktop and for an inventory host": "Работает одинаково для рабочего стола и для хоста из инвентаря",
-  "Passwords live in the vault, exactly as a host’s does": "Пароли лежат в хранилище — ровно так же, как пароль хоста",
-  "Accounts travel with a backup; their passwords only if credentials are included": "Учётные записи переносятся резервной копией, а их пароли — только если включены учётные данные",
-  "Opening a host several times": "Открыть хост несколько раз",
-  "Right-click a host and choose “Connect several times…”": "Правый клик по хосту и «Подключиться несколько раз…»",
-  "Say how many windows, as which account, and where they should land": "Укажите число окон, учётную запись и куда их открыть",
-  "Separate tabs, tiled into one tab, or a workspace of their own": "Отдельными вкладками, плиткой в одной вкладке или в своей рабочей области",
-  "Each window is a connection of its own, numbered so they can be told apart": "Каждое окно — отдельное подключение, пронумерованное, чтобы их различать",
-  "Twenty at once is the limit — every one of them is a real login on the far end": "Больше двадцати за раз нельзя — каждое это настоящий вход на той стороне",
-  ", {accounts} saved accounts": ", учётных записей: {accounts}",
-  "Full screen also hands over every shortcut this app owns, ⌘W and Ctrl+W included": "Полный экран также отдаёт все собственные сочетания приложения, включая ⌘W и Ctrl+W",
-  "So a key aimed at the far machine cannot close a tab on this one instead": "Чтобы клавиша, адресованная удалённой машине, не закрывала вкладку на этой",
-  "Nothing is held back: F11 and holding Escape are the way out, and neither is a shortcut": "Ничего не удерживается: выход — F11 или удержание Escape, ни то ни другое не является сочетанием",
-  "In a window rather than full screen the app keeps its shortcuts as before": "В оконном режиме, а не в полном экране, сочетания приложения работают как раньше",
-  "⌘Q and ⌘Tab stay with macOS in a window, and go to the session in full screen": "⌘Q и ⌘Tab остаются за macOS в окне и уходят в сеанс в полном экране",
-  "The size this desktop asked for, and what the server gave back.": "Размер, который запросил этот рабочий стол, и то, что вернул сервер.",
-  "The pane toolbar goes entirely, so the desktop is the size of the display": "Панель инструментов убирается совсем, и стол становится размером с экран",
-  "There is nothing of this app over the picture — the top edge belongs to the far side": "Ничего от этого приложения поверх картинки нет — верхний край принадлежит той стороне",
-  "On a Mac that is ⌥Tab: ⌘Tab belongs to macOS and cannot be taken from it": "На маке это ⌥Tab: ⌘Tab принадлежит macOS, и отобрать его нельзя",
-  "Groups to take from the repository": "Какие группы взять из репозитория",
-  "Ticking a group takes its subgroups too. Only what is ticked appears in “{folder}” — anything untied here is left in the repository, not deleted from it.": "Отметка на группе берёт и её подгруппы. В «{folder}» попадает только отмеченное — снятое здесь остаётся в репозитории, а не удаляется из него.",
-  "This repository holds no groups.": "В этом репозитории нет групп.",
-  "Select none": "Снять всё",
-  "{count} new since the last sync": "Новых с прошлой синхронизации: {count}",
-  "Gone from the repository, and about to go from this folder: {groups}": "Исчезли из репозитория и будут убраны из папки: {groups}",
-  "{count} hosts will disappear from this folder: {hosts}": "Из папки исчезнут хосты ({count}): {hosts}",
-  "{count} of them have local settings, which go with them — including any password saved for them here.": "У {count} из них есть локальные настройки — они удалятся вместе с ними, включая сохранённые здесь пароли.",
-  "Revision {revision}, {count} inventory files read": "Ревизия {revision}, прочитано файлов инвентаря: {count}",
-  "{count} inventory files read": "Прочитано файлов инвентаря: {count}",
-  "Applying…": "Применяем…",
-  "Apply": "Применить",
-  "This folder can mirror an Ansible inventory out of a repository. The hosts it brings in are shown alongside anything you put in the folder yourself, and are refreshed only when you ask for it.": "Эта папка может отражать инвентарь Ansible из репозитория. Приехавшие хосты показываются рядом с тем, что вы положили в папку сами, и обновляются только по вашей команде.",
-  "Mirror an inventory from a git repository": "Отражать инвентарь из git-репозитория",
-  "Cloned read-only through your system git, so your existing SSH keys or credential helper are used and nothing is ever pushed back. A path may be a file or a directory of *.yml files, read one level deep; leave it empty to scan the repository root.": "Клонируется только на чтение через системный git, поэтому используются ваши SSH-ключи и помощник учётных данных, и ничего никогда не отправляется обратно. Путь может быть файлом или каталогом с *.yml, который читается на один уровень вглубь; оставьте пустым, чтобы просмотреть корень репозитория.",
-  "Nothing is fetched on its own: use “Sync with git…” on the folder, and choose there which groups to take. What was taken last time is kept on this machine and shown as soon as the window opens.": "Само ничего не скачивается: вызовите «Синхронизировать с git…» на папке и выберите там, какие группы взять. Взятое в прошлый раз хранится на этой машине и показывается сразу при открытии окна.",
-  "Saving now unties this folder: the hosts it mirrored disappear, along with the local settings and passwords kept for them. The repository itself is untouched.": "Сохранение отвяжет эту папку: отражённые хосты исчезнут вместе с локальными настройками и сохранёнными для них паролями. Сам репозиторий не трогается.",
-  "Reset local settings": "Сбросить локальные настройки",
-  "Sync with git…": "Синхронизировать с git…",
-  "From the repository this folder mirrors · double-click to connect": "Из репозитория, который отражает эта папка · двойной клик — подключиться",
-  "Settings kept here, over what the repository says": "Настройки, которые хранятся здесь поверх того, что говорит репозиторий",
-  "Reading the repository…": "Читаем репозиторий…",
-  "A Sessions folder tied to git": "Папка на вкладке «Сессии», привязанная к git",
-  "Edit any folder on the Sessions tab and point it at a repository": "Откройте любую папку на вкладке «Сессии» и укажите ей репозиторий",
-  "Its hosts land in the folder as one list, however deeply the inventory nests them": "Хосты попадают в папку одним списком, как бы глубоко их ни вкладывал инвентарь",
-  "They sit beside your own sessions, which can stay in the same folder": "Они стоят рядом с вашими сессиями, которые могут лежать в той же папке",
-  "A host named by several Ansible groups appears once — it is one host": "Хост, названный в нескольких группах Ansible, показывается один раз — это один хост",
-  "The groups are still read: they are where a host\u2019s settings and group_vars come from": "Группы всё равно читаются: из них берутся настройки хоста и group_vars",
-  "Nothing is fetched on its own — the folder is read from disk when the window opens": "Само ничего не скачивается — при открытии окна папка читается с диска",
-  "Sync with git… on the folder, or the ⟳ button on its row, goes to the repository": "«Синхронизировать с git…» на папке или кнопка ⟳ в её строке идут в репозиторий",
-  "Every sync asks which groups to take; ticking a group takes its subgroups": "Каждая синхронизация спрашивает, какие группы взять; отметка на группе берёт и подгруппы",
-  "Groups that appeared since last time arrive ticked and marked new": "Появившиеся с прошлого раза группы приходят отмеченными и с пометкой «новая»",
-  "A subgroup you untick stays unticked — it is not offered again as new": "Снятая вами подгруппа остаётся снятой — как новую её больше не предлагают",
-  "What has left the repository leaves the folder, and the dialog says what goes": "Ушедшее из репозитория уходит из папки, и диалог говорит, что именно",
-  "Local settings and passwords kept for a host that goes are deleted with it": "Локальные настройки и пароли уходящего хоста удаляются вместе с ним",
-  "Nothing on disk changes until you press Apply; Cancel leaves the folder as it was": "До нажатия «Применить» на диске ничего не меняется; «Отмена» оставляет папку как была",
-  "Read-only, like the Inventory tab: nothing is ever pushed back": "Только чтение, как и вкладка «Инвентарь»: обратно никогда ничего не отправляется",
-  "A backup carries the repository and the chosen groups, not the mirrored hosts": "Резервная копия несёт репозиторий и выбранные группы, но не сами отражённые хосты",
-  "Several folders can read one repository: it is cloned once, and each folder takes its own paths out of it — production from one inventory file, staging from another. A repository is offered in the list here after its first successful sync.": "Один репозиторий могут читать несколько папок: он клонируется один раз, и каждая папка берёт из него свои пути — продакшн из одного файла инвентаря, стенд из другого. Репозиторий появляется в списке здесь после первой удачной синхронизации.",
-  "Another repository…": "Другой репозиторий…",
-  "A repository used once is offered to every folder made afterwards": "Однажды использованный репозиторий предлагается всем папкам, созданным потом",
-  "Two folders on one repository share a clone and read their own paths from it": "Две папки на одном репозитории делят клон и читают из него свои пути",
-  "Drag by the edge of a row to sort · drop onto a folder to put it inside": "Тяните за край строки, чтобы отсортировать · бросьте на папку, чтобы вложить внутрь",
-  "A group sorts the same way: its edges are the gaps, its middle means inside": "Группа сортируется так же: края строки — это промежутки, середина означает «внутрь»",
-  "{user}, the account on this machine": "{user} — учётная запись на этой машине",
-  "That includes the login: blank takes the group\u2019s, or your account on this machine": "Это касается и логина: пустое поле берёт логин группы или вашу учётную запись на этой машине",
+  'Its own saved login': 'Его собственная сохранённая учётная запись',
+  'No accounts saved yet': 'Учётных записей пока нет',
+  'Manage accounts…': 'Управление учётными записями…',
+  'Connect as…': 'Подключиться с помощью другой учётной записи…',
+  'Connect several times…': 'Подключиться несколько раз…',
+  Accounts: 'Учётные записи',
+  'Saved accounts': 'Сохранённые учётные записи',
+  'Logins kept on their own, so a host can be reached as somebody else without being edited. Right-click a host and choose “Connect as…” to use one; nothing here changes what a host connects as by default.':
+    'Логины сами по себе: к хосту можно подключиться под другим пользователем, не изменяя сам хост. Нажмите на хост правой кнопкой и выберите «Подключиться с помощью другой учётной записи…». Ничто здесь не меняет то, под кем хост подключается по умолчанию.',
+  'No accounts saved yet.': 'Учётных записей пока нет.',
+  'asks for the password': 'пароль спрашивается при подключении',
+  'Add an account': 'Добавить учётную запись',
+  'New account': 'Новая учётная запись',
+  'Edit account': 'Изменить учётную запись',
+  'What it is called in the menus — “domain admin”, “root”, “svc-backup”.':
+    'Как она называется в меню — «доменный админ», «root», «svc-backup».',
+  'Sent as typed. Either Windows spelling works — a NetBIOS domain and account, or a user principal name — and each is carried across the way the far end expects.':
+    'Передаётся как введено. Подходит любая из двух записей Windows — домен NetBIOS с учётной записью или имя участника-пользователя (UPN); каждая передаётся так, как её ждёт та сторона.',
+  'A password is saved for this account': 'Для этой учётной записи сохранён пароль',
+  'Nothing is saved — you will be asked when you connect':
+    'Ничего не сохранено — пароль спросят при подключении',
+  'An account needs a name and a username': 'Учётной записи нужны название и имя пользователя',
+  'Delete the account “{name}”?': 'Удалить учётную запись «{name}»?',
+  'Its password is deleted with it. Sessions already open are not affected.':
+    'Её пароль удаляется вместе с ней. На уже открытые сессии это не влияет.',
+  'Accounts are stored the way hosts are: the file holds a name and a reference, and the password itself lives in the vault. They travel with a backup export, and their passwords only when credentials are included in it.':
+    'Учётные записи хранятся так же, как хосты: в файле лежат название и ссылка, а сам пароль — в хранилище. Они переносятся вместе с резервной копией, а их пароли — только если в неё включены учётные данные.',
+  'Connect several times': 'Подключиться несколько раз',
+  'How many': 'Сколько окон',
+  Account: 'Учётная запись',
+  'Applies to these windows only. The host keeps the login it is saved with, and every other connection to it is unaffected.':
+    'Действует только для этих окон. Хост сохраняет свою учётную запись, остальные подключения к нему не меняются.',
+  'Open them': 'Открыть',
+  'As separate tabs here': 'Отдельными вкладками здесь',
+  'Tiled into one tab': 'Плиткой в одной вкладке',
+  'In a workspace of their own': 'В отдельной рабочей области',
+  'Each window is a connection of its own, so the host sees as many sessions as you ask for.':
+    'Каждое окно — отдельное подключение, поэтому хост увидит столько сессий, сколько вы запросили.',
+  'Settings → Accounts keeps logins that belong to no host in particular':
+    '«Настройки → Учётные записи» хранят логины, не привязанные ни к одному хосту',
+  'Give each one a name, a username, and a password, a key or the agent':
+    'У каждой есть название, имя пользователя и пароль, ключ или агент',
+  'Leave the password empty to be asked for it every time it is used':
+    'Оставьте пароль пустым — его будут спрашивать при каждом подключении',
+  'Right-click a host and choose “Connect as…” to reach it as one of them':
+    'Правый клик по хосту и «Подключиться с помощью другой учётной записи…» — и вы под ней',
+  'That applies to the new tab alone; the host keeps the login it is saved with':
+    'Это касается только новой вкладки; хост сохраняет свою учётную запись',
+  'The pane is named after the account, so a window signed in as somebody else says so':
+    'Панель называется по учётной записи, поэтому видно, под кем открыто окно',
+  'Reconnecting a pane signs in as the same account again':
+    'Переподключение панели снова входит под той же учётной записью',
+  'Only who you are is replaced: the port, jump host and gateway stay the host’s own':
+    'Заменяется только то, кем вы входите: порт, промежуточный хост и шлюз остаются хостовыми',
+  'A gateway set to use the host’s credentials is offered the chosen account too':
+    'Шлюзу, настроенному на учётные данные хоста, предлагается и выбранная запись',
+  'The jump hosts on the way are still reached as they are configured to be':
+    'Промежуточные хосты по пути по-прежнему открываются так, как настроены',
+  'Works the same for a desktop and for an inventory host':
+    'Работает одинаково для рабочего стола и для хоста из инвентаря',
+  'Passwords live in the vault, exactly as a host’s does':
+    'Пароли лежат в хранилище — ровно так же, как пароль хоста',
+  'Accounts travel with a backup; their passwords only if credentials are included':
+    'Учётные записи переносятся резервной копией, а их пароли — только если включены учётные данные',
+  'Opening a host several times': 'Открыть хост несколько раз',
+  'Right-click a host and choose “Connect several times…”':
+    'Правый клик по хосту и «Подключиться несколько раз…»',
+  'Say how many windows, as which account, and where they should land':
+    'Укажите число окон, учётную запись и куда их открыть',
+  'Separate tabs, tiled into one tab, or a workspace of their own':
+    'Отдельными вкладками, плиткой в одной вкладке или в своей рабочей области',
+  'Each window is a connection of its own, numbered so they can be told apart':
+    'Каждое окно — отдельное подключение, пронумерованное, чтобы их различать',
+  'Twenty at once is the limit — every one of them is a real login on the far end':
+    'Больше двадцати за раз нельзя — каждое это настоящий вход на той стороне',
+  ', {accounts} saved accounts': ', учётных записей: {accounts}',
+  'Full screen also hands over every shortcut this app owns, ⌘W and Ctrl+W included':
+    'Полный экран также отдаёт все собственные сочетания приложения, включая ⌘W и Ctrl+W',
+  'So a key aimed at the far machine cannot close a tab on this one instead':
+    'Чтобы клавиша, адресованная удалённой машине, не закрывала вкладку на этой',
+  'Nothing is held back: F11 and holding Escape are the way out, and neither is a shortcut':
+    'Ничего не удерживается: выход — F11 или удержание Escape, ни то ни другое не является сочетанием',
+  'In a window rather than full screen the app keeps its shortcuts as before':
+    'В оконном режиме, а не в полном экране, сочетания приложения работают как раньше',
+  '⌘Q and ⌘Tab stay with macOS in a window, and go to the session in full screen':
+    '⌘Q и ⌘Tab остаются за macOS в окне и уходят в сеанс в полном экране',
+  'The size this desktop asked for, and what the server gave back.':
+    'Размер, который запросил этот рабочий стол, и то, что вернул сервер.',
+  'The pane toolbar goes entirely, so the desktop is the size of the display':
+    'Панель инструментов убирается совсем, и стол становится размером с экран',
+  'There is nothing of this app over the picture — the top edge belongs to the far side':
+    'Ничего от этого приложения поверх картинки нет — верхний край принадлежит той стороне',
+  'On a Mac that is ⌥Tab: ⌘Tab belongs to macOS and cannot be taken from it':
+    'На маке это ⌥Tab: ⌘Tab принадлежит macOS, и отобрать его нельзя',
+  'Groups to take from the repository': 'Какие группы взять из репозитория',
+  'Ticking a group takes its subgroups too. Only what is ticked appears in “{folder}” — anything untied here is left in the repository, not deleted from it.':
+    'Отметка на группе берёт и её подгруппы. В «{folder}» попадает только отмеченное — снятое здесь остаётся в репозитории, а не удаляется из него.',
+  'This repository holds no groups.': 'В этом репозитории нет групп.',
+  'Select none': 'Снять всё',
+  '{count} new since the last sync': 'Новых с прошлой синхронизации: {count}',
+  'Gone from the repository, and about to go from this folder: {groups}':
+    'Исчезли из репозитория и будут убраны из папки: {groups}',
+  '{count} hosts will disappear from this folder: {hosts}':
+    'Из папки исчезнут хосты ({count}): {hosts}',
+  '{count} of them have local settings, which go with them — including any password saved for them here.':
+    'У {count} из них есть локальные настройки — они удалятся вместе с ними, включая сохранённые здесь пароли.',
+  'Revision {revision}, {count} inventory files read':
+    'Ревизия {revision}, прочитано файлов инвентаря: {count}',
+  '{count} inventory files read': 'Прочитано файлов инвентаря: {count}',
+  'Applying…': 'Применяем…',
+  Apply: 'Применить',
+  'This folder can mirror an Ansible inventory out of a repository. The hosts it brings in are shown alongside anything you put in the folder yourself, and are refreshed only when you ask for it.':
+    'Эта папка может отражать инвентарь Ansible из репозитория. Приехавшие хосты показываются рядом с тем, что вы положили в папку сами, и обновляются только по вашей команде.',
+  'Mirror an inventory from a git repository': 'Отражать инвентарь из git-репозитория',
+  'Cloned read-only through your system git, so your existing SSH keys or credential helper are used and nothing is ever pushed back. A path may be a file or a directory of *.yml files, read one level deep; leave it empty to scan the repository root.':
+    'Клонируется только на чтение через системный git, поэтому используются ваши SSH-ключи и помощник учётных данных, и ничего никогда не отправляется обратно. Путь может быть файлом или каталогом с *.yml, который читается на один уровень вглубь; оставьте пустым, чтобы просмотреть корень репозитория.',
+  'Nothing is fetched on its own: use “Sync with git…” on the folder, and choose there which groups to take. What was taken last time is kept on this machine and shown as soon as the window opens.':
+    'Само ничего не скачивается: вызовите «Синхронизировать с git…» на папке и выберите там, какие группы взять. Взятое в прошлый раз хранится на этой машине и показывается сразу при открытии окна.',
+  'Saving now unties this folder: the hosts it mirrored disappear, along with the local settings and passwords kept for them. The repository itself is untouched.':
+    'Сохранение отвяжет эту папку: отражённые хосты исчезнут вместе с локальными настройками и сохранёнными для них паролями. Сам репозиторий не трогается.',
+  'Reset local settings': 'Сбросить локальные настройки',
+  'Sync with git…': 'Синхронизировать с git…',
+  'From the repository this folder mirrors · double-click to connect':
+    'Из репозитория, который отражает эта папка · двойной клик — подключиться',
+  'Settings kept here, over what the repository says':
+    'Настройки, которые хранятся здесь поверх того, что говорит репозиторий',
+  'Reading the repository…': 'Читаем репозиторий…',
+  'A Sessions folder tied to git': 'Папка на вкладке «Сессии», привязанная к git',
+  'Edit any folder on the Sessions tab and point it at a repository':
+    'Откройте любую папку на вкладке «Сессии» и укажите ей репозиторий',
+  'Its hosts land in the folder as one list, however deeply the inventory nests them':
+    'Хосты попадают в папку одним списком, как бы глубоко их ни вкладывал инвентарь',
+  'They sit beside your own sessions, which can stay in the same folder':
+    'Они стоят рядом с вашими сессиями, которые могут лежать в той же папке',
+  'A host named by several Ansible groups appears once — it is one host':
+    'Хост, названный в нескольких группах Ansible, показывается один раз — это один хост',
+  'The groups are still read: they are where a host\u2019s settings and group_vars come from':
+    'Группы всё равно читаются: из них берутся настройки хоста и group_vars',
+  'Nothing is fetched on its own — the folder is read from disk when the window opens':
+    'Само ничего не скачивается — при открытии окна папка читается с диска',
+  'Sync with git… on the folder, or the ⟳ button on its row, goes to the repository':
+    '«Синхронизировать с git…» на папке или кнопка ⟳ в её строке идут в репозиторий',
+  'Every sync asks which groups to take; ticking a group takes its subgroups':
+    'Каждая синхронизация спрашивает, какие группы взять; отметка на группе берёт и подгруппы',
+  'Groups that appeared since last time arrive ticked and marked new':
+    'Появившиеся с прошлого раза группы приходят отмеченными и с пометкой «новая»',
+  'A subgroup you untick stays unticked — it is not offered again as new':
+    'Снятая вами подгруппа остаётся снятой — как новую её больше не предлагают',
+  'What has left the repository leaves the folder, and the dialog says what goes':
+    'Ушедшее из репозитория уходит из папки, и диалог говорит, что именно',
+  'Local settings and passwords kept for a host that goes are deleted with it':
+    'Локальные настройки и пароли уходящего хоста удаляются вместе с ним',
+  'Nothing on disk changes until you press Apply; Cancel leaves the folder as it was':
+    'До нажатия «Применить» на диске ничего не меняется; «Отмена» оставляет папку как была',
+  'Read-only, like the Inventory tab: nothing is ever pushed back':
+    'Только чтение, как и вкладка «Инвентарь»: обратно никогда ничего не отправляется',
+  'A backup carries the repository and the chosen groups, not the mirrored hosts':
+    'Резервная копия несёт репозиторий и выбранные группы, но не сами отражённые хосты',
+  'Several folders can read one repository: it is cloned once, and each folder takes its own paths out of it — production from one inventory file, staging from another. A repository is offered in the list here after its first successful sync.':
+    'Один репозиторий могут читать несколько папок: он клонируется один раз, и каждая папка берёт из него свои пути — продакшн из одного файла инвентаря, стенд из другого. Репозиторий появляется в списке здесь после первой удачной синхронизации.',
+  'Another repository…': 'Другой репозиторий…',
+  'A repository used once is offered to every folder made afterwards':
+    'Однажды использованный репозиторий предлагается всем папкам, созданным потом',
+  'Two folders on one repository share a clone and read their own paths from it':
+    'Две папки на одном репозитории делят клон и читают из него свои пути',
+  'Drag by the edge of a row to sort · drop onto a folder to put it inside':
+    'Тяните за край строки, чтобы отсортировать · бросьте на папку, чтобы вложить внутрь',
+  'A group sorts the same way: its edges are the gaps, its middle means inside':
+    'Группа сортируется так же: края строки — это промежутки, середина означает «внутрь»',
+  '{user}, the account on this machine': '{user} — учётная запись на этой машине',
+  'That includes the login: blank takes the group\u2019s, or your account on this machine':
+    'Это касается и логина: пустое поле берёт логин группы или вашу учётную запись на этой машине'
 }

@@ -77,9 +77,25 @@ function request(destination: string): Uint8Array {
   // the DER directly, which is what the codec's own tests do too.
   const utf8 = [...new TextEncoder().encode(destination)]
   const body = [
-    0xa0, 0x04, 0x02, 0x02, 0x0d, 0x3e, // [0] version 3390
-    0xa2, utf8.length + 2, 0x0c, utf8.length, ...utf8, // [2] destination
-    0xa6, 0x06, 0x04, 0x04, 0x03, 0x00, 0x00, 0x13 // [6] X.224 PDU
+    0xa0,
+    0x04,
+    0x02,
+    0x02,
+    0x0d,
+    0x3e, // [0] version 3390
+    0xa2,
+    utf8.length + 2,
+    0x0c,
+    utf8.length,
+    ...utf8, // [2] destination
+    0xa6,
+    0x06,
+    0x04,
+    0x04,
+    0x03,
+    0x00,
+    0x00,
+    0x13 // [6] X.224 PDU
   ]
   return Uint8Array.from([0x30, body.length, ...body])
 }
@@ -101,9 +117,7 @@ function firstPdu(socket: WebSocket): Promise<Uint8Array> {
       if (length === null) reject(new Error('not a PDU'))
       else resolve(bytes.subarray(0, length))
     })
-    socket.once('close', (code, reason) =>
-      reject(new Error(`closed ${code} ${reason.toString()}`))
-    )
+    socket.once('close', (code, reason) => reject(new Error(`closed ${code} ${reason.toString()}`)))
   })
 }
 

@@ -540,7 +540,9 @@ async function signIn(
   }
   const method = how.method ?? 'RDG_OUT_DATA'
 
-  trace(`signing in to ${gateway.host} as ${identity.domain || '(no domain)'}\\${identity.username}`)
+  trace(
+    `signing in to ${gateway.host} as ${identity.domain || '(no domain)'}\\${identity.username}`
+  )
   wire.send(
     request(
       gateway,
@@ -578,19 +580,19 @@ async function signIn(
     omitMic: variant.omitMic
   })
   const reply = request(
-      gateway,
-      ids,
-      how.upgrade
-        ? {
-            authorization: `NTLM ${answer.toString('base64')}`,
-            upgrade: 'websocket',
-            connection: 'Upgrade',
-            'sec-websocket-key': key,
-            'sec-websocket-version': '13'
-          }
-        : { connection: 'Keep-Alive', authorization: `NTLM ${answer.toString('base64')}` },
-      method
-    )
+    gateway,
+    ids,
+    how.upgrade
+      ? {
+          authorization: `NTLM ${answer.toString('base64')}`,
+          upgrade: 'websocket',
+          connection: 'Upgrade',
+          'sec-websocket-key': key,
+          'sec-websocket-version': '13'
+        }
+      : { connection: 'Keep-Alive', authorization: `NTLM ${answer.toString('base64')}` },
+    method
+  )
   trace(
     `${how.upgrade ? 'answering the challenge and asking for the WebSocket upgrade' : 'answering the challenge'}` +
       ` — ${reply.length} bytes, of which ${answer.length} are the NTLM message`

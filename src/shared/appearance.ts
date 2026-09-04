@@ -116,12 +116,7 @@ export function appearanceSource(
   groups: SessionGroup[],
   key: keyof AppearanceDefaults
 ): SessionGroup | undefined {
-  return appearanceInheritedFrom(
-    { inheritAppearance: own.inheritAppearance },
-    groupId,
-    groups,
-    key
-  )
+  return appearanceInheritedFrom({ inheritAppearance: own.inheritAppearance }, groupId, groups, key)
 }
 
 /** True when the item sets any appearance of its own, for marking it in the UI. */

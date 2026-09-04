@@ -129,9 +129,7 @@ export default function CredentialsSettings(): JSX.Element {
         </Hint>
       </h3>
 
-      {credentials.length === 0 && (
-        <p className="settings-note">{t('No accounts saved yet.')}</p>
-      )}
+      {credentials.length === 0 && <p className="settings-note">{t('No accounts saved yet.')}</p>}
 
       <div className="known-hosts-list">
         {credentials.map((credential) => (

@@ -121,9 +121,7 @@ function body(raw: Uint8Array, type: PacketType, minimum: number): DataView {
   const header = readHeader(raw)
   if (!header) throw new Error('The gateway sent a packet with no header')
   if (header.type !== type) {
-    throw new Error(
-      `Expected ${nameOf(type)} from the gateway, got ${nameOf(header.type)}`
-    )
+    throw new Error(`Expected ${nameOf(type)} from the gateway, got ${nameOf(header.type)}`)
   }
   if (raw.length < HEADER_LENGTH + minimum) {
     throw new Error(`The gateway's ${nameOf(type)} is ${raw.length} bytes, too short to read`)

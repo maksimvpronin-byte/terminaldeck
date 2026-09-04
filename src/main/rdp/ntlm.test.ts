@@ -74,7 +74,9 @@ describe('parseChallenge', () => {
     // Signed and long enough, but announcing the wrong message type.
     const wrongType = sampleChallenge()
     wrongType.writeUInt32LE(3, 8)
-    expect(() => parseChallenge(wrongType)).toThrow(/Expected an NTLM challenge, got message type 3/)
+    expect(() => parseChallenge(wrongType)).toThrow(
+      /Expected an NTLM challenge, got message type 3/
+    )
   })
 
   it('refuses a field pointing past the end of the message', () => {
@@ -103,9 +105,7 @@ describe('authenticate', () => {
 
   it('produces the LMv2 response from the specification', () => {
     // [MS-NLMP] 4.2.4.2.1.
-    expect(field(12).toString('hex')).toBe(
-      '86c35097ac9cec102554764a57cccc19' + 'aaaaaaaaaaaaaaaa'
-    )
+    expect(field(12).toString('hex')).toBe('86c35097ac9cec102554764a57cccc19' + 'aaaaaaaaaaaaaaaa')
   })
 
   it('builds temp the way the specification lays it out', () => {

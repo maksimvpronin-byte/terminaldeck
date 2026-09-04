@@ -36,7 +36,10 @@ describe('moveRelativeTo', () => {
   })
 
   it('carries the item itself, not just its id', () => {
-    const items = [{ id: 'a', name: 'first' }, { id: 'b', name: 'second' }]
+    const items = [
+      { id: 'a', name: 'first' },
+      { id: 'b', name: 'second' }
+    ]
     expect(moveRelativeTo(items, 'b', 'a', 'before')[0]).toEqual({ id: 'b', name: 'second' })
   })
 })

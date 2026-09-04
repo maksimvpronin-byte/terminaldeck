@@ -126,11 +126,7 @@ export default function ImportSshConfigDialog({ onClose }: { onClose: () => void
 
         <div className="modal-actions">
           <button onClick={onClose}>{t('Cancel')}</button>
-          <button
-            className="primary"
-            onClick={doImport}
-            disabled={busy || picked.size === 0}
-          >
+          <button className="primary" onClick={doImport} disabled={busy || picked.size === 0}>
             {t('Import')} {picked.size > 0 ? `(${picked.size})` : ''}
           </button>
         </div>

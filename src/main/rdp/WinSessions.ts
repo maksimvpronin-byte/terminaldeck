@@ -39,7 +39,6 @@ interface Credentials {
   password: string
 }
 
-
 interface Run {
   code: number | null
   output: string
@@ -50,8 +49,7 @@ interface Run {
  * A line in the terminal running the app, on the same switch the RDP gateway
  * uses. Which of these three steps failed is not guessable from the pane.
  */
-const tracing =
-  process.env.NODE_ENV === 'development' || process.env.TERMINALDECK_RDP_TRACE === '1'
+const tracing = process.env.NODE_ENV === 'development' || process.env.TERMINALDECK_RDP_TRACE === '1'
 
 function trace(message: string): void {
   if (!tracing) return

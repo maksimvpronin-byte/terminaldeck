@@ -1,11 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import {
-  createRecordReader,
-  encodeCommand,
-  readCursor,
-  readFrame,
-  RECORD
-} from './recordStream'
+import { createRecordReader, encodeCommand, readCursor, readFrame, RECORD } from './recordStream'
 
 /** One record, framed the way the client frames it. */
 function record(type: number, payload: Buffer): Buffer {
@@ -29,7 +23,9 @@ describe('createRecordReader', () => {
     const seen: Array<[number, number]> = []
     const reader = createRecordReader((type, payload) => seen.push([type, payload.length]))
 
-    reader.push(Buffer.concat([record(RECORD.event, Buffer.from('{"e":"connected"}')), frame(0, 0, 2, 2)]))
+    reader.push(
+      Buffer.concat([record(RECORD.event, Buffer.from('{"e":"connected"}')), frame(0, 0, 2, 2)])
+    )
 
     expect(seen).toEqual([
       [RECORD.event, 17],

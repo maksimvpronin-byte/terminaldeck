@@ -150,7 +150,14 @@ export default function CollectionsPanel({ query }: { query: string }): JSX.Elem
         </div>
 
         {collections.length === 0 && (
-          <div style={{ padding: '4px 12px 8px', color: 'var(--text-dim)', fontSize: 11, lineHeight: 1.5 }}>
+          <div
+            style={{
+              padding: '4px 12px 8px',
+              color: 'var(--text-dim)',
+              fontSize: 11,
+              lineHeight: 1.5
+            }}
+          >
             {t('Your own sets of hosts, across any groups. Tick hosts above and press')}
             <strong> {t('Collect')}</strong>
             {t(', or right-click a workspace and save it here.')}

@@ -69,13 +69,23 @@ describe('the size a desktop is asked for', () => {
 
   describe('a pinned size', () => {
     it('is asked for exactly as it was stated', () => {
-      const look: RdpView = { ...plain, resolution: 'fixed', desktopWidth: 1024, desktopHeight: 768 }
+      const look: RdpView = {
+        ...plain,
+        resolution: 'fixed',
+        desktopWidth: 1024,
+        desktopHeight: 768
+      }
 
       expect(desktopSizeFor(look, pane, 2)).toEqual({ width: 1024, height: 768, factor: 1 })
     })
 
     it('is stated even before the pane has a size of its own', () => {
-      const look: RdpView = { ...plain, resolution: 'fixed', desktopWidth: 1024, desktopHeight: 768 }
+      const look: RdpView = {
+        ...plain,
+        resolution: 'fixed',
+        desktopWidth: 1024,
+        desktopHeight: 768
+      }
 
       expect(desktopSizeFor(look, null, 1)).not.toBeNull()
     })

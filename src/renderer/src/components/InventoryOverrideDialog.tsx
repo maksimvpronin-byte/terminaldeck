@@ -148,9 +148,10 @@ export default function InventoryOverrideDialog({
    */
   const authWords: AuthWords = {
     inherit: t('From the inventory'),
-    secretHint: auth.ownSecret && !forgetSecret
-      ? '(saved here, and it overrides the inventory)'
-      : '(leave blank to keep the current one)',
+    secretHint:
+      auth.ownSecret && !forgetSecret
+        ? '(saved here, and it overrides the inventory)'
+        : '(leave blank to keep the current one)',
     self: 'this host',
     held: 'This password is kept locally for this host alone, so nothing set on a group above it is used.',
     forget: 'On save this password is forgotten, and the host is asked for one on connect.',
@@ -158,7 +159,9 @@ export default function InventoryOverrideDialog({
   }
 
   async function submit(): Promise<void> {
-    const toSave: InventoryOverride = forgetSecret ? { ...override, secretRef: undefined } : override
+    const toSave: InventoryOverride = forgetSecret
+      ? { ...override, secretRef: undefined }
+      : override
     const hasContent =
       secret !== '' ||
       Object.entries(toSave).some(
@@ -343,8 +346,8 @@ export default function InventoryOverrideDialog({
             <summary>
               <Hint label={t('Desktop')}>
                 {t(
-                'Kept locally, so a sync never takes it away — including a gateway the repository does not know about.'
-              )}
+                  'Kept locally, so a sync never takes it away — including a gateway the repository does not know about.'
+                )}
               </Hint>
             </summary>
             <RdpFields
@@ -370,7 +373,8 @@ export default function InventoryOverrideDialog({
             {effective.port} {t('using')} {effective.authMethod}
             {effective.jumpHostId
               ? ` ${t('via {name}', {
-                  name: sessions.find((s) => s.id === effective.jumpHostId)?.name ?? t('a jump host')
+                  name:
+                    sessions.find((s) => s.id === effective.jumpHostId)?.name ?? t('a jump host')
                 })}`
               : ''}
             .

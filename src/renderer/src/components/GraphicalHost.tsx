@@ -7,11 +7,7 @@ import { useStore } from '../state/store'
 import ShadowView from './ShadowView'
 import { useT } from '../i18n'
 
-type Phase =
-  | { at: 'loading' }
-  | { at: 'choosing' }
-  | { at: 'password' }
-  | ScreenPhase
+type Phase = { at: 'loading' } | { at: 'choosing' } | { at: 'password' } | ScreenPhase
 
 /**
  * The pane body for a desktop session.
@@ -245,8 +241,7 @@ export default function GraphicalHost({
   }
 
   /** Whether a live session should exist at all right now. */
-  const running =
-    attempt > 0 && (phase.at === 'connecting' || phase.at === 'connected')
+  const running = attempt > 0 && (phase.at === 'connecting' || phase.at === 'connected')
 
   return (
     <div className="graphical-host">
@@ -300,7 +295,10 @@ export default function GraphicalHost({
                             {s.name} · {s.state}
                           </span>
                         </span>
-                        <button title={t('Watch without touching')} onClick={() => void shadow(s, false)}>
+                        <button
+                          title={t('Watch without touching')}
+                          onClick={() => void shadow(s, false)}
+                        >
                           Watch
                         </button>
                         <button
@@ -382,7 +380,9 @@ export default function GraphicalHost({
 
             {(phase.at === 'failed' || phase.at === 'closed') && (
               <>
-                <strong>{phase.at === 'failed' ? t('Could not connect') : t('Session ended')}</strong>
+                <strong>
+                  {phase.at === 'failed' ? t('Could not connect') : t('Session ended')}
+                </strong>
                 <p className="settings-note">{phase.reason}</p>
                 <button
                   onClick={() => {

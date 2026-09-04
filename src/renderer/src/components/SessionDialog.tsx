@@ -48,7 +48,11 @@ function blank(defaultGroupId: string | null): SessionProfile {
   }
 }
 
-export default function SessionDialog({ initial, defaultGroupId = null, onClose }: Props): JSX.Element {
+export default function SessionDialog({
+  initial,
+  defaultGroupId = null,
+  onClose
+}: Props): JSX.Element {
   const sessions = useStore((s) => s.sessions)
   const groups = useStore((s) => s.groups)
   const settings = useStore((s) => s.settings)
@@ -131,7 +135,14 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
   }
 
   function addForward(): void {
-    const rule: PortForwardRule = { id: nanoid(), type: 'local', srcHost: '127.0.0.1', srcPort: 8080, dstHost: '127.0.0.1', dstPort: 80 }
+    const rule: PortForwardRule = {
+      id: nanoid(),
+      type: 'local',
+      srcHost: '127.0.0.1',
+      srcPort: 8080,
+      dstHost: '127.0.0.1',
+      dstPort: 80
+    }
     set('portForwards', [...profile.portForwards, rule])
   }
 
@@ -143,7 +154,10 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
   }
 
   function removeForward(id: string): void {
-    set('portForwards', profile.portForwards.filter((r) => r.id !== id))
+    set(
+      'portForwards',
+      profile.portForwards.filter((r) => r.id !== id)
+    )
   }
 
   async function submit(): Promise<void> {
@@ -402,7 +416,10 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
 
         <label>
           {t('Group')}
-          <select value={profile.groupId ?? ''} onChange={(e) => set('groupId', e.target.value || null)}>
+          <select
+            value={profile.groupId ?? ''}
+            onChange={(e) => set('groupId', e.target.value || null)}
+          >
             <option value="">{t('(no group)')}</option>
             {groups.map((g) => (
               <option key={g.id} value={g.id}>
@@ -444,8 +461,8 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
             <summary>
               <Hint label={t('Appearance')}>
                 {t(
-                'Applies to this host’s terminals only. Anything left on “inherit” follows the group, and then Settings — so marking one production box red changes nothing else.'
-              )}
+                  'Applies to this host’s terminals only. Anything left on “inherit” follows the group, and then Settings — so marking one production box red changes nothing else.'
+                )}
               </Hint>
             </summary>
             <AppearanceFields
@@ -470,7 +487,9 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
               effective={desktop}
               inheritedFrom={rdpNote}
               inheritToggle={
-                profile.groupId ? { label: t('Inherit desktop settings from the group') } : undefined
+                profile.groupId
+                  ? { label: t('Inherit desktop settings from the group') }
+                  : undefined
               }
               secret={{
                 typed: gatewaySecret,
@@ -493,7 +512,12 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
               {profile.portForwards.map((r) => (
                 <div className="pf-rule" key={r.id}>
-                  <select value={r.type} onChange={(e) => updateForward(r.id, { type: e.target.value as PortForwardRule['type'] })}>
+                  <select
+                    value={r.type}
+                    onChange={(e) =>
+                      updateForward(r.id, { type: e.target.value as PortForwardRule['type'] })
+                    }
+                  >
                     <option value="local">{t('Local')}</option>
                     <option value="remote">{t('Remote')}</option>
                     <option value="dynamic">{t('Dynamic (SOCKS)')}</option>

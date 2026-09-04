@@ -99,7 +99,6 @@ export function registerSshHandlers(): void {
     sshManager.resize(connectionId, cols, rows)
   })
 
-
   // --- Remote monitoring ---
   ipcMain.handle(IPC.monitorStart, (_e, connectionId: string) => {
     remoteMonitor.start(focusedWin(), connectionId)
@@ -107,7 +106,6 @@ export function registerSshHandlers(): void {
   ipcMain.handle(IPC.monitorStop, (_e, connectionId: string) => {
     remoteMonitor.stop(connectionId)
   })
-
 
   // --- Port forwarding ---
   ipcMain.handle(IPC.pfStart, (_e, connectionId: string, rule: PortForwardRule) =>
@@ -120,8 +118,6 @@ export function registerSshHandlers(): void {
     portForwardManager.listActive(connectionId)
   )
 
-
   // --- Import ---
   ipcMain.handle(IPC.sshConfigRead, () => readSshConfigHosts())
-
 }

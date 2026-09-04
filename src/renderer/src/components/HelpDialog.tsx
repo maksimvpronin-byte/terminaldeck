@@ -72,7 +72,10 @@ const SECTIONS: Section[] = [
       { keys: '⌘+ / ⌘− / ⌘0', what: 'Font size up, down, and back to default' },
       { what: 'Zoom moves the global size, or the host’s own if it has one set' },
       { keys: '⌘C / ⌘V', what: 'Copy the selection, and paste' },
-      { keys: 'Ctrl+anything', what: 'Goes to the shell, never to this app: Ctrl+C interrupts, Ctrl+D ends the session, Ctrl+K, Ctrl+W and Ctrl+L do what readline says' },
+      {
+        keys: 'Ctrl+anything',
+        what: 'Goes to the shell, never to this app: Ctrl+C interrupts, Ctrl+D ends the session, Ctrl+K, Ctrl+W and Ctrl+L do what readline says'
+      },
       { what: 'Selecting text copies it straight away; right-click pastes' },
       { what: 'Both of those are switchable in Settings if you prefer a menu' }
     ]
@@ -80,23 +83,32 @@ const SECTIONS: Section[] = [
   {
     title: 'Remote desktops',
     rows: [
-      { keys: 'Ctrl+Alt+End', what: 'Ctrl+Alt+Del on the far side; this machine keeps the real one' },
+      {
+        keys: 'Ctrl+Alt+End',
+        what: 'Ctrl+Alt+Del on the far side; this machine keeps the real one'
+      },
       { keys: 'F11', what: 'Full screen, which is the only way Alt+Tab reaches the far side' },
       { what: 'On a Mac that is ⌥Tab: ⌘Tab belongs to macOS and cannot be taken from it' },
       { what: 'Hold Escape to leave full screen: while there, it belongs to the session' },
       { what: 'Full screen also hands over every shortcut this app owns, ⌘W and Ctrl+W included' },
       { what: 'So a key aimed at the far machine cannot close a tab on this one instead' },
-      { what: 'Nothing is held back: F11 and holding Escape are the way out, and neither is a shortcut' },
+      {
+        what: 'Nothing is held back: F11 and holding Escape are the way out, and neither is a shortcut'
+      },
       { what: 'In a window rather than full screen the app keeps its shortcuts as before' },
       { what: 'The pane toolbar goes entirely, so the desktop is the size of the display' },
-      { what: 'There is nothing of this app over the picture — the top edge belongs to the far side' },
+      {
+        what: 'There is nothing of this app over the picture — the top edge belongs to the far side'
+      },
       { what: 'A watched session cannot take Alt+Tab even full screen — Windows draws it' },
       { what: 'The desktop takes the size of the pane, so dragging a split resizes it' },
       { what: 'A joined session keeps its own size: Windows draws it, and will not scale it' },
       { what: 'A host’s dialog holds a Desktop section: gateway, size, and the ⌘ key' },
       { what: 'Set the gateway on the group and every RDP host in it goes through it' },
       { what: 'Fixed resolution pins the far end and scales it into the pane instead' },
-      { what: 'The size is counted in the screen’s pixels, so a desktop can be sharper than the pane' },
+      {
+        what: 'The size is counted in the screen’s pixels, so a desktop can be sharper than the pane'
+      },
       { what: 'Past the pixel budget it asks for less than that rather than what was wanted' },
       { what: 'A Retina desktop is drawn the usual size by asking for fewer, larger pixels' },
       { what: 'How much larger is per host; nothing about the far machine is changed' },
@@ -146,10 +158,19 @@ const SECTIONS: Section[] = [
       { what: 'A green dot marks a host that already has a terminal open' },
       { what: '"Jump host" reaches a machine through another one, as ProxyJump does' },
       { what: 'The hop is made by this app, so nothing runs on the machine in between' },
-      { what: '"Forward SSH agent" lets the far host ask this one to sign, whatever you logged in with' },
-      { what: 'The key never travels; root on that host can use it while you are there, so pick hosts you trust' },
-      { what: '"Log session output to file" keeps a transcript per connection under the logs folder' },
-      { keys: '⌘L', what: 'Lock the vault; it also locks itself after the delay set in Settings → Security' },
+      {
+        what: '"Forward SSH agent" lets the far host ask this one to sign, whatever you logged in with'
+      },
+      {
+        what: 'The key never travels; root on that host can use it while you are there, so pick hosts you trust'
+      },
+      {
+        what: '"Log session output to file" keeps a transcript per connection under the logs folder'
+      },
+      {
+        keys: '⌘L',
+        what: 'Lock the vault; it also locks itself after the delay set in Settings → Security'
+      },
       { what: 'Settings → Backup moves everything to another machine, credentials optional' }
     ]
   },
@@ -161,7 +182,9 @@ const SECTIONS: Section[] = [
       { what: 'Leave the password empty to be asked for it every time it is used' },
       { what: 'Right-click a host and choose “Connect as…” to reach it as one of them' },
       { what: 'That applies to the new tab alone; the host keeps the login it is saved with' },
-      { what: 'The pane is named after the account, so a window signed in as somebody else says so' },
+      {
+        what: 'The pane is named after the account, so a window signed in as somebody else says so'
+      },
       { what: 'Reconnecting a pane signs in as the same account again' },
       { what: 'Only who you are is replaced: the port, jump host and gateway stay the host’s own' },
       { what: 'A gateway set to use the host’s credentials is offered the chosen account too' },
@@ -227,7 +250,9 @@ const SECTIONS: Section[] = [
       { what: 'Compare in a clash shows the diff before you decide to replace it' },
       { what: 'Right-click a remote file to compare it against any local one' },
       { what: 'Binary files and anything past 2 MB are not diffed, and say so' },
-      { what: 'The listing re-reads itself every few seconds, so changes made in the shell show up' }
+      {
+        what: 'The listing re-reads itself every few seconds, so changes made in the shell show up'
+      }
     ]
   },
   {
@@ -254,8 +279,12 @@ const SECTIONS: Section[] = [
       { what: 'Its hosts land in the folder as one list, however deeply the inventory nests them' },
       { what: 'They sit beside your own sessions, which can stay in the same folder' },
       { what: 'A host named by several Ansible groups appears once — it is one host' },
-      { what: 'The groups are still read: they are where a host’s settings and group_vars come from' },
-      { what: 'Nothing is fetched on its own — the folder is read from disk when the window opens' },
+      {
+        what: 'The groups are still read: they are where a host’s settings and group_vars come from'
+      },
+      {
+        what: 'Nothing is fetched on its own — the folder is read from disk when the window opens'
+      },
       { what: 'Sync with git… on the folder, or the ⟳ button on its row, goes to the repository' },
       { what: 'Every sync asks which groups to take; ticking a group takes its subgroups' },
       { what: 'Groups that appeared since last time arrive ticked and marked new' },
@@ -278,9 +307,7 @@ export default function HelpDialog({ onClose }: { onClose: () => void }): JSX.El
     <ModalBackdrop onClose={onClose}>
       <div className="modal-card help-card">
         <h2>{t('Shortcuts and features')}</h2>
-        <p className="settings-note">
-          {t('On Windows and Linux read ⌘ as Ctrl.')}
-        </p>
+        <p className="settings-note">{t('On Windows and Linux read ⌘ as Ctrl.')}</p>
 
         {SECTIONS.map((section) => (
           <div key={section.title}>

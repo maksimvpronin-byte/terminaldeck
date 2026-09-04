@@ -13,9 +13,11 @@ describe('encodeChunk', () => {
   })
 
   it('uses hex, not decimal, for a length past nine', () => {
-    expect(Buffer.from(encodeChunk(new Uint8Array(255))).toString('latin1').slice(0, 4)).toBe(
-      'ff\r\n'
-    )
+    expect(
+      Buffer.from(encodeChunk(new Uint8Array(255)))
+        .toString('latin1')
+        .slice(0, 4)
+    ).toBe('ff\r\n')
   })
 })
 

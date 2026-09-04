@@ -17,7 +17,11 @@ const HISTORY = 40
  * without `/proc` shows fewer boxes rather than a row of zeroes, which would
  * read as an idle server rather than an unanswered question.
  */
-export default function MonitorBar({ connectionId }: { connectionId?: string }): JSX.Element | null {
+export default function MonitorBar({
+  connectionId
+}: {
+  connectionId?: string
+}): JSX.Element | null {
   const t = useT()
   const [stats, setStats] = useState<RemoteStats | null>(null)
   const [stopped, setStopped] = useState(false)

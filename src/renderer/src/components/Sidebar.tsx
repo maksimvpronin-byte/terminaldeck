@@ -107,9 +107,7 @@ export default function Sidebar({
   const workspaces = useStore((s) => s.workspaces)
 
   // Which hosts already have a terminal open anywhere, so the tree says so.
-  const connected = new Set(
-    allRoots({ workspaces }).flatMap(collectConnectedSessionIds)
-  )
+  const connected = new Set(allRoots({ workspaces }).flatMap(collectConnectedSessionIds))
 
   /**
    * The tree as it is shown: what is saved here, plus what the folders tied to
@@ -121,7 +119,10 @@ export default function Sidebar({
    * is what may be *done* to them, and that is asked node by node below.
    */
   function withGitOverride<T extends { id: string }>(node: T): T {
-    return applyOverride(node, gitOverrides.find((o) => o.nodeId === node.id))
+    return applyOverride(
+      node,
+      gitOverrides.find((o) => o.nodeId === node.id)
+    )
   }
   const groups: SessionGroup[] = [
     ...savedGroups,
@@ -157,7 +158,9 @@ export default function Sidebar({
     return list.filter((s) => s.groupId === groupId || mirrored?.has(s.id))
   }
 
-  const [editingSession, setEditingSession] = useState<SessionProfile | undefined | 'new'>(undefined)
+  const [editingSession, setEditingSession] = useState<SessionProfile | undefined | 'new'>(
+    undefined
+  )
   /**
    * The folder a new host is being created in.
    *
@@ -179,9 +182,10 @@ export default function Sidebar({
   /** The host being opened several times over, once that has been asked for. */
   const [multiConnecting, setMultiConnecting] = useState<SessionProfile | null>(null)
   const [query, setQuery] = useState('')
-  const [groupDialog, setGroupDialog] = useState<
-    { group?: SessionGroup; parentId: string | null } | null
-  >(null)
+  const [groupDialog, setGroupDialog] = useState<{
+    group?: SessionGroup
+    parentId: string | null
+  } | null>(null)
   const [dropTarget, setDropTarget] = useState<string | null>(null)
   /** The gap a host is about to land in: which row, and which side of it. */
   const [dropEdge, setDropEdge] = useState<{ id: string; place: 'before' | 'after' } | null>(null)
@@ -197,9 +201,10 @@ export default function Sidebar({
   /** Hosts waiting to be put into a brand new collection. */
   const [collecting, setCollecting] = useState<string[] | null>(null)
   /** A folder's sync, once its repository has been read and before it is taken. */
-  const [syncing, setSyncing] = useState<{ folder: SessionGroup; preview: GitFolderPreview } | null>(
-    null
-  )
+  const [syncing, setSyncing] = useState<{
+    folder: SessionGroup
+    preview: GitFolderPreview
+  } | null>(null)
   /** The mirrored host whose local settings are being edited. */
   const [overriding, setOverriding] = useState<SessionProfile | SessionGroup | null>(null)
 
@@ -414,7 +419,9 @@ export default function Sidebar({
     setDropTarget(null)
     // dragover fires continuously; keeping the same object while the gap has
     // not changed spares the whole tree a redraw on every mouse move.
-    setDropEdge((cur) => (cur?.id === target.id && cur.place === at ? cur : { id: target.id, place: at }))
+    setDropEdge((cur) =>
+      cur?.id === target.id && cur.place === at ? cur : { id: target.id, place: at }
+    )
   }
 
   async function handleGroupDrop(e: ReactDragEvent, target: SessionGroup): Promise<void> {
@@ -504,37 +511,39 @@ export default function Sidebar({
             }
           ]
         : []),
-      ...(mirrored ? [] : [
-      {
-        label: t('Duplicate'),
-        separated: true,
-        onSelect: () => {
-          const now = Date.now()
-          // The clone gets its own id; the secret stays with the original, so the
-          // copy has to be given credentials of its own.
-          upsertSession({
-            ...s,
-            id: nanoid(),
-            name: `${s.name} copy`,
-            secretRef: undefined,
-            createdAt: now,
-            updatedAt: now
-          })
-        }
-      },
-      { label: 'Edit…', onSelect: () => setEditingSession(s) },
-      {
-        label: `Copy ${addressOf(s)}`,
-        onSelect: () => window.td.clipboard.write(addressOf(s))
-      },
-      {
-        label: deletable.length > 1 ? `Delete ${deletable.length} hosts…` : t('Delete…'),
-        danger: true,
-        separated: true,
-        disabled: deletable.length === 0,
-        onSelect: () => deleteSessions(deletable)
-      }
-      ])
+      ...(mirrored
+        ? []
+        : [
+            {
+              label: t('Duplicate'),
+              separated: true,
+              onSelect: () => {
+                const now = Date.now()
+                // The clone gets its own id; the secret stays with the original, so the
+                // copy has to be given credentials of its own.
+                upsertSession({
+                  ...s,
+                  id: nanoid(),
+                  name: `${s.name} copy`,
+                  secretRef: undefined,
+                  createdAt: now,
+                  updatedAt: now
+                })
+              }
+            },
+            { label: 'Edit…', onSelect: () => setEditingSession(s) },
+            {
+              label: `Copy ${addressOf(s)}`,
+              onSelect: () => window.td.clipboard.write(addressOf(s))
+            },
+            {
+              label: deletable.length > 1 ? `Delete ${deletable.length} hosts…` : t('Delete…'),
+              danger: true,
+              separated: true,
+              disabled: deletable.length === 0,
+              onSelect: () => deleteSessions(deletable)
+            }
+          ])
     ]
   }
 
@@ -602,8 +611,7 @@ export default function Sidebar({
           // says so. Mirrored ones do not: they exist because this folder
           // mirrors a repository, and go with it.
           const moved = savedSessions.filter((s) => s.groupId === groupId).length
-          const note =
-            moved > 0 ? `\n\nIts ${moved} host(s) move up a level; nothing is lost.` : ''
+          const note = moved > 0 ? `\n\nIts ${moved} host(s) move up a level; nothing is lost.` : ''
           const mirroredCount = group?.git
             ? (gitTrees.find((tree) => tree.groupId === groupId)?.sessions.length ?? 0)
             : 0
@@ -654,7 +662,7 @@ export default function Sidebar({
         title={
           mirrored
             ? t('From the repository this folder mirrors · double-click to connect')
-            : t("Double-click to connect · drag to sort or to move between groups")
+            : t('Double-click to connect · drag to sort or to move between groups')
         }
       >
         <span className="name">
@@ -664,9 +672,9 @@ export default function Sidebar({
             aria-hidden="true"
           />
           {s.name}
-          {connected.has(s.id) && <span className="live-dot" title={t("Connected")} />}
+          {connected.has(s.id) && <span className="live-dot" title={t('Connected')} />}
           {s.groupId && s.inheritAuth === false && (
-            <span className="no-inherit" title={t("Does not inherit settings from its group")}>
+            <span className="no-inherit" title={t('Does not inherit settings from its group')}>
               ⊘
             </span>
           )}
@@ -690,102 +698,106 @@ export default function Sidebar({
   }
 
   function renderGroups(parentId: string | null, depth: number): JSX.Element[] {
-    return groups
-      // Only folders somebody made: what a repository describes is placed flat
-      // inside the folder that mirrors it, not redrawn as a tree of its own.
-      .filter((g) => g.parentId === parentId && !isGitNode(g.id))
-      .filter((g) => !needle || groupHasMatch(g.id))
-      .map((g) => {
-        // While filtering, stay expanded — matches must not hide inside a closed group.
-        const isCollapsed = needle === '' && collapsed.has(g.id)
-        const childCount =
-          hostsIn(g.id, visible).length +
-          groups.filter((x) => x.parentId === g.id && !isGitNode(x.id)).length
-        const isSyncing = gitSyncing.includes(g.id)
+    return (
+      groups
+        // Only folders somebody made: what a repository describes is placed flat
+        // inside the folder that mirrors it, not redrawn as a tree of its own.
+        .filter((g) => g.parentId === parentId && !isGitNode(g.id))
+        .filter((g) => !needle || groupHasMatch(g.id))
+        .map((g) => {
+          // While filtering, stay expanded — matches must not hide inside a closed group.
+          const isCollapsed = needle === '' && collapsed.has(g.id)
+          const childCount =
+            hostsIn(g.id, visible).length +
+            groups.filter((x) => x.parentId === g.id && !isGitNode(x.id)).length
+          const isSyncing = gitSyncing.includes(g.id)
 
-        return (
-          <div className="tree-group" key={g.id}>
-            <div
-              className={`tree-item ${dropTarget === g.id ? 'drop-target' : ''}${
-                dropEdge?.id === g.id ? ` drop-${dropEdge.place}` : ''
-              }`}
-              style={{ paddingLeft: 8 + depth * 12 }}
-              draggable
-              onDragStart={(e) => startDrag(e, { kind: 'group', id: g.id }, g.name)}
-              onDragEnd={endDrag}
-              onDragOver={(e) => allowGroupDrop(e, g)}
-              onDragLeave={() => {
-                setDropTarget(null)
-                setDropEdge((cur) => (cur?.id === g.id ? null : cur))
-              }}
-              onDrop={(e) => handleGroupDrop(e, g)}
-              onClick={() => toggleCollapsed(g.id)}
-              onContextMenu={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                setMenu({ x: e.clientX, y: e.clientY, items: groupMenu(g.id) })
-              }}
-              /* A folder tied to a repository is still a folder, and keeps the
+          return (
+            <div className="tree-group" key={g.id}>
+              <div
+                className={`tree-item ${dropTarget === g.id ? 'drop-target' : ''}${
+                  dropEdge?.id === g.id ? ` drop-${dropEdge.place}` : ''
+                }`}
+                style={{ paddingLeft: 8 + depth * 12 }}
+                draggable
+                onDragStart={(e) => startDrag(e, { kind: 'group', id: g.id }, g.name)}
+                onDragEnd={endDrag}
+                onDragOver={(e) => allowGroupDrop(e, g)}
+                onDragLeave={() => {
+                  setDropTarget(null)
+                  setDropEdge((cur) => (cur?.id === g.id ? null : cur))
+                }}
+                onDrop={(e) => handleGroupDrop(e, g)}
+                onClick={() => toggleCollapsed(g.id)}
+                onContextMenu={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setMenu({ x: e.clientX, y: e.clientY, items: groupMenu(g.id) })
+                }}
+                /* A folder tied to a repository is still a folder, and keeps the
                  folder's own icon; the link beside it is the difference. What a
                  sync last did is here rather than on a line of its own under
                  every such folder — three lines of grey text per folder is what
                  the tree looked like, and it is a thing you go and look at, not
                  a thing you read past. */
-              title={
-                g.git
-                  ? `${isSyncing ? t('Reading the repository…') : ago(t, g.git.lastSyncedAt)}` +
-                    (g.git.lastRevision ? ` · ${g.git.lastRevision}` : '') +
-                    ` · ${g.git.branch || t('default branch')}` +
-                    ` · ${g.git.repoUrl}`
-                  : t('Drag by the edge of a row to sort · drop onto a folder to put it inside')
-              }
-            >
-              <span className="tree-group-title name">
-                <span className="chevron">{isCollapsed ? '▸' : '▾'}</span> 📁
-                {g.git && <span className="git-mark">🔗</span>} {g.name}
-                {isCollapsed && childCount > 0 && <span className="child-count">{childCount}</span>}
-              </span>
-              <div className="actions">
-                {g.git && (
+                title={
+                  g.git
+                    ? `${isSyncing ? t('Reading the repository…') : ago(t, g.git.lastSyncedAt)}` +
+                      (g.git.lastRevision ? ` · ${g.git.lastRevision}` : '') +
+                      ` · ${g.git.branch || t('default branch')}` +
+                      ` · ${g.git.repoUrl}`
+                    : t('Drag by the edge of a row to sort · drop onto a folder to put it inside')
+                }
+              >
+                <span className="tree-group-title name">
+                  <span className="chevron">{isCollapsed ? '▸' : '▾'}</span> 📁
+                  {g.git && <span className="git-mark">🔗</span>} {g.name}
+                  {isCollapsed && childCount > 0 && (
+                    <span className="child-count">{childCount}</span>
+                  )}
+                </span>
+                <div className="actions">
+                  {g.git && (
+                    <button
+                      title={t('Sync with git…')}
+                      disabled={isSyncing}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        startSync(g)
+                      }}
+                    >
+                      {isSyncing ? '…' : '⟳'}
+                    </button>
+                  )}
                   <button
-                    title={t('Sync with git…')}
-                    disabled={isSyncing}
+                    title={t('New subgroup')}
                     onClick={(e) => {
                       e.stopPropagation()
-                      startSync(g)
+                      setGroupDialog({ parentId: g.id })
                     }}
                   >
-                    {isSyncing ? '…' : '⟳'}
+                    +
                   </button>
-                )}
-                <button
-                  title={t("New subgroup")}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setGroupDialog({ parentId: g.id })
-                  }}
-                >
-                  +
-                </button>
+                </div>
               </div>
-            </div>
-            {/* Only when a sync went wrong. That is not a caption to read past:
+              {/* Only when a sync went wrong. That is not a caption to read past:
                 the folder goes on showing what it already had, and without this
                 a failed sync looks exactly like one that changed nothing. */}
-            {g.git && !isSyncing && (gitErrors[g.id] ?? g.git.lastError) && (
-              <div className="inventory-error" style={{ paddingLeft: 20 + depth * 12 }}>
-                {gitErrors[g.id] ?? g.git.lastError}
-              </div>
-            )}
-            {!isCollapsed && (
-              <>
-                {hostsIn(g.id, visible).map((s) => renderSession(s, 20 + depth * 12))}
-                {renderGroups(g.id, depth + 1)}
-              </>
-            )}
-          </div>
-        )
-      })
+              {g.git && !isSyncing && (gitErrors[g.id] ?? g.git.lastError) && (
+                <div className="inventory-error" style={{ paddingLeft: 20 + depth * 12 }}>
+                  {gitErrors[g.id] ?? g.git.lastError}
+                </div>
+              )}
+              {!isCollapsed && (
+                <>
+                  {hostsIn(g.id, visible).map((s) => renderSession(s, 20 + depth * 12))}
+                  {renderGroups(g.id, depth + 1)}
+                </>
+              )}
+            </div>
+          )
+        })
+    )
   }
 
   return (
@@ -845,58 +857,58 @@ export default function Sidebar({
 
       {tab === 'sessions' && (
         <>
-      <div className="sidebar-header">
-        <button className="primary" style={{ flex: 1 }} onClick={() => newSession(null)}>
-          + Session
-        </button>
-        <button onClick={() => setGroupDialog({ parentId: null })}>+ Group</button>
-        <button title={t("Import from ~/.ssh/config")} onClick={() => setShowImport(true)}>
-          ⇩
-        </button>
-      </div>
-      <div className="sidebar-header" style={{ borderTop: 'none' }}>
-        <button style={{ flex: 1 }} onClick={() => setShowQuickConnect(true)}>
-          {t('Quick connect…')}
-        </button>
-      </div>
-      <div className="sidebar-tree">
-        {renderGroups(null, 0)}
-
-        {rootSessions.length > 0 && (
-          <div className="tree-group">
-            <div className="tree-group-title">{t('Sessions')}</div>
-            {rootSessions.map((s) => renderSession(s, 8))}
+          <div className="sidebar-header">
+            <button className="primary" style={{ flex: 1 }} onClick={() => newSession(null)}>
+              + Session
+            </button>
+            <button onClick={() => setGroupDialog({ parentId: null })}>+ Group</button>
+            <button title={t('Import from ~/.ssh/config')} onClick={() => setShowImport(true)}>
+              ⇩
+            </button>
           </div>
-        )}
-
-        {groups.length === 0 && sessions.length === 0 && (
-          <div style={{ padding: 12, color: 'var(--text-dim)', fontSize: 12 }}>
-            {t('No saved sessions yet. Click "+ Session" to add one.')}
+          <div className="sidebar-header" style={{ borderTop: 'none' }}>
+            <button style={{ flex: 1 }} onClick={() => setShowQuickConnect(true)}>
+              {t('Quick connect…')}
+            </button>
           </div>
-        )}
-        {needle !== '' && visible.length === 0 && (
-          <div style={{ padding: 12, color: 'var(--text-dim)', fontSize: 12 }}>
-            Nothing matches “{query}”.
-          </div>
-        )}
+          <div className="sidebar-tree">
+            {renderGroups(null, 0)}
 
-        {/* An explicit strip, rather than outlining the whole tree, which made
+            {rootSessions.length > 0 && (
+              <div className="tree-group">
+                <div className="tree-group-title">{t('Sessions')}</div>
+                {rootSessions.map((s) => renderSession(s, 8))}
+              </div>
+            )}
+
+            {groups.length === 0 && sessions.length === 0 && (
+              <div style={{ padding: 12, color: 'var(--text-dim)', fontSize: 12 }}>
+                {t('No saved sessions yet. Click "+ Session" to add one.')}
+              </div>
+            )}
+            {needle !== '' && visible.length === 0 && (
+              <div style={{ padding: 12, color: 'var(--text-dim)', fontSize: 12 }}>
+                Nothing matches “{query}”.
+              </div>
+            )}
+
+            {/* An explicit strip, rather than outlining the whole tree, which made
             it look as though the entire structure were being moved. */}
-        {isDragging && (
-          <div
-            className={`root-drop-zone ${dropTarget === ROOT_TARGET ? 'over' : ''}`}
-            onDragOver={(e) => allowDrop(e, null)}
-            onDragLeave={() => setDropTarget(null)}
-            onDrop={(e) => handleDrop(e, null)}
-          >
-            {t('Move to top level')}
-          </div>
-        )}
+            {isDragging && (
+              <div
+                className={`root-drop-zone ${dropTarget === ROOT_TARGET ? 'over' : ''}`}
+                onDragOver={(e) => allowDrop(e, null)}
+                onDragLeave={() => setDropTarget(null)}
+                onDrop={(e) => handleDrop(e, null)}
+              >
+                {t('Move to top level')}
+              </div>
+            )}
 
-        {/* Custom sets live in the same tree as the groups, below them: they are
+            {/* Custom sets live in the same tree as the groups, below them: they are
             another way of grouping the very same hosts, not a separate place. */}
-        <CollectionsPanel query={query} />
-      </div>
+            <CollectionsPanel query={query} />
+          </div>
         </>
       )}
 
@@ -907,29 +919,29 @@ export default function Sidebar({
         <div className="selection-bar">
           <span className="count">{selectedHostIds.length} selected</span>
           <span style={{ flex: 1 }} />
-          <button className="icon-button" title={t("Clear")} onClick={clearHostSelection}>
+          <button className="icon-button" title={t('Clear')} onClick={clearHostSelection}>
             ✕
           </button>
           {/* The four verbs cannot fit beside the count in a sidebar this narrow,
               so they take a row of their own and wrap within it. */}
           <div className="selection-actions">
             <button
-              title={t("Each in its own tab, in the current workspace")}
+              title={t('Each in its own tab, in the current workspace')}
               onClick={() => openSelectedHosts('tabs')}
             >
               Open
             </button>
-            <button title={t("All tiled in one tab")} onClick={() => openSelectedHosts('grid')}>
+            <button title={t('All tiled in one tab')} onClick={() => openSelectedHosts('grid')}>
               Tile
             </button>
             <button
-              title={t("A new workspace with a tab per host")}
+              title={t('A new workspace with a tab per host')}
               onClick={() => openSelectedHosts('workspace')}
             >
               Workspace
             </button>
             <button
-              title={t("Save these hosts as a collection you can reopen later")}
+              title={t('Save these hosts as a collection you can reopen later')}
               onClick={(e) => {
                 e.stopPropagation()
                 const picked = [...selectedHostIds]
@@ -964,13 +976,25 @@ export default function Sidebar({
           {t('Snippets')}
         </button>
         <span style={{ flex: 1 }} />
-        <button className="icon-button" title={keyHint(t('Shortcuts and features (⌘/)'))} onClick={onOpenHelp}>
+        <button
+          className="icon-button"
+          title={keyHint(t('Shortcuts and features (⌘/)'))}
+          onClick={onOpenHelp}
+        >
           ?
         </button>
-        <button className="icon-button" title={t("Settings")} onClick={() => setSettingsTab('general')}>
+        <button
+          className="icon-button"
+          title={t('Settings')}
+          onClick={() => setSettingsTab('general')}
+        >
           ⚙
         </button>
-        <button className="icon-button" title={keyHint(t('Lock vault (⌘L)'))} onClick={() => lockVault()}>
+        <button
+          className="icon-button"
+          title={keyHint(t('Lock vault (⌘L)'))}
+          onClick={() => lockVault()}
+        >
           🔒
         </button>
       </div>
@@ -989,10 +1013,7 @@ export default function Sidebar({
       )}
 
       {multiConnecting && (
-        <MultiConnectDialog
-          host={multiConnecting}
-          onClose={() => setMultiConnecting(null)}
-        />
+        <MultiConnectDialog host={multiConnecting} onClose={() => setMultiConnecting(null)} />
       )}
 
       {collecting && (

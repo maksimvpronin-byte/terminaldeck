@@ -224,7 +224,9 @@ async function connectChain(
      * gives up and calls `auth` an `any`.
      */
     const auth: ResolvedAuth =
-      cursor === profile ? applyCredential(effectiveAuth(cursor), credential) : effectiveAuth(cursor)
+      cursor === profile
+        ? applyCredential(effectiveAuth(cursor), credential)
+        : effectiveAuth(cursor)
     hops.unshift({ profile: cursor, auth })
     cursor = auth.jumpHostId
       ? sessionStore.getAll().sessions.find((s) => s.id === auth.jumpHostId)
@@ -258,10 +260,16 @@ async function connectChain(
     if (!isLast) {
       const nextHop = hops[i + 1]
       sock = await new Promise<Readable>((resolve, reject) => {
-        client.forwardOut('127.0.0.1', 0, nextHop.profile.host, nextHop.auth.port, (err, stream) => {
-          if (err) reject(err)
-          else resolve(stream as unknown as Readable)
-        })
+        client.forwardOut(
+          '127.0.0.1',
+          0,
+          nextHop.profile.host,
+          nextHop.auth.port,
+          (err, stream) => {
+            if (err) reject(err)
+            else resolve(stream as unknown as Readable)
+          }
+        )
       })
     }
   }

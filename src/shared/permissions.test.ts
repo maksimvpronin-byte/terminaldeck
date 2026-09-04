@@ -106,18 +106,20 @@ describe('parseLongnameOwner', () => {
   })
 
   it('takes numeric ids as the names they stand in for', () => {
-    expect(parseLongnameOwner('drwxr-xr-x   2 0        0            4096 Jan  1  2020 etc')).toEqual(
-      { owner: '0', group: '0' }
-    )
+    expect(
+      parseLongnameOwner('drwxr-xr-x   2 0        0            4096 Jan  1  2020 etc')
+    ).toEqual({ owner: '0', group: '0' })
   })
 
   it('reads a line whose mode carries setuid or a sticky bit', () => {
-    expect(
-      parseLongnameOwner('-rwsr-xr-x 1 root root 166056 Feb 21  2024 sudo')
-    ).toEqual({ owner: 'root', group: 'root' })
-    expect(
-      parseLongnameOwner('drwxrwxrwt 8 root root 4096 Aug 11 13:00 tmp')
-    ).toEqual({ owner: 'root', group: 'root' })
+    expect(parseLongnameOwner('-rwsr-xr-x 1 root root 166056 Feb 21  2024 sudo')).toEqual({
+      owner: 'root',
+      group: 'root'
+    })
+    expect(parseLongnameOwner('drwxrwxrwt 8 root root 4096 Aug 11 13:00 tmp')).toEqual({
+      owner: 'root',
+      group: 'root'
+    })
   })
 
   it('refuses a line that is not a listing, rather than guessing', () => {

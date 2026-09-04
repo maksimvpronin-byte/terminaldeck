@@ -248,7 +248,7 @@ describe('agent forwarding', () => {
   const auth = (agentForward: boolean): Parameters<typeof forwarding>[0] =>
     ({ agentForward }) as Parameters<typeof forwarding>[0]
 
-  const withSock = <T,>(sock: string | undefined, run: () => T): T => {
+  const withSock = <T>(sock: string | undefined, run: () => T): T => {
     const had = process.env.SSH_AUTH_SOCK
     if (sock === undefined) delete process.env.SSH_AUTH_SOCK
     else process.env.SSH_AUTH_SOCK = sock

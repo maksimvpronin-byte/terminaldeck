@@ -94,9 +94,7 @@ export default function HostPalette({ onClose }: { onClose: () => void }): JSX.E
   const matches = useMemo(() => {
     const needle = query.trim().toLowerCase()
     if (!needle) return entries
-    return entries.filter((e) =>
-      `${e.title} ${e.address} ${e.path}`.toLowerCase().includes(needle)
-    )
+    return entries.filter((e) => `${e.title} ${e.address} ${e.path}`.toLowerCase().includes(needle))
   }, [entries, query])
 
   useEffect(() => {

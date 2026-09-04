@@ -51,8 +51,7 @@ interface Session {
 }
 
 /** A line in the terminal running the app, on the same switch the rest of RDP uses. */
-const tracing =
-  process.env.NODE_ENV === 'development' || process.env.TERMINALDECK_RDP_TRACE === '1'
+const tracing = process.env.NODE_ENV === 'development' || process.env.TERMINALDECK_RDP_TRACE === '1'
 
 function trace(message: string): void {
   if (!tracing) return
@@ -87,7 +86,10 @@ class ShadowHostBridge {
     )
 
     const id = `shadow${this.nextId++}`
-    const child = spawn(hostExecutable(), [], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true })
+    const child = spawn(hostExecutable(), [], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true
+    })
     this.sessions.set(id, { child, window })
 
     let buffered = ''

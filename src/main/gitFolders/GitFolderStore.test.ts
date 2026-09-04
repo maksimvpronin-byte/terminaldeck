@@ -195,10 +195,12 @@ describe('a Sessions folder mirroring a repository', () => {
     expect(preview.groups.map((g) => g.path)).toEqual(['all', 'all/prod', 'all/dev'])
     expect(gitFolderStore.treeOf('folder-2')?.sessions.map((s) => s.name)).toEqual(['dev1'])
     // The first folder is untouched by the second's sync.
-    expect(gitFolderStore.treeOf(FOLDER)?.sessions.map((s) => s.name).sort()).toEqual([
-      'db1',
-      'web1'
-    ])
+    expect(
+      gitFolderStore
+        .treeOf(FOLDER)
+        ?.sessions.map((s) => s.name)
+        .sort()
+    ).toEqual(['db1', 'web1'])
     // One clone between them, and one entry in the list rather than two.
     expect(readdirSync(join(userData, 'git-folder-repos'))).toHaveLength(1)
     expect(gitFolderStore.repos()).toHaveLength(1)

@@ -9,13 +9,7 @@ import ModalBackdrop from './ModalBackdrop'
 import { keyHint } from '../state/keys'
 import { LANGUAGES, useT, type Language } from '../i18n'
 
-export type SettingsTab =
-  | 'general'
-  | 'terminal'
-  | 'files'
-  | 'accounts'
-  | 'security'
-  | 'backup'
+export type SettingsTab = 'general' | 'terminal' | 'files' | 'accounts' | 'security' | 'backup'
 
 export default function SettingsDialog({
   initialTab,
@@ -45,31 +39,19 @@ export default function SettingsDialog({
             put it on every tab — a setting somebody changes once, permanently in
             front of the ones they came to change. */}
         <div className="settings-tabs">
-          <button
-            className={tab === 'general' ? 'active' : ''}
-            onClick={() => setTab('general')}
-          >
+          <button className={tab === 'general' ? 'active' : ''} onClick={() => setTab('general')}>
             {t('General')}
           </button>
-          <button
-            className={tab === 'terminal' ? 'active' : ''}
-            onClick={() => setTab('terminal')}
-          >
+          <button className={tab === 'terminal' ? 'active' : ''} onClick={() => setTab('terminal')}>
             {t('Terminal')}
           </button>
           <button className={tab === 'files' ? 'active' : ''} onClick={() => setTab('files')}>
             {t('Files')}
           </button>
-          <button
-            className={tab === 'accounts' ? 'active' : ''}
-            onClick={() => setTab('accounts')}
-          >
+          <button className={tab === 'accounts' ? 'active' : ''} onClick={() => setTab('accounts')}>
             {t('Accounts')}
           </button>
-          <button
-            className={tab === 'security' ? 'active' : ''}
-            onClick={() => setTab('security')}
-          >
+          <button className={tab === 'security' ? 'active' : ''} onClick={() => setTab('security')}>
             {t('Security')}
           </button>
           <button className={tab === 'backup' ? 'active' : ''} onClick={() => setTab('backup')}>
@@ -136,140 +118,142 @@ export default function SettingsDialog({
               )}
             </p>
 
-        <label>
-          {t('Font')}
-          <select
-            value={settings.fontFamily}
-            onChange={(e) => updateSettings({ fontFamily: e.target.value })}
-          >
-            {FONT_CHOICES.map((f) => (
-              <option key={f} value={f}>
-                {f.split(',')[0]}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <div className="form-row">
-          <label>
-            {t('Font size')}
-            <div className="stepper">
-              <button
-                title={keyHint(t('Smaller (⌘−)'))}
-                disabled={settings.fontSize <= 8}
-                onClick={() => updateSettings({ fontSize: settings.fontSize - 1 })}
+            <label>
+              {t('Font')}
+              <select
+                value={settings.fontFamily}
+                onChange={(e) => updateSettings({ fontFamily: e.target.value })}
               >
-                −
-              </button>
-              <span className="stepper-value">{settings.fontSize}</span>
-              <button
-                title={keyHint(t('Larger (⌘+)'))}
-                disabled={settings.fontSize >= 32}
-                onClick={() => updateSettings({ fontSize: settings.fontSize + 1 })}
-              >
-                +
-              </button>
-            </div>
-          </label>
-          <label>
-            {t('Scrollback (lines)')}
-            <input
-              type="number"
-              min={100}
-              max={200000}
-              step={1000}
-              value={settings.scrollback}
-              onChange={(e) => updateSettings({ scrollback: Number(e.target.value) })}
-            />
-          </label>
-        </div>
-
-        <label>
-          {t('Colour theme')}
-          <select
-            value={settings.themeName}
-            onChange={(e) => updateSettings({ themeName: e.target.value })}
-          >
-            {THEME_GROUPS.map((group) => (
-              <optgroup key={group.label} label={group.label}>
-                {group.names.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
+                {FONT_CHOICES.map((f) => (
+                  <option key={f} value={f}>
+                    {f.split(',')[0]}
                   </option>
                 ))}
-              </optgroup>
-            ))}
-          </select>
-        </label>
+              </select>
+            </label>
 
-        <div
-          className="theme-preview"
-          style={{
-            background: preview.background,
-            color: preview.foreground,
-            fontFamily: settings.fontFamily,
-            fontSize: settings.fontSize
-          }}
-        >
-          <div>
-            <span style={{ color: preview.green ?? preview.foreground }}>user@host</span>:
-            <span style={{ color: preview.blue ?? preview.foreground }}>~</span>${' '}
-            <span>ls -la</span>
-          </div>
-          <div style={{ color: preview.red ?? preview.foreground }}>permission denied</div>
-        </div>
+            <div className="form-row">
+              <label>
+                {t('Font size')}
+                <div className="stepper">
+                  <button
+                    title={keyHint(t('Smaller (⌘−)'))}
+                    disabled={settings.fontSize <= 8}
+                    onClick={() => updateSettings({ fontSize: settings.fontSize - 1 })}
+                  >
+                    −
+                  </button>
+                  <span className="stepper-value">{settings.fontSize}</span>
+                  <button
+                    title={keyHint(t('Larger (⌘+)'))}
+                    disabled={settings.fontSize >= 32}
+                    onClick={() => updateSettings({ fontSize: settings.fontSize + 1 })}
+                  >
+                    +
+                  </button>
+                </div>
+              </label>
+              <label>
+                {t('Scrollback (lines)')}
+                <input
+                  type="number"
+                  min={100}
+                  max={200000}
+                  step={1000}
+                  value={settings.scrollback}
+                  onChange={(e) => updateSettings({ scrollback: Number(e.target.value) })}
+                />
+              </label>
+            </div>
 
-        <div className="form-row">
-          <label>
-            {t('Cursor style')}
-            <select
-              value={settings.cursorStyle}
-              onChange={(e) =>
-                updateSettings({ cursorStyle: e.target.value as typeof settings.cursorStyle })
-              }
+            <label>
+              {t('Colour theme')}
+              <select
+                value={settings.themeName}
+                onChange={(e) => updateSettings({ themeName: e.target.value })}
+              >
+                {THEME_GROUPS.map((group) => (
+                  <optgroup key={group.label} label={group.label}>
+                    {group.names.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </label>
+
+            <div
+              className="theme-preview"
+              style={{
+                background: preview.background,
+                color: preview.foreground,
+                fontFamily: settings.fontFamily,
+                fontSize: settings.fontSize
+              }}
             >
-              <option value="block">{t('Block')}</option>
-              <option value="underline">{t('Underline')}</option>
-              <option value="bar">{t('Bar')}</option>
-            </select>
-          </label>
-          <label className="checkbox-row" style={{ alignSelf: 'flex-end', paddingBottom: 6 }}>
-            <input
-              type="checkbox"
-              checked={settings.cursorBlink}
-              onChange={(e) => updateSettings({ cursorBlink: e.target.checked })}
-            />
-            {t('Blinking cursor')}
-          </label>
-        </div>
+              <div>
+                <span style={{ color: preview.green ?? preview.foreground }}>user@host</span>:
+                <span style={{ color: preview.blue ?? preview.foreground }}>~</span>${' '}
+                <span>ls -la</span>
+              </div>
+              <div style={{ color: preview.red ?? preview.foreground }}>permission denied</div>
+            </div>
 
-        <label className="checkbox-row" style={{ flexDirection: 'row' }}>
-          <input
-            type="checkbox"
-            checked={settings.copyOnSelect}
-            onChange={(e) => updateSettings({ copyOnSelect: e.target.checked })}
-          />
-          {t('Copy to clipboard as soon as text is selected')}
-        </label>
+            <div className="form-row">
+              <label>
+                {t('Cursor style')}
+                <select
+                  value={settings.cursorStyle}
+                  onChange={(e) =>
+                    updateSettings({ cursorStyle: e.target.value as typeof settings.cursorStyle })
+                  }
+                >
+                  <option value="block">{t('Block')}</option>
+                  <option value="underline">{t('Underline')}</option>
+                  <option value="bar">{t('Bar')}</option>
+                </select>
+              </label>
+              <label className="checkbox-row" style={{ alignSelf: 'flex-end', paddingBottom: 6 }}>
+                <input
+                  type="checkbox"
+                  checked={settings.cursorBlink}
+                  onChange={(e) => updateSettings({ cursorBlink: e.target.checked })}
+                />
+                {t('Blinking cursor')}
+              </label>
+            </div>
 
-        <label>
-          {t('Right-click in a terminal')}
-          <select
-            value={settings.rightClick}
-            onChange={(e) =>
-              updateSettings({ rightClick: e.target.value as typeof settings.rightClick })
-            }
-          >
-            <option value="paste">{t('Paste clipboard')}</option>
-            <option value="menu">{t('Open context menu')}</option>
-          </select>
-        </label>
+            <label className="checkbox-row" style={{ flexDirection: 'row' }}>
+              <input
+                type="checkbox"
+                checked={settings.copyOnSelect}
+                onChange={(e) => updateSettings({ copyOnSelect: e.target.checked })}
+              />
+              {t('Copy to clipboard as soon as text is selected')}
+            </label>
+
+            <label>
+              {t('Right-click in a terminal')}
+              <select
+                value={settings.rightClick}
+                onChange={(e) =>
+                  updateSettings({ rightClick: e.target.value as typeof settings.rightClick })
+                }
+              >
+                <option value="paste">{t('Paste clipboard')}</option>
+                <option value="menu">{t('Open context menu')}</option>
+              </select>
+            </label>
           </>
         )}
 
         <div className="modal-actions">
           {tab === 'terminal' && (
-            <button onClick={() => updateSettings(DEFAULT_SETTINGS)}>{t('Reset to defaults')}</button>
+            <button onClick={() => updateSettings(DEFAULT_SETTINGS)}>
+              {t('Reset to defaults')}
+            </button>
           )}
           <button className="primary" onClick={onClose}>
             {t('Done')}

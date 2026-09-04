@@ -111,7 +111,8 @@ function parseWindowsInvitation(
     endpoints,
     invitationId: invitationAttributes.ID || undefined,
     certificateDerBase64: compactBase64(invitationAttributes.CE),
-    keyHashBase64: extractHash(invitationAttributes.KH2)?.hash ?? (invitationAttributes.KH || undefined),
+    keyHashBase64:
+      extractHash(invitationAttributes.KH2)?.hash ?? (invitationAttributes.KH || undefined),
     keyHashAlgorithm: extractHash(invitationAttributes.KH2)?.algorithm
   }
 }

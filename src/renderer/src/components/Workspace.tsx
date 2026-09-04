@@ -92,7 +92,9 @@ export default function Workspace(): JSX.Element {
               className={`workspace-chip ${isActive ? 'active' : ''} ${
                 dropTarget === w.id ? 'drop' : ''
               }`}
-              title={t("Double-click to rename; right-click to save it; drop a tab here to move it")}
+              title={t(
+                'Double-click to rename; right-click to save it; drop a tab here to move it'
+              )}
               onClick={() => setActiveWorkspace(w.id)}
               onDoubleClick={() => startRename(w.id, w.title)}
               onContextMenu={(e) => {
@@ -128,7 +130,7 @@ export default function Workspace(): JSX.Element {
             >
               {w.color && <span className="tab-colour" style={{ background: w.color }} />}
               {!isActive && workspaceHasActivity(w) && (
-                <span className="activity-dot" title={t("New output in this workspace")} />
+                <span className="activity-dot" title={t('New output in this workspace')} />
               )}
               {renaming === w.id ? (
                 <input
@@ -149,7 +151,7 @@ export default function Workspace(): JSX.Element {
               <span className="workspace-count">{w.tabs.length}</span>
               <span
                 className="close"
-                title={t("Close this workspace and everything in it")}
+                title={t('Close this workspace and everything in it')}
                 onClick={(e) => {
                   e.stopPropagation()
                   requestCloseWorkspace(w.id, w.title, w.tabs.length)
@@ -162,7 +164,7 @@ export default function Workspace(): JSX.Element {
         })}
         <button
           className="workspace-add"
-          title={t("New workspace")}
+          title={t('New workspace')}
           onClick={() => openWorkspace()}
         >
           +
@@ -171,7 +173,7 @@ export default function Workspace(): JSX.Element {
         {allLeaves.length > 0 && (
           <button
             className={`broadcast-toggle ${broadcast ? 'on' : ''}`}
-            title={t("Mirror typing to every open pane, in every workspace")}
+            title={t('Mirror typing to every open pane, in every workspace')}
             onClick={() => toggleBroadcast()}
           >
             ⇉ {t('Broadcast')}
@@ -186,7 +188,7 @@ export default function Workspace(): JSX.Element {
               key={tab.id}
               className={`tab ${tab.id === current.activeTabId ? 'active' : ''}`}
               draggable
-              title={t("Drag onto a pane to view side by side, or onto a workspace to move it")}
+              title={t('Drag onto a pane to view side by side, or onto a workspace to move it')}
               onDragStart={(e) => {
                 e.dataTransfer.setData(DRAG_MIME, JSON.stringify({ kind: 'tab', id: tab.id }))
                 e.dataTransfer.effectAllowed = 'copyMove'
@@ -200,7 +202,7 @@ export default function Workspace(): JSX.Element {
                 ) : null
               })()}
               {tab.hasActivity && tab.id !== current.activeTabId && (
-                <span className="activity-dot" title={t("New output since you last looked")} />
+                <span className="activity-dot" title={t('New output since you last looked')} />
               )}
               <span>{tab.title}</span>
               {broadcast && collectLeaves(tab.root).some((l) => l.broadcastEnabled) && (

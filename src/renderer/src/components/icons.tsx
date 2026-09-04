@@ -13,13 +13,7 @@ const frame = {
 export function SplitRightIcon(): JSX.Element {
   return (
     <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" focusable="false">
-      <rect
-        {...frame}
-        rx="1.5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.2"
-      />
+      <rect {...frame} rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.2" />
       <rect x="8" y="2.5" width="6.5" height="11" fill="currentColor" opacity="0.45" />
       <line x1="8" y1="2.5" x2="8" y2="13.5" stroke="currentColor" strokeWidth="1.2" />
     </svg>
@@ -29,13 +23,7 @@ export function SplitRightIcon(): JSX.Element {
 export function SplitDownIcon(): JSX.Element {
   return (
     <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" focusable="false">
-      <rect
-        {...frame}
-        rx="1.5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.2"
-      />
+      <rect {...frame} rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.2" />
       <rect x="1.5" y="8" width="13" height="5.5" fill="currentColor" opacity="0.45" />
       <line x1="1.5" y1="8" x2="14.5" y2="8" stroke="currentColor" strokeWidth="1.2" />
     </svg>
@@ -53,8 +41,14 @@ export function RefreshIcon(): JSX.Element {
         strokeWidth="1.5"
         strokeLinecap="round"
       />
-      <path d="M13.2 2.2V5.4H10" fill="none" stroke="currentColor" strokeWidth="1.5"
-        strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M13.2 2.2V5.4H10"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   )
 }

@@ -11,9 +11,7 @@ Host web1
   User deploy
   Port 2222
 `)
-    expect(hosts).toEqual([
-      { alias: 'web1', hostname: '10.0.0.5', user: 'deploy', port: 2222 }
-    ])
+    expect(hosts).toEqual([{ alias: 'web1', hostname: '10.0.0.5', user: 'deploy', port: 2222 }])
   })
 
   it('defaults the port to 22', () => {

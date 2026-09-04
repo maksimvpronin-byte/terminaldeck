@@ -5,12 +5,7 @@ import {
   inheritedAppearance,
   resolveAppearance
 } from './appearance'
-import type {
-  AppearanceDefaults,
-  AuthDefaults,
-  ResolvedAppearance,
-  SessionGroup
-} from './types'
+import type { AppearanceDefaults, AuthDefaults, ResolvedAppearance, SessionGroup } from './types'
 
 const globals: ResolvedAppearance = {
   fontFamily: 'Menlo, Consolas, monospace',
@@ -89,7 +84,7 @@ describe('resolveAppearance', () => {
 })
 
 describe('inheritedAppearance', () => {
-  it("reports what a host would look like without its own values", () => {
+  it('reports what a host would look like without its own values', () => {
     const own = { themeName: 'Light', fontSize: 9 }
     expect(inheritedAppearance(own, 'prod', groups, globals)).toMatchObject({
       themeName: 'Dracula',

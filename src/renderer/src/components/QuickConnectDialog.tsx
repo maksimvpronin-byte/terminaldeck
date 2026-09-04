@@ -89,7 +89,11 @@ export default function QuickConnectDialog({ onClose }: { onClose: () => void })
             </div>
             <label>
               {t('Passphrase')}
-              <input type="password" value={passphrase} onChange={(e) => setPassphrase(e.target.value)} />
+              <input
+                type="password"
+                value={passphrase}
+                onChange={(e) => setPassphrase(e.target.value)}
+              />
             </label>
           </>
         )}

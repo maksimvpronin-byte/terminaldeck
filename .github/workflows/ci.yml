@@ -52,10 +52,15 @@ jobs:
 
       # Errors fail the job; `exhaustive-deps` is still a warning and does not,
       # which is why this step could be added the day the first run was read
-      # rather than waiting for the rule to be promoted. `format:check` stays
-      # out until the tree has been through Prettier once.
+      # rather than waiting for the rule to be promoted.
       - name: Lint
         run: npm run lint
+
+      # It could not be here before: the tree had never been through Prettier,
+      # so this would have failed on eighty-six files that nobody had touched.
+      # It has now, in a commit of its own, and this is what keeps it that way.
+      - name: Format
+        run: npm run format:check
 
       # One runner, not the release matrix: the tests are pure Node modules with
       # no platform branches. A three-OS matrix belongs here the day a platform

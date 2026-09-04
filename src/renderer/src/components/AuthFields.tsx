@@ -158,8 +158,8 @@ export default function AuthFields({
           book matches whole strings rather than filling in blanks. */}
       {splitCredential && (
         <p className="settings-note warning-note">
-          The key file comes from {nameOf(keyFrom)} and the passphrase from{' '}
-          {nameOf(passphraseFrom)}. A passphrase saved for a different key will not open this one.
+          The key file comes from {nameOf(keyFrom)} and the passphrase from {nameOf(passphraseFrom)}
+          . A passphrase saved for a different key will not open this one.
         </p>
       )}
 

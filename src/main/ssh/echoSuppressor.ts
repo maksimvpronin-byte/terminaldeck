@@ -66,10 +66,7 @@ function noiseLength(buf: Buffer, at: number): number {
  * three hundred distinctive characters long, so there is no realistic way for
  * this to find an echo that is not one.
  */
-function findEcho(
-  haystack: Buffer,
-  expected: Buffer
-): { start: number; end: number } | undefined {
+function findEcho(haystack: Buffer, expected: Buffer): { start: number; end: number } | undefined {
   for (let start = 0; start < haystack.length; start++) {
     if (haystack[start] !== expected[0]) continue
 
@@ -136,10 +133,7 @@ export class EchoSuppressor {
     if (found) {
       this.finished = true
       const after = pastLineEnd(this.held, found.end)
-      const out = Buffer.concat([
-        this.held.subarray(0, found.start),
-        this.held.subarray(after)
-      ])
+      const out = Buffer.concat([this.held.subarray(0, found.start), this.held.subarray(after)])
       this.held = Buffer.alloc(0)
       return out
     }

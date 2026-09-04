@@ -36,7 +36,6 @@ export function registerAppHandlers(): void {
     return dir
   })
 
-
   // --- Dialogs ---
   /**
    * Picks a private key, starting where private keys actually live.

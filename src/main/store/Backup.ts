@@ -91,9 +91,7 @@ export async function exportToFile(
         .filter((ref): ref is string => Boolean(ref))
     )
     const all = vault.allSecrets()
-    const referenced = Object.fromEntries(
-      Object.entries(all).filter(([ref]) => wanted.has(ref))
-    )
+    const referenced = Object.fromEntries(Object.entries(all).filter(([ref]) => wanted.has(ref)))
 
     const salt = newSalt()
     const key = await deriveKey(password, salt)

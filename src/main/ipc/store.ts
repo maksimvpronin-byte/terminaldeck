@@ -76,7 +76,6 @@ export function registerStoreHandlers(): void {
     return sessionStore.deleteGroup(id)
   })
 
-
   // --- Backup ---
   ipcMain.handle(IPC.backupExport, (_e, includeSecrets: boolean, password?: string) =>
     exportToFile(focusedWin(), includeSecrets, password)
@@ -84,7 +83,6 @@ export function registerStoreHandlers(): void {
   ipcMain.handle(IPC.backupImport, (_e, password?: string) =>
     importFromFile(focusedWin(), password)
   )
-
 
   // --- Snippets ---
   ipcMain.handle(IPC.snippetsList, () => snippetStore.list())
@@ -102,13 +100,10 @@ export function registerStoreHandlers(): void {
    * A method that cannot carry one drops it, so a password left in the box
    * after switching to the agent is not kept where nothing will ever use it.
    */
-  ipcMain.handle(
-    IPC.credentialsSave,
-    (_e, credential: Credential, secret?: string | null) => {
-      applySecret(credential, 'secretRef', credential.authMethod === 'agent' ? null : secret)
-      return credentialStore.save(credential)
-    }
-  )
+  ipcMain.handle(IPC.credentialsSave, (_e, credential: Credential, secret?: string | null) => {
+    applySecret(credential, 'secretRef', credential.authMethod === 'agent' ? null : secret)
+    return credentialStore.save(credential)
+  })
   ipcMain.handle(IPC.credentialsDelete, (_e, id: string) => {
     // The secret goes with the account. Left behind it would sit in the vault
     // for good, with nothing left pointing at it.
@@ -117,12 +112,10 @@ export function registerStoreHandlers(): void {
     credentialStore.remove(id)
   })
 
-
   ipcMain.handle(IPC.collectionsList, () => collectionStore.list())
   ipcMain.handle(IPC.collectionsSave, (_e, collection: HostCollection) =>
     collectionStore.save(collection)
   )
   ipcMain.handle(IPC.collectionsDelete, (_e, id: string) => collectionStore.remove(id))
   ipcMain.handle(IPC.collectionsReorder, (_e, ids: string[]) => collectionStore.reorder(ids))
-
 }

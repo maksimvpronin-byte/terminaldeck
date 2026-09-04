@@ -112,10 +112,10 @@ export default function TransferConflictDialog({
       <div className="modal-card conflict-card">
         <h2>{heading(t, plan.direction, plan.conflicts.length)}</h2>
         <p className="settings-note">
-          {untouched > 0
-            ? t('Other files written as normal: {count}. ', { count: untouched })
-            : ''}
-          {t('Nothing is overwritten unless you say so here, and nothing is remembered for next time.')}
+          {untouched > 0 ? t('Other files written as normal: {count}. ', { count: untouched }) : ''}
+          {t(
+            'Nothing is overwritten unless you say so here, and nothing is remembered for next time.'
+          )}
         </p>
 
         {replaceable.length > 0 && (

@@ -56,7 +56,10 @@ function reposRoot(): string {
  * ones.
  */
 function checkoutFor(url: string, branch?: string): string {
-  const key = createHash('sha1').update(`${url}\n${branch ?? ''}`).digest('hex').slice(0, 16)
+  const key = createHash('sha1')
+    .update(`${url}\n${branch ?? ''}`)
+    .digest('hex')
+    .slice(0, 16)
   return join(reposRoot(), key)
 }
 
@@ -199,7 +202,9 @@ class GitFolderStore {
       // Unioned rather than kept from the first file: a host named in two files
       // belongs to the groups of both.
       for (const [hostKey, groupIds] of Object.entries(parsed.memberships)) {
-        tree.memberships[hostKey] = [...new Set([...(tree.memberships[hostKey] ?? []), ...groupIds])]
+        tree.memberships[hostKey] = [
+          ...new Set([...(tree.memberships[hostKey] ?? []), ...groupIds])
+        ]
       }
     }
 
@@ -335,7 +340,9 @@ class GitFolderStore {
       ...(this.treeOf(folderId)?.sessions ?? []).map((s) => s.id)
     ])
     const prefix = gitNodePrefix(folderId)
-    const orphaned = this.data.overrides.filter((o) => o.nodeId.startsWith(prefix) && !live.has(o.nodeId))
+    const orphaned = this.data.overrides.filter(
+      (o) => o.nodeId.startsWith(prefix) && !live.has(o.nodeId)
+    )
     for (const override of orphaned) forgetSecret(override)
     this.data.overrides = this.data.overrides.filter((o) => !orphaned.includes(o))
   }
@@ -415,7 +422,12 @@ class GitFolderStore {
   allGroups(): SessionGroup[] {
     return this.data.trees
       .flatMap((t) => t.groups)
-      .map((g) => applyOverride(g, this.data.overrides.find((o) => o.nodeId === g.id)))
+      .map((g) =>
+        applyOverride(
+          g,
+          this.data.overrides.find((o) => o.nodeId === g.id)
+        )
+      )
   }
 }
 

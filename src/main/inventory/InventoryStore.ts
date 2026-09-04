@@ -102,7 +102,12 @@ class InventoryStore {
   allGroups(): import('../../shared/types').SessionGroup[] {
     return [...this.trees.values()]
       .flatMap((t) => t.groups)
-      .map((g) => applyOverride(g, this.data.overrides.find((o) => o.nodeId === g.id)))
+      .map((g) =>
+        applyOverride(
+          g,
+          this.data.overrides.find((o) => o.nodeId === g.id)
+        )
+      )
   }
 
   async sync(sourceId: string): Promise<InventoryTree> {

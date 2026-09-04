@@ -1,9 +1,7 @@
 export const DRAG_MIME = 'application/x-terminaldeck-item'
 
 export type DragItem =
-  | { kind: 'session'; id: string }
-  | { kind: 'group'; id: string }
-  | { kind: 'tab'; id: string }
+  { kind: 'session'; id: string } | { kind: 'group'; id: string } | { kind: 'tab'; id: string }
 
 /** Which edge of a pane a drop landed nearest, deciding how the pane splits. */
 export type DropEdge = 'left' | 'right' | 'top' | 'bottom'

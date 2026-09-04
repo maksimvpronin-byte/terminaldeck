@@ -54,9 +54,7 @@ export default function GroupDialog({
   const gitRepos = useStore((s) => s.gitRepos)
   const t = useT()
 
-  const [group, setGroup] = useState<SessionGroup>(
-    initial ?? { id: nanoid(), name: '', parentId }
-  )
+  const [group, setGroup] = useState<SessionGroup>(initial ?? { id: nanoid(), name: '', parentId })
   /**
    * The repository this folder mirrors, while it is being edited. Held apart
    * from the group so unticking the box does not throw away what was typed
@@ -325,11 +323,7 @@ export default function GroupDialog({
           </summary>
 
           <label className="checkbox-row" style={{ flexDirection: 'row' }}>
-            <input
-              type="checkbox"
-              checked={linked}
-              onChange={(e) => setLinked(e.target.checked)}
-            />
+            <input type="checkbox" checked={linked} onChange={(e) => setLinked(e.target.checked)} />
             {t('Mirror an inventory from a git repository')}
           </label>
 
@@ -341,8 +335,7 @@ export default function GroupDialog({
                   <select
                     value={
                       gitRepos.some(
-                        (r) =>
-                          r.url === link?.repoUrl && (r.branch ?? '') === (link?.branch ?? '')
+                        (r) => r.url === link?.repoUrl && (r.branch ?? '') === (link?.branch ?? '')
                       )
                         ? `${link?.repoUrl}\n${link?.branch ?? ''}`
                         : ''
@@ -364,7 +357,10 @@ export default function GroupDialog({
                   >
                     <option value="">{t('Another repository…')}</option>
                     {gitRepos.map((repo) => (
-                      <option key={`${repo.url}\n${repo.branch ?? ''}`} value={`${repo.url}\n${repo.branch ?? ''}`}>
+                      <option
+                        key={`${repo.url}\n${repo.branch ?? ''}`}
+                        value={`${repo.url}\n${repo.branch ?? ''}`}
+                      >
                         {repo.branch ? `${repo.url} · ${repo.branch}` : repo.url}
                       </option>
                     ))}

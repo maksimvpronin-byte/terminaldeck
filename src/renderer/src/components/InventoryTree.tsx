@@ -53,9 +53,7 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
   const openMany = useStore((s) => s.openMany)
   const credentials = useStore((s) => s.credentials)
   const workspaces = useStore((s) => s.workspaces)
-  const connected = new Set(
-    allRoots({ workspaces }).flatMap(collectConnectedSessionIds)
-  )
+  const connected = new Set(allRoots({ workspaces }).flatMap(collectConnectedSessionIds))
 
   const [editing, setEditing] = useState<InventorySource | 'new' | undefined>(undefined)
   const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsed)
@@ -64,9 +62,11 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
   /** Which page Settings should open on, or null while it is closed. */
   const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null)
   /** The host being opened several times over, once that has been asked for. */
-  const [multiConnecting, setMultiConnecting] = useState<
-    { id: string; name: string; color?: string } | null
-  >(null)
+  const [multiConnecting, setMultiConnecting] = useState<{
+    id: string
+    name: string
+    color?: string
+  } | null>(null)
 
   useEffect(() => {
     loadInventory()
@@ -86,7 +86,10 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
 
   /** Local settings layered over a derived node, blank fields ignored. */
   function withOverride<T extends { id: string }>(node: T): T {
-    return applyOverride(node, overrides.find((x) => x.nodeId === node.id))
+    return applyOverride(
+      node,
+      overrides.find((x) => x.nodeId === node.id)
+    )
   }
 
   // Groups carry overrides too, so a whole Ansible group can be pointed at a
@@ -180,8 +183,7 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
         connectAs: (credentialId) => connect(host, colour, credentialId),
         showMenu: (items) => setMenu({ x: atX, y: atY, items }),
         manageAccounts: () => setSettingsTab('accounts'),
-        openMultiConnect: () =>
-          setMultiConnecting({ id: host.id, name: host.name, color: colour })
+        openMultiConnect: () => setMultiConnecting({ id: host.id, name: host.name, color: colour })
       }),
       {
         label: t('Copy {address}', {
@@ -426,7 +428,9 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
       <div className="sidebar-tree">
         {!gitAvailable && (
           <div className="inventory-warning">
-            {t('git was not found on this machine. Install it (or add it to PATH) to sync inventories.')}
+            {t(
+              'git was not found on this machine. Install it (or add it to PATH) to sync inventories.'
+            )}
           </div>
         )}
 

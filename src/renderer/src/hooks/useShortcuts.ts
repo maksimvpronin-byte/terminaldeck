@@ -254,7 +254,9 @@ async function zoomHost(found: FoundHost, direction: 'in' | 'out' | 'reset'): Pr
   const size =
     direction === 'reset'
       ? undefined
-      : clampFontSize((found.host.fontSize ?? state.settings.fontSize) + (direction === 'in' ? 1 : -1))
+      : clampFontSize(
+          (found.host.fontSize ?? state.settings.fontSize) + (direction === 'in' ? 1 : -1)
+        )
 
   if (found.gitFolderId) {
     const existing = state.gitFolderOverrides.find((o) => o.nodeId === found.host.id)

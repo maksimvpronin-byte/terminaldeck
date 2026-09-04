@@ -127,8 +127,8 @@ export function pruneTree(
   const sessions: SessionProfile[] = []
   const memberships: Record<string, string[]> = {}
   for (const host of full.sessions) {
-    const claims = (full.memberships[host.id] ?? (host.groupId ? [host.groupId] : [])).filter((id) =>
-      keptIds.has(id)
+    const claims = (full.memberships[host.id] ?? (host.groupId ? [host.groupId] : [])).filter(
+      (id) => keptIds.has(id)
     )
     if (claims.length === 0) continue
     sessions.push({ ...host, groupId: claims[claims.length - 1] })

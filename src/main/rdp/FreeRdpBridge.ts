@@ -4,13 +4,7 @@ import { X509Certificate } from 'crypto'
 import { app, type BrowserWindow } from 'electron'
 import { IPC } from '../../shared/ipc-channels'
 import { askAboutCertificate } from './certificateVerifier'
-import {
-  createRecordReader,
-  encodeCommand,
-  readCursor,
-  readFrame,
-  RECORD
-} from './recordStream'
+import { createRecordReader, encodeCommand, readCursor, readFrame, RECORD } from './recordStream'
 
 /**
  * Drives td-rdp, which is what draws a desktop pane.
@@ -122,7 +116,8 @@ class FreeRdpBridge {
 
     const reader = createRecordReader(
       (type, payload) => this.receive(id, session, type, payload),
-      (why) => this.say(session, id, { e: 'failed', detail: `the client's output made no sense: ${why}` })
+      (why) =>
+        this.say(session, id, { e: 'failed', detail: `the client's output made no sense: ${why}` })
     )
     child.stdout?.on('data', (chunk: Buffer) => reader.push(chunk))
 
@@ -146,9 +141,7 @@ class FreeRdpBridge {
       this.say(session, id, {
         e: 'closed',
         detail:
-          code === 0
-            ? 'the session ended'
-            : `the desktop client stopped (${code ?? 'killed'})`
+          code === 0 ? 'the session ended' : `the desktop client stopped (${code ?? 'killed'})`
       })
     })
     child.on('error', (err: Error) => {

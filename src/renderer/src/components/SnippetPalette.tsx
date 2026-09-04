@@ -79,7 +79,9 @@ export default function SnippetPalette({ onClose }: { onClose: () => void }): JS
     return (
       <ModalBackdrop onClose={() => setEditing(null)}>
         <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-          <h2>{snippets.some((s) => s.id === editing.id) ? t('Edit snippet') : t('New snippet')}</h2>
+          <h2>
+            {snippets.some((s) => s.id === editing.id) ? t('Edit snippet') : t('New snippet')}
+          </h2>
           <label>
             {t('Name')}
             <input

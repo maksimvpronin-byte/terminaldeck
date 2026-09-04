@@ -58,7 +58,12 @@ class FakeGateway {
 
   private answerTo(type: number): Uint8Array | null {
     const error = this.errors[type] ?? 0
-    const le32 = (v: number): number[] => [v & 0xff, (v >>> 8) & 0xff, (v >>> 16) & 0xff, (v >>> 24) & 0xff]
+    const le32 = (v: number): number[] => [
+      v & 0xff,
+      (v >>> 8) & 0xff,
+      (v >>> 16) & 0xff,
+      (v >>> 24) & 0xff
+    ]
     const le16 = (v: number): number[] => [v & 0xff, (v >>> 8) & 0xff]
 
     switch (type) {
@@ -197,7 +202,6 @@ describe('Tunnel', () => {
   })
 })
 
-
 /**
  * The older transport, where the two directions are two connections and every
  * packet is one HTTP chunk. Modelled with streams rather than sockets: what is
@@ -237,7 +241,12 @@ class FakeLegacyGateway {
 }
 
 function answerTo(type: number, packet: Uint8Array): Uint8Array | null {
-  const le32 = (v: number): number[] => [v & 0xff, (v >>> 8) & 0xff, (v >>> 16) & 0xff, (v >>> 24) & 0xff]
+  const le32 = (v: number): number[] => [
+    v & 0xff,
+    (v >>> 8) & 0xff,
+    (v >>> 16) & 0xff,
+    (v >>> 24) & 0xff
+  ]
   const le16 = (v: number): number[] => [v & 0xff, (v >>> 8) & 0xff]
   switch (type) {
     case PacketType.HandshakeRequest:
@@ -317,7 +326,9 @@ describe('the older transport', () => {
     gateway.say(Buffer.alloc(10, 0xab))
 
     // A chunk boundary has nothing to do with a packet boundary.
-    const response = Buffer.from(build(PacketType.HandshakeResponse, [0, 0, 0, 0, 1, 0, 6, 0, 0, 0]))
+    const response = Buffer.from(
+      build(PacketType.HandshakeResponse, [0, 0, 0, 0, 1, 0, 6, 0, 0, 0])
+    )
     gateway.say(response.subarray(0, 5))
     gateway.say(response.subarray(5))
 

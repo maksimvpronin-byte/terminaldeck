@@ -8,6 +8,14 @@ the other produces a version nobody can install, which is how 0.1.10 through
 
 ## Unreleased
 
+### Changed
+
+- **The tree has been through Prettier, and CI keeps it that way.** Eighty-six
+  files were formatted in a commit of its own — nothing but whitespace, so it
+  can be skipped whole in `git blame` — and `format:check` joins the checks
+  that already run on every push. It was left out until now for exactly this
+  reason: it would have failed on files nobody had touched.
+
 ### Security
 
 - **The window's preload runs sandboxed.** The interface draws other people's
@@ -853,6 +861,14 @@ accumulated since 0.4.0.
   `logs/desktop-<time>.log` only when asked, never printed: the client it
   replaced wrote several lines a frame into a console that held every one, and
   took the window to four gigabytes inside forty seconds.
+
+### Changed
+
+- **The tree has been through Prettier, and CI keeps it that way.** Eighty-six
+  files were formatted in a commit of its own — nothing but whitespace, so it
+  can be skipped whole in `git blame` — and `format:check` joins the checks
+  that already run on every push. It was left out until now for exactly this
+  reason: it would have failed on files nobody had touched.
 
 ### Security
 

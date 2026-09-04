@@ -32,12 +32,7 @@ export function registerInventoryHandlers(): void {
   ipcMain.handle(IPC.inventorySyncAll, () => inventoryStore.syncAll())
   ipcMain.handle(
     IPC.inventorySaveOverride,
-    (
-      _e,
-      override: InventoryOverride,
-      secret?: string | null,
-      gatewaySecret?: string | null
-    ) => {
+    (_e, override: InventoryOverride, secret?: string | null, gatewaySecret?: string | null) => {
       applySecret(override, 'secretRef', secret)
       applySecret(override, 'gatewaySecretRef', gatewaySecret)
       return inventoryStore.saveOverride(override)
@@ -51,5 +46,4 @@ export function registerInventoryHandlers(): void {
     }
     return inventoryStore.clearOverride(nodeId)
   })
-
 }

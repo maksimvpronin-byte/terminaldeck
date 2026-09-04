@@ -193,8 +193,7 @@ class RdpGateway {
 // Read from the environment rather than through @electron-toolkit/utils, which
 // imports electron: this file is covered by tests that run under plain Node,
 // and pulling electron in there breaks every one of them at import time.
-const tracing =
-  process.env.NODE_ENV === 'development' || process.env.TERMINALDECK_RDP_TRACE === '1'
+const tracing = process.env.NODE_ENV === 'development' || process.env.TERMINALDECK_RDP_TRACE === '1'
 
 function trace(message: string): void {
   if (!tracing) return

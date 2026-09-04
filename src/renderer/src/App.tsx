@@ -31,8 +31,8 @@ function CreateVaultScreen({ onCreated }: { onCreated: () => void }): JSX.Elemen
       <div className="gate-card">
         <h1>Welcome to TerminalDeck</h1>
         <p>
-          Create a master password to protect your saved SSH credentials. This password never
-          leaves your machine.
+          Create a master password to protect your saved SSH credentials. This password never leaves
+          your machine.
         </p>
         <label>
           Master password

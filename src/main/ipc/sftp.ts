@@ -35,13 +35,8 @@ export function registerSftpHandlers(): void {
   )
   ipcMain.handle(
     IPC.sftpPlanRelay,
-    (
-      _e,
-      srcConnectionId: string,
-      srcPath: string,
-      dstConnectionId: string,
-      destParent: string
-    ) => sftpManager.planRelay(srcConnectionId, srcPath, dstConnectionId, destParent)
+    (_e, srcConnectionId: string, srcPath: string, dstConnectionId: string, destParent: string) =>
+      sftpManager.planRelay(srcConnectionId, srcPath, dstConnectionId, destParent)
   )
   ipcMain.handle(
     IPC.sftpRunPlan,
@@ -81,15 +76,11 @@ export function registerSftpHandlers(): void {
   ipcMain.handle(IPC.sftpMkdir, (_e, connectionId: string, path: string) =>
     sftpManager.mkdir(connectionId, path)
   )
-  ipcMain.handle(
-    IPC.sftpDelete,
-    (_e, connectionId: string, path: string, isDirectory: boolean) =>
-      sftpManager.delete(connectionId, path, isDirectory)
+  ipcMain.handle(IPC.sftpDelete, (_e, connectionId: string, path: string, isDirectory: boolean) =>
+    sftpManager.delete(connectionId, path, isDirectory)
   )
-  ipcMain.handle(
-    IPC.sftpRename,
-    (_e, connectionId: string, oldPath: string, newPath: string) =>
-      sftpManager.rename(connectionId, oldPath, newPath)
+  ipcMain.handle(IPC.sftpRename, (_e, connectionId: string, oldPath: string, newPath: string) =>
+    sftpManager.rename(connectionId, oldPath, newPath)
   )
   ipcMain.handle(
     IPC.sftpDownload,
@@ -128,5 +119,4 @@ export function registerSftpHandlers(): void {
   ipcMain.handle(IPC.sftpStopEdit, (_e, connectionId: string, remotePath: string) =>
     remoteEdit.stop(connectionId, remotePath)
   )
-
 }
