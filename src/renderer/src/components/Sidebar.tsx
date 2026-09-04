@@ -12,6 +12,7 @@ import {
   allRoots
 } from '../state/store'
 import { DRAG_MIME, type DragItem } from '../state/dnd'
+import { dropSide, dropZone } from '../state/dropZone'
 import SessionDialog from './SessionDialog'
 import QuickConnectDialog from './QuickConnectDialog'
 import ImportSshConfigDialog from './ImportSshConfigDialog'
@@ -337,28 +338,17 @@ export default function Sidebar({
     setDropEdge(null)
   }
 
-  /** Above the middle of a row means before it, below means after it. */
+  /**
+   * The two questions a row is asked while something is dragged over it, both
+   * answered by where in the row the pointer is — see `state/dropZone`, which
+   * is where the arithmetic and its tests live.
+   */
   function placeFor(e: ReactDragEvent): 'before' | 'after' {
-    const rect = e.currentTarget.getBoundingClientRect()
-    return e.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
+    return dropSide(e.currentTarget.getBoundingClientRect(), e.clientY)
   }
 
-  /**
-   * Where a folder dragged over another folder would land: in the gap above it,
-   * in the gap below it, or inside it.
-   *
-   * A folder row has to answer two questions at once, and the answer is the
-   * part of the row the pointer is over: the edges are the gaps between rows,
-   * and the middle is the folder itself. A quarter of the row at each end is
-   * enough to hit without aiming, and leaves half of it meaning "inside" —
-   * which is the drop this tree has always had, and must not become harder.
-   */
   function folderDropAt(e: ReactDragEvent): 'before' | 'after' | 'inside' {
-    const rect = e.currentTarget.getBoundingClientRect()
-    const edge = rect.height / 4
-    if (e.clientY < rect.top + edge) return 'before'
-    if (e.clientY > rect.bottom - edge) return 'after'
-    return 'inside'
+    return dropZone(e.currentTarget.getBoundingClientRect(), e.clientY)
   }
 
   /**

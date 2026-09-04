@@ -16,6 +16,12 @@ the other produces a version nobody can install, which is how 0.1.10 through
   that already run on every push. It was left out until now for exactly this
   reason: it would have failed on files nobody had touched.
 
+- **The drop-zone arithmetic is out of the tree and under test.** Which part of
+  a row means "sort me here" and which means "put this inside me" is four lines
+  of arithmetic that decided the feel of every drag, and it sat in a
+  thousand-line component where nothing could reach it. It is now a module of
+  its own with tests for each third of a row.
+
 ### Security
 
 - **The window's preload runs sandboxed.** The interface draws other people's
@@ -869,6 +875,12 @@ accumulated since 0.4.0.
   can be skipped whole in `git blame` — and `format:check` joins the checks
   that already run on every push. It was left out until now for exactly this
   reason: it would have failed on files nobody had touched.
+
+- **The drop-zone arithmetic is out of the tree and under test.** Which part of
+  a row means "sort me here" and which means "put this inside me" is four lines
+  of arithmetic that decided the feel of every drag, and it sat in a
+  thousand-line component where nothing could reach it. It is now a module of
+  its own with tests for each third of a row.
 
 ### Security
 
