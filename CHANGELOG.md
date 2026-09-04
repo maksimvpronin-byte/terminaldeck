@@ -6,7 +6,7 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
-## Unreleased
+## 0.9.1
 
 ### Fixed
 
