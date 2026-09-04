@@ -17,7 +17,12 @@ the other produces a version nobody can install, which is how 0.1.10 through
   settings. Passing through a bastion does not sign you in to the far host as
   whoever you are on the bastion; the far host is offered whatever the app has
   for it, and a blank field there means the group's password, silently. The
-  error now names the host, the login and where that credential came from.
+  error now names the host, the login and where that credential came from — and,
+  when the server said so during the handshake, the ways of signing in it is
+  actually prepared to accept. That last part separates the two causes that look
+  identical from this end: a password that is wrong, and a server that never
+  wanted a password at all. Only the second is worth changing settings over, and
+  nothing here could tell them apart before.
 
 ## 0.10.1
 

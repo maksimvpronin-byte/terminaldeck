@@ -135,22 +135,67 @@ function credentialSource(profile: SessionProfile, auth: ResolvedAuth): string {
 }
 
 /**
+ * Watches the handshake for the one thing the failure never says: which ways of
+ * signing in the server is prepared to accept.
+ *
+ * A refusal has two quite different causes that look identical from here — the
+ * password was wrong, or the server never wanted a password at all — and only
+ * the second is worth changing settings over. The server states this on every
+ * rejection, in a line ssh2 writes to its debug channel and nowhere else:
+ * "Received USERAUTH_FAILURE, continue with: publickey,keyboard-interactive".
+ *
+ * So the channel is read, for the length of the handshake only. It carries
+ * every packet otherwise, which is not a thing to leave running on a live
+ * session.
+ */
+function methodWatcher(): {
+  debug: (message: string) => void
+  stop: () => void
+  seen: () => string | undefined
+} {
+  let methods: string | undefined
+  let watching = true
+  return {
+    debug: (message) => {
+      if (!watching) return
+      const match = /continue with:?\s*(.+)/i.exec(message)
+      if (match) methods = match[1].trim()
+    },
+    stop: () => {
+      watching = false
+    },
+    seen: () => methods
+  }
+}
+
+/**
  * The same failure, said in a way that names the machine that refused.
  *
  * ssh2 says "All configured authentication methods failed" and nothing else,
  * which in a chain does not even say which end refused — and that was the whole
  * of what a user saw.
  */
-function hopFailure(err: Error, profile: SessionProfile, auth: ResolvedAuth): Error {
+function hopFailure(
+  err: Error,
+  profile: SessionProfile,
+  auth: ResolvedAuth,
+  offered?: string
+): Error {
   const who = `${auth.username}@${profile.host}`
   if (!/authentication methods failed/i.test(err.message)) {
     return new Error(`${profile.name} (${who}): ${err.message}`)
   }
-  return new Error(
-    `${profile.name} refused every way of signing in as ${who}. It was offered ` +
-      `${credentialSource(profile, auth)}. If that is not what this machine wants, ` +
-      `set the login and password on the host itself rather than inheriting them.`
-  )
+  const tried = `It was offered ${credentialSource(profile, auth)}`
+  /*
+   * When the server has said what it accepts, that is the whole answer and it
+   * goes first: a host that does not list `password` will never take one
+   * however many times it is retyped, and nothing on this end could have shown
+   * that before.
+   */
+  const accepts = offered
+    ? `, while the server accepts: ${offered}.`
+    : `. If that is not what this machine wants, set the login and password on the host itself rather than inheriting them.`
+  return new Error(`${profile.name} refused to sign in as ${who}. ${tried}${accepts}`)
 }
 
 async function buildAuthConfig(
@@ -289,13 +334,22 @@ async function connectChain(
     chain.push(client)
     const authConfig = await buildAuthConfig(win, hop, auth)
     wireKeyboardInteractive(win, client, `${auth.username}@${hop.host}`)
+    const methods = methodWatcher()
     await new Promise<void>((resolve, reject) => {
-      client.on('ready', () => resolve())
-      // Which machine, as whom, and with what — none of which ssh2's own
-      // message carries, and all of which decide what to do about it.
-      client.on('error', (err) => reject(hopFailure(err as Error, hop, auth)))
+      client.on('ready', () => {
+        methods.stop()
+        resolve()
+      })
+      // Which machine, as whom, with what, and what it would have taken instead
+      // — none of which ssh2's own message carries, and all of which decide
+      // what to do about it.
+      client.on('error', (err) => {
+        methods.stop()
+        reject(hopFailure(err as Error, hop, auth, methods.seen()))
+      })
       client.connect({
         ...COMMON_CONNECT,
+        debug: methods.debug,
         host: hop.host,
         port: auth.port,
         username: auth.username,
