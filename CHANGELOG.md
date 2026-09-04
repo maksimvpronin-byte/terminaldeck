@@ -24,6 +24,17 @@ the other produces a version nobody can install, which is how 0.1.10 through
   also means a manual run leaves the packages on the run itself, so a build can
   be tested without a tag.
 
+- **The Windows installer is named without spaces, so the updater can find
+  it.** Its default name is `TerminalDeck Setup 0.9.1.exe`, and electron-builder
+  writes the hyphenated form into `latest.yml` while renaming the file to match
+  as it uploads. Uploading with `gh` instead sends the name from disk, and
+  GitHub turns the spaces into dots — so the updater asked for
+  `TerminalDeck-Setup-0.9.1.exe` and the release held
+  `TerminalDeck.Setup.0.9.1.exe`. Every Windows update would have failed on a
+  404, and failed silently, since the window says nothing about a failed update.
+  The name is now stated with hyphens where the file is built, and cannot
+  drift.
+
 ## 0.9.1
 
 ### Fixed

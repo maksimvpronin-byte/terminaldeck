@@ -89,6 +89,19 @@ win:
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
+  # Named without spaces, because the name is also a URL.
+  #
+  # The default here is "TerminalDeck Setup 0.9.1.exe". electron-builder writes
+  # the hyphenated form into `latest.yml` — which is what the updater fetches —
+  # and used to rename the file to match as it uploaded. Now that the release is
+  # assembled with `gh`, the file goes up under the name it has on disk, and
+  # GitHub turns the spaces into dots: the updater then asked for
+  # `TerminalDeck-Setup-0.9.1.exe` and the release held
+  # `TerminalDeck.Setup.0.9.1.exe`. A 404, and a silent one, since a failed
+  # update shows nothing. A name with no spaces in it cannot drift.
+  artifactName: ${productName}-Setup-${version}.${ext}
+portable:
+  artifactName: ${productName}-${version}.${ext}
 linux:
   icon: resources/icon.png
   target:
