@@ -6,6 +6,22 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## Unreleased
+
+### Fixed
+
+- **Syncing a folder no longer fails on Windows with `EPERM, Permission
+  denied`.** A folder that had synced under 0.8.0 kept a clone of its own, and
+  0.9.0 deletes that on the first sync now that checkouts are shared. Git marks
+  everything under `.git/objects` read-only, and on Windows a read-only file
+  cannot be unlinked at all — `force: true` forgives a file that is missing, not
+  one that refuses to go — so the deletion threw, and threw *after* the
+  repository had been cloned and read successfully. The user was shown a
+  permission error in place of the inventory they had asked for, by a step that
+  exists only to reclaim disk space. The attribute is now cleared first, and
+  more to the point the tidying up can no longer fail the sync: it is
+  housekeeping, and the worst it can now cost is a directory nobody reclaims.
+
 ## 0.9.0
 
 ### Added

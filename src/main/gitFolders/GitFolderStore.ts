@@ -1,6 +1,6 @@
 import { app } from 'electron'
 import { createHash } from 'crypto'
-import { existsSync, readFileSync, rmSync } from 'fs'
+import { readFileSync } from 'fs'
 import { basename, dirname, join, relative } from 'path'
 import { parse } from 'yaml'
 import type {
@@ -19,6 +19,7 @@ import { applyOverride } from '../../shared/overrides'
 import { parseAnsibleInventory } from '../inventory/ansible'
 import { noInventoryFound, readVarsFor, resolveInventoryFiles } from '../inventory/files'
 import { headRevision, syncRepo } from '../inventory/GitRepo'
+import { removeTree } from './removeTree'
 import { readJson, writeJson } from '../store/jsonFile'
 import { sessionStore } from '../store/SessionStore'
 
@@ -171,8 +172,7 @@ class GitFolderStore {
      * again — and on an inventory of any size that is the largest thing this
      * application keeps.
      */
-    const mine = join(reposRoot(), folderId)
-    if (existsSync(mine)) rmSync(mine, { recursive: true, force: true })
+    removeTree(join(reposRoot(), folderId))
 
     const files = resolveInventoryFiles(dir, link.paths)
 
@@ -380,8 +380,7 @@ class GitFolderStore {
           (g.git.branch ?? '') === (link.branch ?? '')
       )
     if (shared) return
-    const dir = checkoutFor(link.repoUrl, link.branch)
-    if (existsSync(dir)) rmSync(dir, { recursive: true, force: true })
+    removeTree(checkoutFor(link.repoUrl, link.branch))
   }
 
   saveOverride(override: InventoryOverride): void {
