@@ -15,22 +15,6 @@ jobs:
   build:
     strategy:
       fail-fast: false
-      # One runner at a time, and not for the runners' sake.
-      #
-      # Each of them publishes to the release for this version, and each starts
-      # by looking for it and creating it when it is not there. Run together,
-      # all three look at the same instant, all three see nothing, and two of
-      # them create a draft — which is what happened to v0.9.1: two drafts of
-      # the same tag, created in the same second, with the artifacts split four
-      # and eight between them, and even the disk image in one while its
-      # blockmap went to the other. Nothing failed; the release was simply in
-      # two places.
-      #
-      # Whichever goes first now creates the draft and the others find it. It
-      # costs the length of the two short builds — Linux and macOS are about
-      # three minutes each against Windows' twenty — which is a fair price for a
-      # release that is in one piece.
-      max-parallel: 1
       matrix:
         include:
           # `freerdp` names the build script for the desktop client, and an
@@ -170,19 +154,77 @@ jobs:
             echo "APPLE_TEAM_ID=$APPLE_TEAM_ID" >> "$GITHUB_ENV"
           fi
 
-      # Publishing only from a tag, and the flag says so rather than the
-      # workflow trusting that nobody presses Run workflow.
-      #
-      # `--publish always` uploads to the release named for the version in
-      # package.json, whether or not this run was tagged — so a manual run from
-      # a branch did not skip the tag check so much as walk around it: it built
-      # whatever that branch held and added the artifacts to the release for the
-      # version already sitting there, which by then is one the updater is
-      # handing out. A dispatched run is a build, and now proves itself as one.
-      - name: Build and publish
-        run: >
-          npm run ${{ matrix.script }} --
-          --publish ${{ startsWith(github.ref, 'refs/tags/v') && 'always' || 'never' }}
+      # Built here, published in one job at the end — see `release` below for
+      # why electron-builder is never allowed to do the uploading itself.
+      - name: Build
+        run: npm run ${{ matrix.script }} -- --publish never
+
+      - name: Keep what was built
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ matrix.os }}
+          # The packages and the update metadata, and none of the directories
+          # they were made from: `dist/` also holds the unpacked application,
+          # which is the same bytes again and several times the size.
+          path: |
+            dist/*.dmg
+            dist/*.zip
+            dist/*.exe
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.blockmap
+            dist/latest*.yml
+          if-no-files-found: error
+          retention-days: 7
+
+  # ------------------------------------------------------------------ the
+  # release itself, assembled once, by one job, from what the three built.
+  #
+  # electron-builder used to upload straight from each runner, and could not be
+  # made to put everything in one place. It looks a release up by tag — and a
+  # draft has no published tag, so `GET /releases/tags/v0.9.1` answers 404 for a
+  # release that plainly exists. Every publish that asks is therefore told there
+  # is none, and creates one. It is not a race between the runners: v0.9.1 was
+  # built one runner at a time and still came out in two drafts, with a disk
+  # image in one of them and its blockmap in the other, because a single runner
+  # publishes several groups of artifacts at once and each asked the same
+  # question. Whether a release came out whole was down to timing, and v0.9.0
+  # was simply lucky.
+  #
+  # So nothing publishes until everything is built, and then one job does it
+  # with one command. A run that is not a tag skips this and leaves the packages
+  # on the run itself, which is what makes Run workflow a way to test a build.
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: packages
+          merge-multiple: true
+
+      # electron-updater reads these, not the packages: without them a release
+      # is one nobody is ever offered, and that is worth failing over rather
+      # than finding out from a user who never got the update.
+      - name: Check the update metadata is there
+        run: |
+          for file in latest.yml latest-mac.yml latest-linux.yml; do
+            if [ ! -f "packages/$file" ]; then
+              echo "::error::packages/$file is missing — electron-updater needs it to offer this version"
+              exit 1
+            fi
+          done
+          ls -la packages
+
+      - name: Draft the release
         env:
-          # Provided by Actions; lets electron-builder upload to the release.
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft \
+            --title "${GITHUB_REF_NAME#v}" \
+            --generate-notes \
+            packages/*

@@ -10,14 +10,19 @@ the other produces a version nobody can install, which is how 0.1.10 through
 
 ### Fixed
 
-- **A release is built one platform at a time, so it lands in one place.** Each
-  runner publishes to the release for its version and creates that release when
-  it cannot find one. Run together, all three looked at the same instant, none
-  saw a release, and two made one: v0.9.1 was drafted twice in the same second,
-  with the artifacts split four and eight between the two drafts — the disk
-  image in one and its blockmap in the other. Every job reported success, which
-  is how a release can be broken and green at once. Serialising the matrix costs
-  the six minutes of the two short builds and closes the race.
+- **A release is assembled once, by one job, instead of by three runners at
+  the same time.** electron-builder uploaded straight from each runner and
+  looked the release up by tag — and a draft release has no published tag, so
+  the lookup answers 404 for a release that plainly exists. Every publish that
+  asked was told there was none, and made one. It was never a race between the
+  runners: v0.9.1 was built one runner at a time and still came out as two
+  drafts, with a disk image in one of them and its blockmap in the other,
+  because a single runner publishes several groups of artifacts at once and each
+  asked the same question. Whether a release came out whole was down to timing,
+  and every release before this one was lucky. Now nothing publishes until
+  everything is built, and one job creates the draft with one command — which
+  also means a manual run leaves the packages on the run itself, so a build can
+  be tested without a tag.
 
 ## 0.9.1
 
