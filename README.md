@@ -65,6 +65,14 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
 - Untying the folder, or deleting it, removes the mirrored hosts along with the local settings and
   passwords kept for them; the repository itself is untouched
 
+### The tree
+
+- Hosts **and folders** are sorted by hand: drag either one onto the top or bottom edge of a row
+  and it lands in that gap, with a line showing where. A folder dropped onto the *middle* of
+  another goes inside it, which is what dragging a folder has always done — the edges are the new
+  part, and half the row still means "inside"
+- The order is the one the store keeps, so it survives a restart, a rename and a move
+
 ### Credentials
 
 - Encrypted local vault (AES-256-GCM, master password via scrypt), with a lock button, `⌘L`,

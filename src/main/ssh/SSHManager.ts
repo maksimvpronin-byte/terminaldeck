@@ -2,6 +2,7 @@ import { Client, type ConnectConfig, type ClientChannel } from 'ssh2'
 import { randomUUID } from 'crypto'
 import { createWriteStream, existsSync, mkdirSync, type WriteStream } from 'fs'
 import { readFileSync } from 'fs'
+import { userInfo } from 'os'
 import { join } from 'path'
 import type { Readable } from 'stream'
 import { app, BrowserWindow } from 'electron'
@@ -83,7 +84,16 @@ function agentSockForPlatform(): string | undefined {
   return existsSync(OPENSSH_PIPE) ? OPENSSH_PIPE : 'pageant'
 }
 
-/** Collapses a profile's own settings with everything inherited from its groups. */
+/**
+ * Collapses a profile's own settings with everything inherited from its groups.
+ *
+ * A login that is set nowhere — not on the host, not on any group above it —
+ * means the account you are logged in as here, which is what `ssh somehost`
+ * does and what people expect from it. Before this it meant an empty user name
+ * handed to the server, which is a refused connection and a puzzling one; the
+ * host dialog worked around it by refusing to save a host until a login was
+ * typed, even when the whole point was to inherit one.
+ */
 function effectiveAuth(profile: SessionProfile): ResolvedAuth {
   // A host from a repository hangs off groups derived from it — an Inventory
   // source's, or those a Sessions folder mirrors — rather than off saved ones.
@@ -92,7 +102,8 @@ function effectiveAuth(profile: SessionProfile): ResolvedAuth {
     ...inventoryStore.allGroups(),
     ...gitFolderStore.allGroups()
   ]
-  return resolveAuthChain(profile, profile.groupId, groups)
+  const auth = resolveAuthChain(profile, profile.groupId, groups)
+  return auth.username ? auth : { ...auth, username: userInfo().username }
 }
 
 async function buildAuthConfig(

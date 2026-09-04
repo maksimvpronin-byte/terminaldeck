@@ -19,6 +19,7 @@ export const IPC = {
   storeDeleteSession: 'store:deleteSession',
   storeReorderSessions: 'store:reorderSessions',
   storeSaveGroup: 'store:saveGroup',
+  storeReorderGroups: 'store:reorderGroups',
   storeDeleteGroup: 'store:deleteGroup',
 
   // Inventory sources backed by git

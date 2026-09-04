@@ -151,10 +151,6 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
       setError(t('Name and host are required'))
       return
     }
-    if (!effective.username.trim()) {
-      setError(t('Username is not set here and none is inherited from a group'))
-      return
-    }
     const tags = tagsInput
       .split(',')
       .map((tag) => tag.trim())
@@ -297,7 +293,18 @@ export default function SessionDialog({ initial, defaultGroupId = null, onClose 
           {t('Username')}
           <input
             value={profile.username ?? ''}
-            placeholder={inheritNote('username') || 'required'}
+            /*
+             * What this host will actually sign in as, when nothing is typed
+             * here: the group's login, or — when no group above it names one —
+             * the account this machine is logged in as, exactly as `ssh
+             * somehost` does. It used to say "required", and saving was refused
+             * until something was typed, which made a blank field impossible
+             * even where inheriting was the whole intention.
+             */
+            placeholder={
+              inheritNote('username') ||
+              t('{user}, the account on this machine', { user: window.td.localUsername })
+            }
             onChange={(e) => set('username', e.target.value)}
           />
         </label>

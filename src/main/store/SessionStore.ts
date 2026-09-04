@@ -68,6 +68,17 @@ class SessionStore {
     this.persist()
   }
 
+  /**
+   * The order the sidebar shows folders in, saved as the array's own order —
+   * the same arrangement hosts have always had. A folder is where you put it,
+   * and where you put it is worth keeping: the tree is read far more often than
+   * it is edited, and alphabetical is not the order anything is used in.
+   */
+  reorderGroups(orderedIds: string[]): void {
+    this.data.groups = applyOrder(this.data.groups, orderedIds)
+    this.persist()
+  }
+
   saveGroup(group: SessionGroup): SessionGroup {
     const idx = this.data.groups.findIndex((g) => g.id === group.id)
     if (idx >= 0) this.data.groups[idx] = group

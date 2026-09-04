@@ -8,6 +8,16 @@ the other produces a version nobody can install, which is how 0.1.10 through
 
 ## Unreleased
 
+### Added
+
+- **Folders can be sorted by hand, as hosts already could.** Dragging a folder
+  could only put it inside another one; there was no way to say which of two
+  folders comes first, and the order was the order they happened to be created
+  in. A folder now lands in the gap when it is dropped on the top or bottom
+  quarter of a row, and inside when it is dropped on the middle — so the drop
+  the tree has always had keeps half the row, and aiming is not required for
+  either. The order is stored the same way the hosts' order always has been.
+
 ### Fixed
 
 - **A release is assembled once, by one job, instead of by three runners at

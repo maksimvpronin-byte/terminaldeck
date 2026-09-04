@@ -58,6 +58,9 @@ export function registerStoreHandlers(): void {
       return sessionStore.saveGroup(group)
     }
   )
+  ipcMain.handle(IPC.storeReorderGroups, (_e, orderedIds: string[]) => {
+    sessionStore.reorderGroups(orderedIds)
+  })
   ipcMain.handle(IPC.storeDeleteGroup, (_e, id: string) => {
     // Only the group's own credential: hosts and subgroups are re-parented, not
     // deleted, and keep whatever they hold themselves.

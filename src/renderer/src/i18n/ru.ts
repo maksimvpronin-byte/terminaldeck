@@ -376,7 +376,6 @@ export const ru: Record<string, string> = {
   "No password is saved for this host. Save one in its dialog to stop being asked.": "Для этого хоста пароль не сохранён. Сохраните его в диалоге хоста, чтобы больше не спрашивали.",
   "Connecting to": "Подключение к",
   "Name and host are required": "Нужно указать имя и хост",
-  "Username is not set here and none is inherited from a group": "Логин здесь не задан и не наследуется ни от какой группы",
   "(saved on this host — it overrides the group)": "(сохранён на этом хосте — перебивает группу)",
   "(leave blank to keep existing)": "(оставьте пустым, чтобы сохранить прежний)",
   "Edit session": "Изменить сессию",
@@ -808,4 +807,8 @@ export const ru: Record<string, string> = {
   "Another repository…": "Другой репозиторий…",
   "A repository used once is offered to every folder made afterwards": "Однажды использованный репозиторий предлагается всем папкам, созданным потом",
   "Two folders on one repository share a clone and read their own paths from it": "Две папки на одном репозитории делят клон и читают из него свои пути",
+  "Drag by the edge of a row to sort · drop onto a folder to put it inside": "Тяните за край строки, чтобы отсортировать · бросьте на папку, чтобы вложить внутрь",
+  "A group sorts the same way: its edges are the gaps, its middle means inside": "Группа сортируется так же: края строки — это промежутки, середина означает «внутрь»",
+  "{user}, the account on this machine": "{user} — учётная запись на этой машине",
+  "That includes the login: blank takes the group\u2019s, or your account on this machine": "Это касается и логина: пустое поле берёт логин группы или вашу учётную запись на этой машине",
 }

@@ -2,6 +2,7 @@ import type { StateCreator } from 'zustand'
 import type { SessionStoreData } from '../../../../shared/types'
 import type { AppState, SessionsSlice } from './types'
 import { moveRelativeTo } from '../../../../shared/ordering'
+import { descendsFrom } from '../../../../shared/groups'
 
 export const createSessionsSlice: StateCreator<AppState, [], [], SessionsSlice> = (set, get) => ({
   groups: [],
@@ -81,16 +82,43 @@ export const createSessionsSlice: StateCreator<AppState, [], [], SessionsSlice> 
     await window.td.store.reorderSessions(next.map((s) => s.id))
   },
 
+  reorderGroup: async (groupId, targetId, place) => {
+    if (groupId === targetId) return
+    const { groups } = get()
+    const dragged = groups.find((g) => g.id === groupId)
+    const target = groups.find((g) => g.id === targetId)
+    if (!dragged || !target) return
+    /*
+     * Landing beside a folder means landing at its level, so this is a move as
+     * well as a sort — the same one gesture that drops a host beside another
+     * one and into its group.
+     *
+     * Which is why the target cannot be inside the folder being dragged: that
+     * would ask the folder to become its own descendant, and the branch would
+     * come away with it. Refused rather than half-applied.
+     */
+    if (descendsFrom(groups, target.parentId, groupId)) return
+
+    const moved =
+      dragged.parentId === target.parentId ? dragged : { ...dragged, parentId: target.parentId }
+    const next = moveRelativeTo(
+      groups.map((g) => (g.id === groupId ? moved : g)),
+      groupId,
+      targetId,
+      place
+    )
+
+    set({ groups: next })
+    if (moved !== dragged) await window.td.store.saveGroup(moved)
+    await window.td.store.reorderGroups(next.map((g) => g.id))
+  },
+
   moveGroup: async (groupId, parentId) => {
     const { groups } = get()
     const group = groups.find((g) => g.id === groupId)
-    if (!group || group.parentId === parentId || groupId === parentId) return
+    if (!group || group.parentId === parentId) return
     // Refuse to nest a group inside its own subtree — that would detach the branch.
-    let cursor = parentId
-    while (cursor) {
-      if (cursor === groupId) return
-      cursor = groups.find((g) => g.id === cursor)?.parentId ?? null
-    }
+    if (descendsFrom(groups, parentId, groupId)) return
     await get().upsertGroup({ ...group, parentId })
   }
 })

@@ -93,6 +93,7 @@ export default function Sidebar({
   const moveSession = useStore((s) => s.moveSession)
   const reorderSession = useStore((s) => s.reorderSession)
   const moveGroup = useStore((s) => s.moveGroup)
+  const reorderGroup = useStore((s) => s.reorderGroup)
   const selectedHostIds = useStore((s) => s.selectedHostIds)
   const toggleHostSelection = useStore((s) => s.toggleHostSelection)
   const selectOnlyHost = useStore((s) => s.selectOnlyHost)
@@ -157,6 +158,20 @@ export default function Sidebar({
   }
 
   const [editingSession, setEditingSession] = useState<SessionProfile | undefined | 'new'>(undefined)
+  /**
+   * The folder a new host is being created in.
+   *
+   * "New session here" meant here in the menu and nowhere in the dialog: the
+   * host opened with no group, so there was nothing above it to inherit a login
+   * or a password from, and the dialog then refused to save until one was typed
+   * by hand — for a host that was supposed to take the folder's.
+   */
+  const [newSessionIn, setNewSessionIn] = useState<string | null>(null)
+
+  function newSession(groupId: string | null): void {
+    setNewSessionIn(groupId)
+    setEditingSession('new')
+  }
   const [showQuickConnect, setShowQuickConnect] = useState(false)
   const [showImport, setShowImport] = useState(false)
   /** Which page Settings should open on, or null while it is closed. */
@@ -324,6 +339,24 @@ export default function Sidebar({
   }
 
   /**
+   * Where a folder dragged over another folder would land: in the gap above it,
+   * in the gap below it, or inside it.
+   *
+   * A folder row has to answer two questions at once, and the answer is the
+   * part of the row the pointer is over: the edges are the gaps between rows,
+   * and the middle is the folder itself. A quarter of the row at each end is
+   * enough to hit without aiming, and leaves half of it meaning "inside" —
+   * which is the drop this tree has always had, and must not become harder.
+   */
+  function folderDropAt(e: ReactDragEvent): 'before' | 'after' | 'inside' {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const edge = rect.height / 4
+    if (e.clientY < rect.top + edge) return 'before'
+    if (e.clientY > rect.bottom - edge) return 'after'
+    return 'inside'
+  }
+
+  /**
    * Hosts are sorted by dropping them into the gap between two rows. Only a host
    * drag does this — a group dragged over a host row still means nothing, so it
    * falls through to the group it is over.
@@ -355,6 +388,50 @@ export default function Sidebar({
     const item = JSON.parse(raw) as DragItem
     if (item.kind !== 'session' || item.id === target.id) return
     await reorderSession(item.id, target.id, place)
+  }
+
+  /**
+   * A folder dragged over another folder: sorted into the gap at either edge,
+   * or dropped inside it from the middle. Anything else — a host — keeps
+   * meaning "inside", which is what it has always meant.
+   */
+  function allowGroupDrop(e: ReactDragEvent, target: SessionGroup): void {
+    if (dragItem?.kind !== 'group' || dragItem.id === target.id) {
+      allowDrop(e, target.id)
+      return
+    }
+    if (!e.dataTransfer.types.includes(DRAG_MIME)) return
+    e.preventDefault()
+    e.stopPropagation()
+    e.dataTransfer.dropEffect = 'move'
+
+    const at = folderDropAt(e)
+    if (at === 'inside') {
+      setDropEdge(null)
+      setDropTarget(target.id)
+      return
+    }
+    setDropTarget(null)
+    // dragover fires continuously; keeping the same object while the gap has
+    // not changed spares the whole tree a redraw on every mouse move.
+    setDropEdge((cur) => (cur?.id === target.id && cur.place === at ? cur : { id: target.id, place: at }))
+  }
+
+  async function handleGroupDrop(e: ReactDragEvent, target: SessionGroup): Promise<void> {
+    const raw = e.dataTransfer.getData(DRAG_MIME)
+    if (!raw) return
+    const item = JSON.parse(raw) as DragItem
+    if (item.kind !== 'group' || item.id === target.id) {
+      await handleDrop(e, target.id)
+      return
+    }
+    e.preventDefault()
+    e.stopPropagation()
+    const at = folderDropAt(e)
+    setDropTarget(null)
+    setDropEdge(null)
+    if (at === 'inside') await moveGroup(item.id, target.id)
+    else await reorderGroup(item.id, target.id, at)
   }
 
   async function handleDrop(e: ReactDragEvent, targetGroupId: string | null): Promise<void> {
@@ -514,7 +591,7 @@ export default function Sidebar({
         disabled: !group,
         onSelect: () => group && setGroupDialog({ group, parentId: group.parentId })
       },
-      { label: t('New session here'), onSelect: () => setEditingSession('new') },
+      { label: t('New session here'), onSelect: () => newSession(groupId) },
       { label: t('New subgroup…'), onSelect: () => setGroupDialog({ parentId: groupId }) },
       {
         label: t('Delete group…'),
@@ -629,14 +706,19 @@ export default function Sidebar({
         return (
           <div className="tree-group" key={g.id}>
             <div
-              className={`tree-item ${dropTarget === g.id ? 'drop-target' : ''}`}
+              className={`tree-item ${dropTarget === g.id ? 'drop-target' : ''}${
+                dropEdge?.id === g.id ? ` drop-${dropEdge.place}` : ''
+              }`}
               style={{ paddingLeft: 8 + depth * 12 }}
               draggable
               onDragStart={(e) => startDrag(e, { kind: 'group', id: g.id }, g.name)}
               onDragEnd={endDrag}
-              onDragOver={(e) => allowDrop(e, g.id)}
-              onDragLeave={() => setDropTarget(null)}
-              onDrop={(e) => handleDrop(e, g.id)}
+              onDragOver={(e) => allowGroupDrop(e, g)}
+              onDragLeave={() => {
+                setDropTarget(null)
+                setDropEdge((cur) => (cur?.id === g.id ? null : cur))
+              }}
+              onDrop={(e) => handleGroupDrop(e, g)}
               onClick={() => toggleCollapsed(g.id)}
               onContextMenu={(e) => {
                 e.preventDefault()
@@ -655,7 +737,7 @@ export default function Sidebar({
                     (g.git.lastRevision ? ` · ${g.git.lastRevision}` : '') +
                     ` · ${g.git.branch || t('default branch')}` +
                     ` · ${g.git.repoUrl}`
-                  : undefined
+                  : t('Drag by the edge of a row to sort · drop onto a folder to put it inside')
               }
             >
               <span className="tree-group-title name">
@@ -764,7 +846,7 @@ export default function Sidebar({
       {tab === 'sessions' && (
         <>
       <div className="sidebar-header">
-        <button className="primary" style={{ flex: 1 }} onClick={() => setEditingSession('new')}>
+        <button className="primary" style={{ flex: 1 }} onClick={() => newSession(null)}>
           + Session
         </button>
         <button onClick={() => setGroupDialog({ parentId: null })}>+ Group</button>
@@ -896,6 +978,7 @@ export default function Sidebar({
       {editingSession !== undefined && (
         <SessionDialog
           initial={editingSession === 'new' ? undefined : editingSession}
+          defaultGroupId={newSessionIn}
           onClose={() => setEditingSession(undefined)}
         />
       )}

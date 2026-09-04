@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils, clipboard } from 'electron'
+import { userInfo } from 'os'
 import { IPC } from '../shared/ipc-channels'
 import type {
   SessionProfile,
@@ -87,6 +88,8 @@ const api = {
       gatewaySecret?: string | null
     ): Promise<SessionGroup> =>
       ipcRenderer.invoke(IPC.storeSaveGroup, group, secret, gatewaySecret),
+    reorderGroups: (orderedIds: string[]): Promise<void> =>
+      ipcRenderer.invoke(IPC.storeReorderGroups, orderedIds),
     deleteGroup: (id: string): Promise<void> => ipcRenderer.invoke(IPC.storeDeleteGroup, id)
   },
   inventory: {
@@ -517,6 +520,13 @@ const api = {
       return () => ipcRenderer.removeListener(IPC.uiForwardKey, listener)
     }
   },
+  /**
+   * The account this machine is logged in as, which is what a connection uses
+   * when no login is set on the host or on any group above it — the same rule
+   * `ssh somehost` follows. Read here so a dialog can show what will be used
+   * instead of demanding that it be typed.
+   */
+  localUsername: userInfo().username,
   clipboard: {
     // Electron's own clipboard rather than navigator.clipboard: the packaged app
     // is served from file://, which is not a secure context, so the web API fails.

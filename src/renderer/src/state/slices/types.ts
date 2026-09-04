@@ -94,6 +94,16 @@ export interface SessionsSlice {
     place: 'before' | 'after'
   ) => Promise<void>
   moveGroup: (groupId: string, parentId: string | null) => Promise<void>
+  /**
+   * Drops a folder immediately before or after another one, joining that
+   * folder's parent on the way. This is how the tree is sorted by hand, and it
+   * is the same gesture hosts have always had.
+   */
+  reorderGroup: (
+    groupId: string,
+    targetId: string,
+    place: 'before' | 'after'
+  ) => Promise<void>
 }
 
 export interface InventorySlice {
