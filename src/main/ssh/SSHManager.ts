@@ -8,11 +8,12 @@ import type { Readable } from 'stream'
 import { app, BrowserWindow } from 'electron'
 import type {
   Credential,
+  SessionGroup,
   SessionProfile,
   QuickConnectParams,
   ResolvedAuth
 } from '../../shared/types'
-import { resolveAuth as resolveAuthChain } from '../../shared/authResolution'
+import { inheritedFrom, resolveAuth as resolveAuthChain } from '../../shared/authResolution'
 import { applyCredential } from '../../shared/credentials'
 import { IPC } from '../../shared/ipc-channels'
 import { OSC7_SHELL_SETUP, scanOsc7 } from '../../shared/osc7'
@@ -95,15 +96,61 @@ function agentSockForPlatform(): string | undefined {
  * typed, even when the whole point was to inherit one.
  */
 function effectiveAuth(profile: SessionProfile): ResolvedAuth {
-  // A host from a repository hangs off groups derived from it — an Inventory
-  // source's, or those a Sessions folder mirrors — rather than off saved ones.
-  const groups = [
+  const auth = resolveAuthChain(profile, profile.groupId, everyGroup())
+  return auth.username ? auth : { ...auth, username: userInfo().username }
+}
+
+/**
+ * Every group a host can inherit from — the saved ones, an Inventory source's,
+ * and those a Sessions folder mirrors out of git.
+ */
+function everyGroup(): SessionGroup[] {
+  return [
     ...sessionStore.getAll().groups,
     ...inventoryStore.allGroups(),
     ...gitFolderStore.allGroups()
   ]
-  const auth = resolveAuthChain(profile, profile.groupId, groups)
-  return auth.username ? auth : { ...auth, username: userInfo().username }
+}
+
+/**
+ * What a host was signed in with, in words.
+ *
+ * A refused login is the one failure where "what did it even try?" is the whole
+ * question, and the answer is regularly "a password you have never typed for
+ * this machine": a blank field inherits, so a host sitting in a group is
+ * offered that group's password without anything on screen saying so. Through a
+ * jump host it is worse still, since two machines authenticate separately and
+ * the error names neither.
+ */
+function credentialSource(profile: SessionProfile, auth: ResolvedAuth): string {
+  if (auth.authMethod === 'agent') return 'the SSH agent'
+  if (auth.authMethod === 'privateKey') {
+    const from = inheritedFrom(profile, profile.groupId, everyGroup(), 'privateKeyPath')
+    const key = auth.privateKeyPath ?? 'no key file'
+    return from ? `the key ${key}, from the group ${from.name}` : `the key ${key}`
+  }
+  if (!auth.secretRef) return 'the password you typed'
+  const from = inheritedFrom(profile, profile.groupId, everyGroup(), 'secretRef')
+  return from ? `the password saved on the group ${from.name}` : 'the password saved on this host'
+}
+
+/**
+ * The same failure, said in a way that names the machine that refused.
+ *
+ * ssh2 says "All configured authentication methods failed" and nothing else,
+ * which in a chain does not even say which end refused — and that was the whole
+ * of what a user saw.
+ */
+function hopFailure(err: Error, profile: SessionProfile, auth: ResolvedAuth): Error {
+  const who = `${auth.username}@${profile.host}`
+  if (!/authentication methods failed/i.test(err.message)) {
+    return new Error(`${profile.name} (${who}): ${err.message}`)
+  }
+  return new Error(
+    `${profile.name} refused every way of signing in as ${who}. It was offered ` +
+      `${credentialSource(profile, auth)}. If that is not what this machine wants, ` +
+      `set the login and password on the host itself rather than inheriting them.`
+  )
 }
 
 async function buildAuthConfig(
@@ -244,7 +291,9 @@ async function connectChain(
     wireKeyboardInteractive(win, client, `${auth.username}@${hop.host}`)
     await new Promise<void>((resolve, reject) => {
       client.on('ready', () => resolve())
-      client.on('error', (err) => reject(err))
+      // Which machine, as whom, and with what — none of which ssh2's own
+      // message carries, and all of which decide what to do about it.
+      client.on('error', (err) => reject(hopFailure(err as Error, hop, auth)))
       client.connect({
         ...COMMON_CONNECT,
         host: hop.host,

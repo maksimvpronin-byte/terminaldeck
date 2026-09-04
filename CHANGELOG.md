@@ -6,6 +6,19 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## Unreleased
+
+### Changed
+
+- **A refused login now says which machine refused, as whom, and with what.**
+  ssh2 answers "All configured authentication methods failed" and nothing else,
+  which through a jump host does not even say which end refused — and the answer
+  matters, because each machine in a chain authenticates separately with its own
+  settings. Passing through a bastion does not sign you in to the far host as
+  whoever you are on the bastion; the far host is offered whatever the app has
+  for it, and a blank field there means the group's password, silently. The
+  error now names the host, the login and where that credential came from.
+
 ## 0.10.1
 
 ### Changed
