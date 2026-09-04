@@ -193,15 +193,15 @@ export default function TerminalHost({
       const key = e.key.toLowerCase()
 
       /**
-       * Search opens on ⌘F, and on a Mac only on ⌘F.
+       * Search opens on ⌘F, and off a Mac on Ctrl+Shift+F.
        *
        * Ctrl+F is a readline binding — one character forward, the other half of
-       * Ctrl+B — and taking it here meant it never reached the shell. Elsewhere
-       * Ctrl+F stays, because there is no ⌘ and it is the only way to open
-       * search at all; that is the same unresolved trade the other shortcuts
-       * are in, and it is written down in the README rather than guessed at.
+       * Ctrl+B — and taking it meant it never reached the shell. It used to be
+       * taken anyway on Windows and Linux, on the grounds that there was no ⌘
+       * and no other way to open search; Ctrl+Shift is that other way, and it
+       * is now what the whole application uses there.
        */
-      if (key === 'f' && (IS_MAC ? e.metaKey : true)) {
+      if (key === 'f' && (IS_MAC ? e.metaKey : e.ctrlKey && e.shiftKey)) {
         setSearchOpen(true)
         return false
       }

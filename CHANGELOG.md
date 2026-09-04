@@ -8,6 +8,21 @@ the other produces a version nobody can install, which is how 0.1.10 through
 
 ## Unreleased
 
+### Fixed
+
+- **Ctrl belongs to the shell on Windows and Linux too.** The application's
+  shortcuts sat on plain `Ctrl` there, which took the keys a terminal exists to
+  deliver: `Ctrl+D` split the pane instead of ending the session, and `Ctrl+W`,
+  `Ctrl+K`, `Ctrl+L`, `Ctrl+P` and `Ctrl+F` never reached the far end either.
+  The comment above that code said this had been dealt with — it had, on a Mac
+  alone, where `⌘` gave somewhere else to put them. Off a Mac they now sit on
+  `Ctrl+Shift`, which is where Windows Terminal and MobaXterm put theirs, for
+  this reason. Two exceptions, both deliberate: `Ctrl+1 … Ctrl+9` still jump
+  between tabs, since no shell has ever wanted them, and splitting downwards is
+  `Ctrl+Shift+E`, because `Shift` is part of the modifier there and cannot also
+  choose the direction. The hints in the interface say the combination that
+  works rather than translating `⌘` to `Ctrl`.
+
 ### Changed
 
 - **A refused login now says which machine refused, as whom, and with what.**

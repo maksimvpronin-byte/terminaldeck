@@ -72,7 +72,6 @@ export const ru: Record<string, string> = {
   'Jump to that tab within the current workspace':
     'Перейти к этой вкладке в текущей рабочей области',
   'Split the pane to the right': 'Разделить панель вправо',
-  'Split the pane downwards': 'Разделить панель вниз',
   'Drag a host or a whole tab onto a pane to place them side by side':
     'Перетащите хост или целую вкладку на панель, чтобы поставить их рядом',
   'The edge you drop nearest decides which half the new pane takes':
@@ -271,7 +270,6 @@ export const ru: Record<string, string> = {
   'Reset to defaults': 'Сбросить к исходным',
   Done: 'Готово',
   'Shortcuts and features': 'Сочетания клавиш и возможности',
-  'On Windows and Linux read ⌘ as Ctrl.': 'В Windows и Linux читайте ⌘ как Ctrl.',
   Connect: 'Подключиться',
   Reconnect: 'Переподключиться',
   'Connect in split': 'Подключиться в разделении',
@@ -1067,5 +1065,9 @@ export const ru: Record<string, string> = {
     'Группа сортируется так же: края строки — это промежутки, середина означает «внутрь»',
   '{user}, the account on this machine': '{user} — учётная запись на этой машине',
   'That includes the login: blank takes the group\u2019s, or your account on this machine':
-    'Это касается и логина: пустое поле берёт логин группы или вашу учётную запись на этой машине'
+    'Это касается и логина: пустое поле берёт логин группы или вашу учётную запись на этой машине',
+  'On Windows and Linux read ⌘ as Ctrl+Shift — plain Ctrl belongs to the shell.':
+    'На Windows и Linux читайте ⌘ как Ctrl+Shift — голый Ctrl принадлежит шеллу.',
+  'Split the pane downwards; Ctrl+Shift+E off a Mac':
+    'Разделить панель по горизонтали; вне мака — Ctrl+Shift+E'
 }

@@ -149,11 +149,14 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   terminal, not the app
 - Search (`⌘F`), zoom (`⌘+` / `⌘−` / `⌘0`, moving the host's own size when it has one),
   copy-on-select, right-click paste
-- **On a Mac, `Ctrl` belongs to the shell.** Every shortcut here is on `⌘` alone, so `Ctrl+C`,
-  `Ctrl+D`, `Ctrl+K`, `Ctrl+W` and `Ctrl+L` reach the far end and mean what readline says they
-  mean. On Windows and Linux the shortcuts sit on `Ctrl` themselves and still take those keys —
-  there is no second modifier free on those platforms, and choosing one without being able to
-  try it is worse than saying so here
+- **`Ctrl` belongs to the shell, on every platform.** Every shortcut here is on `⌘` on a Mac and
+  on `Ctrl+Shift` elsewhere — the convention Windows Terminal and MobaXterm follow — so `Ctrl+C`,
+  `Ctrl+D`, `Ctrl+K`, `Ctrl+W`, `Ctrl+L` and `Ctrl+F` reach the far end and mean what readline
+  says they mean. Until 0.10.2 that held on a Mac alone: elsewhere the shortcuts sat on plain
+  `Ctrl` and took exactly those keys, so `Ctrl+D` split the pane instead of ending the session.
+  Two exceptions, both deliberate: `Ctrl+1 … Ctrl+9` still jump between tabs, since no shell has
+  ever wanted them, and splitting downwards is `Ctrl+Shift+E` rather than a shifted `D`, because
+  `Shift` is part of the modifier there and cannot also choose the direction
 - Colour-coded sessions, restored workspace and tab layout on launch, activity marks on
   background tabs and workspaces, and a green dot on hosts that already have a terminal open
 - **Export and import** everything to one file to move machines or keep a backup; credentials

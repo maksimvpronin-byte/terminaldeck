@@ -101,6 +101,14 @@ export function useShortcuts(actions: {
        * screen, Ctrl+P walks back through history. All of them were being
        * caught here and turned into split, snippets, lock and so on, and the
        * keystroke never reached the far end.
+       *
+       * That was fixed for the Mac and left standing everywhere else, which is
+       * where it mattered most — the comment said "⌘ only" while the line below
+       * read `e.ctrlKey` off a Mac, and Ctrl+D went on splitting the pane
+       * instead of ending the session. So Windows and Linux take Ctrl+Shift,
+       * which is what Windows Terminal and MobaXterm take and for this reason.
+       * Digits are the one exception: no shell has ever wanted Ctrl+1, so the
+       * tabs stay where the fingers already are.
        */
       const mod = IS_MAC ? e.metaKey : e.ctrlKey
       // Both have to agree: what the event says, and what we watched happen.
@@ -158,6 +166,13 @@ export function useShortcuts(actions: {
         return
       }
 
+      /*
+       * Off a Mac every letter below belongs to the shell first, so the
+       * application asks for Shift as well. The digits above do not: they are
+       * handled before this line for exactly that reason.
+       */
+      if (!IS_MAC && !e.shiftKey) return
+
       switch (key) {
         case 't': {
           // Duplicate the active pane's target into a fresh tab.
@@ -178,11 +193,25 @@ export function useShortcuts(actions: {
           else state.closeTab(current.id)
           break
         }
+        /*
+         * Splitting, and the one place the new rule costs something. On a Mac
+         * ⇧ chooses the direction — ⌘D beside, ⌘⇧D below — and off a Mac ⇧ is
+         * already spoken for by the modifier itself, so the direction needs a
+         * key of its own rather than a modifier.
+         */
         case 'd': {
           if (!current) return
           e.preventDefault()
           e.stopPropagation()
-          state.splitPane(current.id, current.activePaneId, e.shiftKey ? 'col' : 'row')
+          const direction = IS_MAC && e.shiftKey ? 'col' : 'row'
+          state.splitPane(current.id, current.activePaneId, direction)
+          break
+        }
+        case 'e': {
+          if (IS_MAC || !current) return
+          e.preventDefault()
+          e.stopPropagation()
+          state.splitPane(current.id, current.activePaneId, 'col')
           break
         }
         case 'l': {

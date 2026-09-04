@@ -55,7 +55,7 @@ const SECTIONS: Section[] = [
       { keys: '⌘W', what: 'Close the focused pane, or the tab when it is the last one' },
       { keys: '⌘1 … ⌘9', what: 'Jump to that tab within the current workspace' },
       { keys: '⌘D', what: 'Split the pane to the right' },
-      { keys: '⌘⇧D', what: 'Split the pane downwards' },
+      { keys: '⌘⇧D', what: 'Split the pane downwards; Ctrl+Shift+E off a Mac' },
       { what: 'Drag a host or a whole tab onto a pane to place them side by side' },
       { what: 'The edge you drop nearest decides which half the new pane takes' },
       { what: 'Use ⇱ in a pane toolbar to move it back out into its own tab' },
@@ -307,7 +307,9 @@ export default function HelpDialog({ onClose }: { onClose: () => void }): JSX.El
     <ModalBackdrop onClose={onClose}>
       <div className="modal-card help-card">
         <h2>{t('Shortcuts and features')}</h2>
-        <p className="settings-note">{t('On Windows and Linux read ⌘ as Ctrl.')}</p>
+        <p className="settings-note">
+          {t('On Windows and Linux read ⌘ as Ctrl+Shift — plain Ctrl belongs to the shell.')}
+        </p>
 
         {SECTIONS.map((section) => (
           <div key={section.title}>
