@@ -6,6 +6,19 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## Unreleased
+
+### Fixed
+
+- **A release is built one platform at a time, so it lands in one place.** Each
+  runner publishes to the release for its version and creates that release when
+  it cannot find one. Run together, all three looked at the same instant, none
+  saw a release, and two made one: v0.9.1 was drafted twice in the same second,
+  with the artifacts split four and eight between the two drafts — the disk
+  image in one and its blockmap in the other. Every job reported success, which
+  is how a release can be broken and green at once. Serialising the matrix costs
+  the six minutes of the two short builds and closes the race.
+
 ## 0.9.1
 
 ### Fixed

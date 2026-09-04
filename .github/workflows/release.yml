@@ -15,6 +15,22 @@ jobs:
   build:
     strategy:
       fail-fast: false
+      # One runner at a time, and not for the runners' sake.
+      #
+      # Each of them publishes to the release for this version, and each starts
+      # by looking for it and creating it when it is not there. Run together,
+      # all three look at the same instant, all three see nothing, and two of
+      # them create a draft — which is what happened to v0.9.1: two drafts of
+      # the same tag, created in the same second, with the artifacts split four
+      # and eight between them, and even the disk image in one while its
+      # blockmap went to the other. Nothing failed; the release was simply in
+      # two places.
+      #
+      # Whichever goes first now creates the draft and the others find it. It
+      # costs the length of the two short builds — Linux and macOS are about
+      # three minutes each against Windows' twenty — which is a fair price for a
+      # release that is in one piece.
+      max-parallel: 1
       matrix:
         include:
           # `freerdp` names the build script for the desktop client, and an
