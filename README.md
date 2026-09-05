@@ -365,13 +365,15 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   is what the translation is keyed by, so anything not yet translated appears in English rather
   than as a placeholder — and a test fails if a phrase is asked for that the book does not have,
   so the gap is always the screens nobody has been through yet rather than a line someone missed.
-  Translated so far: Settings including its security and backup tabs, the shortcut list, the
-  session tree, the tab strip, the pane toolbar, the host, group and inventory-override dialogs,
-  575 phrases, and a test fails on one the book has not got — though what it checks is that every
-  phrase *asked for* has an entry, not that every line of text asks. A paragraph written straight
-  into the markup is invisible to it, and a few remain: the group dialog, the first-run prompt and
-  one menu item. What is deliberately left in English is the crash screen, which must not depend on
-  the store it is reporting the failure of, and the status lines the app writes into the terminal
+  **741 phrases** so far: Settings including its security and backup tabs, the shortcut list, the
+  session tree, the tab strip, the pane toolbar, the first-run and unlock screens, and the host,
+  group and inventory-override dialogs. What that test checks is that every phrase *asked for* has
+  an entry, not that every line of text asks — a paragraph written straight into the markup is
+  invisible to it. One string is knowingly outside the book: the `View` menu, built in the main
+  process where the renderer's phrase book does not reach; every other entry in that menu is an
+  Electron role, which the operating system translates itself. What is deliberately left in
+  English is the crash screen, which must not depend on the store it is reporting the failure of,
+  and the status lines the app writes into the terminal
 
 Press `⌘/` in the app for the full list of shortcuts and gestures.
 
@@ -565,8 +567,10 @@ Prettier is configured to the style the code was already written in — single q
 100 columns, no trailing commas — so a format pass should be close to a no-op. Markdown is left
 alone deliberately; the prose here is wrapped by hand.
 
-`npm run lint` runs in CI; `format:check` does not, since the tree has not been through Prettier
-once yet and a check that starts out red teaches everyone to ignore it.
+`npm run lint` and `format:check` both run in CI, along with the type-check, the tests and the
+release contract. `format:check` was held back at first — the tree had not been through Prettier
+once, and a check that starts out red teaches everyone to ignore it — so the pass was made in a
+commit of its own, and the check went in behind it.
 
 ## Building installers
 
@@ -724,6 +728,14 @@ The first refuses a bundle with no signature at all — macOS calls that a damag
 demands a Developer ID rather than an ad-hoc signature once `CSC_LINK` is configured. The second
 refuses to publish unless every kind of artifact is present exactly once and every file the update
 metadata names is actually in the release under that name.
+
+The first release this contract guarded is also the one it broke, and the lesson is written into
+the verifier. Every rule above is a regular expression, several of them anchored on `\n`, and a
+Windows checkout of a repository with no `.gitattributes` has `\r\n` — so the Windows build job
+failed at `electron-builder.yml has no nsis section` against a file whose `nsis` section is plainly
+there, twenty minutes in, with the other two platforms already green and the release job skipped.
+Line endings are now normalised in the one function that reads a file, rather than in each rule,
+so no rule added later can acquire the same fault.
 
 The idea, and the shape of the verifier, are borrowed from KubeDeck's `release-contract.json`.
 Record what changed in [CHANGELOG.md](CHANGELOG.md) as part of the release commit.
