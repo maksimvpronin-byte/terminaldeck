@@ -1,0 +1,1137 @@
+<meta charset="utf-8">
+<title>TerminalDeck 0.11</title>
+
+<style>
+:root{
+  /* Взято из палитры самого приложения: src/renderer/src/styles.css */
+  --bg:#121317;
+  --panel:#1e2025;
+  --panel-2:#26282e;
+  --ink:#e4e6eb;
+  --ink-soft:#a8aeb9;
+  --ink-faint:#767d89;
+  --rule:#383b42;
+  --rule-soft:#2a2d33;
+  --accent:#5b9dff;
+  --accent-ink:#8fbcff;
+  --accent-wash:#1c2b44;
+  --ok:#3fb950;
+  --ok-wash:#14301a;
+  --warn:#d9a441;
+  --warn-wash:#332711;
+  --crit:#e5534b;
+  --crit-wash:#3a1a18;
+  --link:#4dd0d8;
+  --plate:#0c0d10;
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 20px 48px -18px rgba(0,0,0,.8);
+  --maxw:1360px;
+  --serif:Georgia,"Iowan Old Style","Times New Roman",serif;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:16px;
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ---------- каркас ---------- */
+#deck{height:100dvh;overflow-y:auto;scroll-snap-type:y mandatory}
+.slide{
+  scroll-snap-align:start;
+  min-height:100dvh;
+  display:flex;
+  align-items:center;
+  padding:clamp(28px,4vh,64px) clamp(20px,4vw,72px);
+  border-bottom:1px solid var(--rule-soft);
+}
+.inner{width:100%;max-width:var(--maxw);margin:0 auto}
+
+#rail{position:fixed;top:0;left:0;right:0;height:3px;background:var(--rule-soft);z-index:40}
+#railfill{height:100%;width:0;background:var(--accent);transition:width .18s linear}
+#counter{
+  position:fixed;right:clamp(14px,2.4vw,28px);bottom:clamp(14px,2.4vh,24px);z-index:40;
+  font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:var(--ink-faint);
+  background:color-mix(in srgb,var(--panel) 88%,transparent);
+  border:1px solid var(--rule);border-radius:999px;padding:5px 12px;
+  font-variant-numeric:tabular-nums;
+}
+#dots{position:fixed;left:clamp(10px,1.6vw,20px);top:50%;transform:translateY(-50%);z-index:40;display:flex;flex-direction:column;gap:7px}
+#dots button{width:7px;height:7px;padding:0;border-radius:50%;border:1px solid var(--rule);background:transparent;cursor:pointer}
+#dots button[aria-current="true"]{background:var(--accent);border-color:var(--accent)}
+#dots button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+@media (max-width:900px){#dots{display:none}}
+
+/* ---------- типографика ---------- */
+.eyebrow{
+  font-family:var(--mono);font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--accent);margin:0 0 12px;display:flex;align-items:center;gap:10px;
+}
+.eyebrow::after{content:"";flex:1;height:1px;background:var(--rule);max-width:120px}
+h1,h2,h3{font-family:var(--serif);text-wrap:balance;margin:0}
+h1{font-size:clamp(2.5rem,5.6vw,4.4rem);font-weight:700;line-height:1.03;letter-spacing:-.02em}
+h2{font-size:clamp(1.5rem,2.8vw,2.4rem);font-weight:700;line-height:1.13;letter-spacing:-.01em;margin-bottom:14px}
+h3{font-size:1rem;font-weight:700;margin-bottom:6px}
+p{margin:0 0 12px;color:var(--ink-soft);max-width:64ch}
+.lede{font-size:clamp(1rem,1.3vw,1.14rem);color:var(--ink-soft)}
+strong{color:var(--ink);font-weight:600}
+em{color:var(--ink);font-style:italic}
+code,kbd{
+  font-family:var(--mono);font-size:.86em;background:var(--panel-2);
+  border:1px solid var(--rule);border-radius:4px;padding:1px 5px;color:var(--ink);
+}
+
+/* ---------- блоки ---------- */
+.split{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,13fr);gap:clamp(22px,3vw,52px);align-items:center}
+.split.rev{grid-template-columns:minmax(0,13fr) minmax(0,7fr)}
+.split.even{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+@media (max-width:1000px){
+  .split,.split.rev,.split.even{grid-template-columns:1fr;gap:22px}
+  .split.rev > *:first-child{order:2}
+}
+
+ul.facts{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+ul.facts li{position:relative;padding-left:20px;color:var(--ink-soft);font-size:.95rem;max-width:62ch}
+ul.facts li::before{content:"";position:absolute;left:0;top:.62em;width:7px;height:1px;background:var(--accent)}
+ul.facts li strong{color:var(--ink)}
+
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin:14px 0 0}
+.chip{font-family:var(--mono);font-size:11px;letter-spacing:.04em;border:1px solid var(--rule);border-radius:999px;padding:4px 10px;color:var(--ink-soft);background:var(--panel)}
+.chip.on{border-color:var(--accent);color:var(--accent-ink);background:var(--accent-wash)}
+.chip.ok{border-color:var(--ok);color:var(--ok);background:var(--ok-wash)}
+.chip.warn{border-color:var(--warn);color:var(--warn);background:var(--warn-wash)}
+.chip.crit{border-color:var(--crit);color:var(--crit);background:var(--crit-wash)}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+.card{background:var(--panel);border:1px solid var(--rule);border-radius:9px;padding:16px 17px}
+.card p{margin:0;font-size:.9rem}
+.card .k{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);display:block;margin-bottom:7px}
+
+.tablewrap{overflow-x:auto;border:1px solid var(--rule);border-radius:9px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;min-width:620px;font-size:.92rem}
+th,td{text-align:left;padding:11px 15px;border-bottom:1px solid var(--rule-soft);vertical-align:top}
+thead th{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);font-weight:500}
+tbody tr:last-child td{border-bottom:none}
+td:first-child{color:var(--ink);font-weight:500;white-space:nowrap}
+td{color:var(--ink-soft)}
+
+.cmd{
+  font-family:var(--mono);font-size:12.5px;line-height:1.7;
+  background:var(--plate);border:1px solid var(--rule);border-radius:8px;
+  padding:14px 16px;color:var(--ink-soft);overflow-x:auto;white-space:pre;
+}
+.cmd b{color:var(--accent-ink);font-weight:500}
+.cmd i{color:var(--ink-faint);font-style:normal}
+.cmd u{color:var(--ok);text-decoration:none}
+.cmd s{color:var(--crit);text-decoration:none}
+
+figure{margin:0}
+figure.diagram{background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:clamp(14px,2vw,26px)}
+figure.diagram svg{display:block;width:100%;height:auto}
+figcaption{font-family:var(--mono);font-size:11px;letter-spacing:.05em;color:var(--ink-faint);margin-top:9px}
+
+.plate{background:var(--plate);border:1px solid var(--rule);border-radius:10px;box-shadow:var(--shadow);overflow:hidden}
+.stack{display:grid;gap:14px}
+
+/* ---------- титул ---------- */
+.hero{display:grid;grid-template-columns:minmax(0,1fr);gap:26px}
+.hero .meta{display:flex;flex-wrap:wrap;gap:10px 26px;align-items:baseline;font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:var(--ink-faint);text-transform:uppercase}
+.hero .rule{height:1px;background:var(--rule);width:100%}
+.mark{display:inline-flex;align-items:center;gap:11px;font-family:var(--mono);font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-soft)}
+.mark .sq{width:26px;height:26px;border-radius:7px;background:var(--accent-wash);border:1px solid var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-size:10px;letter-spacing:.02em;font-weight:700}
+.hint{font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);letter-spacing:.05em}
+.hint kbd{background:var(--panel);border:1px solid var(--rule);padding:2px 6px;border-radius:4px}
+
+.endgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(22px,3vw,48px)}
+@media (max-width:900px){.endgrid{grid-template-columns:1fr}}
+
+/* SVG-макеты */
+svg text{font-family:var(--mono);font-size:11px;fill:var(--ink-soft)}
+svg text.t{fill:var(--ink);font-family:var(--sans);font-size:12px;font-weight:600}
+svg text.d{fill:var(--ink-faint);font-size:10px}
+svg text.a{fill:var(--accent-ink)}
+svg .box{fill:var(--panel-2);stroke:var(--rule)}
+svg .boxa{fill:var(--accent-wash);stroke:var(--accent)}
+svg .arr{stroke:var(--ink-faint);stroke-width:1.2;fill:none}
+svg .arra{stroke:var(--accent);stroke-width:1.4;fill:none}
+</style>
+
+<div id="rail"><div id="railfill"></div></div>
+<nav id="dots" aria-label="Слайды"></nav>
+<div id="counter">01 / 25</div>
+
+<main id="deck">
+
+<!-- 1 -->
+<section class="slide" data-title="Титул">
+  <div class="inner">
+    <div class="hero">
+      <span class="mark"><span class="sq">TD</span> Менеджер SSH-подключений и удалённых рабочих столов</span>
+      <h1>TerminalDeck<br>0.11.1</h1>
+      <div class="rule"></div>
+      <p class="lede" style="max-width:60ch">Одно окно на весь парк машин: дерево хостов, терминалы, файлы по SFTP, туннели и RDP-сессии в тех же панелях. Пароли — в локальном зашифрованном хранилище, инвентарь — из вашего git.</p>
+      <div class="meta">
+        <span>macOS · Windows · Linux</span>
+        <span>Electron 43 · Node 22.12+</span>
+        <span>MIT</span>
+        <span>RU / EN</span>
+      </div>
+      <p class="hint" style="margin-top:10px">Листайте <kbd>↓</kbd> <kbd>→</kbd> <kbd>Space</kbd> · схемы нарисованы по коду, а не сняты с экрана</p>
+    </div>
+  </div>
+</section>
+
+<!-- 2 -->
+<section class="slide" data-title="Зачем">
+  <div class="inner">
+    <p class="eyebrow">Зачем это админу</p>
+    <h2>Одно окно вместо четырёх программ и одной бумажки</h2>
+    <p class="lede" style="max-width:72ch">Обычный рабочий день разложен по несовместимым инструментам: клиент SSH, файловый менеджер, клиент RDP и место, где лежат пароли. TerminalDeck держит их в одном дереве и в одной модели наследования <em>хост → группа → родитель</em>.</p>
+    <div class="cards" style="margin-top:26px">
+      <div class="card"><span class="k">Держать</span><p>Дерево сессий с ручной сортировкой, группы, коллекции, инвентарь Ansible прямо из git-репозитория.</p></div>
+      <div class="card"><span class="k">Открывать</span><p>Вкладки, сплиты и рабочие пространства; целая группа открывается одним движением, по вкладке на хост.</p></div>
+      <div class="card"><span class="k">Доставать</span><p>SFTP рядом с терминалом, копирование между хостами, проброс портов, jump host, удалённый рабочий стол в той же панели.</p></div>
+      <div class="card"><span class="k">Не помнить</span><p>Логины и пароли — в хранилище AES-256-GCM, наследуются по дереву и задаются один раз на группу.</p></div>
+    </div>
+    <div class="chips">
+      <span class="chip on">ничего не уходит наружу</span>
+      <span class="chip on">права = ваши ключи и логины</span>
+      <span class="chip on">инвентарь только на чтение</span>
+    </div>
+  </div>
+</section>
+
+<!-- 3 -->
+<section class="slide" data-title="Что внутри">
+  <div class="inner">
+    <p class="eyebrow">Что внутри</p>
+    <h2>Тонкое окно, толстый главный процесс</h2>
+    <p class="lede" style="max-width:74ch">Окно рисует и принимает нажатия. Всё, что умеет сеть, ключи и диск, живёт в главном процессе Electron — включая сам RDP-клиент, вынесенный ещё дальше, в отдельную программу.</p>
+    <div class="tablewrap" style="margin-top:22px">
+      <table>
+        <thead><tr><th>Слой</th><th>Технология</th><th>За что отвечает</th></tr></thead>
+        <tbody>
+          <tr><td>Окно</td><td>React · TypeScript · Zustand</td><td>Дерево, вкладки, сплиты, диалоги; из привилегий — только мост <code>window.td</code></td></tr>
+          <tr><td>Терминал</td><td><code>xterm.js</code> + WebGL</td><td>Отрисовка, поиск по буферу, тема и размер шрифта</td></tr>
+          <tr><td>Главный процесс</td><td>Node.js в main</td><td>SSH и SFTP, хранилище секретов, git, туннели, мониторинг, обновления</td></tr>
+          <tr><td>Транспорт</td><td><code>ssh2</code></td><td>Сессии, exec-каналы, jump host, проброс портов, SOCKS5</td></tr>
+          <tr><td>Рабочий стол</td><td>FreeRDP 3.31 → <code>td-rdp</code></td><td>Отдельный процесс: подключается, декодирует, отдаёт готовые пиксели</td></tr>
+          <tr><td>Секреты</td><td>AES-256-GCM · scrypt</td><td>Файл в каталоге пользователя ОС; ключ живёт только в памяти main</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <ul class="facts" style="margin-top:22px">
+      <li><strong>Изоляция контекста включена</strong>, песочница включена, переходы и встраивание веб-содержимого запрещены — окну просто нечем выйти за свои пределы.</li>
+      <li><strong>103 канала IPC</strong> перечислены в одном файле и типизированы: мост окна не умеет ничего, чего в этом списке нет.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 4 -->
+<section class="slide" data-title="Где пароль">
+  <div class="inner">
+    <p class="eyebrow">Граница</p>
+    <h2>Куда пароль не доходит</h2>
+    <div class="split">
+      <div>
+        <p>Секрет хранится не у хоста, а в хранилище — у хоста лежит ссылка на него. Ссылку окно видеть может, значение — нет: подстановка происходит в главном процессе, за мостом.</p>
+        <ul class="facts">
+          <li><strong>Окно получает <code>secretRef</code></strong>, а не строку. Диалог хоста показывает «пароль сохранён», не показывая пароль.</li>
+          <li><strong>Пароль шлюза RD</strong> раскрывается в main и уходит прямо в дочерний процесс клиента, не появляясь в окне ни на кадр.</li>
+          <li><strong>Одно честное исключение:</strong> собственный пароль хоста для RDP — CredSSP требует его на стороне клиента. Именно поэтому клиент вынесен из окна в отдельный процесс, и теперь пароль идёт из хранилища прямо туда по каналу.</li>
+        </ul>
+      </div>
+      <figure class="diagram">
+        <svg viewBox="0 0 720 300" role="img" aria-label="Схема: окно, мост, главный процесс, хранилище">
+          <rect class="box" x="8" y="30" width="180" height="240" rx="9"/>
+          <text class="t" x="24" y="56">Окно (renderer)</text>
+          <text class="d" x="24" y="76">sandbox · contextIsolation</text>
+          <rect class="box" x="28" y="96" width="140" height="34" rx="6"/>
+          <text x="42" y="117">дерево, вкладки</text>
+          <rect class="box" x="28" y="140" width="140" height="34" rx="6"/>
+          <text x="42" y="161">xterm.js</text>
+          <rect class="boxa" x="28" y="184" width="140" height="34" rx="6"/>
+          <text class="a" x="42" y="205">secretRef: s_7f2…</text>
+          <text class="d" x="28" y="240">значения здесь нет</text>
+
+          <rect class="boxa" x="216" y="96" width="76" height="122" rx="8"/>
+          <text class="a" x="232" y="140">window</text>
+          <text class="a" x="232" y="156">.td</text>
+          <text class="d" x="228" y="178">103 канала</text>
+
+          <rect class="box" x="320" y="30" width="220" height="240" rx="9"/>
+          <text class="t" x="336" y="56">Главный процесс</text>
+          <rect class="box" x="340" y="76" width="180" height="32" rx="6"/>
+          <text x="354" y="96">SSHManager · ssh2</text>
+          <rect class="box" x="340" y="118" width="180" height="32" rx="6"/>
+          <text x="354" y="138">SFTP · туннели</text>
+          <rect class="boxa" x="340" y="160" width="180" height="52" rx="6"/>
+          <text class="a" x="354" y="180">Vault</text>
+          <text class="d" x="354" y="198">AES-256-GCM · scrypt</text>
+          <text class="d" x="340" y="240">ключ только в памяти</text>
+
+          <rect class="box" x="572" y="96" width="140" height="52" rx="8"/>
+          <text class="t" x="588" y="118">Хост</text>
+          <text class="d" x="588" y="136">SSH · SFTP</text>
+          <rect class="box" x="572" y="164" width="140" height="52" rx="8"/>
+          <text class="t" x="588" y="186">td-rdp</text>
+          <text class="d" x="588" y="204">отдельный процесс</text>
+
+          <path class="arra" d="M188 157 L214 157"/><path class="arra" d="M292 157 L318 157"/>
+          <path class="arr" d="M540 122 L570 122"/><path class="arr" d="M540 190 L570 190"/>
+          <text class="d" x="196" y="146">запрос</text>
+        </svg>
+        <figcaption>Схема по коду: src/preload, src/main/ssh, src/main/vault</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- 5 -->
+<section class="slide" data-title="Инвентарь">
+  <div class="inner">
+    <p class="eyebrow">Откуда берутся хосты</p>
+    <h2>Инвентарь Ansible — из вашего репозитория, только на чтение</h2>
+    <p class="lede" style="max-width:74ch">Список машин обычно уже существует и уже лежит в git. TerminalDeck читает его тем же системным <code>git</code>, которым пользуетесь вы, — значит работают ваши ключи, агенты, credential helper'ы и прокси. Наружу не уходит ни одного коммита.</p>
+    <div class="split even" style="margin-top:24px">
+      <div>
+        <ul class="facts">
+          <li><strong>Группы, <code>children</code>, inline <code>vars</code>, <code>group_vars/</code> и <code>host_vars/</code></strong> становятся группами и параметрами подключения.</li>
+          <li><strong>Хост из нескольких групп</strong> показан под каждой, с указанием их числа, и остаётся одним хостом: один набор локальных правок, один терминал.</li>
+          <li><strong>Источник следует одной ветке</strong>, и строка под ним называет ветку, ревизию, число хостов и групп и прочитанные файлы — чтобы «синхронизировалось не то» было видно, а не загадочно.</li>
+          <li><strong>Только YAML</strong>: <code>.yml</code> и <code>.yaml</code>, каталог читается на уровень вглубь.</li>
+        </ul>
+      </div>
+      <div class="stack">
+        <div class="cmd">inventory/
+  <b>prod.yml</b>          <i># 142 хоста, 11 групп</i>
+  <b>staging.yml</b>       <i># 38 хостов</i>
+  group_vars/
+    <b>webservers.yml</b>  <i>ansible_user: deploy</i>
+    <b>dbs.yml</b>         <i>ansible_port: 2222</i>
+  host_vars/
+    <b>db-01.yml</b>       <i>ansible_host: 10.0.4.11</i></div>
+        <p style="margin:0"><strong>Наследование параметров</strong> берётся из одной группы — самой глубокой, а среди равных последней по алфавиту: той, которую выбрал бы сам Ansible. Полный порядок приоритетов переменных не реализован, и там, где это важно, ставится локальная правка хоста. Сказано прямо, потому что молчаливое расхождение с Ansible было бы хуже отсутствия функции.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 6 -->
+<section class="slide" data-title="Папка из git">
+  <div class="inner">
+    <p class="eyebrow">Новое в 0.11</p>
+    <h2>Обычная папка на вкладке «Сессии» — но привязанная к git</h2>
+    <p class="lede" style="max-width:76ch">Вкладка «Инвентарь» — отдельное место. А это та же идея внутри привычного дерева: любая папка, сделанная руками, может зеркалить инвентарь из репозитория, и пришедшие хосты стоят рядом с сохранёнными вручную.</p>
+    <div class="split even" style="margin-top:22px">
+      <div>
+        <ul class="facts">
+          <li><strong>Один репозиторий на папку</strong> — но папка при этом остаётся вашей: собственные сессии и подпапки в ней синхронизация не трогает.</li>
+          <li><strong>Хосты ложатся одним плоским списком</strong>, как бы глубоко инвентарь их ни вкладывал, а хост из нескольких групп появляется один раз. Группы прочитаны и сохранены, но не рисуются: они — источник параметров, а не место хранения.</li>
+          <li><strong>Хосты приходят производными узлами</strong> с локальными настройками поверх: правки переживают любую следующую синхронизацию, а логин, поставленный на папку, накрывает всё, что под ней.</li>
+          <li><strong>Резервная копия несёт репозиторий, ветку, выбор групп и ваши правки</strong> — но не само зеркало: его на новой машине восстановит одна синхронизация.</li>
+        </ul>
+      </div>
+      <div class="stack">
+        <div class="cmd"><i>Сессии</i>
+├─ 📁 Личное
+│   └─ jump-01
+└─ 📁🔗 <b>Прод</b>            <i>git · main · a4d40d6</i>
+    ├─ web-01.prod
+    ├─ web-02.prod
+    ├─ db-01.prod
+    ├─ …                <i>ещё 138</i>
+    └─ 📁 мои заметки    <i>синхронизация не трогает</i></div>
+        <p style="margin:0">Значок папки остаётся значком папки; связь с git обозначена вторым значком рядом, а не строкой серого текста под именем.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 7 -->
+<section class="slide" data-title="Синхронизация">
+  <div class="inner">
+    <p class="eyebrow">Как это себя ведёт</p>
+    <h2>Само не происходит ничего</h2>
+    <div class="split">
+      <div>
+        <p>То, что взяла прошлая синхронизация, записано на диск. Поэтому папка показывает свои хосты <strong>на первом же кадре после запуска</strong>, не заглядывая в сеть. В git она идёт только тогда, когда её об этом попросили — пунктом меню или кнопкой ⟳ на строке.</p>
+        <ul class="facts">
+          <li><strong>Каждая синхронизация спрашивает, какие группы взять</strong> — до того, как на диске что-то поменяется. Прошлый выбор отмечен, появившиеся с прошлого раза группы отмечены и помечены как новые, а снятая вами подгруппа остаётся снятой, а не предлагается снова как открытие.</li>
+          <li><strong>Синхронизация приводит папку к тому, что в репозитории сейчас</strong> — значит ушедшая группа или хост уходят и отсюда. Диалог перечисляет, что именно исчезнет, и сколько среди них хостов с локальными настройками: они и сохранённые для них пароли уйдут вместе с ними.</li>
+          <li><strong>Общий клон.</strong> Папки, совпадающие по адресу и ветке, тянут один рабочий каталог: он выкачивается один раз и удаляется, когда уходит последняя папка, которая его читала.</li>
+          <li><strong>Репозиторий запоминается</strong> после первой удачной синхронизации и предлагается списком каждой следующей папке: прод из одного файла, стейджинг из другого — по одному инвентарю.</li>
+        </ul>
+      </div>
+      <figure class="diagram">
+        <svg viewBox="0 0 700 330" role="img" aria-label="Схема синхронизации папки с git">
+          <rect class="box" x="8" y="20" width="150" height="70" rx="8"/>
+          <text class="t" x="24" y="46">git-репозиторий</text>
+          <text class="d" x="24" y="66">ветка · ревизия</text>
+          <text class="d" x="24" y="80">только чтение</text>
+
+          <rect class="box" x="200" y="20" width="160" height="70" rx="8"/>
+          <text class="t" x="216" y="46">общий клон</text>
+          <text class="d" x="216" y="66">ключ — sha1(url+ветка)</text>
+          <text class="d" x="216" y="80">одна очередь операций</text>
+
+          <rect class="boxa" x="402" y="20" width="180" height="70" rx="8"/>
+          <text class="a" x="418" y="46">preview()</text>
+          <text class="d" x="418" y="66">что придёт, что уйдёт,</text>
+          <text class="d" x="418" y="80">у скольких есть правки</text>
+
+          <rect class="boxa" x="402" y="130" width="180" height="60" rx="8"/>
+          <text class="a" x="418" y="156">диалог выбора групп</text>
+          <text class="d" x="418" y="176">до записи на диск</text>
+
+          <rect class="box" x="402" y="230" width="180" height="70" rx="8"/>
+          <text class="t" x="418" y="256">apply()</text>
+          <text class="d" x="418" y="276">дерево + локальный кеш</text>
+          <text class="d" x="418" y="290">правки наложены заново</text>
+
+          <rect class="box" x="130" y="230" width="200" height="70" rx="8"/>
+          <text class="t" x="146" y="256">запуск приложения</text>
+          <text class="d" x="146" y="276">читает кеш, не сеть</text>
+          <text class="d" x="146" y="290">хосты видны сразу</text>
+
+          <path class="arr" d="M158 55 L198 55"/>
+          <path class="arr" d="M360 55 L400 55"/>
+          <path class="arra" d="M492 90 L492 128"/>
+          <path class="arra" d="M492 190 L492 228"/>
+          <path class="arr" d="M400 265 L332 265"/>
+          <text class="d" x="336" y="252">кеш</text>
+        </svg>
+        <figcaption>Схема по коду: src/main/gitFolders/GitFolderStore.ts</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- 8 -->
+<section class="slide" data-title="Хранилище">
+  <div class="inner">
+    <p class="eyebrow">Учётные данные</p>
+    <h2>Один логин на группу, а не двадцать записок</h2>
+    <div class="split even">
+      <div>
+        <ul class="facts">
+          <li><strong>Хранилище AES-256-GCM</strong>, мастер-пароль через scrypt, файл — в каталоге пользователя ОС. Мастер-пароль можно сменить, не потеряв ни одного секрета.</li>
+          <li><strong>Наследование.</strong> Сессия оставляет поле пустым и берёт его у группы, группа — у родителя, хост из инвентаря — у своего репозитория. Побеждает ближайшее значение.</li>
+          <li><strong>Хост со своим паролем сохраняет его</strong> при переносе в группу — и диалог говорит об этом. Возврат метода проверки в «Наследовать» тем же движением снимает этот пароль, так что начинает работать групповой: один клик, и до сохранения обратимо.</li>
+          <li><strong>Удаление уносит секрет.</strong> Удалили хост, группу, репозиторий или локальную правку — её учётные данные уходят из хранилища, а не остаются в нём висеть.</li>
+          <li><strong>Проверка ключа хоста</strong> по локальному <code>known_hosts</code>: при первом контакте спрашивает, при смене ключа — предупреждает громко. Сохранённые ключи можно посмотреть и отозвать.</li>
+          <li><strong>Команды при подключении</strong> — <code>sudo -i</code>, <code>tmux attach</code> — наследуются по той же цепочке, но читаются <em>только</em> из локальной конфигурации и никогда из репозитория: иначе право коммита стало бы правом выполнять команды на ваших машинах.</li>
+        </ul>
+      </div>
+      <div class="stack">
+        <div class="cmd"><i>Группа «Прод»</i>
+  логин      <b>deploy</b>
+  метод      <b>ключ ~/.ssh/id_prod</b>
+  команды    <b>sudo -i</b>
+
+  <i>└ web-01</i>   логин   <i>наследует</i> → deploy
+             метод   <i>наследует</i> → ключ
+  <i>└ db-01</i>    логин   <b>postgres</b>      <i>своё</i>
+             метод   <i>наследует</i> → ключ
+  <i>└ old-01</i>   метод   <b>пароль</b>        <i>своё</i>
+             <s>наследование выключено</s></div>
+        <div class="chips">
+          <span class="chip ok">пароль спрашивается, если не сохранён</span>
+          <span class="chip ok">keyboard-interactive для 2FA</span>
+          <span class="chip on">импорт из ~/.ssh/config, вместе с ProxyJump</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 9 -->
+<section class="slide" data-title="Замок">
+  <div class="inner">
+    <p class="eyebrow">Безопасность</p>
+    <h2>Замок останавливает приложение, а не картинку</h2>
+    <p class="lede" style="max-width:76ch">Рабочее место закрывается, а не разбирается: живые сессии переживают блокировку. Но оно убирается и из-под клавиатуры тоже, а главный процесс, пока хранилище закрыто, отказывается что-либо начинать.</p>
+    <div class="cards" style="margin-top:24px">
+      <div class="card"><span class="k">Пока закрыто</span><p>Ни новой SSH-сессии, ни рабочего стола, ни листинга файлов по SFTP. Отказ приходит с границы IPC, а не из глубины кода.</p></div>
+      <div class="card"><span class="k">Почему именно так</span><p>Хост, входящий по ключу или через агент, у хранилища ничего не спрашивает — значит ничто другое и не встало бы у него на пути.</p></div>
+      <div class="card"><span class="k">Что продолжается</span><p>Уже работающее работает: блокировка — это не отключение. Редактор, сохраняющий файл, открытый до замка, дописывает его на хост.</p></div>
+      <div class="card"><span class="k">Когда закрывается</span><p><kbd>⌘L</kbd> или простой: пятнадцать минут по умолчанию, от минуты до восьми часов, можно выключить совсем.</p></div>
+    </div>
+    <ul class="facts" style="margin-top:22px">
+      <li><strong>Восемь часов есть в списке не случайно:</strong> рабочий день — тот промежуток, поперёк которого люди действительно просили их не прерывать. Правильный ответ зависит от комнаты, а не от приложения, поэтому решает настройка, а не мы.</li>
+      <li><strong>Закрытие — не только визуальное:</strong> накрытая часть окна помечена <code>inert</code>, то есть не берёт ни клик, ни фокус с клавиатуры.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 10 -->
+<section class="slide" data-title="Аккаунты">
+  <div class="inner">
+    <p class="eyebrow">Кем зайти</p>
+    <h2>«Подключиться как…» — не меняя того, как хост сохранён</h2>
+    <div class="split">
+      <div>
+        <p>Сохранённые учётные записи (Настройки → Аккаунты) — логины сами по себе, не принадлежащие ни хосту, ни группе. Правый клик по любому хосту, хоть из инвентаря, и он открывается под выбранной.</p>
+        <ul class="facts">
+          <li><strong>Это касается только новой вкладки.</strong> Обратно ничего не записывается: хост остаётся с тем логином, с которым сохранён, и остальные подключения к нему не затронуты.</li>
+          <li><strong>Выбор едет на панели</strong>, поэтому переподключение снова входит тем же аккаунтом, а панель называется его именем — окно, вошедшее кем-то другим, так и говорит.</li>
+          <li><strong>Заменяется только «кто вы».</strong> Порт, jump host, команды при подключении и шлюз остаются хостовыми. Промежуточные бастионы достигаются так, как настроены они.</li>
+          <li><strong>Аккаунт без сохранённого пароля</strong> — это осознанная конструкция, а не недоделанная: имя и логин помнятся, пароль спрашивается каждый раз.</li>
+        </ul>
+      </div>
+      <div class="stack">
+        <div class="cmd"><i>Правый клик по web-01</i>
+  Подключиться
+  <b>Подключиться как…</b>  ▸  deploy
+                            <b>root-audit</b>   <i>пароль каждый раз</i>
+                            svc-backup
+  Подключиться несколько раз…
+  Локальные настройки…</div>
+        <p style="margin:0">Работает и для рабочих столов, и пароли аккаунтов лежат в хранилище ровно так же, как хостовые.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 11 -->
+<section class="slide" data-title="Пространства">
+  <div class="inner">
+    <p class="eyebrow">Как это разложено на экране</p>
+    <h2>Пространства, вкладки, сплиты</h2>
+    <div class="split rev">
+      <figure class="diagram">
+        <svg viewBox="0 0 720 300" role="img" aria-label="Макет раскладки: пространства, вкладки, сплиты">
+          <rect class="box" x="8" y="8" width="704" height="26" rx="6"/>
+          <rect class="boxa" x="16" y="13" width="96" height="16" rx="4"/>
+          <text class="a" x="26" y="25">Прод</text>
+          <text x="128" y="25">Стейдж</text>
+          <text x="200" y="25">Сеть •</text>
+          <text class="d" x="640" y="25">пространства</text>
+
+          <rect class="box" x="8" y="42" width="704" height="24" rx="6"/>
+          <rect class="boxa" x="16" y="46" width="88" height="16" rx="4"/>
+          <text class="a" x="26" y="58">web-01</text>
+          <text x="120" y="58">web-02</text>
+          <text x="190" y="58">db-01 •</text>
+          <text class="d" x="672" y="58">вкладки</text>
+
+          <rect class="box" x="8" y="76" width="150" height="216" rx="8"/>
+          <text class="d" x="20" y="96">СЕССИИ</text>
+          <text x="20" y="118">📁 Прод</text>
+          <text x="32" y="136">web-01</text>
+          <circle cx="26" cy="132" r="3" fill="var(--ok)"/>
+          <text x="32" y="154">web-02</text>
+          <text x="32" y="172">db-01</text>
+          <text x="20" y="196">📁🔗 Инвентарь</text>
+          <text x="20" y="220">★ Базы</text>
+          <text class="d" x="20" y="238">коллекция</text>
+
+          <rect class="box" x="168" y="76" width="270" height="140" rx="8"/>
+          <text class="t" x="182" y="98">web-01 — shell</text>
+          <text x="182" y="122">$ tail -f /var/log/…</text>
+          <text x="182" y="140">$ systemctl status</text>
+
+          <rect class="box" x="448" y="76" width="264" height="140" rx="8"/>
+          <text class="t" x="462" y="98">web-01 — файлы</text>
+          <text x="462" y="122" fill="var(--file-dir)">drwxr-xr-x  var</text>
+          <text x="462" y="140" fill="var(--file-exec)">-rwxr-xr-x  deploy.sh</text>
+
+          <rect class="box" x="168" y="226" width="544" height="66" rx="8"/>
+          <text class="t" x="182" y="248">db-01 — рабочий стол (RDP)</text>
+          <text class="d" x="182" y="268">та же панель, тот же сплит</text>
+        </svg>
+        <figcaption>Макет раскладки — нарисован, не снят с экрана</figcaption>
+      </figure>
+      <div>
+        <ul class="facts">
+          <li><strong>Пространства</strong> — верхняя полоса именованных контейнеров, у каждого свой ряд вкладок. Целая группа хостов или целый репозиторий открываются в одно, по вкладке на хост.</li>
+          <li><strong>Вкладка переезжает между пространствами</strong>, не роняя соединение.</li>
+          <li><strong>Сплиты</strong>: перетащите хост или целую вкладку на панель, чтобы поставить их рядом, и выньте панель обратно в свою вкладку.</li>
+          <li><strong>Раскладка восстанавливается при запуске</strong>; на фоновых вкладках и пространствах видны отметки активности, а на хостах с открытым терминалом — зелёная точка.</li>
+          <li><strong>Дерево подключает по двойному щелчку</strong> — одиночный только выделяет, чтобы случайный клик не открыл терминал. Удаление живёт в правом клике за подтверждением, а не кнопкой на строке.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 12 -->
+<section class="slide" data-title="Коллекции">
+  <div class="inner">
+    <p class="eyebrow">Коллекции</p>
+    <h2>Набор хостов, у которого есть свой вид</h2>
+    <div class="split even">
+      <div>
+        <p>Коллекция — собранный руками набор, который лежит под группами в дереве и открывается пространством, когда он снова понадобился. В отличие от группы, хост может быть в любом их числе, на учётные данные членство не влияет, а пространство можно сохранить коллекцией прямо перед закрытием.</p>
+        <ul class="facts">
+          <li><strong>Пропавшие хосты помечаются</strong>, а не исчезают из набора молча.</li>
+          <li><strong>У коллекции есть профиль внешнего вида</strong> — цвет и тема терминала, — чтобы целое окружение читалось как одно целое с одного взгляда.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Вид применяется по контексту</h3>
+        <p>Хост носит вид набора там, где вы видите его под этим набором, и там, откуда вы его из этого набора открыли. Одна и та же машина в «Прод» и в «Базы» выглядит как то, через что вы вошли, а открытая из обычного дерева — не участвует ни в каком наборе вовсе. Хост с собственными настройками сохраняет их в любом случае.</p>
+        <div class="chips">
+          <span class="chip on">шрифт и размер</span>
+          <span class="chip on">тема</span>
+          <span class="chip on">курсор</span>
+          <span class="chip on">размер буфера</span>
+        </div>
+        <p style="margin-top:14px">Всё это задаётся глобально в настройках, а группа, репозиторий инвентаря или отдельный хост могут переопределить: каждый элемент управления говорит, что именно он унаследует и откуда. Тема хоста перекрашивает его собственный терминал, а не приложение.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 13 -->
+<section class="slide" data-title="Много сразу">
+  <div class="inner">
+    <p class="eyebrow">Когда машин много</p>
+    <h2>Одно движение на десять хостов</h2>
+    <div class="cards">
+      <div class="card"><span class="k">⌘P · палитра хостов</span><p>Поиск по сохранённым сессиям и инвентарям сразу. <kbd>Tab</kbd> отмечает несколько, <kbd>⇧⏎</kbd> открывает их плиткой в одной вкладке, <kbd>⌥⏎</kbd> — отдельным пространством.</p></div>
+      <div class="card"><span class="k">⌘K · сниппеты</span><p>Сохранённые команды: <kbd>⏎</kbd> выполняет, <kbd>⇧⏎</kbd> кладёт на приглашение невыполненной. Палитра говорит, куда именно команда попадёт.</p></div>
+      <div class="card"><span class="k">Broadcast</span><p>Ввод расходится по отмеченным терминалам — по всем вкладкам, а не только по видимой.</p></div>
+      <div class="card"><span class="k">Подключиться несколько раз…</span><p>Один хост в стольких окнах, сколько попросите, под выбранным аккаунтом: отдельными вкладками, плиткой в одной или своим пространством.</p></div>
+    </div>
+    <ul class="facts" style="margin-top:24px">
+      <li><strong>Двадцать за раз — предел</strong>, и он намеренный: каждое из них — настоящий вход на дальней стороне. Подключения нумеруются, чтобы их можно было различить.</li>
+      <li><strong>Хосты сортируются руками:</strong> перетащите строку на верхний или нижний край другой, и она встанет в этот промежуток — в своей группе или в другой. Папки перетаскиваются так же; середина строки по-прежнему значит «внутрь». Порядок держит хранилище, поэтому он переживает перезапуск, переименование и переезд.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 14 -->
+<section class="slide" data-title="Ctrl">
+  <div class="inner">
+    <p class="eyebrow">Клавиатура</p>
+    <h2><code>Ctrl</code> принадлежит шеллу — на всех платформах</h2>
+    <p class="lede" style="max-width:76ch">До 0.10.2 это было верно только на Mac. На Windows и Linux горячие клавиши сидели на голом <code>Ctrl</code> и забирали ровно те сочетания, ради которых открывают терминал: <code>Ctrl+D</code> делил панель вместо того, чтобы завершить сессию.</p>
+    <div class="tablewrap" style="margin-top:22px">
+      <table>
+        <thead><tr><th>Сочетание</th><th>Кому принадлежит</th><th>Что делает</th></tr></thead>
+        <tbody>
+          <tr><td><code>Ctrl+C</code> <code>Ctrl+D</code> <code>Ctrl+L</code></td><td>дальней стороне</td><td>Ровно то, что говорит readline: прервать, закрыть ввод, очистить экран</td></tr>
+          <tr><td><code>Ctrl+Shift+…</code></td><td>приложению</td><td>Вкладки, сплиты, поиск, палитры — соглашение Windows Terminal и MobaXterm</td></tr>
+          <tr><td><code>⌘…</code></td><td>приложению, на Mac</td><td>Там <code>Ctrl</code> шеллу никто и не занимал</td></tr>
+          <tr><td><code>Ctrl+1 … Ctrl+9</code></td><td>приложению, намеренно</td><td>Переход по вкладкам: ни один шелл никогда их не хотел</td></tr>
+          <tr><td><code>Ctrl+Shift+E</code></td><td>приложению, намеренно</td><td>Деление вниз: <code>Shift</code> уже часть модификатора и не может ещё и выбирать направление</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <ul class="facts" style="margin-top:22px">
+      <li><strong>Полноэкранный рабочий стол отдаёт сессии всю клавиатуру:</strong> каждое сочетание этого приложения на время уходит, включая <code>⌘W</code> и пункты меню macOS. Списка исключений нет намеренно — клавиша, посланная дальней машине и попавшая в эту, и есть та самая ошибка, которой всё это избегает. Выходов два: <kbd>F11</kbd> и удержание <kbd>Esc</kbd>, и ни один из них не проходит через обработку сочетаний.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 15 -->
+<section class="slide" data-title="SFTP">
+  <div class="inner">
+    <p class="eyebrow">Файлы</p>
+    <h2>Список, в котором видно, что это за файл</h2>
+    <div class="split rev">
+      <figure class="diagram">
+        <svg viewBox="0 0 720 268" role="img" aria-label="Макет панели SFTP">
+          <rect class="box" x="8" y="8" width="704" height="26" rx="6"/>
+          <text class="d" x="20" y="25">◂ ▸ ⌂</text>
+          <rect class="boxa" x="72" y="12" width="500" height="18" rx="4"/>
+          <text class="a" x="82" y="25">/var/www/releases/2026-09-05</text>
+          <text class="d" x="596" y="25">⇉ следовать</text>
+
+          <rect class="box" x="8" y="42" width="150" height="218" rx="8"/>
+          <text class="d" x="20" y="62">ДЕРЕВО</text>
+          <text x="20" y="84" fill="var(--file-dir)">▾ /</text>
+          <text x="32" y="102" fill="var(--file-dir)">▾ var</text>
+          <text x="44" y="120" fill="var(--file-dir)">▾ www</text>
+          <text x="56" y="138" fill="var(--file-dir)">releases</text>
+          <text x="32" y="160" fill="var(--file-dir)">▸ etc</text>
+          <text x="32" y="178" fill="var(--file-dir)">▸ home</text>
+
+          <rect class="box" x="168" y="42" width="544" height="218" rx="8"/>
+          <line x1="168" y1="66" x2="712" y2="66" stroke="var(--rule)"/>
+          <text class="d" x="182" y="60">ИМЯ</text><text class="d" x="392" y="60">РАЗМЕР</text>
+          <text class="d" x="466" y="60">ИЗМЕНЁН</text><text class="d" x="566" y="60">ПРАВА</text><text class="d" x="650" y="60">ВЛАДЕЛЕЦ</text>
+          <text x="182" y="88" fill="var(--file-dir)">..</text>
+          <text x="182" y="110" fill="var(--file-dir)">assets</text><text x="392" y="110">—</text><text x="466" y="110">05.09 14:02</text><text x="566" y="110" fill="var(--file-dir)">drwxr-xr-x</text><text x="650" y="110" fill="var(--file-dir)">deploy</text>
+          <text x="182" y="132" fill="var(--file-link)">current →</text><text x="392" y="132">—</text><text x="466" y="132">05.09 14:02</text><text x="566" y="132" fill="var(--file-link)">lrwxrwxrwx</text><text x="650" y="132" fill="var(--file-link)">deploy</text>
+          <text x="182" y="154" fill="var(--file-exec)">deploy.sh</text><text x="392" y="154">2,1 КБ</text><text x="466" y="154">05.09 13:58</text><text x="566" y="154" fill="var(--file-exec)">-rwxr-xr-x</text><text x="650" y="154" fill="var(--file-exec)">root</text>
+          <text x="182" y="176">app.log</text><text x="392" y="176">18,4 МБ</text><text x="466" y="176">05.09 14:11</text><text x="566" y="176">-rw-r--r--</text><text x="650" y="176">deploy</text>
+          <text x="182" y="198">config.yml</text><text x="392" y="198">861 Б</text><text x="466" y="198">04.09 09:20</text><text x="566" y="198">-rw-r-----</text><text x="650" y="198">deploy</text>
+          <text x="182" y="220" fill="var(--file-exec)">passwd-helper</text><text x="392" y="220">44 КБ</text><text x="466" y="220">01.09 11:00</text><text x="566" y="220" fill="var(--file-exec)">-rwsr-xr-x</text><text x="650" y="220" fill="var(--file-exec)">root</text>
+          <text class="d" x="182" y="244">setuid показан отдельной буквой, а не подразумевается</text>
+        </svg>
+        <figcaption>Макет панели — цвета взяты из палитры приложения</figcaption>
+      </figure>
+      <div>
+        <ul class="facts">
+          <li><strong>Имя, режим и владелец красятся одним цветом на вид:</strong> синие каталоги, голубые симлинки, красные исполняемые — чтобы «что это» и «что его таким сделало» стояли рядом.</li>
+          <li><strong>Права разобраны полностью</strong> — <code>rwxr-xr-x</code>, setuid, setgid и sticky-бит в том числе.</li>
+          <li><strong>Тянется всё:</strong> панель за левый край, дерево за разделитель, каждая колонка за заголовок. Ширины запоминаются, а если ширины не хватило — список едет вбок, а не роняет колонку.</li>
+          <li><strong>Адресная строка редактируемая:</strong> введите путь и нажмите <kbd>⏎</kbd>. <code>~</code> и <code>..</code> раскрывает сервер, а не догадка на этой стороне, а путь, указывающий на файл, открывает его папку с выделенным файлом.</li>
+          <li><strong>Мультивыделение, переименование, удаление, mkdir</strong>, передача целых каталогов, загрузка перетаскиванием из Finder, прогресс и автообновление.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 16 -->
+<section class="slide" data-title="Хост в хост">
+  <div class="inner">
+    <p class="eyebrow">Передача</p>
+    <h2>С хоста на хост, минуя ваш диск</h2>
+    <div class="split">
+      <div>
+        <p>Перетащите файлы или папки из одной открытой панели SFTP в другую — и они поедут потоком, из сокета источника в сокет получателя.</p>
+        <ul class="facts">
+          <li><strong>Двум серверам не нужен маршрут друг к другу.</strong> Оба соединения — ваши, и сходятся они здесь.</li>
+          <li><strong>На вашем диске по дороге не остаётся ничего</strong> — ни временного файла, ни кеша.</li>
+          <li><strong>Бросок на строку папки</strong> кладёт внутрь неё, а не в тот каталог, который сейчас показан.</li>
+        </ul>
+        <div class="chips">
+          <span class="chip warn">планировщик покрыт тестами, сама передача против двух реальных серверов ещё не гонялась</span>
+        </div>
+      </div>
+      <figure class="diagram">
+        <svg viewBox="0 0 700 220" role="img" aria-label="Схема копирования между хостами">
+          <rect class="box" x="8" y="70" width="170" height="80" rx="8"/>
+          <text class="t" x="24" y="98">web-01</text>
+          <text class="d" x="24" y="118">SFTP-канал</text>
+          <text class="d" x="24" y="134">/var/www/…</text>
+
+          <rect class="boxa" x="262" y="50" width="176" height="120" rx="9"/>
+          <text class="a" x="278" y="78">TerminalDeck</text>
+          <text class="d" x="278" y="100">два канала,</text>
+          <text class="d" x="278" y="116">сшитых потоком</text>
+          <text class="d" x="278" y="140">на диск не пишется</text>
+          <text class="d" x="278" y="156">ничего</text>
+
+          <rect class="box" x="522" y="70" width="170" height="80" rx="8"/>
+          <text class="t" x="538" y="98">db-07</text>
+          <text class="d" x="538" y="118">SFTP-канал</text>
+          <text class="d" x="538" y="134">/backup/…</text>
+
+          <path class="arra" d="M178 110 L258 110"/>
+          <path class="arra" d="M442 110 L518 110"/>
+          <path class="arr" d="M100 70 C100 20 600 20 600 70" stroke-dasharray="4 4"/>
+          <text class="d" x="292" y="34">маршрута между ними может не быть</text>
+        </svg>
+        <figcaption>Схема по коду: src/main/ssh/SFTPManager</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- 17 -->
+<section class="slide" data-title="Перезапись">
+  <div class="inner">
+    <p class="eyebrow">Перед тем, как заменить</p>
+    <h2>Сначала показать, потом писать</h2>
+    <div class="split even">
+      <div>
+        <p>Передача целиком планируется до того, как сдвинется первый байт, и всё, что она бы заменила, перечисляется с размером и датой с каждой стороны.</p>
+        <ul class="facts">
+          <li><strong>Каждое столкновение начинается с «Пропустить».</strong> Умолчание не должно ничего терять.</li>
+          <li><strong>Папка на месте файла</strong> — отказ, а не замена.</li>
+          <li><strong>Ответ не запоминается:</strong> каждая передача спрашивает заново.</li>
+          <li><strong>Сравнить, не выходя из диалога:</strong> любой текстовый файл со столкновением можно посмотреть построчно, а любой удалённый — сравнить с локальным из контекстного меню.</li>
+          <li><strong>Двоичные и всё, что больше 2 МБ, так и говорят</strong>, вместо того чтобы тянуться через канал.</li>
+          <li><strong>Разница только в CRLF</strong> называется именно так, а не «файл переписан целиком».</li>
+        </ul>
+      </div>
+      <div class="cmd"><i>Заменить 3 файла?</i>
+
+  <b>config.yml</b>
+    здесь   861 Б   04.09 09:20
+    там     902 Б   05.09 12:04
+    <u>[ Пропустить ]</u>  [ Заменить ]  [ Сравнить ]
+
+  <b>app.log</b>
+    здесь   18,4 МБ  <i>двоичный · не сравнивается</i>
+    <u>[ Пропустить ]</u>  [ Заменить ]
+
+  <b>deploy.sh</b>
+    <i>различие только в переводах строк (CRLF)</i>
+    <u>[ Пропустить ]</u>  [ Заменить ]  [ Сравнить ]</div>
+    </div>
+  </div>
+</section>
+
+<!-- 18 -->
+<section class="slide" data-title="Мониторинг">
+  <div class="inner">
+    <p class="eyebrow">Панель рядом с шеллом</p>
+    <h2>Панель идёт за терминалом — и ничего не печатает в него</h2>
+    <div class="split even">
+      <div>
+        <h3>Следовать за <code>cd</code></h3>
+        <p>Кнопка <code>⇉</code> в адресной строке заставляет панель ходить за шеллом и так же выключается — на живом соединении, без диалога и без переподключения.</p>
+        <ul class="facts">
+          <li><strong>Ловится последовательность <code>OSC 7</code></strong>, которую шелл печатает на каждом приглашении.</li>
+          <li><strong>Хостам, где это не настроено</strong>, в шелл вводится однострочная настройка — и её эхо вырезается из потока, так что до экрана оно не доходит.</li>
+          <li><strong>По умолчанию выключено:</strong> это позволяет удалённой машине двигать ваш файловый браузер. Настройка хоста или группы решает лишь то, как стартует новое соединение.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Удалённый мониторинг</h3>
+        <p>Полоса под панелью: загрузка процессора и её короткая история, занятая память, трафик, аптайм, вошедший пользователь и заполненность каждого смонтированного диска.</p>
+        <ul class="facts">
+          <li><strong>Опрос идёт своим каналом</strong>, поэтому в ваш шелл ничего не печатается — и только пока полоса открыта.</li>
+          <li><strong>Цвет предупреждения после 75%</strong> и тревоги после 90%.</li>
+        </ul>
+        <div class="cmd" style="margin-top:14px">cpu  <u>▁▂▃▅▇▅▃▂</u>  34%    up 41d
+mem  6,2 / 15,6 ГБ     eth0 ↓1,2 ↑0,3 МБ/с
+/          <u>41%</u>
+/var       <b>78%</b>
+/var/log   <s>93%</s></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 19 -->
+<section class="slide" data-title="Туннели">
+  <div class="inner">
+    <p class="eyebrow">Сеть</p>
+    <h2>Туда, куда напрямую хода нет</h2>
+    <div class="split">
+      <div>
+        <ul class="facts">
+          <li><strong>Jump host / ProxyJump</strong> — и для сохранённых сессий, и для хостов из инвентаря, цепочкой.</li>
+          <li><strong>Проброс портов трёх видов:</strong> локальный, обратный и динамический (SOCKS5), с автозапуском на сессию и панелью управления во время работы.</li>
+          <li><strong>Разовый туннель</strong> поднимается из меню панели, без правки хоста.</li>
+          <li><strong>Проброс агента</strong> — по настройке хоста.</li>
+        </ul>
+        <p style="margin-top:16px"><strong>Проход через бастион — это туннель, а не сессия.</strong> Две машины проверяют вас по отдельности, и дальней предъявляется то, что приложение хранит именно для неё: ровно так же ведёт себя <code>ssh -J</code>. Это стоит знать заранее — иначе «на бастион по ключу зашёл, а дальше не пускает» выглядит ошибкой приложения.</p>
+      </div>
+      <figure class="diagram">
+        <svg viewBox="0 0 700 230" role="img" aria-label="Схема jump host и SOCKS5">
+          <rect class="boxa" x="8" y="80" width="150" height="72" rx="8"/>
+          <text class="a" x="24" y="106">TerminalDeck</text>
+          <text class="d" x="24" y="126">SOCKS5 :1080</text>
+          <text class="d" x="24" y="142">local :5432 →</text>
+
+          <rect class="box" x="238" y="80" width="150" height="72" rx="8"/>
+          <text class="t" x="254" y="106">bastion</text>
+          <text class="d" x="254" y="126">ключ ~/.ssh/id_b</text>
+          <text class="d" x="254" y="142">только транзит</text>
+
+          <rect class="box" x="470" y="24" width="200" height="62" rx="8"/>
+          <text class="t" x="486" y="50">app-07</text>
+          <text class="d" x="486" y="70">свой логин и пароль</text>
+
+          <rect class="box" x="470" y="146" width="200" height="62" rx="8"/>
+          <text class="t" x="486" y="172">db-01</text>
+          <text class="d" x="486" y="192">свой ключ</text>
+
+          <path class="arra" d="M158 116 L234 116"/>
+          <path class="arr" d="M388 108 C430 108 430 56 466 56"/>
+          <path class="arr" d="M388 124 C430 124 430 176 466 176"/>
+          <text class="d" x="168" y="106">ssh -J</text>
+          <text class="d" x="398" y="96">проверяют</text>
+          <text class="d" x="398" y="112">по отдельности</text>
+        </svg>
+        <figcaption>Схема по коду: src/main/ssh/SSHManager, PortForwardManager</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- 20 -->
+<section class="slide" data-title="Рабочий стол">
+  <div class="inner">
+    <p class="eyebrow">Рабочие столы</p>
+    <h2>RDP в той же панели — но в другом процессе</h2>
+    <div class="split rev">
+      <figure class="diagram">
+        <svg viewBox="0 0 700 240" role="img" aria-label="Схема: панель, канал, td-rdp, хост">
+          <rect class="box" x="8" y="40" width="180" height="150" rx="9"/>
+          <text class="t" x="24" y="66">Панель в окне</text>
+          <rect class="box" x="28" y="86" width="140" height="80" rx="6"/>
+          <text x="42" y="112">&lt;canvas&gt;</text>
+          <text class="d" x="42" y="132">ImageData</text>
+          <text class="d" x="42" y="150">без перекодирования</text>
+
+          <rect class="boxa" x="252" y="40" width="196" height="150" rx="9"/>
+          <text class="a" x="268" y="66">td-rdp</text>
+          <text class="d" x="268" y="86">отдельный процесс</text>
+          <text class="d" x="268" y="106">FreeRDP 3.31</text>
+          <text class="d" x="268" y="132">H.264 AVC420/444</text>
+          <text class="d" x="268" y="150">RemoteFX progressive</text>
+          <text class="d" x="268" y="168">RemoteFX</text>
+
+          <rect class="box" x="512" y="40" width="180" height="150" rx="9"/>
+          <text class="t" x="528" y="66">Windows-хост</text>
+          <text class="d" x="528" y="86">RDP</text>
+          <text class="d" x="528" y="112">звук — своим каналом</text>
+          <text class="d" x="528" y="138">размер — MS-RDPEDISP</text>
+
+          <path class="arra" d="M248 100 L192 100"/>
+          <text class="d" x="196" y="90">RGBA по каналу</text>
+          <path class="arr" d="M192 150 L248 150"/>
+          <text class="d" x="196" y="168">ввод</text>
+          <path class="arr" d="M448 115 L508 115"/>
+          <text class="d" x="20" y="216">Пароль из хранилища идёт в td-rdp напрямую и в окно не попадает.</text>
+        </svg>
+        <figcaption>Схема по коду: src/main/rdp, resources/freerdp</figcaption>
+      </figure>
+      <div>
+        <ul class="facts">
+          <li><strong>Картинку даёт настоящий RDP-клиент</strong> — FreeRDP 3.31, собранный из исходников и уложенный внутрь приложения программой <code>td-rdp</code>. Он подключается, декодирует и пишет изменившиеся прямоугольники обычной RGBA; панель кладёт их прямо на canvas. По дороге ничего не перекодируется и нигде не преобразуется цвет.</li>
+          <li><strong>Именно это делает картинку резкой и быстрой.</strong> Весь графический конвейер согласовывается: H.264 в AVC420 и AVC444, под ним progressive RemoteFX, ниже RemoteFX. У WebAssembly-клиента, которого он заменил, ничего этого не было — не выключено, а отсутствовало, — и хост, умеющий видео, слал вместо него RLE-битмапы.</li>
+          <li><strong>Отдельный процесс — намеренно.</strong> Сбой в декодере кончает одну панель, а не окно; ничто не привязано к ABI Electron; и клиент входит там, где работает, — сохранённый пароль идёт из хранилища прямо по каналу и в окно не попадает вовсе.</li>
+          <li><strong>Звук</strong> играет сам клиент, средствами платформы, и включается на хост или группу: он идёт своим каналом, поэтому стоит этой стороне ничего, а линии — кое-что.</li>
+          <li><strong>Панели, живущие на SSH</strong> — файлы, туннели, мониторинг, broadcast — для рабочего стола не гасятся серым, а прячутся: их там не будет.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 21 -->
+<section class="slide" data-title="Шлюз">
+  <div class="inner">
+    <p class="eyebrow">RD Gateway</p>
+    <h2>Со шлюзом разговаривает само приложение</h2>
+    <p class="lede" style="max-width:78ch">[MS-TSGU], реализованный здесь: HTTPS-запрос на <code>/remoteDesktopGateway/</code>, вход NTLMv2 в его заголовках, затем туннель и канал к одной достигаемой машине. Ничего нативного и никакого внешнего клиента — RDP-обмен выше не меняется и не знает, что он в туннеле.</p>
+    <div class="split even" style="margin-top:22px">
+      <figure class="diagram">
+        <svg viewBox="0 0 700 250" role="img" aria-label="Схема двух транспортов шлюза">
+          <rect class="boxa" x="8" y="90" width="150" height="70" rx="8"/>
+          <text class="a" x="24" y="116">td-rdp</text>
+          <text class="d" x="24" y="136">NTLMv2</text>
+          <text class="d" x="24" y="152">+ привязка канала</text>
+
+          <rect class="box" x="238" y="20" width="220" height="88" rx="8"/>
+          <text class="t" x="254" y="46">Современный шлюз</text>
+          <text class="d" x="254" y="68">апгрейд до WebSocket</text>
+          <text class="d" x="254" y="88">одно соединение</text>
+
+          <rect class="box" x="238" y="140" width="220" height="98" rx="8"/>
+          <text class="t" x="254" y="166">Старый шлюз</text>
+          <text class="d" x="254" y="188">RDG_OUT_DATA ←</text>
+          <text class="d" x="254" y="206">RDG_IN_DATA →</text>
+          <text class="d" x="254" y="226">по чанку на пакет</text>
+
+          <rect class="box" x="530" y="90" width="162" height="70" rx="8"/>
+          <text class="t" x="546" y="116">целевая машина</text>
+          <text class="d" x="546" y="136">одна, названная</text>
+
+          <path class="arra" d="M158 108 C200 108 200 64 234 64"/>
+          <path class="arr" d="M158 142 C200 142 200 188 234 188" stroke-dasharray="4 4"/>
+          <text class="d" x="166" y="180">если первый</text>
+          <text class="d" x="166" y="196">молча оборвался</text>
+          <path class="arr" d="M458 64 C500 64 500 108 526 108"/>
+          <path class="arr" d="M458 188 C500 188 500 142 526 142"/>
+        </svg>
+        <figcaption>Схема по коду: src/main/rdp — реализация MS-TSGU</figcaption>
+      </figure>
+      <div>
+        <ul class="facts">
+          <li><strong>Два транспорта, именно в этом порядке.</strong> Современный шлюз поднимает соединение до WebSocket и несёт всё по нему. Старый так не умеет и <em>не предупреждает</em>: вход проходит, а потом соединение просто рвут молча — поэтому неудача там не считается окончательной, и следом идёт старый транспорт.</li>
+          <li><strong>Вход привязан к соединению, по которому пришёл</strong> — <code>tls-server-end-point</code>, посчитанный по сертификату самого шлюза: шлюз с включённой расширенной защитой отвергает непривязанный вход тем же «access denied», что и неверный пароль.</li>
+          <li><strong>Реализован только NTLM.</strong> Шлюз, предлагающий один Kerberos через SPNEGO, так и говорит, а не падает как при отказанном пароле.</li>
+          <li><strong>Сертификаты проверяются</strong> — и у шлюза, и у самой машины. Подписанный доверенным центром принимается молча и ничем не запоминается, так что плановый перевыпуск ничего не меняет. Всё прочее спрашивается один раз, с отпечатком, и помнится в Настройках → Безопасность. Изменившийся сертификат предупреждает громко, а отказ останавливает сессию — «подключиться всё равно» здесь нет.</li>
+          <li><strong>Шлюз берёт логин хоста</strong>, если ему не задали собственный, и его пароль раскрывается в главном процессе, не доходя до окна.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 22 -->
+<section class="slide" data-title="Размер">
+  <div class="inner">
+    <p class="eyebrow">Пиксели и размер — разные вопросы</p>
+    <h2>Почему рабочий стол на Retina — это отдельное решение</h2>
+    <p class="lede" style="max-width:80ch">Панель шириной 1400 пунктов — это 2800 пикселей на Retina. Что из двух запросить у дальней стороны, решает, будет картинка нарисована пиксель в пиксель или увеличена. Но Windows разложит меню в 20 пикселей одинаково, независимо от того, миллиметр этот пиксель или полмиллиметра, — поэтому рабочий стол, запрошенный в пикселях Retina, выходит резким <em>и вдвое мельче, чем нужно</em>.</p>
+    <div class="cards" style="margin-top:24px">
+      <div class="card"><span class="k">Спросить дальнюю сторону</span><p>Размер согласуется на каждом изменении панели; каждый пиксель остаётся своим.</p></div>
+      <div class="card"><span class="k">Растянуть здесь</span><p>По плотности этого дисплея — тогда у Retina-панели запрашиваются её пункты, и каждый пиксель рисуется четырьмя. На обычном мониторе это множитель 1 и не меняет ничего.</p></div>
+      <div class="card"><span class="k">Растянуть на процент</span><p>Хост, группа или правка инвентаря могут закрепить его. 100% — это все пиксели экрана и предельная резкость, в том самом размере, из-за которого настройка и понадобилась.</p></div>
+      <div class="card"><span class="k">Сообщить плотность</span><p>По хосту и по умолчанию выключено: дальняя сторона раскладывает интерфейс крупнее сама, и картинка не тянется вовсе — тот же размер при полной резкости.</p></div>
+    </div>
+    <ul class="facts" style="margin-top:22px">
+      <li><strong>Это один элемент управления, потому что это одно решение.</strong> Раньше здесь стояла галочка, гасившая поле процента, — форма, которая приглашает выставить процент, включить галочку и недоумевать, почему ничего не произошло. Внутри это по-прежнему две настройки: наследуются они порознь, и только об одной из них дальней стороне вообще сообщают.</li>
+      <li><strong>Плотность выключена по умолчанию не из осторожности вообще, а по конкретной причине:</strong> DPI договаривается на подключение, и переразметить интерфейс под собой мог бы кто-то другой. Поэтому сообщают только сессии этого приложения, а к чужой, уже открытой, не прикасаются вовсе. Windows 8.1 и Server 2012 R2 и новее это понимают; более старые молча игнорируют, и остаётся увеличение на этой стороне.</li>
+      <li><strong>Полный экран отдаёт дисплей целиком:</strong> панель инструментов уходит вся, а не полоской, и пока её нет — не берёт и клик. Размер запрашивается по дисплею, а не по дисплею минус панель: размер, которого нет ни у одного монитора, — это как раз тот, который не ляжет пиксель в пиксель.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 23 -->
+<section class="slide" data-title="Границы">
+  <div class="inner">
+    <p class="eyebrow">Честно</p>
+    <h2>Чего здесь нет и что ещё не проверено боем</h2>
+    <div class="split even">
+      <div>
+        <h3>Написано, но в реальной работе не доказано</h3>
+        <ul class="facts">
+          <li><strong>Сам клиент FreeRDP.</strong> Собран и проверен на macOS. Windows собирается в CI и уезжает укомплектованным — клиент, FreeRDP, OpenSSL, кодеки, рантайм Visual C++, — но панель рабочего стола на нём ещё не открывали: сборка доказана, сессия нет. Под Linux клиента нет, и панель там честно говорит, что клиента нет.</li>
+          <li><strong>Шлюз RD.</strong> Один настоящий шлюз, один аккаунт, одна машина за ним. Это одно развёртывание, а не утверждение про шлюзы вообще.</li>
+          <li><strong>Копирование между хостами</strong> — планировщик в тестах, сама передача против двух настоящих серверов не гонялась.</li>
+          <li><strong>Синхронизация из удалённого репозитория</strong> — прогонялся только локальный клон <code>file://</code>.</li>
+          <li>keyboard-interactive (2FA), проброс портов всех видов, журнал сессии в файл, пакеты для Windows и Linux.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Сознательно не делается</h3>
+        <ul class="facts">
+          <li><strong>Telnet и последовательный порт.</strong> Первый — открытый текст ради легаси-железа, второй тянет нативный модуль в каждую сборку.</li>
+          <li><strong>Буфер обмена и передача файлов в RDP — пока нет.</strong> Оба ехали на расширениях прежнего клиента и смены не пережили. FreeRDP умеет нужный канал, так что это следующая работа, а не решение против. Сказано прямо, потому что это шаг назад, и настоящий: текст, скопированный в сессии, сегодня из неё не вставляется.</li>
+          <li><strong>Подключение к чужой сессии внутри панели.</strong> Оно предлагается, но окно рисует Windows: механизм идёт по RPC и SMB, а не по RDP.</li>
+          <li><strong>Подпись кода и нотаризация.</strong> Настроены и описаны, но сертификата в работе нет — а значит, автообновление на macOS скачает обновление, которое не сможет применить.</li>
+        </ul>
+        <div class="chips">
+          <span class="chip warn">RDP когда-то был в этом же списке</span>
+          <span class="chip on">и ушёл из него, когда появился компилируемый клиент</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 24 -->
+<section class="slide" data-title="Проверка">
+  <div class="inner">
+    <p class="eyebrow">Как это удерживается</p>
+    <h2>Тесты там, где молчаливая ошибка дороже всего</h2>
+    <div class="split">
+      <div>
+        <p><strong>702 теста в 60 файлах</strong> и три с половиной секунды на прогон. Покрыто не то, что легко покрыть, а то, что ломается тихо: разборщики <code>~/.ssh/config</code> и инвентарей Ansible, цепочки наследования, дерево панелей, обработка удалённых путей, планировщик столкновений, движок сравнения, разбор битов прав, чтение <code>OSC 7</code> и зонда <code>/proc</code>. Всё это отказывает не исключением, а правдоподобным неверным ответом.</p>
+        <ul class="facts">
+          <li><strong>Три теста охраняют то, что теряет данные</strong>, а не просто ведёт себя странно: смена мастер-пароля переносит все секреты, а неверный не меняет ничего; экспорт переживает импорт на машине с другим мастер-паролем, и каждый способ отказать плохому импорту оставляет хранилища нетронутыми; передача пишет то, что разрешил диалог, и не создаёт файл на дальней стороне, если источник не открылся.</li>
+          <li><strong>Контракт релиза.</strong> Версия в трёх местах, раздел в CHANGELOG, хук подписи, имена артефактов без пробелов, ровно один шаг, создающий релиз, — плюс проверка собранной пачки: каждый вид артефакта ровно один раз и каждая ссылка в метаданных обновления резолвится в реальный файл.</li>
+        </ul>
+      </div>
+      <div class="cmd">$ <b>npm run verify:release</b>
+Release contract
+  <u>✓</u> version 0.11.1 matches v0.11.1
+  <u>✓</u> CHANGELOG.md has a section for 0.11.1
+  <u>✓</u> electron-builder keeps the signing hook
+    and space-free artifact names
+  <u>✓</u> the release is assembled by one job,
+    after every build
+  <u>✓</u> every artifact kind present once
+  <u>✓</u> 8 update-metadata references all resolve
+Release contract satisfied.
+
+<i># каждое правило написано после релиза,
+# который оно бы поймало:</i>
+<s>0.9.1</s>  <i>два черновика, артефакты пополам</i>
+<s>0.9.1</s>  <i>имя установщика ≠ latest.yml → 404</i>
+<s>0.9.x</s>  <i>macOS без подписи → «повреждён»</i>
+<i># все три были зелёными</i></div>
+    </div>
+  </div>
+</section>
+
+<!-- 25 -->
+<section class="slide" data-title="Итог">
+  <div class="inner">
+    <p class="eyebrow">Итог</p>
+    <h2>Что это такое на сегодня</h2>
+    <div class="endgrid" style="margin-top:8px">
+      <div>
+        <p class="lede">Менеджер подключений, в котором дерево хостов, терминалы, файлы, туннели и рабочие столы живут в одном окне и в одной модели наследования. Инвентарь берётся из вашего git и только читается; пароли лежат в локальном зашифрованном хранилище и в окно не попадают.</p>
+        <div class="tablewrap" style="margin-top:18px">
+          <table>
+            <thead><tr><th>Платформа</th><th>Что собирается</th><th>Состояние</th></tr></thead>
+            <tbody>
+              <tr><td>macOS arm64</td><td>.dmg и .zip</td><td>основная машина разработки; подпись ad-hoc</td></tr>
+              <tr><td>Windows x64</td><td>установщик NSIS и portable</td><td>собирается в CI полностью, включая клиент RDP</td></tr>
+              <tr><td>Linux x64</td><td>AppImage и .deb</td><td>без клиента RDP: панель скажет, что его нет</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div>
+        <h3>Цифры, которые можно проверить</h3>
+        <ul class="facts">
+          <li><strong>224 файла</strong> TypeScript, ≈38 500 строк</li>
+          <li><strong>702 теста</strong> в 60 файлах</li>
+          <li><strong>103 канала IPC</strong>, перечисленных в одном месте</li>
+          <li><strong>741 фраза</strong> в русском переводе; непереведённое показывается по-английски, а не заглушкой</li>
+          <li><strong>Electron 43</strong>, Node 22.12+, FreeRDP 3.31, лицензия MIT</li>
+        </ul>
+        <div class="chips" style="margin-top:18px">
+          <span class="chip on">⌘/ — полный список сочетаний в самом приложении</span>
+        </div>
+        <p class="hint" style="margin-top:22px">TerminalDeck 0.11.1 · сентябрь 2026 · схемы нарисованы по исходному коду</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script>
+(function(){
+  var deck = document.getElementById('deck');
+  var slides = Array.prototype.slice.call(deck.querySelectorAll('.slide'));
+  var counter = document.getElementById('counter');
+  var fill = document.getElementById('railfill');
+  var dots = document.getElementById('dots');
+  var current = 0;
+
+  function pad(n){ return (n < 10 ? '0' : '') + n; }
+
+  slides.forEach(function(s, i){
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.title = s.getAttribute('data-title') || ('Слайд ' + (i + 1));
+    b.addEventListener('click', function(){ go(i); });
+    dots.appendChild(b);
+  });
+  var dotEls = Array.prototype.slice.call(dots.children);
+
+  function paint(i){
+    current = i;
+    counter.textContent = pad(i + 1) + ' / ' + pad(slides.length);
+    fill.style.width = ((i + 1) / slides.length * 100) + '%';
+    dotEls.forEach(function(d, n){ d.setAttribute('aria-current', n === i ? 'true' : 'false'); });
+  }
+
+  function go(i){
+    i = Math.max(0, Math.min(slides.length - 1, i));
+    deck.scrollTo({ top: slides[i].offsetTop, behavior: 'auto' });
+    paint(i);
+  }
+
+  if ('IntersectionObserver' in window){
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if (e.isIntersecting && e.intersectionRatio > 0.5){
+          paint(slides.indexOf(e.target));
+        }
+      });
+    }, { root: deck, threshold: [0.51] });
+    slides.forEach(function(s){ io.observe(s); });
+  }
+
+  document.addEventListener('keydown', function(e){
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    var t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+    switch (e.key){
+      case 'ArrowRight': case 'ArrowDown': case 'PageDown': case ' ':
+        e.preventDefault(); go(current + 1); break;
+      case 'ArrowLeft': case 'ArrowUp': case 'PageUp':
+        e.preventDefault(); go(current - 1); break;
+      case 'Home': e.preventDefault(); go(0); break;
+      case 'End': e.preventDefault(); go(slides.length - 1); break;
+    }
+  });
+
+  paint(0);
+})();
+</script>
