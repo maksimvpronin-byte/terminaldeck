@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useStore } from '../state/store'
-import { FONT_CHOICES, THEME_GROUPS, DEFAULT_SETTINGS, themeOf } from '../state/settings'
+import { FONT_CHOICES, THEME_GROUPS, terminalDefaults, themeOf } from '../state/settings'
 import SecuritySettings from './SecuritySettings'
 import CredentialsSettings from './CredentialsSettings'
 import BackupSettings from './BackupSettings'
@@ -250,8 +250,9 @@ export default function SettingsDialog({
         )}
 
         <div className="modal-actions">
+          {/* This tab's fields and no others — see `terminalDefaults`. */}
           {tab === 'terminal' && (
-            <button onClick={() => updateSettings(DEFAULT_SETTINGS)}>
+            <button onClick={() => updateSettings(terminalDefaults())}>
               {t('Reset to defaults')}
             </button>
           )}

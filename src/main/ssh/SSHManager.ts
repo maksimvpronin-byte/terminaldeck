@@ -23,6 +23,7 @@ import { gitFolderStore } from '../gitFolders/GitFolderStore'
 import { inventoryStore } from '../inventory/InventoryStore'
 import { vault } from '../vault/Vault'
 import { makeHostVerifier } from './hostVerifier'
+import { requireUnlocked } from '../vault/locked'
 import { requestAuth } from './authPrompt'
 
 interface LiveConnection {
@@ -452,6 +453,12 @@ class SSHManager {
     }
   }
 
+  /**
+   * Opening a session is one of the things a locked vault must refuse. A host
+   * that signs in by key or through the agent never asks the vault for
+   * anything, so without this the lock did not stand between anybody and the
+   * machines at all — see `vault/locked.ts`.
+   */
   async connectProfile(
     win: BrowserWindow,
     profile: SessionProfile,
@@ -460,6 +467,7 @@ class SSHManager {
     /** A login chosen for this session alone, in place of the host's own. */
     credential?: Credential
   ): Promise<string> {
+    requireUnlocked()
     const connectionId = randomUUID()
     try {
       const { target, chain } = await connectChain(win, profile, credential)
@@ -471,12 +479,14 @@ class SSHManager {
     }
   }
 
+  /** The same for a connection typed in by hand rather than saved. */
   async connectQuick(
     win: BrowserWindow,
     params: QuickConnectParams,
     cols: number,
     rows: number
   ): Promise<string> {
+    requireUnlocked()
     const connectionId = randomUUID()
     try {
       const client = new Client()

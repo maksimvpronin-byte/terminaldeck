@@ -4,6 +4,7 @@ import { X509Certificate } from 'crypto'
 import { app, type BrowserWindow } from 'electron'
 import { IPC } from '../../shared/ipc-channels'
 import { askAboutCertificate } from './certificateVerifier'
+import { requireUnlocked } from '../vault/locked'
 import { createRecordReader, encodeCommand, readCursor, readFrame, RECORD } from './recordStream'
 
 /**
@@ -90,12 +91,19 @@ class FreeRdpBridge {
   private sessions = new Map<string, Session>()
   private nextId = 1
 
+  /**
+   * Starting a desktop is starting a session, and a locked vault refuses those
+   * for the same reason it refuses an SSH connection: a host whose password is
+   * typed at the far end needs nothing from the vault, so nothing else would
+   * have stopped it. See `vault/locked.ts`.
+   */
   start(
     window: BrowserWindow,
     request: DesktopRequest,
     credentials: DesktopCredentials,
     gateway?: DesktopGateway
   ): string {
+    requireUnlocked()
     const id = `desktop${this.nextId++}`
     const port = request.port ?? 3389
 

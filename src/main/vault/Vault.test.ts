@@ -141,6 +141,77 @@ describe('vault', () => {
       expect(after.secrets['host-1']).not.toEqual(before.secrets['host-1'])
     })
 
+    it('keeps every secret saved while it was working', async () => {
+      /*
+       * Deriving a key is slow on purpose and runs off the main thread, so the
+       * rest of the application keeps going while it does — including anything
+       * that saves a password. The re-encryption used to work from a copy of
+       * the secrets taken before the second derivation and then write the whole
+       * file, so a secret stored during it was overwritten by a file that
+       * predated it: lost, silently, with nothing to recover it from.
+       *
+       * Saved on a timer rather than once, because the window is the *second*
+       * derivation and this end cannot see where one ends and the next begins.
+       * Whatever the timing, every one of these must survive.
+       */
+      await vault.create(OLD)
+      vault.setSecret('host-0', 'before')
+
+      let saved = 0
+      const changing = vault.changePassword(OLD, NEW)
+      const ticker = setInterval(() => vault.setSecret(`host-${++saved}`, `during ${saved}`), 10)
+      await changing
+      clearInterval(ticker)
+
+      expect(saved).toBeGreaterThan(0)
+      vault.lock()
+      await vault.unlock(NEW)
+      const secrets = vault.allSecrets()
+      expect(secrets['host-0']).toBe('before')
+      for (let i = 1; i <= saved; i++) expect(secrets[`host-${i}`]).toBe(`during ${i}`)
+    })
+
+    it('stays closed when it is locked while it works', async () => {
+      /*
+       * The idle timer can fire mid-change. Finishing anyway put the new key
+       * back into an open vault through `adopt`, while the window went on
+       * showing its lock screen — the one state worse than either.
+       *
+       * The lock is aimed at the second derivation by timing the first one: it
+       * is the same work with the same parameters, so one is a fair measure of
+       * the next. Landing late costs nothing — the assertion is the invariant
+       * that matters either way, that an explicit lock leaves the vault closed.
+       */
+      await vault.create(OLD)
+      const started = Date.now()
+      vault.lock()
+      await vault.unlock(OLD)
+      const derivation = Date.now() - started
+
+      const changing = vault.changePassword(OLD, NEW).catch(() => undefined)
+      await new Promise((resolve) => setTimeout(resolve, Math.round(derivation * 1.4)))
+      vault.lock()
+      await changing
+
+      expect(vault.status().unlocked).toBe(false)
+    })
+
+    it('runs one change at a time, whatever the caller does', async () => {
+      // Two at once would each write the whole file from its own reading of it,
+      // and the loser would leave the vault keyed to a password nobody knows.
+      await vault.create(OLD)
+      vault.setSecret('host-1', 'one')
+
+      const first = vault.changePassword(OLD, NEW)
+      const second = vault.changePassword(NEW, 'a third password')
+      await expect(first).resolves.toBeUndefined()
+      await expect(second).resolves.toBeUndefined()
+
+      vault.lock()
+      await vault.unlock('a third password')
+      expect(vault.getSecret('host-1')).toBe('one')
+    })
+
     it('closes the door on the old password', async () => {
       await vault.create(OLD)
       await vault.changePassword(OLD, NEW)

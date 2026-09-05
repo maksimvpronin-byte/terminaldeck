@@ -171,6 +171,8 @@ const SECTIONS: Section[] = [
         keys: '⌘L',
         what: 'Lock the vault; it also locks itself after the delay set in Settings → Security'
       },
+      { what: 'A locked app opens nothing new: no session, no desktop, no remote file listing' },
+      { what: 'Open sessions stay connected behind the lock, and the keyboard cannot reach them' },
       { what: 'Settings → Backup moves everything to another machine, credentials optional' }
     ]
   },

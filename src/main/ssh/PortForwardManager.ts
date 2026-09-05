@@ -1,6 +1,15 @@
 import net, { type Server, type Socket } from 'net'
 import type { Client } from 'ssh2'
 import { sshManager } from './SSHManager'
+import {
+  HANDSHAKE_LIMIT,
+  HANDSHAKE_TIMEOUT,
+  parseGreeting,
+  parseRequest,
+  reply,
+  SOCKS5_FAILED,
+  SOCKS5_GRANTED
+} from './socks5'
 import type { PortForwardRule } from '../../shared/types'
 
 interface ActiveForward {
@@ -28,56 +37,90 @@ function pipeStreams(a: NodeJS.ReadWriteStream, b: NodeJS.ReadWriteStream): void
   b.on('error', cleanup)
 }
 
-/** Minimal SOCKS5 handshake (no-auth) sufficient for a dynamic port forward. */
+/**
+ * A SOCKS5 handshake, read the way a stream has to be read.
+ *
+ * Nothing here assumes that a message arrives in one piece: bytes are collected
+ * until a parser says it has a whole one, and whatever follows the request is
+ * handed to the tunnel rather than dropped. See `socks5.ts` for why both halves
+ * of that matter — the first cost the main process an uncaught `RangeError`,
+ * and the second silently swallowed the first thing a pipelining client said.
+ */
 function handleSocks5(socket: Socket, client: Client): void {
-  let stage: 'greeting' | 'request' = 'greeting'
+  // Annotated: `alloc` yields a buffer tied to its own ArrayBuffer, while the
+  // slices a parser hands back are views onto another, and the two disagree.
+  let buf: Buffer = Buffer.alloc(0)
+  let stage: 'greeting' | 'request' | 'done' = 'greeting'
 
-  socket.once('data', function onGreeting(data: Buffer) {
-    if (data[0] !== 0x05) {
-      socket.destroy()
+  /** A handshake that never finishes must not hold the socket for ever. */
+  const timer = setTimeout(() => {
+    if (stage !== 'done') socket.destroy()
+  }, HANDSHAKE_TIMEOUT)
+  timer.unref?.()
+
+  const give_up = (): void => {
+    clearTimeout(timer)
+    socket.destroy()
+  }
+
+  const onData = (chunk: Buffer): void => {
+    buf = buf.length === 0 ? chunk : Buffer.concat([buf, chunk])
+    if (buf.length > HANDSHAKE_LIMIT) {
+      give_up()
       return
     }
-    socket.write(Buffer.from([0x05, 0x00])) // no-auth accepted
-    stage = 'request'
-    socket.once('data', onRequest)
-  })
 
-  function onRequest(data: Buffer): void {
-    if (stage !== 'request' || data[0] !== 0x05 || data[1] !== 0x01) {
-      socket.destroy()
+    if (stage === 'greeting') {
+      const greeting = parseGreeting(buf)
+      if (greeting.status === 'incomplete') return
+      if (greeting.status === 'invalid') {
+        give_up()
+        return
+      }
+      socket.write(Buffer.from([0x05, 0x00])) // no-auth accepted
+      buf = greeting.rest
+      stage = 'request'
+      // The request may already be in hand: a client is free to send it without
+      // waiting for the reply, and some do.
+      if (buf.length === 0) return
+    }
+
+    const request = parseRequest(buf)
+    if (request.status === 'incomplete') return
+    if (request.status === 'invalid') {
+      give_up()
       return
     }
-    const atyp = data[3]
-    let addr = ''
-    let offset = 4
-    if (atyp === 0x01) {
-      addr = `${data[4]}.${data[5]}.${data[6]}.${data[7]}`
-      offset = 8
-    } else if (atyp === 0x03) {
-      const len = data[4]
-      addr = data.subarray(5, 5 + len).toString('ascii')
-      offset = 5 + len
-    } else if (atyp === 0x04) {
-      const parts: string[] = []
-      for (let i = 0; i < 16; i += 2) parts.push(data.readUInt16BE(4 + i).toString(16))
-      addr = parts.join(':')
-      offset = 20
-    } else {
-      socket.destroy()
-      return
-    }
-    const port = data.readUInt16BE(offset)
 
-    client.forwardOut('127.0.0.1', 0, addr, port, (err, stream) => {
+    stage = 'done'
+    clearTimeout(timer)
+    socket.removeListener('data', onData)
+    /*
+     * Paused until the tunnel exists. Between here and the callback below the
+     * socket has no reader at all, and anything it emitted in that gap would go
+     * nowhere — which is the same lost-bytes fault as dropping `rest`, only
+     * harder to see.
+     */
+    socket.pause()
+    const leftover = request.rest
+
+    client.forwardOut('127.0.0.1', 0, request.address, request.port, (err, stream) => {
       if (err) {
-        socket.write(Buffer.from([0x05, 0x05, 0x00, 0x01, 0, 0, 0, 0, 0, 0]))
+        socket.write(reply(SOCKS5_FAILED))
         socket.destroy()
         return
       }
-      socket.write(Buffer.from([0x05, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0]))
-      pipeStreams(socket, stream as unknown as NodeJS.ReadWriteStream)
+      socket.write(reply(SOCKS5_GRANTED))
+      const tunnel = stream as unknown as NodeJS.ReadWriteStream
+      if (leftover.length > 0) tunnel.write(leftover)
+      pipeStreams(socket, tunnel)
+      socket.resume()
     })
   }
+
+  socket.on('data', onData)
+  socket.on('error', () => clearTimeout(timer))
+  socket.on('close', () => clearTimeout(timer))
 }
 
 class PortForwardManager {

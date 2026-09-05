@@ -83,6 +83,13 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   password can be rotated without losing secrets.
   Deleting a host, a group, a repository or a local override takes its stored credential with it,
   rather than leaving it in the vault
+- **A lock stops the application, not only the picture.** The workspace is covered rather than
+  torn down, so live sessions survive being locked — but it is put beyond reach of the keyboard as
+  well as the mouse, and the main process refuses to start anything while the vault is shut: no
+  new SSH session, no desktop, no file listing over SFTP. That last part matters because a host
+  that signs in by key or through the agent never asks the vault for anything, so nothing else
+  would have stood in the way. What is already running keeps running: locking is not
+  disconnecting, and an editor saving a file it opened before the lock still uploads it
 - **Inheritance**: a session leaves fields unset to take them from its group, a group from its
   parent, and an inventory host from its repository — so a shared login is set once. Inheritance
   can be switched off per host or group. The nearest value wins, so a host that has a password of

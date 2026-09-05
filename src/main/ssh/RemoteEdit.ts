@@ -1,5 +1,5 @@
 import { shell, type BrowserWindow } from 'electron'
-import { dirname, join } from 'path'
+import { join } from 'path'
 import { spawn } from 'child_process'
 import { mkdtempSync, existsSync, statSync, rmSync, watch, type FSWatcher } from 'fs'
 import { tmpdir } from 'os'
@@ -71,6 +71,18 @@ async function openInEditor(localPath: string, editorCommand?: string): Promise<
  */
 class RemoteEditManager {
   private sessions = new Map<string, EditSession>()
+  /**
+   * Every temporary directory made for an edit, kept apart from the sessions.
+   *
+   * A session ends when its connection does, and its entry goes with it — but
+   * the copy on disk does not: the editor may still have the file open, and
+   * pulling it away mid-edit would be worse than leaving it. So the directory
+   * is remembered here instead, and this is what the clean-up at quit walks.
+   * Walking the sessions meant that anything whose connection had closed first
+   * — which is most of them, since a tab is usually shut long before the app —
+   * was never removed at all.
+   */
+  private dirs = new Set<string>()
 
   private key(connectionId: string, remotePath: string): string {
     return `${connectionId}:${remotePath}`
@@ -91,6 +103,7 @@ class RemoteEditManager {
 
     const name = remotePath.split('/').pop() || 'file'
     const dir = mkdtempSync(join(tmpdir(), 'terminaldeck-edit-'))
+    this.dirs.add(dir)
     const localPath = join(dir, name)
 
     await sftpManager.download(connectionId, remotePath, localPath)
@@ -202,15 +215,25 @@ class RemoteEditManager {
     for (const session of this.sessions.values()) {
       clearTimeout(session.timer)
       session.watcher.close()
+    }
+    this.sessions.clear()
+
+    // Every directory ever made, not only the ones still being watched.
+    for (const dir of this.dirs) {
       try {
-        rmSync(dirname(session.localPath), { recursive: true, force: true })
+        rmSync(dir, { recursive: true, force: true })
       } catch {
         // A file still held open, or a directory already gone. Not worth
         // delaying a quit over, and the next boot clears it on two platforms
         // out of three.
       }
     }
-    this.sessions.clear()
+    this.dirs.clear()
+  }
+
+  /** Which temporary directories are still on disk, for the test to look at. */
+  temporaryDirs(): string[] {
+    return [...this.dirs]
   }
 
   /** Called when a connection goes away: its watchers are pointless afterwards. */

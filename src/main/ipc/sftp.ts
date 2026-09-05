@@ -3,9 +3,36 @@ import { IPC } from '../../shared/ipc-channels'
 import type { TransferDecisions, TransferPlan } from '../../shared/types'
 import { remoteEdit } from '../ssh/RemoteEdit'
 import { sftpManager } from '../ssh/SFTPManager'
+import { requireUnlocked } from '../vault/locked'
 import { focusedWin } from './win'
 
 /** The file browser: listing, transfers, and editing a remote file locally. */
+
+/**
+ * Every channel in this file, refused while the vault is locked.
+ *
+ * Browsing a remote filesystem is reading somebody's data, and a locked
+ * application must not do it — not even down a connection that was open before
+ * the lock, because the connection is not what the lock is about. Written as a
+ * wrapper rather than a line in each of seventeen handlers: one of them would
+ * eventually be added without it, and the one that was missed would be the
+ * whole of the hole.
+ *
+ * The guard is here rather than inside `SFTPManager` on purpose. This is the
+ * boundary with the window — the place where somebody is asking for something —
+ * while the manager is also used by work already in flight, such as the upload
+ * that follows a save in an external editor. Locking should refuse a new
+ * request, not throw away an edit somebody made before they walked away.
+ */
+function handleWhileUnlocked(
+  channel: string,
+  handler: (event: Electron.IpcMainInvokeEvent, ...args: never[]) => unknown
+): void {
+  ipcMain.handle(channel, (event, ...args) => {
+    requireUnlocked()
+    return handler(event, ...(args as never[]))
+  })
+}
 
 function reportTransfer(
   connectionId: string,
@@ -20,25 +47,25 @@ function reportTransfer(
 
 export function registerSftpHandlers(): void {
   // --- SFTP ---
-  ipcMain.handle(IPC.sftpList, (_e, connectionId: string, path: string) =>
+  handleWhileUnlocked(IPC.sftpList, (_e, connectionId: string, path: string) =>
     sftpManager.list(connectionId, path)
   )
-  ipcMain.handle(
+  handleWhileUnlocked(
     IPC.sftpPlanUpload,
     (_e, connectionId: string, localPath: string, remoteParent: string) =>
       sftpManager.planUpload(connectionId, localPath, remoteParent)
   )
-  ipcMain.handle(
+  handleWhileUnlocked(
     IPC.sftpPlanDownload,
     (_e, connectionId: string, remotePath: string, localTarget: string, exactFile?: boolean) =>
       sftpManager.planDownload(connectionId, remotePath, localTarget, exactFile)
   )
-  ipcMain.handle(
+  handleWhileUnlocked(
     IPC.sftpPlanRelay,
     (_e, srcConnectionId: string, srcPath: string, dstConnectionId: string, destParent: string) =>
       sftpManager.planRelay(srcConnectionId, srcPath, dstConnectionId, destParent)
   )
-  ipcMain.handle(
+  handleWhileUnlocked(
     IPC.sftpRunPlan,
     (
       _e,
@@ -62,48 +89,52 @@ export function registerSftpHandlers(): void {
         destConnectionId
       )
   )
-  ipcMain.handle(
+  handleWhileUnlocked(
     IPC.sftpCompare,
     (_e, connectionId: string, remotePath: string, localPath: string) =>
       sftpManager.compareWithLocal(connectionId, remotePath, localPath)
   )
-  ipcMain.handle(IPC.sftpRealpath, (_e, connectionId: string, path: string) =>
+  handleWhileUnlocked(IPC.sftpRealpath, (_e, connectionId: string, path: string) =>
     sftpManager.realpath(connectionId, path)
   )
-  ipcMain.handle(IPC.sftpStat, (_e, connectionId: string, path: string) =>
+  handleWhileUnlocked(IPC.sftpStat, (_e, connectionId: string, path: string) =>
     sftpManager.statPath(connectionId, path)
   )
-  ipcMain.handle(IPC.sftpMkdir, (_e, connectionId: string, path: string) =>
+  handleWhileUnlocked(IPC.sftpMkdir, (_e, connectionId: string, path: string) =>
     sftpManager.mkdir(connectionId, path)
   )
-  ipcMain.handle(IPC.sftpDelete, (_e, connectionId: string, path: string, isDirectory: boolean) =>
-    sftpManager.delete(connectionId, path, isDirectory)
+  handleWhileUnlocked(
+    IPC.sftpDelete,
+    (_e, connectionId: string, path: string, isDirectory: boolean) =>
+      sftpManager.delete(connectionId, path, isDirectory)
   )
-  ipcMain.handle(IPC.sftpRename, (_e, connectionId: string, oldPath: string, newPath: string) =>
-    sftpManager.rename(connectionId, oldPath, newPath)
+  handleWhileUnlocked(
+    IPC.sftpRename,
+    (_e, connectionId: string, oldPath: string, newPath: string) =>
+      sftpManager.rename(connectionId, oldPath, newPath)
   )
-  ipcMain.handle(
+  handleWhileUnlocked(
     IPC.sftpDownload,
     (_e, connectionId: string, remotePath: string, localPath: string) =>
       sftpManager.download(connectionId, remotePath, localPath, (transferred, total) =>
         reportTransfer(connectionId, remotePath, transferred, total)
       )
   )
-  ipcMain.handle(
+  handleWhileUnlocked(
     IPC.sftpUpload,
     (_e, connectionId: string, localPath: string, remotePath: string) =>
       sftpManager.upload(connectionId, localPath, remotePath, (transferred, total) =>
         reportTransfer(connectionId, remotePath, transferred, total)
       )
   )
-  ipcMain.handle(
+  handleWhileUnlocked(
     IPC.sftpDownloadDir,
     (_e, connectionId: string, remotePath: string, localDir: string) =>
       sftpManager.downloadDirectory(connectionId, remotePath, localDir, (t, total, path) =>
         reportTransfer(connectionId, path, t, total)
       )
   )
-  ipcMain.handle(
+  handleWhileUnlocked(
     IPC.sftpUploadPath,
     (_e, connectionId: string, localPath: string, remoteParent: string) =>
       sftpManager.uploadPath(connectionId, localPath, remoteParent, (t, total, path) =>
@@ -111,12 +142,12 @@ export function registerSftpHandlers(): void {
       )
   )
 
-  ipcMain.handle(
+  handleWhileUnlocked(
     IPC.sftpEdit,
     (_e, connectionId: string, remotePath: string, editorCommand?: string) =>
       remoteEdit.open(focusedWin(), connectionId, remotePath, editorCommand)
   )
-  ipcMain.handle(IPC.sftpStopEdit, (_e, connectionId: string, remotePath: string) =>
+  handleWhileUnlocked(IPC.sftpStopEdit, (_e, connectionId: string, remotePath: string) =>
     remoteEdit.stop(connectionId, remotePath)
   )
 }

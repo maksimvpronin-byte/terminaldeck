@@ -92,8 +92,40 @@ class Vault {
   /**
    * Re-keys the vault: every secret is decrypted with the old key and re-encrypted
    * under a key derived from the new password and a fresh salt.
+   *
+   * Two derivations, and therefore two moments where the rest of the
+   * application runs: scrypt is deliberately slow and deliberately off the main
+   * thread, so anything else can happen in between. Both moments are guarded,
+   * and the second one used not to be —
+   *
+   * - the idle timer can lock the vault, and finishing afterwards put the key
+   *   back through `adopt`. The window kept its lock screen up while the main
+   *   process was open again: the worst of both, since the person looking at it
+   *   believed it was closed.
+   * - a secret can be saved, by a host dialog or by a sync storing a
+   *   credential. The re-encryption worked from a snapshot taken before the
+   *   wait and then wrote the whole file, so that secret was gone — silently,
+   *   and with nothing left to recover it from.
+   *
+   * Hence: one change of password at a time, the state re-checked after every
+   * wait, and the secrets read at the moment they are re-encrypted rather than
+   * before the wait that precedes it.
    */
   async changePassword(current: string, next: string): Promise<void> {
+    return (this.rekeying = this.rekeying.then(
+      () => this.rekey(current, next),
+      () => this.rekey(current, next)
+    ))
+  }
+
+  /**
+   * One at a time. Two of these at once would each write the whole file from
+   * its own reading of it, and the second would undo the first — including
+   * leaving the vault keyed to a password nobody was told about.
+   */
+  private rekeying: Promise<void> = Promise.resolve()
+
+  private async rekey(current: string, next: string): Promise<void> {
     const { key: oldKey, file } = this.requireUnlocked()
     const check = await deriveKey(current, file.salt)
     // Deriving a key takes long enough for the idle timer to lock the vault
@@ -108,15 +140,29 @@ class Vault {
     wipe(check)
     if (!matches) throw new WrongPasswordError()
 
-    const plaintexts = new Map<string, string>()
-    for (const [ref, payload] of Object.entries(file.secrets)) {
-      plaintexts.set(ref, decrypt(oldKey, payload))
-    }
-
     const salt = newSalt()
     const key = await deriveKey(next, salt)
+    /*
+     * The same check as above, for the same reason: this wait is the longer of
+     * the two, and adopting a key into a vault that has since been locked would
+     * open it again behind the lock screen.
+     */
+    if (this.key !== oldKey || this.file !== file) {
+      wipe(key)
+      throw new Error('Vault is locked')
+    }
+
+    /*
+     * Read here, after the last wait, and not one statement earlier. Everything
+     * from this line to the write is synchronous, so what is re-encrypted is
+     * what the vault holds at the moment it is written — a secret saved while
+     * the key was being derived is carried across rather than overwritten by a
+     * copy of the file taken before it existed.
+     */
     const secrets: Record<string, EncryptedPayload> = {}
-    for (const [ref, value] of plaintexts) secrets[ref] = encrypt(key, value)
+    for (const [ref, payload] of Object.entries(file.secrets)) {
+      secrets[ref] = encrypt(key, decrypt(oldKey, payload))
+    }
 
     const rekeyed: VaultFile = { salt, verifier: encrypt(key, VERIFIER_PLAINTEXT), secrets }
     // Only adopt the new key once the file is safely on disk. Adopting it also

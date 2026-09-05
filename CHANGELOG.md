@@ -6,6 +6,68 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## Unreleased
+
+### Security
+
+- **A lock now stops the application, not only the view of it.** Locking covered
+  the workspace with an opaque overlay and left everything under it mounted,
+  listening and connected: two presses of Tab out of the password field walked
+  the focus into the interface behind, where tabs could be switched, the snippet
+  palette opened, and a terminal typed into that nobody could see. The overlay
+  stopped a mouse and nothing else. The background is now `inert` — beyond reach
+  of the keyboard as well — and the main process refuses to start anything while
+  the vault is shut: no SSH session, no desktop, no file listing over SFTP. That
+  half matters on its own, because a host that signs in with a key or through
+  the agent never asks the vault for anything, so nothing at all stood between a
+  locked application and those machines. What is already running is left alone:
+  locking is not disconnecting, and an edit saved after the lock still uploads.
+
+- **Changing the master password can no longer lose a secret or reopen the
+  vault.** Deriving a key is deliberately slow and runs off the main thread, so
+  the application keeps going while it happens — and the re-encryption worked
+  from a copy of the secrets taken before that wait, then wrote the whole file.
+  A password saved in between was overwritten by a file that predated it, with
+  nothing left to recover it from. In the same window the idle timer could lock
+  the vault, and finishing anyway put the new key back into it: the window went
+  on showing its lock screen while the main process was open again. The state is
+  now re-checked after every wait, the secrets are read at the moment they are
+  re-encrypted, and two changes at once are serialised rather than overwriting
+  one another.
+
+### Fixed
+
+- **A fragmented SOCKS request no longer kills the application.** The handshake
+  of a dynamic port forward was read with one `data` event per message, which is
+  not something TCP promises: a request split across two segments left the
+  parser reading a port past the end of the buffer, and a `RangeError` thrown
+  inside a socket handler is an uncaught exception in the main process — every
+  open session goes with it. The handshake is now accumulated and parsed only
+  when complete, with tests that feed it a byte at a time. Two quieter faults
+  went with it: bytes sent behind the request were dropped, so a client that
+  does not wait for the reply lost the first thing it said, and a handshake that
+  never finished held its socket for as long as the application ran.
+
+- **Temporary copies of remote files are removed at quit.** Every file opened
+  for editing is downloaded in the clear, and the clean-up walked the list of
+  live edit sessions — but a session is dropped the moment its connection
+  closes, which for most files is long before the application exits. The copies
+  of everything edited over a connection that had since been closed stayed on
+  disk. The directories are now tracked in their own right.
+
+- **Resetting the terminal settings resets the terminal settings.** The button
+  handed over every default there is, so it also put the interface back into
+  another language, forgot the external editor and moved the idle lock back to
+  fifteen minutes — three settings on other tabs, none of them named on the
+  button.
+
+### Changed
+
+- **The vault screens speak Russian too.** Creating and unlocking the vault were
+  the last screens written only in English, which made the lock screen — the one
+  screen every user sees — the least translated thing in the application. The
+  two buttons above the tree went with them.
+
 ## 0.10.2
 
 ### Fixed

@@ -465,6 +465,38 @@ export const DEFAULT_SETTINGS: TerminalSettings = {
   lockAfterMinutes: 15
 }
 
+/**
+ * Which settings the Terminal tab owns — and, therefore, the only ones its
+ * "Reset to defaults" is entitled to touch.
+ *
+ * The button handed over the whole of `DEFAULT_SETTINGS`, so resetting the font
+ * size also put the interface back into another language, forgot the external
+ * editor and moved the idle lock back to fifteen minutes. Three settings on
+ * other tabs, changed by a button that names none of them.
+ */
+export const TERMINAL_KEYS = [
+  'fontFamily',
+  'fontSize',
+  'scrollback',
+  'themeName',
+  'cursorStyle',
+  'cursorBlink',
+  'copyOnSelect',
+  'rightClick'
+] as const satisfies ReadonlyArray<keyof TerminalSettings>
+
+/** Everything else, listed so that a new setting has to be placed deliberately. */
+export const OTHER_KEYS = [
+  'language',
+  'externalEditor',
+  'lockAfterMinutes'
+] as const satisfies ReadonlyArray<keyof TerminalSettings>
+
+/** The defaults for the Terminal tab alone. */
+export function terminalDefaults(): Partial<TerminalSettings> {
+  return Object.fromEntries(TERMINAL_KEYS.map((key) => [key, DEFAULT_SETTINGS[key]]))
+}
+
 export const FONT_CHOICES = [
   'Menlo, Consolas, monospace',
   'SF Mono, Menlo, monospace',

@@ -1069,5 +1069,22 @@ export const ru: Record<string, string> = {
   'On Windows and Linux read ⌘ as Ctrl+Shift — plain Ctrl belongs to the shell.':
     'На Windows и Linux читайте ⌘ как Ctrl+Shift — голый Ctrl принадлежит шеллу.',
   'Split the pane downwards; Ctrl+Shift+E off a Mac':
-    'Разделить панель по горизонтали; вне мака — Ctrl+Shift+E'
+    'Разделить панель по горизонтали; вне мака — Ctrl+Shift+E',
+  'Master password must be at least 8 characters': 'Мастер-пароль должен быть не короче 8 символов',
+  'Passwords do not match': 'Пароли не совпадают',
+  'Welcome to TerminalDeck': 'Добро пожаловать в TerminalDeck',
+  'Create a master password to protect your saved SSH credentials. This password never leaves your machine.':
+    'Придумайте мастер-пароль, который защитит сохранённые учётные данные SSH. Этот пароль никогда не покидает вашу машину.',
+  'Confirm password': 'Повторите пароль',
+  'Create vault': 'Создать хранилище',
+  'Failed to unlock': 'Не удалось разблокировать',
+  'Enter your master password to unlock saved sessions.':
+    'Введите мастер-пароль, чтобы разблокировать сохранённые сессии.',
+  Unlock: 'Разблокировать',
+  '+ Session': '+ Сессия',
+  '+ Group': '+ Группа',
+  'A locked app opens nothing new: no session, no desktop, no remote file listing':
+    'Заблокированное приложение ничего не открывает: ни сессию, ни рабочий стол, ни список удалённых файлов',
+  'Open sessions stay connected behind the lock, and the keyboard cannot reach them':
+    'Открытые сессии остаются подключёнными за блокировкой, и клавиатура до них не достаёт'
 }

@@ -849,9 +849,9 @@ export default function Sidebar({
         <>
           <div className="sidebar-header">
             <button className="primary" style={{ flex: 1 }} onClick={() => newSession(null)}>
-              + Session
+              {t('+ Session')}
             </button>
-            <button onClick={() => setGroupDialog({ parentId: null })}>+ Group</button>
+            <button onClick={() => setGroupDialog({ parentId: null })}>{t('+ Group')}</button>
             <button title={t('Import from ~/.ssh/config')} onClick={() => setShowImport(true)}>
               ⇩
             </button>
