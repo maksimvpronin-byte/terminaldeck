@@ -56,6 +56,14 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # The half of the release contract that needs no build: the version in
+      # step across its files, a changelog section to cut notes from, the
+      # signing hook, space-free artifact names, and one job creating the
+      # release. Run on every push rather than only on a tag, because finding
+      # out at the tag means finding out after the twenty-minute build.
+      - name: Release contract
+        run: npm run verify:release
+
       # It could not be here before: the tree had never been through Prettier,
       # so this would have failed on eighty-six files that nobody had touched.
       # It has now, in a commit of its own, and this is what keeps it that way.

@@ -695,6 +695,37 @@ git push --follow-tags
 
 The workflow checks the tag against `package.json` before building and fails on a mismatch, then
 type-checks and runs the tests before anything is packaged.
+
+### The release contract
+
+`npm run verify:release` states what has to be true of a release and checks it, because none of it
+is something a compiler or a test can see — it is a set of agreements between files. Every rule was
+written after the release it would have caught:
+
+- the version agrees across `package.json` and both places `package-lock.json` states it, and with
+  the tag when one is given;
+- `CHANGELOG.md` has a section for that version, since the release notes are cut from it;
+- `electron-builder.yml` keeps the ad-hoc signing hook and artifact names that carry the version and
+  contain no spaces — a space becomes a dot when GitHub stores the file, and the update metadata
+  goes on asking for the hyphenated name, which is a silent 404 for every Windows update;
+- the release workflow still packages with `--publish never` and creates the release in exactly one
+  job — publishing from each build job drafted one release per publisher, with the artifacts split
+  between them.
+
+Two more modes run where the answer only exists during a release, and both are wired into
+[release.yml](.github/workflows/release.yml):
+
+```bash
+node scripts/verify-release.cjs --app dist/mac-arm64/TerminalDeck.app   # on the macOS runner
+node scripts/verify-release.cjs --version 1.2.3 --release-dir packages  # before the draft is made
+```
+
+The first refuses a bundle with no signature at all — macOS calls that a damaged download — and
+demands a Developer ID rather than an ad-hoc signature once `CSC_LINK` is configured. The second
+refuses to publish unless every kind of artifact is present exactly once and every file the update
+metadata names is actually in the release under that name.
+
+The idea, and the shape of the verifier, are borrowed from KubeDeck's `release-contract.json`.
 Record what changed in [CHANGELOG.md](CHANGELOG.md) as part of the release commit.
 
 ## Installing a release on macOS

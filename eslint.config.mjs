@@ -34,6 +34,29 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
 
   {
+    /*
+     * Build-time scripts: plain CommonJS run by `node`, not by Electron and not
+     * through the bundler, so `require` and the Node globals are the point
+     * rather than a mistake. They stay in this project's tree — and therefore
+     * under this project's linter — because they enforce its own rules; see
+     * `scripts/verify-release.cjs`.
+     */
+    files: ['scripts/**/*.cjs'],
+    languageOptions: {
+      sourceType: 'commonjs',
+      globals: {
+        require: 'readonly',
+        module: 'writable',
+        process: 'readonly',
+        __dirname: 'readonly'
+      }
+    },
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off'
+    }
+  },
+
+  {
     files: ['**/*.{ts,tsx,mts,cts}'],
     rules: {
       // TypeScript resolves every identifier already, and this rule would

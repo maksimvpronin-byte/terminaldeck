@@ -6,6 +6,23 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## Unreleased
+
+### Changed
+
+- **A release now has a contract, and something other than memory checks it.**
+  Four days of releases produced one drafted twice with its artifacts split
+  between the halves, one whose Windows installer was named differently from
+  what `latest.yml` asked for — a silent 404 for every update — and one whose
+  macOS bundle carried no signature at all, which Apple Silicon calls a damaged
+  download. All three were green: none of it is a compile error or a failing
+  test, it is a set of agreements between files that nothing was comparing.
+  `npm run verify:release` compares them, on every push and again at three
+  points during a release: the sources before the build, the macOS bundle before
+  it is wrapped in a disk image, and the assembled payload before the draft is
+  created. The idea is borrowed from KubeDeck, which keeps the same kind of
+  contract beside its own build.
+
 ## 0.11.0
 
 ### Security

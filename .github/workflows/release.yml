@@ -65,6 +65,14 @@ jobs:
           fi
           echo "Tag and package.json agree on $pkg."
 
+      # The rest of what a release has to be true about itself: the changelog
+      # section the notes are cut from, the signing hook, the space-free
+      # artifact names, and the rule that one job and only one creates the
+      # release. Each of these is a release that went out broken and green.
+      - name: Verify the release contract
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: node scripts/verify-release.cjs --tag "$GITHUB_REF_NAME"
+
       # ---------------------------------------------------------------- the
       # desktop client, which is compiled rather than downloaded and is the one
       # thing here a runner cannot get from npm.
@@ -159,6 +167,12 @@ jobs:
       - name: Build
         run: npm run ${{ matrix.script }} -- --publish never
 
+      # Before it is wrapped in a disk image, while the bundle is still a
+      # directory this can read. An unsigned bundle is what macOS calls damaged.
+      - name: Verify the macOS signature
+        if: matrix.os == 'macos-latest'
+        run: node scripts/verify-release.cjs --app dist/mac-arm64/TerminalDeck.app
+
       - name: Keep what was built
         uses: actions/upload-artifact@v4
         with:
@@ -200,23 +214,29 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Checked out for the verifier below; the packages themselves arrive from
+      # the build jobs rather than from the repository.
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       - uses: actions/download-artifact@v4
         with:
           path: packages
           merge-multiple: true
 
-      # electron-updater reads these, not the packages: without them a release
-      # is one nobody is ever offered, and that is worth failing over rather
-      # than finding out from a user who never got the update.
-      - name: Check the update metadata is there
+      # The payload itself: every kind of artifact present exactly once, every
+      # name carrying the version, and every file the update metadata names
+      # actually present under that name. v0.9.1 failed both halves — drafted
+      # twice with the artifacts split, and a Windows installer whose name did
+      # not match the one `latest.yml` asked for.
+      - name: Verify the release payload
         run: |
-          for file in latest.yml latest-mac.yml latest-linux.yml; do
-            if [ ! -f "packages/$file" ]; then
-              echo "::error::packages/$file is missing — electron-updater needs it to offer this version"
-              exit 1
-            fi
-          done
-          ls -la packages
+          node scripts/verify-release.cjs \
+            --version "${GITHUB_REF_NAME#v}" \
+            --release-dir packages
 
       - name: Draft the release
         env:
