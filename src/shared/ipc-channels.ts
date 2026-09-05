@@ -1,4 +1,14 @@
 export const IPC = {
+  aiSettings: 'ai:settings',
+  aiSave: 'ai:save',
+  aiClear: 'ai:clear',
+  aiTest: 'ai:test',
+  aiStart: 'ai:start',
+  aiGet: 'ai:get',
+  aiDecide: 'ai:decide',
+  aiReport: 'ai:report',
+  aiStop: 'ai:stop',
+  aiUpdate: 'ai:update',
   // Vault
   vaultStatus: 'vault:status',
   vaultCreate: 'vault:create',

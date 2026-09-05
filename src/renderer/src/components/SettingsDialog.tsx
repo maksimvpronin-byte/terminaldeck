@@ -1,3 +1,4 @@
+import AiSettings from './AiSettings'
 import { useState } from 'react'
 import { useStore } from '../state/store'
 import { FONT_CHOICES, THEME_GROUPS, terminalDefaults, themeOf } from '../state/settings'
@@ -9,7 +10,8 @@ import ModalBackdrop from './ModalBackdrop'
 import { keyHint } from '../state/keys'
 import { LANGUAGES, useT, type Language } from '../i18n'
 
-export type SettingsTab = 'general' | 'terminal' | 'files' | 'accounts' | 'security' | 'backup'
+export type SettingsTab =
+  'general' | 'terminal' | 'files' | 'accounts' | 'security' | 'backup' | 'ai'
 
 export default function SettingsDialog({
   initialTab,
@@ -32,13 +34,19 @@ export default function SettingsDialog({
 
   return (
     <ModalBackdrop onClose={onClose}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+      <div
+        className={`modal-card ${tab === 'ai' ? 'ai-settings-dialog' : ''}`}
+        onClick={(e) => e.stopPropagation()}
+      >
         <h2>{t('Settings')}</h2>
 
         {/* Nothing floats above the tabs any more. Language sat up here, which
             put it on every tab — a setting somebody changes once, permanently in
             front of the ones they came to change. */}
         <div className="settings-tabs">
+          <button className={tab === 'ai' ? 'active' : ''} onClick={() => setTab('ai')}>
+            {t('AI assistant')}
+          </button>
           <button className={tab === 'general' ? 'active' : ''} onClick={() => setTab('general')}>
             {t('General')}
           </button>
@@ -85,6 +93,8 @@ export default function SettingsDialog({
             </div>
           </>
         )}
+
+        {tab === 'ai' && <AiSettings />}
 
         {tab === 'accounts' && <CredentialsSettings />}
         {tab === 'security' && <SecuritySettings />}

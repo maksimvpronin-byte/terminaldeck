@@ -1086,5 +1086,97 @@ export const ru: Record<string, string> = {
   'A locked app opens nothing new: no session, no desktop, no remote file listing':
     'Заблокированное приложение ничего не открывает: ни сессию, ни рабочий стол, ни список удалённых файлов',
   'Open sessions stay connected behind the lock, and the keyboard cannot reach them':
-    'Открытые сессии остаются подключёнными за блокировкой, и клавиатура до них не достаёт'
+    'Открытые сессии остаются подключёнными за блокировкой, и клавиатура до них не достаёт',
+  AI: 'ИИ',
+  'AI assistant': 'ИИ-помощник',
+  'API base URL': 'Базовый адрес API',
+  'Model ID': 'Идентификатор модели',
+  'Model name from your provider': 'Имя модели у вашего провайдера',
+  'API key': 'API-ключ',
+  'Key saved; leave empty to keep it': 'Ключ сохранён; оставьте пустым, чтобы сохранить его',
+  'Enter API key': 'Введите API-ключ',
+  'Save AI settings': 'Сохранить настройки ИИ',
+  'Test AI connection': 'Проверить подключение ИИ',
+  'Remove AI settings': 'Удалить настройки ИИ',
+  'Working…': 'Выполняется…',
+  'Connect an OpenAI-compatible Chat Completions API. Each diagnostic command needs your separate approval.':
+    'Подключите OpenAI-совместимый Chat Completions API. Каждая диагностическая команда требует отдельного подтверждения.',
+  'Include the API prefix, usually /v1. Changing the endpoint requires entering a key again.':
+    'Укажите префикс API, обычно /v1. При изменении адреса ключ нужно ввести заново.',
+  'The key is encrypted in the vault. Saving or removing settings stops active analyses.':
+    'Ключ зашифрован в хранилище. Сохранение или удаление настроек останавливает активные анализы.',
+  'Allow sending filtered diagnostic output and log excerpts to this provider after I approve a command.':
+    'Разрешаю отправлять отфильтрованный вывод диагностики и фрагменты логов этому провайдеру после подтверждения команды.',
+  'Logs may contain sensitive data. Filtering is best-effort. SSH passwords, private keys and terminal history are not included. API usage may be billed by your provider.':
+    'Логи могут содержать чувствительные данные. Фильтрация не гарантирует удаления всех секретов. SSH-пароли, приватные ключи и история терминала не передаются. Провайдер может взимать плату за API.',
+  'The connection test sends a small request without server data. Save changes before testing.':
+    'Проверка отправляет небольшой запрос без данных сервера. Перед проверкой сохраните изменения.',
+  'Hide AI assistant': 'Скрыть ИИ-помощника',
+  Analyze: 'Анализ',
+  'Stop analysis': 'Остановить анализ',
+  'AI settings': 'Настройки ИИ',
+  'Understand this Linux host': 'Диагностика Linux-машины',
+  'Review CPU, memory, disks and services. Analyze prepares a plan; nothing runs until you approve each command.':
+    'Проверьте CPU, память, диски и сервисы. «Анализ» готовит план; команды запускаются только после отдельного подтверждения.',
+  'Disk checks cover capacity, inodes, latency, errors and RAID. SMART/NVMe checks can be proposed when a device is identified.':
+    'Проверки дисков охватывают место, inode, задержки, ошибки и RAID. После определения устройства помощник может предложить SMART/NVMe.',
+  'commands completed': 'команд выполнено',
+  Started: 'Начало',
+  'AI requests': 'запросов к ИИ',
+  'Only this exact command will run once on this connection. Filtered output will be sent to the configured AI provider.':
+    'Только эта команда выполнится один раз на указанном подключении. Отфильтрованный вывод будет отправлен настроенному ИИ-провайдеру.',
+  'Run this command': 'Выполнить команду',
+  'Skip command': 'Пропустить',
+  'Finish with collected data (skip remaining checks)':
+    'Составить отчёт по собранным данным (остальные проверки пропустить)',
+  'Diagnostic sequence and results': 'Порядок диагностики и результаты',
+  'Approved at': 'Подтверждено',
+  'Exit code': 'Код завершения',
+  'No stdout': 'Нет stdout',
+  'Output was truncated; this check is incomplete.': 'Вывод обрезан; проверка неполная.',
+  'Machine health report': 'Отчёт о состоянии машины',
+  'Possible cause': 'Возможная причина',
+  Recommendation: 'Рекомендация',
+  Evidence: 'Доказательство',
+  Limitations: 'Ограничения',
+  'Results stay in memory for this SSH session. Closing the panel hides it; Stop, vault lock or disconnect cancels active work. AI interpretations need administrator review.':
+    'Результаты хранятся в памяти этой SSH-сессии. Закрытие панели скрывает её; остановка, блокировка хранилища или отключение отменяют работу. Выводы ИИ требуют проверки администратором.',
+  'Awaiting command approval': 'Ожидается подтверждение команды',
+  Planned: 'Запланировано',
+  'Running command': 'Команда выполняется',
+  'AI is interpreting results': 'ИИ анализирует результаты',
+  'Analysis complete': 'Анализ завершён',
+  Completed: 'Завершено',
+  'Analysis stopped': 'Анализ остановлен',
+  Cancelled: 'Отменено',
+  Skipped: 'Пропущено',
+  Error: 'Ошибка',
+  'Timed out': 'Время ожидания истекло',
+  'Output limit reached': 'Достигнут лимит вывода',
+  Critical: 'Критично',
+  Warning: 'Предупреждение',
+  Information: 'Информация',
+  'AI settings saved': 'Настройки ИИ сохранены',
+  'AI settings removed': 'Настройки ИИ удалены',
+  'AI connection works': 'Подключение к ИИ работает',
+  'Could not load AI settings': 'Не удалось загрузить настройки ИИ',
+  'SSH connection is unavailable': 'SSH-подключение недоступно',
+  'Configure AI and allow diagnostic data transfer first':
+    'Сначала настройте ИИ и разрешите передачу диагностических данных',
+  'Configure API key and model first': 'Сначала укажите API-ключ и модель',
+  'Enter a new API key when changing endpoint': 'При смене адреса API введите ключ заново',
+  'Invalid AI settings': 'Некорректные настройки ИИ',
+  'Invalid API key': 'Некорректный API-ключ',
+  'Use HTTPS (HTTP is allowed only on loopback)':
+    'Используйте HTTPS (HTTP разрешён только для loopback)',
+  'AI request failed or returned an invalid proposal/report. Check settings; no additional command was executed.':
+    'Запрос к ИИ не удался или ответ содержит некорректное предложение/отчёт. Проверьте настройки; дополнительные команды не выполнялись.',
+  'Analysis failed; inspect the connection or AI settings. Collected results are retained.':
+    'Ошибка анализа: проверьте подключение и настройки ИИ. Собранные результаты сохранены в окне.',
+  'Could not generate the report': 'Не удалось сформировать отчёт',
+  'Diagnostic budget exhausted': 'Бюджет диагностики исчерпан',
+  'Analysis budget exhausted; collected results are retained':
+    'Бюджет анализа исчерпан; собранные результаты сохранены в окне',
+  'AI context budget exhausted; collected results are retained':
+    'Бюджет контекста ИИ исчерпан; собранные результаты сохранены в окне'
 }

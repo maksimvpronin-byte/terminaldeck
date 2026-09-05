@@ -53,6 +53,7 @@ if (typeof window !== 'undefined') {
       snippets: stub({ list: () => Promise.resolve([]) }),
       vault: stub({ status: () => Promise.resolve({ exists: false, unlocked: false }) }),
       clipboard: stub({ read: () => '', write: () => undefined }),
+      ai: stub({ get: () => Promise.resolve(null), onUpdate: () => () => undefined }),
       ssh: stub(),
       sftp: stub(),
       rdp: stub(),

@@ -1,3 +1,4 @@
+import { registerAiHandlers } from './ai'
 import { registerKeyboardCapture } from '../keyboardCapture'
 import { registerAppHandlers } from './app'
 import { registerGitFolderHandlers } from './gitFolders'
@@ -22,6 +23,7 @@ import { registerVaultHandlers } from './vault'
  */
 export function registerIpcHandlers(): void {
   registerVaultHandlers()
+  registerAiHandlers()
   registerStoreHandlers()
   registerInventoryHandlers()
   registerGitFolderHandlers()

@@ -5,6 +5,57 @@ Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [s
 
 ## Features
 
+
+### AI diagnostics (development branch)
+
+Open **Settings → AI assistant** and enter an OpenAI-compatible API base URL
+(including its prefix, usually `/v1`), a model ID and an API key. Save the settings,
+then use **Test AI connection**; this sends a small, potentially billable request
+without server data. The API must support Chat Completions, `max_completion_tokens`
+and text responses. The [API format](https://developers.openai.com/api/reference/typescript/resources/chat/subresources/completions/methods/create)
+is used directly; Responses-only endpoints are not supported.
+
+On a connected SSH pane, press **AI → Analyze**. This prepares an ordered plan;
+it runs **no remote command**. Each command shows its exact text, host, reason,
+rights and possible impact. **Run this command** authorizes that one execution;
+**Skip command** records an omission. Results include stdout, stderr, exit status
+and duration. The model interprets completed checks and can propose a different
+next check, but that proposal also waits for approval. **Finish with collected
+data** skips the remaining checks and requests a partial report with evidence links.
+
+Disk diagnostics cover devices, mount options, free space/inodes, I/O samples,
+kernel errors and software RAID. Follow-ups include service logs, SMART/NVMe,
+LVM, ZFS, per-process I/O and limited directory-size checks. Missing utilities or
+permissions are reported; nothing installs packages, elevates through sudo,
+repairs a filesystem or restarts a service.
+
+The API key and provider settings are encrypted in the vault. Enable data sharing
+explicitly: filtered diagnostic output and log excerpts are sent to that provider.
+Secret filtering is best-effort and cannot make arbitrary logs non-sensitive.
+SSH credentials and terminal history are not collected by the assistant.
+HTTPS is required except on loopback; redirects are refused and changing the
+endpoint requires entering a key again. Provider settings are not included in
+portable configuration backups.
+
+Commands run sequentially in separate SSH channels with a 15-second deadline and
+64 KiB combined output limit. A run has 14 base checks, at most 10 follow-ups,
+24 model requests, 512 KiB collected output and a five-minute active-work budget;
+waiting for approval does not consume that time. The model receives bounded head/tail
+excerpts, not necessarily all retained output. Request context and response sizes
+are also bounded. An exhausted budget or failed provider leaves collected results
+visible rather than presenting an incomplete analysis as success.
+
+Hiding the panel keeps it available. **Stop**, vault lock, SSH disconnect, window
+reload/close or a provider-settings change cancels active work. Closing an SSH
+channel is not a guarantee that every remote process has terminated. Reports live
+only in memory for the SSH session. Findings are advisory and should be checked
+against their evidence.
+
+This branch has been exercised with local SSH and API fixtures, including the
+Electron UI. Live-cloud and real-host acceptance testing still requires the
+administrator's configured provider and a suitable test machine. No release is
+published by this feature branch. See [the implementation plan](PLAN-ai-assistant.md).
+
 ### Machine inventories from git
 
 - Point the app at a git repository holding an **Ansible inventory** and its hosts appear under

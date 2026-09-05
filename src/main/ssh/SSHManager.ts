@@ -471,7 +471,16 @@ class SSHManager {
     const connectionId = randomUUID()
     try {
       const { target, chain } = await connectChain(win, profile, credential)
-      await this.openShell(win, connectionId, target, chain, cols, rows, profile)
+      await this.openShell(
+        win,
+        connectionId,
+        target,
+        chain,
+        cols,
+        rows,
+        profile,
+        `${profile.host}:${effectiveAuth(profile).port ?? 22}`
+      )
       return connectionId
     } catch (err) {
       this.send(win, connectionId, IPC.sshError, (err as Error).message)
@@ -514,12 +523,36 @@ class SSHManager {
         })
       })
 
-      await this.openShell(win, connectionId, client, [client], cols, rows)
+      await this.openShell(
+        win,
+        connectionId,
+        client,
+        [client],
+        cols,
+        rows,
+        undefined,
+        `${params.host}:${params.port}`
+      )
       return connectionId
     } catch (err) {
       this.send(win, connectionId, IPC.sshError, (err as Error).message)
       throw err
     }
+  }
+
+  private diagnosticTargets = new Map<
+    string,
+    { host: string; sender: BrowserWindow['webContents'] }
+  >()
+  private diagnosticDisconnects = new Set<(id: string) => void>()
+
+  diagnosticTarget(id: string): { host: string; sender: BrowserWindow['webContents'] } | undefined {
+    return this.diagnosticTargets.get(id)
+  }
+
+  onDiagnosticDisconnect(listener: (id: string) => void): () => void {
+    this.diagnosticDisconnects.add(listener)
+    return () => this.diagnosticDisconnects.delete(listener)
   }
 
   private openShell(
@@ -529,7 +562,8 @@ class SSHManager {
     chain: Client[],
     cols: number,
     rows: number,
-    profile?: SessionProfile
+    profile?: SessionProfile,
+    host = ''
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       target.shell({ term: 'xterm-256color', cols, rows }, (err, stream) => {
@@ -561,6 +595,7 @@ class SSHManager {
           paused: false
         }
         this.connections.set(connectionId, connection)
+        this.diagnosticTargets.set(connectionId, { host, sender: win.webContents })
 
         let pending = ''
         let lastCwd: string | undefined
@@ -726,6 +761,10 @@ class SSHManager {
   }
 
   private teardown(connectionId: string): void {
+    if (this.diagnosticTargets.has(connectionId)) {
+      for (const listener of this.diagnosticDisconnects) listener(connectionId)
+      this.diagnosticTargets.delete(connectionId)
+    }
     const conn = this.connections.get(connectionId)
     if (!conn) return
     if (conn.flushTimer) clearTimeout(conn.flushTimer)

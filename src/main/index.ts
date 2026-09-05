@@ -1,3 +1,4 @@
+import { stopAi } from './ai/service'
 import { app, shell, BrowserWindow, Menu, type MenuItemConstructorOptions } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -95,6 +96,8 @@ function createWindow(): void {
   // A window that has just loaded is holding no session, whatever the one
   // before it was doing. See releaseKeyboard.
   mainWindow.webContents.on('did-finish-load', releaseKeyboard)
+  mainWindow.webContents.on('did-start-loading', stopAi)
+  mainWindow.on('closed', stopAi)
 
   // Chromium zooms the page on Cmd/Ctrl with +, - or 0 on its own, quite apart
   // from the menu, and swallows the keys before the renderer sees them. Claiming
@@ -254,6 +257,7 @@ app.whenReady().then(() => {
  * far end open while it finishes.
  */
 app.on('before-quit', () => {
+  stopAi()
   freeRdpBridge.stopAll()
   /**
    * The shadow viewers, which are the ones that matter here.

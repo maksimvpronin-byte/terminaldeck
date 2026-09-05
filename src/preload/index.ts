@@ -1,3 +1,4 @@
+import type { AiAnalysis, AiSettings, AiSettingsInput } from '../shared/ai'
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { IPC } from '../shared/ipc-channels'
 import type {
@@ -42,6 +43,31 @@ export type DesktopCursor =
   | { kind: 'hidden' | 'default' }
 
 const api = {
+  ai: {
+    settings: (): Promise<AiSettings> => ipcRenderer.invoke(IPC.aiSettings),
+    save: (input: AiSettingsInput): Promise<AiSettings> => ipcRenderer.invoke(IPC.aiSave, input),
+    clear: (): Promise<AiSettings> => ipcRenderer.invoke(IPC.aiClear),
+    test: (): Promise<void> => ipcRenderer.invoke(IPC.aiTest),
+    start: (connectionId: string, language: 'en' | 'ru'): Promise<AiAnalysis> =>
+      ipcRenderer.invoke(IPC.aiStart, connectionId, language),
+    get: (connectionId: string): Promise<AiAnalysis | null> =>
+      ipcRenderer.invoke(IPC.aiGet, connectionId),
+    decide: (
+      connectionId: string,
+      analysisId: string,
+      stepId: string,
+      action: 'approve' | 'skip'
+    ): Promise<void> => ipcRenderer.invoke(IPC.aiDecide, connectionId, analysisId, stepId, action),
+    report: (connectionId: string, analysisId: string): Promise<void> =>
+      ipcRenderer.invoke(IPC.aiReport, connectionId, analysisId),
+    stop: (connectionId: string): Promise<void> => ipcRenderer.invoke(IPC.aiStop, connectionId),
+    onUpdate: (callback: (analysis: AiAnalysis) => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, analysis: AiAnalysis): void =>
+        callback(analysis)
+      ipcRenderer.on(IPC.aiUpdate, listener)
+      return () => ipcRenderer.removeListener(IPC.aiUpdate, listener)
+    }
+  },
   vault: {
     status: (): Promise<VaultStatus> => ipcRenderer.invoke(IPC.vaultStatus),
     create: (password: string): Promise<VaultStatus> =>

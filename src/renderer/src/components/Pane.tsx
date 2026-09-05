@@ -1,3 +1,4 @@
+import AiPanel from './AiPanel'
 import { useRef, useState } from 'react'
 import type { DragEvent as ReactDragEvent } from 'react'
 import type { PaneNode, PaneTarget } from '../state/store'
@@ -76,6 +77,7 @@ export default function Pane({
    * for what that cost. Empty for a terminal, which has no such thing.
    */
   const [measured, setMeasured] = useState('')
+  const [aiOpen, setAiOpen] = useState(false)
 
   const isActive = isActiveTab && activePaneId === node.id
 
@@ -183,6 +185,16 @@ export default function Pane({
               {t('Tunnels')}
             </button>
           )}
+          {traits.textual && (
+            <button
+              disabled={!node.connectionId}
+              className={aiOpen ? 'active' : ''}
+              title={t('AI assistant')}
+              onClick={() => setAiOpen(!aiOpen)}
+            >
+              {t('AI')}
+            </button>
+          )}
           {traits.monitor && (
             <button
               className={node.monitorOpen ? 'active' : ''}
@@ -251,6 +263,15 @@ export default function Pane({
             credentialId={credentialId}
             onMeasured={setMeasured}
             paneVisible={isActiveTab}
+          />
+        )}
+        {traits.textual && node.connectionId && (
+          <AiPanel
+            key={node.connectionId}
+            connectionId={node.connectionId}
+            title={node.title}
+            visible={aiOpen && isActiveTab}
+            onClose={() => setAiOpen(false)}
           />
         )}
         {traits.files && node.sftpOpen && <SftpPanel connectionId={node.connectionId} />}

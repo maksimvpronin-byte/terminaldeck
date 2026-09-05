@@ -1,3 +1,4 @@
+import { stopAi } from '../ai/service'
 import { ipcMain } from 'electron'
 import { IPC } from '../../shared/ipc-channels'
 import { trustedCertificates } from '../rdp/CertificateTrust'
@@ -23,6 +24,7 @@ export function registerVaultHandlers(): void {
     }
   })
   ipcMain.handle(IPC.vaultLock, () => {
+    stopAi()
     vault.lock()
     return vault.status()
   })
