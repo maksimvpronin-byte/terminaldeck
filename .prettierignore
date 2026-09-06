@@ -12,3 +12,9 @@ resources
 # leaves line breaks alone by default, but it still rewrites list markers and
 # emphasis, which would bury a real change in a reformat of every plan document.
 *.md
+
+# Presentation decks. Their whitespace is content, not indentation: the terminal
+# mock-ups inside them are `white-space: pre`, so Prettier reflows the lines of a
+# file listing into one paragraph and the slide stops meaning anything. Proven
+# rather than assumed — a --write over the 0.11 deck collapsed every one of them.
+docs/*-presentation.html
