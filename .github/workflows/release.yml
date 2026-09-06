@@ -22,6 +22,7 @@ jobs:
           # a pane says the client is missing rather than opening.
           - os: macos-latest
             script: build:mac
+            platform: mac
             freerdp: mac
             shim: build:freerdp:shim
             # Hashed into the cache key. Only this platform's own recipe: with
@@ -30,11 +31,13 @@ jobs:
             recipe: resources/freerdp/build-macos.sh
           - os: windows-latest
             script: build:win
+            platform: win
             freerdp: win
             shim: build:freerdp:win:shim
             recipe: resources/freerdp/build-windows.ps1
           - os: ubuntu-latest
             script: build:linux
+            platform: linux
             freerdp: ''
             shim: ''
             recipe: ''
@@ -166,6 +169,15 @@ jobs:
       # why electron-builder is never allowed to do the uploading itself.
       - name: Build
         run: npm run ${{ matrix.script }} -- --publish never
+
+      # What travels inside the application, which the payload check at the end
+      # cannot see: it reads the release directory, and `if-no-files-found:
+      # error` proves a disk image exists rather than what is in it. The desktop
+      # client and the libraries it loads arrive through `extraResources`
+      # filters, and a filter that quietly stops matching produces a build that
+      # installs, launches and cannot open a single RDP pane.
+      - name: Verify what the package carries
+        run: node scripts/verify-release.cjs --package dist --platform ${{ matrix.platform }}
 
       # Before it is wrapped in a disk image, while the bundle is still a
       # directory this can read. An unsigned bundle is what macOS calls damaged.
