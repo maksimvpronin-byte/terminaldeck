@@ -41,6 +41,10 @@
 #include <winpr/crt.h>
 #include <winpr/synch.h>
 #include <winpr/thread.h>
+/* For WSAStartup below. Not <winsock2.h>: this header exists to include the
+ * Windows ones in the order that works, and is what FreeRDP's own clients use.
+ * On anything but Windows it is empty. */
+#include <winpr/windows.h>
 
 #include "td_proto.h"
 
@@ -1052,6 +1056,38 @@ int main(int argc, char* argv[])
 	/* Before anything can be said, the pipe has to be ours alone. */
 	if (!td_proto_init())
 		return 1;
+
+	/*
+	 * Winsock has to be started by the process that uses it, and libfreerdp
+	 * does not do it: every FreeRDP client and server that runs on Windows
+	 * calls WSAStartup itself, under exactly this guard — see
+	 * client/Windows/wf_client.c and sdl_client_global_init() in the SDL
+	 * clients.
+	 *
+	 * Without it the first socket call in the process returns
+	 * WSANOTINITIALISED, whatever it was asked. That call is `getaddrinfo` in
+	 * freerdp_tcp_resolve_host, and freerdp_tcp_is_hostname_resolvable turns a
+	 * null result into FREERDP_ERROR_DNS_NAME_NOT_FOUND — so every connection
+	 * from Windows failed with "The DNS host name was not found." for a name
+	 * the machine resolves perfectly well, and would have failed the same way
+	 * for a bare IP address. This shim was written on a Mac, where nothing has
+	 * to be started, which is why no desktop pane has ever opened on Windows.
+	 *
+	 * 2.2 because that is the version getaddrinfo belongs to. There is no
+	 * matching WSACleanup: it would only be reached on the paths that already
+	 * exit, and Windows reclaims the whole of it when the process goes.
+	 */
+#if defined(_WIN32)
+	{
+		WSADATA wsa = { 0 };
+		const int started = WSAStartup(MAKEWORD(2, 2), &wsa);
+		if (started != 0)
+		{
+			td_event("{\"e\":\"failed\",\"detail\":\"WSAStartup failed with %d\"}", started);
+			return 1;
+		}
+	}
+#endif
 
 	entry.Version = RDP_CLIENT_INTERFACE_VERSION;
 	entry.Size = sizeof(RDP_CLIENT_ENTRY_POINTS_V1);
