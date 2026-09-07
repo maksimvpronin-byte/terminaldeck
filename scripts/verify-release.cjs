@@ -239,6 +239,119 @@ function verifyPayload(directory, version) {
   ok(`${referenced} update-metadata references all resolve`)
 }
 
+/** What each platform's application has to be carrying, and where. */
+const PACKAGED = {
+  mac: {
+    resources: 'mac-arm64/TerminalDeck.app/Contents/Resources',
+    carry: [{ file: 'freerdp/bin/td-rdp', what: 'the desktop client' }],
+    // Copied in beside the client by bundle-macos.sh, which rewrites every
+    // reference to @rpath. Without them the client loads nothing on a machine
+    // that has never heard of Homebrew.
+    libraries: { directory: 'freerdp/lib', extension: '.dylib' }
+  },
+  win: {
+    resources: 'win-unpacked/resources',
+    carry: [
+      { file: 'freerdp/bin/td-rdp.exe', what: 'the desktop client' },
+      { file: 'shadowhost/ShadowHost.exe', what: 'the shadow-session host' }
+    ],
+    // Windows looks for a binary's libraries beside it, so these share the
+    // client's directory rather than having a lib/ of their own.
+    libraries: { directory: 'freerdp/bin', extension: '.dll' }
+  },
+  // No desktop client on Linux yet: a pane says the client is missing rather
+  // than opening. Nothing to carry — and nothing that may slip in either.
+  linux: { resources: 'linux-unpacked/resources', carry: [], libraries: null }
+}
+
+/**
+ * What lives next to the things that ship and must never ship itself.
+ *
+ * All four are one edited `extraResources` filter away from travelling, and
+ * none of them would break anything on the way out — they would just make the
+ * download several times larger than it needs to be, which is the kind of
+ * mistake that survives a release or two before anybody notices.
+ */
+const FORBIDDEN = [
+  { pattern: /(^|[\\/])sdl\d*-freerdp/i, why: 'an SDL client exists to prove a build by hand' },
+  { pattern: /(^|[\\/])(winpr-hash|winpr-makecert)/i, why: 'a FreeRDP developer tool' },
+  { pattern: /(^|[\\/])vcpkg[\\/]/i, why: "vcpkg is a package manager's working directory" },
+  { pattern: /(^|[\\/])shadowprobe[\\/]/i, why: 'shadowprobe is an experiment, not a feature' }
+]
+
+function walk(directory) {
+  const result = []
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const target = path.join(directory, entry.name)
+    if (entry.isDirectory()) result.push(...walk(target))
+    else result.push(target)
+  }
+  return result
+}
+
+/**
+ * What travels inside the application.
+ *
+ * The payload check above reads the release directory: it proves a disk image
+ * exists and that the update metadata names files that are there. Neither it
+ * nor `if-no-files-found: error` says anything about what is *inside* the
+ * package. The desktop client and the libraries it loads arrive through
+ * `extraResources` filters, and a filter that quietly stops matching — a
+ * renamed directory, an architecture placeholder that resolves to nothing —
+ * produces a build that installs, launches, and cannot open a single RDP pane.
+ * Nothing distinguishes it from a good build until somebody tries to open one.
+ *
+ * Read from the unpacked directory electron-builder leaves behind, which is the
+ * only place the contents of a package can be read without opening a disk
+ * image, and only on the runner that built it.
+ */
+function verifyPackage(directory, platform) {
+  const expected = PACKAGED[platform]
+  assert(
+    expected,
+    `Unknown platform: ${platform || '(none given)'}. Expected one of ${Object.keys(PACKAGED).join(', ')}`
+  )
+
+  const resources = path.resolve(root, directory, expected.resources)
+  assert(fs.existsSync(resources), `The unpacked application is not there: ${resources}`)
+
+  for (const { file, what } of expected.carry) {
+    const target = path.join(resources, file)
+    assert(fs.existsSync(target), `The package does not carry ${file} — ${what} would be missing`)
+    assert(fs.statSync(target).size > 0, `${file} is in the package but is empty`)
+    // Windows has no such bit, and a mode check there would always pass.
+    if (platform !== 'win')
+      assert(
+        (fs.statSync(target).mode & 0o111) !== 0,
+        `${file} is in the package but is not executable`
+      )
+  }
+
+  if (expected.libraries) {
+    const { directory: where, extension } = expected.libraries
+    const target = path.join(resources, where)
+    assert(fs.existsSync(target), `The package does not carry ${where}`)
+    const found = fs.readdirSync(target).filter((name) => name.endsWith(extension))
+    assert(
+      found.length > 0,
+      `No ${extension} in ${where} — the client would not load anywhere but the machine that built it`
+    )
+    ok(`${platform} carries the desktop client and ${found.length} ${extension} beside it`)
+  } else {
+    ok(`${platform} carries no desktop client, as it should not`)
+  }
+
+  for (const file of walk(resources)) {
+    const relative = path.relative(resources, file)
+    for (const forbidden of FORBIDDEN)
+      assert(
+        !forbidden.pattern.test(relative),
+        `Forbidden in a release — ${forbidden.why}: ${relative}`
+      )
+  }
+  ok('nothing travelled that was not meant to')
+}
+
 /**
  * The macOS bundle carries a signature — any signature.
  *
@@ -275,8 +388,11 @@ function verifyApp(appPath) {
 try {
   process.stdout.write('Release contract\n')
   const app = option('--app')
+  const packaged = option('--package')
   if (app) {
     verifyApp(app)
+  } else if (packaged) {
+    verifyPackage(packaged, option('--platform'))
   } else {
     const version = option('--version') || verifyVersion()
     if (!option('--version')) {
