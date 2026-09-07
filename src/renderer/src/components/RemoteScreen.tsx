@@ -4,6 +4,7 @@ import { buttonEvent, PTR, wheelFlags, wheelUnits } from '../../../shared/rdpInp
 import { rdpKeyFor, substituteCommand, unicodeKey } from '../../../shared/rdpScancodes'
 import { modifierFixes } from '../../../shared/modifierSync'
 import type { ForwardedKey, RdpView } from '../../../shared/types'
+import { isRefusal } from '../../../shared/rdpLogon'
 
 /**
  * A desktop, drawn from the pixels a client in another process decoded.
@@ -55,6 +56,12 @@ interface Props {
    * outside the two are told apart only by squinting.
    */
   onMeasured: (text: string) => void
+  /**
+   * Something the host said that is worth repeating but is not a refusal - see
+   * `isRefusal`. It arrives while the pane is still connecting, so it belongs
+   * beside the progress rather than in place of it.
+   */
+  onNotice: (text: string) => void
 }
 
 /** How long to let a drag settle before asking the far end to resize. */
@@ -88,6 +95,7 @@ export default function RemoteScreen({
   look,
   password,
   onPhase,
+  onNotice,
   onMeasured
 }: Props): JSX.Element {
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -121,6 +129,8 @@ export default function RemoteScreen({
   onPhaseRef.current = onPhase
   const onMeasuredRef = useRef(onMeasured)
   onMeasuredRef.current = onMeasured
+  const onNoticeRef = useRef(onNotice)
+  onNoticeRef.current = onNotice
   /* Through a ref like the two above: the session's subscriptions are set up
      once, and a function captured there would go on wording the tooltip with
      whatever the density was when the pane opened. */
@@ -476,8 +486,16 @@ export default function RemoteScreen({
                 reason: String(event.detail || 'The session ended')
               })
             } else if (what === 'logon') {
-              // The host's own explanation, which is usually the real one.
-              onPhaseRef.current({ at: 'failed', reason: String(event.detail ?? '') })
+              // The host's own explanation, which is the better one when the
+              // host is refusing. Most of these are not refusals: "the session
+              // continues" is what a host sends on putting you back into the
+              // session you already had, and taking that for a failure closed
+              // the pane it was reporting on, before the first frame, every
+              // time.
+              const detail = String(event.detail ?? '')
+              if (isRefusal(event.data, event.type))
+                onPhaseRef.current({ at: 'failed', reason: detail })
+              else onNoticeRef.current(detail)
             }
           })
         ]

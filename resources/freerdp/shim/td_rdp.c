@@ -636,6 +636,15 @@ static int td_verify_x509(freerdp* instance, const BYTE* data, size_t length, co
 	return td->trusted ? 1 : -1;
 }
 
+/*
+ * The host's logon message, passed on rather than judged here.
+ *
+ * A Logon Error Info PDU is named for its worst case and is usually not one:
+ * "the session continues", with a session id, is what any host that keeps
+ * disconnected sessions sends when it puts you back into yours. The codes
+ * travel beside the text because the pane cannot tell a refusal from a remark
+ * without them, and src/shared/rdpLogon.ts is where that is decided and tested.
+ */
 static int td_logon_error(freerdp* instance, UINT32 data, UINT32 type)
 {
 	char escaped[512];
@@ -644,7 +653,7 @@ static int td_logon_error(freerdp* instance, UINT32 data, UINT32 type)
 
 	(void)snprintf(text, sizeof(text), "%s [%s]", freerdp_get_logon_error_info_data(data),
 	               freerdp_get_logon_error_info_type(type));
-	td_event("{\"e\":\"logon\",\"detail\":\"%s\"}",
+	td_event("{\"e\":\"logon\",\"data\":%u,\"type\":%u,\"detail\":\"%s\"}", data, type,
 	         td_json_escape(escaped, sizeof(escaped), text));
 	return 1;
 }

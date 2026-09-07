@@ -477,6 +477,7 @@ export const ru: Record<string, string> = {
   "Copy and paste then land where they do on Windows. While the desktop has the keyboard this app's own ⌘ shortcuts do not fire; ⌘Q and ⌘Tab still belong to macOS.":
     'Тогда копирование и вставка окажутся там же, где в Windows. Пока клавиатура у рабочего стола, собственные сочетания приложения с ⌘ не срабатывают; ⌘Q и ⌘Tab по-прежнему принадлежат macOS.',
   'Could not connect': 'Не удалось подключиться',
+  'The host says': 'Хост сообщает',
   'Session ended': 'Сессия завершена',
   'Try again': 'Повторить',
   'Not a desktop': 'Это не рабочий стол',
