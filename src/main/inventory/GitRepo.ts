@@ -59,6 +59,13 @@ function refuseOption(what: string, value: string): void {
   }
 }
 
+function checkoutDir(root: string, sourceId: string): string {
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(sourceId)) {
+    throw new Error('The repository id is not a safe filesystem component')
+  }
+  return join(root, sourceId)
+}
+
 /** Clones on first use, then fast-forwards. Returns the checkout directory. */
 export async function syncRepo(
   root: string,
@@ -69,7 +76,7 @@ export async function syncRepo(
   refuseOption('repository address', repoUrl)
   if (branch) refuseOption('branch', branch)
 
-  const dir = join(root, sourceId)
+  const dir = checkoutDir(root, sourceId)
 
   if (!existsSync(join(dir, '.git'))) {
     // Shallow and single-branch: we only ever read the current tree.

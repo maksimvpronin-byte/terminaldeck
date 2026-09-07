@@ -320,7 +320,9 @@ describe('backup import', () => {
     writeFileSync(FILE, JSON.stringify({ format: 'something-else', sessions: [] }), 'utf8')
     openFrom = FILE
 
-    await expect(importFromFile(win)).rejects.toThrow(/not a TerminalDeck export/i)
+    await expect(importFromFile(win)).rejects.toThrow(
+      /Invalid TerminalDeck export: backup\.format/i
+    )
     expect(snapshot()).toEqual(before)
   })
 
@@ -335,6 +337,69 @@ describe('backup import', () => {
 
     await expect(importFromFile(win)).rejects.toThrow()
     expect(snapshot()).toEqual(before)
+  })
+
+  /**
+   * An export is a file someone was sent, not a file this application wrote,
+   * and until it was validated field by field its contents were cast to the
+   * shape they were assumed to have. These three are what that let through.
+   */
+  describe('an export that is well formed but hostile', () => {
+    /**
+     * Exports a real one, changes a single thing about it, and offers it back.
+     *
+     * Typed loosely on purpose: every mutation below is one the real shapes
+     * forbid, which is the point of them.
+     */
+    async function tamper(
+      change: (backup: Record<string, Record<string, unknown>[]>) => void
+    ): Promise<void> {
+      populate()
+      saveTo = FILE
+      await exportToFile(win, false)
+      const backup = JSON.parse(readFileSync(FILE, 'utf8')) as Record<
+        string,
+        Record<string, unknown>[]
+      >
+      change(backup)
+      writeFileSync(FILE, JSON.stringify(backup), 'utf8')
+      openFrom = FILE
+    }
+
+    // A group id is a path component elsewhere - GitFolderStore removes a tree
+    // named after one - so an id that climbs out of the folder is the whole
+    // attack rather than a typo.
+    it('refuses an id that would climb out of the folder it is unpacked into', async () => {
+      await tamper((backup) => {
+        backup.groups[0].id = '../../evil'
+      })
+      const before = clone(snapshot())
+
+      await expect(importFromFile(win)).rejects.toThrow(/not a safe identifier/i)
+      expect(snapshot()).toEqual(before)
+    })
+
+    it('refuses an inventory source id that is not one filesystem component', async () => {
+      await tamper((backup) => {
+        backup.inventorySources[0].id = 'a/b'
+      })
+      const before = clone(snapshot())
+
+      await expect(importFromFile(win)).rejects.toThrow(/not a safe identifier/i)
+      expect(snapshot()).toEqual(before)
+    })
+
+    it('refuses a field of the wrong type, naming where it is', async () => {
+      await tamper((backup) => {
+        backup.sessions[0].host = 22
+      })
+      const before = clone(snapshot())
+
+      await expect(importFromFile(win)).rejects.toThrow(
+        /backup\.sessions\[0\]\.host must be a string/i
+      )
+      expect(snapshot()).toEqual(before)
+    })
   })
 
   /**

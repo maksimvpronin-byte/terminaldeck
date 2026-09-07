@@ -63,6 +63,15 @@ function checkoutFor(url: string, branch?: string): string {
   return join(reposRoot(), key)
 }
 
+/**
+ * Legacy checkouts were keyed directly by a folder id. Imported data can supply
+ * that id, so only a single filesystem-safe component is eligible for cleanup.
+ */
+function legacyCheckoutFor(folderId: string): string | undefined {
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(folderId)) return undefined
+  return join(reposRoot(), folderId)
+}
+
 /** The whole repository as parsed, before the chosen groups are cut out of it. */
 interface ParsedRepo {
   tree: GitFolderTree
@@ -175,7 +184,8 @@ class GitFolderStore {
      * again — and on an inventory of any size that is the largest thing this
      * application keeps.
      */
-    removeTree(join(reposRoot(), folderId))
+    const legacyCheckout = legacyCheckoutFor(folderId)
+    if (legacyCheckout && legacyCheckout !== checkout) removeTree(legacyCheckout)
 
     const files = resolveInventoryFiles(dir, link.paths)
 
