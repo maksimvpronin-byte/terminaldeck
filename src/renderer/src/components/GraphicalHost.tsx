@@ -79,6 +79,12 @@ export default function GraphicalHost({
    */
   const [attempt, setAttempt] = useState(0)
   /**
+   * Something the host said in passing - see `isRefusal`. Kept rather than
+   * shown and forgotten: when a session does end, the host's own remark is
+   * usually more use than the generic reason that arrives with the ending.
+   */
+  const [notice, setNotice] = useState('')
+  /**
    * How this host wants its desktop drawn, resolved through the same
    * inheritance chain its login comes from. Held until it arrives rather than
    * defaulted, because connecting at the wrong size and correcting afterwards
@@ -202,6 +208,7 @@ export default function GraphicalHost({
   function start(typed: string | undefined): void {
     lastTyped.current = typed
     setAttempt((n) => n + 1)
+    setNotice('')
     setPhase({ at: 'connecting' })
   }
 
@@ -253,6 +260,7 @@ export default function GraphicalHost({
           look={look}
           password={lastTyped.current}
           onPhase={setPhase}
+          onNotice={setNotice}
           onMeasured={(text) => {
             setAsked(text)
             onMeasured?.(text)
@@ -375,6 +383,7 @@ export default function GraphicalHost({
                 <p className="settings-note">
                   {t('Negotiating with the server.')} {asked}
                 </p>
+                {notice && <p className="settings-note">{`${t('The host says')}: ${notice}`}</p>}
               </>
             )}
 
@@ -384,6 +393,9 @@ export default function GraphicalHost({
                   {phase.at === 'failed' ? t('Could not connect') : t('Session ended')}
                 </strong>
                 <p className="settings-note">{phase.reason}</p>
+                {notice && phase.reason !== notice && (
+                  <p className="settings-note">{`${t('The host says')}: ${notice}`}</p>
+                )}
                 <button
                   onClick={() => {
                     // The stored password is used again without ever being
