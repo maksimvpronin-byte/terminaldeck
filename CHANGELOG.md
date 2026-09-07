@@ -6,6 +6,61 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.12.0
+
+### Security
+
+- **An export file was trusted to be what it claimed.** `importFromFile` parsed
+  it, checked one field, and cast the rest to the shape it was assumed to have —
+  so everything afterwards ran on values TypeScript had been told about rather
+  than values anyone had looked at. Some of those values become paths: an
+  inventory source id names its checkout directory, and a group id names a tree
+  the application removes. An export is a file someone was sent. It is now
+  walked field by field, it says where it went wrong, and an id that reaches the
+  filesystem has to be one safe component — checked again at the two places that
+  build a path out of one, the second of which deletes.
+- **A remote server chose local file names.** Downloading a directory over SFTP
+  joined each entry's name to the local directory, and the name is whatever the
+  far end said — so `..`, an absolute path or a drive letter wrote outside the
+  folder being downloaded into. Anything whose basename is not itself is now
+  refused.
+- **The build jobs held a token that could publish.** The release workflow asked
+  for `contents: write` at the top, so all four jobs had it, including the three
+  that install npm packages and compile third-party C — which is exactly where a
+  supply-chain problem lands, and a write token in that process is one an
+  install script can reach. Only the job that creates the release has it now.
+
+### Fixed
+
+- **No desktop pane had ever opened on Windows.** Every connection failed with
+  "The DNS host name was not found." for a host the machine resolves perfectly
+  well, and would have failed the same way for a bare IP address. On Windows a
+  process must call `WSAStartup` before it may use a socket, and until it does
+  every socket call returns `WSANOTINITIALISED` whatever it was asked; the first
+  such call is the name lookup, whose empty result FreeRDP reports as a DNS
+  failure. libfreerdp does not start Winsock for you — every FreeRDP client and
+  server that runs on Windows does it itself — and the desktop client here was
+  written on a Mac, where nothing has to be started.
+- **A remark from the host closed the session it was describing.** A Logon Error
+  Info PDU is named for its worst case and is usually not one:
+  `LOGON_MSG_SESSION_CONTINUE` with a session id is what a host that keeps
+  disconnected sessions sends on putting you back into yours. The pane took
+  every one of them for a failure, and a failure stops the session — at logon,
+  before the first frame, every time, which made such a host unreachable. The
+  codes now travel with the message, and only a refusal is one.
+
+### Changed
+
+- **The release contract now looks inside the package.** It could say a disk
+  image existed and that every name in `latest*.yml` resolved to a file; it
+  could say nothing about what was in the disk image. The desktop client and the
+  libraries it loads travel through an `extraResources` filter, and a filter
+  that quietly stops matching produces a build that installs, launches and
+  cannot open a single pane. Each runner now reads its own unpacked application:
+  the client is there, non-empty and executable, its libraries are beside it,
+  `ShadowHost.exe` came along on Windows — and the SDL clients, the FreeRDP
+  developer tools, `vcpkg` and `shadowprobe` did not.
+
 ## 0.11.1
 
 ### Changed
