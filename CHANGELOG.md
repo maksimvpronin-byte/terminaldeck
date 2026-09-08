@@ -6,6 +6,30 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.12.1
+
+### Fixed
+
+- **A folder untied from its repository kept showing its hosts.** Clearing
+  “Mirror an inventory from a git repository” deletes the mirrored tree, and the
+  local settings and passwords kept for those hosts with it — that much the
+  dialog promises and the main process does. The window was never told: it holds
+  its own copy of the tree, read once when it opened, and saving a group made it
+  look no further than the group. So the hosts went on being drawn in the tree,
+  found by the host palette and opened, for machines the folder no longer had,
+  until the application was next started. Deleting such a folder outright left
+  the same copy behind.
+- **The file panel could take the whole pane, and the pane stopped answering the
+  mouse.** Its width is remembered per window and knows nothing of the pane it
+  opens in, so a panel left wide in a full-width pane fills a pane half that size
+  entirely — and with the terminal squeezed to nothing beside it, rows in the
+  panel could no longer be selected or dragged. The remembered width is kept, and
+  a terminal is now always left 200px to be. The terminal is also clipped to its
+  own box, which it never was: xterm's screen element, canvases and accessibility
+  tree carry pixel widths written when it was last measured, a terminal with no
+  room in it is not measured again, and those layers stood spread across the
+  panel beside them with only its background keeping them out of sight.
+
 ## 0.12.0
 
 ### Security
