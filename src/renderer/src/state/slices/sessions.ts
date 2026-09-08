@@ -28,15 +28,25 @@ export const createSessionsSlice: StateCreator<AppState, [], [], SessionsSlice> 
   },
 
   upsertGroup: async (group, secret, gatewaySecret) => {
+    /*
+     * Whether this save unties the folder from its repository. Main throws the
+     * mirrored tree away when it does, and this window is holding a copy of it:
+     * without re-reading, the hosts the folder no longer has go on being drawn,
+     * opened and searched until the application is next started.
+     */
+    const untied = Boolean(get().groups.find((x) => x.id === group.id)?.git) && !group.git
     const saved = await window.td.store.saveGroup(group, secret, gatewaySecret)
     set((s) => ({
       groups: s.groups.some((x) => x.id === saved.id)
         ? s.groups.map((x) => (x.id === saved.id ? saved : x))
         : [...s.groups, saved]
     }))
+    if (untied) await get().loadGitFolders()
   },
 
   removeGroup: async (id) => {
+    // Deleting the folder takes its mirrored tree with it, for the same reason.
+    const wasMirroring = Boolean(get().groups.find((g) => g.id === id)?.git)
     await window.td.store.deleteGroup(id)
     set((s) => {
       // Mirror SessionStore.deleteGroup: children are adopted, not orphaned.
@@ -48,6 +58,7 @@ export const createSessionsSlice: StateCreator<AppState, [], [], SessionsSlice> 
         sessions: s.sessions.map((x) => (x.groupId === id ? { ...x, groupId: newParent } : x))
       }
     })
+    if (wasMirroring) await get().loadGitFolders()
   },
 
   moveSession: async (sessionId, groupId) => {

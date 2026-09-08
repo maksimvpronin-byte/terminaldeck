@@ -828,6 +828,15 @@ label {
   position: relative;
   display: flex;
   flex-direction: column;
+  /* Clipped to its own box, because xterm's layers are not.
+     The screen element, the canvases and the accessibility tree carry pixel
+     widths written when the terminal was last measured, and a terminal squeezed
+     towards nothing beside a wide file panel is not measured again — the fit
+     addon declines a box with no room in it. Those layers then stand where they
+     were, spread across the panel beside them, and only the panel's own
+     background keeps them out of sight. Nothing should be reaching over there
+     at all, whatever the paint order happens to make of it. */
+  overflow: hidden;
 }
 .terminal-host {
   flex: 1;
@@ -980,6 +989,13 @@ label {
   /* Anchors the resize grip that sits over the left border. Width is inline,
      set by that grip. */
   position: relative;
+  /* The width is remembered per window, and the pane it opens in is whatever
+     the split gives it: a panel left wide in a full-width pane fills a pane
+     half that size entirely, and takes the terminal with it. The stored width
+     is kept — widen the pane and the panel comes back to it — but a terminal is
+     always left something to be. The floor matches PANEL_MIN in sftpLayout, so
+     the cap never squeezes the panel past what its own grip allows. */
+  max-width: max(260px, calc(100% - 200px));
 }
 /* A grab strip over the panel's own border, wider than the border so it can
    actually be hit. */
