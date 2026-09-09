@@ -33,7 +33,7 @@ const preview: GitFolderPreview = {
 
 /** In the order the dialog draws them, which is the order of `preview.groups`. */
 function boxes(): HTMLInputElement[] {
-  return screen.getAllByRole('checkbox') as HTMLInputElement[]
+  return screen.getAllByRole('checkbox').slice(0, preview.groups.length) as HTMLInputElement[]
 }
 
 const applyGitFolder = vi.fn(() => Promise.resolve())
@@ -71,8 +71,38 @@ describe('the sync dialog', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Apply' }))
 
-    expect(applyGitFolder).toHaveBeenCalledWith('folder-1', ['all', 'all/prod', 'all/dev'])
+    expect(applyGitFolder).toHaveBeenCalledWith('folder-1', ['all', 'all/prod', 'all/dev'], false)
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it('applies the folder layout choice and restores it on the next preview', async () => {
+    render(
+      <GitFolderSyncDialog
+        folderName="Infra"
+        preview={{ ...preview, showGroupFolders: true }}
+        onClose={() => {}}
+      />
+    )
+    const layout = screen.getByRole('checkbox', { name: 'Arrange hosts in group folders' })
+    expect((layout as HTMLInputElement).checked).toBe(true)
+    await userEvent.click(layout)
+    await userEvent.click(screen.getByRole('button', { name: 'Apply' }))
+    expect(applyGitFolder).toHaveBeenCalledWith('folder-1', preview.included, false)
+    await userEvent.click(layout)
+    await userEvent.click(screen.getByRole('button', { name: 'Apply' }))
+    expect(applyGitFolder).toHaveBeenLastCalledWith('folder-1', preview.included, true)
+  })
+
+  it('keeps the dialog open with an error when applying fails', async () => {
+    applyGitFolder.mockRejectedValueOnce(new Error('Could not save'))
+    const onClose = vi.fn()
+    render(<GitFolderSyncDialog folderName="Infra" preview={preview} onClose={onClose} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Apply' }))
+    expect(screen.getByRole('alert').textContent).toBe('Could not save')
+    expect(onClose).not.toHaveBeenCalled()
+    expect((screen.getByRole('button', { name: 'Apply' }) as HTMLButtonElement).disabled).toBe(
+      false
+    )
   })
 
   it('leaves the folder alone when it is closed instead', async () => {

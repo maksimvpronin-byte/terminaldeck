@@ -6,6 +6,7 @@ import { IPC } from '../../shared/ipc-channels'
 import { askAboutCertificate } from './certificateVerifier'
 import { requireUnlocked } from '../vault/locked'
 import { createRecordReader, encodeCommand, readCursor, readFrame, RECORD } from './recordStream'
+import { complaintIn, failureText } from './clientLog'
 
 /**
  * Drives td-rdp, which is what draws a desktop pane.
@@ -61,6 +62,21 @@ interface Session {
   window: BrowserWindow
   host: string
   port: number
+  /** The client's last complaint, which is usually the reason it stopped. */
+  complaint?: string
+}
+
+/**
+ * A line in the terminal running the app, on the same switch the rest of the
+ * desktop side uses. Off by default: a session logs several lines per frame at
+ * FreeRDP's DEBUG, and that is a diagnostic, not a default.
+ */
+const tracing = process.env.NODE_ENV === 'development' || process.env.TERMINALDECK_RDP_TRACE === '1'
+
+function trace(message: string): void {
+  if (!tracing) return
+  // eslint-disable-next-line no-console
+  console.log(`[rdp client] ${message}`)
 }
 
 function executable(): string {
@@ -124,8 +140,37 @@ class FreeRdpBridge {
     )
     child.stdout?.on('data', (chunk: Buffer) => reader.push(chunk))
 
-    // Drain diagnostics so the child cannot block on a full stderr pipe.
-    child.stderr?.resume()
+    /**
+     * The client's own log, which is where the reason for a failure lives.
+     *
+     * Everything FreeRDP writes arrives here — the shim points descriptor 1 at
+     * 2 so that a library writing to stdout cannot land in the middle of a
+     * frame — and the line naming a refusal is written at ERROR, which the
+     * WARN level above already lets through. Draining this into nothing was
+     * the reason "the connection failed at negotiating security settings" was
+     * all anyone ever got: FreeRDP's summary names the step, and the line one
+     * moment earlier names which of the several things that step covers went
+     * wrong.
+     *
+     * Only the complaint is kept: a buffer of the rest would be read by
+     * nothing, and the lines themselves are already in the terminal whenever
+     * tracing is on.
+     */
+    let pending = ''
+    child.stderr?.on('data', (chunk: Buffer) => {
+      pending += chunk.toString('utf8')
+      const lines = pending.split('\n')
+      // Whatever follows the last newline is half a line, and waits here for
+      // the rest of itself rather than being read as a short one.
+      pending = lines.pop() ?? ''
+      for (const line of lines) {
+        const text = line.trimEnd()
+        if (!text.trim()) continue
+        trace(`${id} ${text}`)
+        const complaint = complaintIn(text)
+        if (complaint) session.complaint = complaint
+      }
+    })
 
     child.on('exit', (code) => {
       this.sessions.delete(id)
@@ -254,6 +299,15 @@ class FreeRdpBridge {
 
     if (event.e === 'certificate') {
       void this.decideCertificate(id, session, event)
+      return
+    }
+    if (event.e === 'failed') {
+      const detail = failureText(
+        String(event.detail ?? ''),
+        session.complaint,
+        Number(event.code ?? 0)
+      )
+      this.say(session, id, { ...event, detail })
       return
     }
     this.say(session, id, event)

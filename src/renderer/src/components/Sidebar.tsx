@@ -4,7 +4,7 @@ import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from 
 import type { GitFolderPreview, SessionGroup, SessionProfile } from '../../../shared/types'
 import { resolveAuth } from '../../../shared/authResolution'
 import { applyOverride } from '../../../shared/overrides'
-import { isGitNode } from '../../../shared/gitFolders'
+import { isGitNode, gitFolderLayout } from '../../../shared/gitFolders'
 import {
   useStore,
   collectConnectedSessionIds,
@@ -136,27 +136,11 @@ export default function Sidebar({
     )
   ]
 
-  /**
-   * Mirrored hosts sit in the folder itself, as one list, however the inventory
-   * nests them.
-   *
-   * The repository's groups are still read and still kept — they are where a
-   * host's connection settings come from, and `group_vars` would be lost with
-   * them — but they are not drawn. An Ansible inventory nests four levels deep
-   * for reasons that have to do with playbooks rather than with looking a
-   * machine up, and a host named by three groups would otherwise appear three
-   * times in the tree while being one host. Which groups a host came from is a
-   * question the sync dialog answers.
-   */
-  const mirroredIn = new Map<string, Set<string>>(
-    gitTrees.map((tree) => [tree.groupId, new Set(tree.sessions.map((s) => s.id))])
-  )
+  const { visibleGroupIds, hostsByGroup } = gitFolderLayout(gitTrees, savedGroups)
+  const groupIsVisible = (id: string): boolean => !isGitNode(id) || visibleGroupIds.has(id)
   function hostsIn(groupId: string, list: SessionProfile[]): SessionProfile[] {
-    // A repository's own group is not a place in this tree: its hosts are
-    // listed once, in the folder, and asking it for them would list them twice.
-    if (isGitNode(groupId)) return []
-    const mirrored = mirroredIn.get(groupId)
-    return list.filter((s) => s.groupId === groupId || mirrored?.has(s.id))
+    const mirrored = hostsByGroup.get(groupId)
+    return list.filter((s) => (isGitNode(s.id) ? mirrored?.has(s.id) : s.groupId === groupId))
   }
 
   const [editingSession, setEditingSession] = useState<SessionProfile | undefined | 'new'>(
@@ -252,13 +236,13 @@ export default function Sidebar({
   function flattenOrder(parentId: string | null): string[] {
     const out: string[] = []
     for (const g of groups
-      .filter((x) => x.parentId === parentId && !isGitNode(x.id))
+      .filter((x) => x.parentId === parentId && groupIsVisible(x.id))
       .filter((g) => !needle || groupHasMatch(g.id))) {
       if (needle === '' && collapsed.has(g.id)) continue
       out.push(...hostsIn(g.id, visible).map((s) => s.id))
       out.push(...flattenOrder(g.id))
     }
-    return out
+    return [...new Set(out)]
   }
 
   function onSessionClick(e: ReactMouseEvent, s: SessionProfile): void {
@@ -555,10 +539,10 @@ export default function Sidebar({
 
   function groupMenu(groupId: string): MenuItem[] {
     const group = groups.find((g) => g.id === groupId)
-    // The subtree includes the repository's own groups, invisible as they are,
-    // so a mirrored host is found through the group it hangs off.
+    // Include hosts from every visible placement, deduplicated by session id.
     const inGroup = groupSubtree(groupId)
-    const hosts = sessions.filter((s) => s.groupId && inGroup.has(s.groupId))
+    const hostIds = new Set([...inGroup].flatMap((id) => hostsIn(id, sessions).map((s) => s.id)))
+    const hosts = sessions.filter((s) => hostIds.has(s.id))
     return [
       {
         label: `Open all in a new workspace (${hosts.length})`,
@@ -588,12 +572,25 @@ export default function Sidebar({
         label: t('Edit group…'),
         separated: !group?.git,
         disabled: !group,
-        onSelect: () => group && setGroupDialog({ group, parentId: group.parentId })
+        onSelect: () => {
+          if (!group) return
+          if (isGitNode(groupId)) setOverriding(group)
+          else setGroupDialog({ group, parentId: group.parentId })
+        }
       },
-      { label: t('New session here'), onSelect: () => newSession(groupId) },
-      { label: t('New subgroup…'), onSelect: () => setGroupDialog({ parentId: groupId }) },
+      {
+        label: t('New session here'),
+        disabled: isGitNode(groupId),
+        onSelect: () => newSession(groupId)
+      },
+      {
+        label: t('New subgroup…'),
+        disabled: isGitNode(groupId),
+        onSelect: () => setGroupDialog({ parentId: groupId })
+      },
       {
         label: t('Delete group…'),
+        disabled: isGitNode(groupId),
         danger: true,
         separated: true,
         onSelect: () => {
@@ -690,16 +687,15 @@ export default function Sidebar({
   function renderGroups(parentId: string | null, depth: number): JSX.Element[] {
     return (
       groups
-        // Only folders somebody made: what a repository describes is placed flat
-        // inside the folder that mirrors it, not redrawn as a tree of its own.
-        .filter((g) => g.parentId === parentId && !isGitNode(g.id))
+        // Git groups appear only when their folder opts into the hierarchy.
+        .filter((g) => g.parentId === parentId && groupIsVisible(g.id))
         .filter((g) => !needle || groupHasMatch(g.id))
         .map((g) => {
           // While filtering, stay expanded — matches must not hide inside a closed group.
           const isCollapsed = needle === '' && collapsed.has(g.id)
           const childCount =
             hostsIn(g.id, visible).length +
-            groups.filter((x) => x.parentId === g.id && !isGitNode(x.id)).length
+            groups.filter((x) => x.parentId === g.id && groupIsVisible(x.id)).length
           const isSyncing = gitSyncing.includes(g.id)
 
           return (
@@ -709,7 +705,7 @@ export default function Sidebar({
                   dropEdge?.id === g.id ? ` drop-${dropEdge.place}` : ''
                 }`}
                 style={{ paddingLeft: 8 + depth * 12 }}
-                draggable
+                draggable={!isGitNode(g.id)}
                 onDragStart={(e) => startDrag(e, { kind: 'group', id: g.id }, g.name)}
                 onDragEnd={endDrag}
                 onDragOver={(e) => allowGroupDrop(e, g)}
@@ -736,7 +732,9 @@ export default function Sidebar({
                       (g.git.lastRevision ? ` · ${g.git.lastRevision}` : '') +
                       ` · ${g.git.branch || t('default branch')}` +
                       ` · ${g.git.repoUrl}`
-                    : t('Drag by the edge of a row to sort · drop onto a folder to put it inside')
+                    : isGitNode(g.id)
+                      ? t('Settings kept here, over what the repository says')
+                      : t('Drag by the edge of a row to sort · drop onto a folder to put it inside')
                 }
               >
                 <span className="tree-group-title name">
@@ -761,6 +759,7 @@ export default function Sidebar({
                   )}
                   <button
                     title={t('New subgroup')}
+                    disabled={isGitNode(g.id)}
                     onClick={(e) => {
                       e.stopPropagation()
                       setGroupDialog({ parentId: g.id })

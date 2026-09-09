@@ -6,6 +6,36 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.13.0
+
+### Added
+
+- Add “Arrange hosts in group folders” to Git inventory sync. Selected groups
+  appear as nested folders, shared hosts appear in each selected group, and the
+  layout choice is remembered for subsequent syncs. Leave the option off to
+  keep the existing flat host list.
+
+### Fixed
+
+- **A host with a slow login showed the directory-tracking setup line.** The line
+  that teaches a shell to report its directory was typed in the instant the channel
+  opened — while a login shell was still working through `/etc/profile`, with no line
+  editor running yet. The tty driver echoed it into the middle of the banner and the
+  editor drew it again after the prompt, so the copy the suppressor removed was never
+  the copy on screen; a banner longer than eight kilobytes exhausted the suppressor's
+  budget on its own. The line now waits for the shell to fall quiet before it is sent,
+  which also keeps anything in the profile that reads from the terminal from eating it,
+  and the suppressor removes every echo of it rather than the first while passing
+  untouched output straight through.
+
+- **A desktop that would not open said what step failed and never why.** The client's own
+  log — where the reason is written, one line before it stops — was read only to keep its
+  pipe from filling and then discarded, so "the connection failed at negotiating security
+  settings" was all anyone ever saw, for a host that refused every security level offered
+  and for a connection that broke mid-negotiation alike. The pane now quotes the client's
+  last complaint alongside FreeRDP's summary and states the numeric error code, and
+  `TERMINALDECK_RDP_TRACE=1` prints the whole log to the terminal instead of nowhere.
+
 ## 0.12.2
 
 ### Maintenance

@@ -116,6 +116,15 @@ describe('a Sessions folder mirroring a repository', () => {
     expect(linkNow().lastSyncedAt).toBeGreaterThan(0)
   })
 
+  it('persists the folder layout and restores it in the next sync preview', async () => {
+    await gitFolderStore.preview(FOLDER)
+    gitFolderStore.apply(FOLDER, ['all', 'all/prod'], forget, true)
+    expect(linkNow().showGroupFolders).toBe(true)
+    expect((await gitFolderStore.preview(FOLDER)).showGroupFolders).toBe(true)
+    gitFolderStore.apply(FOLDER, ['all', 'all/prod'], forget, false)
+    expect(linkNow().showGroupFolders).toBe(false)
+  })
+
   it('resolves a host through the repository groups and on into the folder', () => {
     const host = gitFolderStore.findSession(gitHostId(FOLDER, 'web1'))
     expect(host?.host).toBe('10.0.0.1')

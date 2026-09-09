@@ -52,10 +52,11 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
 - A sync brings the folder to what the repository says now, so **a group or host that has left it
   leaves the folder** — the dialog lists what is about to go, and how many of those hosts hold
   local settings, because those and any password saved for them go with them
-- Hosts land in the folder as **one flat list**, however deeply the inventory nests them, and a
-  host named by several Ansible groups appears once. The groups themselves are read and kept but
-  not drawn: they are where a host's connection settings and `group_vars` come from, not where it
-  is filed. Which groups a host came from is what the sync dialog is for
+- Hosts land in the folder as **one flat list** by default. Enable **Arrange hosts in group
+  folders** in the sync dialog to show selected groups as nested folders. A host belonging to
+  several selected groups appears in each; opening the entire folder opens each host once.
+  The layout choice is remembered for future syncs. Connection settings still inherit through
+  the repository groups in either layout
 - Hosts arrive as **derived nodes with local settings layered on top**, exactly as on the
   Inventory tab: right-click one for *Local settings…*, and what you set there survives every
   later sync. Their connection settings inherit through the repository's groups and on up into
@@ -304,16 +305,20 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
 - Joining without the prompt is a **checkbox, off by default**. The host's policy decides
   whether it is permitted at all; where it is not, asking for it is refused outright rather
   than quietly falling back to asking
-- When a session will not start, set `TERMINALDECK_RDP_TRACE=1`. The desktop client is then run
-  at FreeRDP's `DEBUG`, which is what names the codecs and channels it agreed on with the host.
-  It is kept, not printed — the last client taught that lesson expensively, several lines per
-  frame into a console that holds every one of them, four gigabytes and an out-of-memory crash
-  inside forty seconds. The main process keeps the last 400 lines per session and writes them to
-  `logs/desktop-<time>.log` in the user-data directory only when asked. The client's own output
-  cannot reach the pipe that carries the picture even in principle: it takes the real standard
-  output for itself at startup and points descriptor 1 at the log, so a stray `printf` anywhere
-  in FreeRDP or the libraries under it lands where it belongs rather than desynchronising a
-  frame
+- **A connection that fails says why.** FreeRDP's own summary names the step and only the step
+  — "the connection failed at negotiating security settings" covers a host that refused every
+  security level offered and a connection that broke before the answer came back — so the pane
+  also shows whatever the client last complained about and the numeric error code. That makes a
+  screenshot of a failed pane worth as much as the log would have been
+- When more is needed, set `TERMINALDECK_RDP_TRACE=1`. The desktop client then runs at FreeRDP's
+  `DEBUG`, which is what names the codecs and channels it agreed on with the host, and every line
+  it writes is printed to the terminal running the app. Nothing is held in memory: the last
+  client taught that lesson expensively — several lines per frame into a console that kept every
+  one of them, four gigabytes and an out-of-memory crash inside forty seconds — and keeping
+  nothing is what makes the level safe to raise. The client's own output cannot reach the pipe
+  that carries the picture even in principle: it takes the real standard output for itself at
+  startup and points descriptor 1 at the log, so a stray `printf` anywhere in FreeRDP or the
+  libraries under it lands where it belongs rather than desynchronising a frame
 
 ### Files and networking
 

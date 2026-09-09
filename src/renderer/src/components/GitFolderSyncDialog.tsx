@@ -25,6 +25,8 @@ export default function GitFolderSyncDialog({
   const t = useT()
   const applyGitFolder = useStore((s) => s.applyGitFolder)
   const [chosen, setChosen] = useState<Set<string>>(() => new Set(preview.included))
+  const [showGroupFolders, setShowGroupFolders] = useState(preview.showGroupFolders ?? false)
+  const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
 
   const allPaths = preview.groups.map((g) => g.path)
@@ -42,16 +44,26 @@ export default function GitFolderSyncDialog({
 
   async function apply(): Promise<void> {
     setBusy(true)
-    await applyGitFolder(preview.groupId, [...chosen])
-    setBusy(false)
-    onClose()
+    setError(undefined)
+    try {
+      await applyGitFolder(preview.groupId, [...chosen], showGroupFolders)
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
   }
 
   const newCount = preview.groups.filter((g) => g.isNew).length
   const losingSettings = preview.removedHosts.filter((h) => h.hasLocalSettings)
 
   return (
-    <ModalBackdrop onClose={onClose}>
+    <ModalBackdrop
+      onClose={() => {
+        if (!busy) onClose()
+      }}
+    >
       <div className="modal-card">
         <h2>{t('Groups to take from the repository')}</h2>
         <p className="settings-note">
@@ -101,6 +113,26 @@ export default function GitFolderSyncDialog({
           </>
         )}
 
+        <label className="checkbox-row" style={{ flexDirection: 'row' }}>
+          <input
+            type="checkbox"
+            checked={showGroupFolders}
+            disabled={busy}
+            onChange={(e) => setShowGroupFolders(e.target.checked)}
+          />
+          {t('Arrange hosts in group folders')}
+        </label>
+        <p className="settings-note">
+          {t(
+            'Keep the selected group hierarchy inside this folder. Hosts belonging to several groups appear in each of them.'
+          )}
+        </p>
+        {error && (
+          <p className="error-text" role="alert">
+            {error}
+          </p>
+        )}
+
         {preview.removedGroups.length > 0 && (
           <p className="settings-note">
             {t('Gone from the repository, and about to go from this folder: {groups}', {
@@ -140,7 +172,9 @@ export default function GitFolderSyncDialog({
         </p>
 
         <div className="modal-actions">
-          <button onClick={onClose}>{t('Cancel')}</button>
+          <button onClick={onClose} disabled={busy}>
+            {t('Cancel')}
+          </button>
           <button className="primary" onClick={apply} disabled={busy}>
             {busy ? t('Applying…') : t('Apply')}
           </button>

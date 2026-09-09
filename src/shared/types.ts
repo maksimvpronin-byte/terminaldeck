@@ -297,6 +297,8 @@ export interface GitFolderLink {
    * to, not the clicks that produced it.
    */
   includedGroups: string[]
+  /** Display selected inventory groups as folders instead of a flat host list. */
+  showGroupFolders?: boolean
   /**
    * Every group path the repository held at the last sync, chosen or not. It is
    * what makes "new" mean new: a subgroup left unticked on purpose is not
@@ -460,6 +462,7 @@ export interface GitFolderPreviewGroup {
  * the choice made in front of this is applied.
  */
 export interface GitFolderPreview {
+  showGroupFolders?: boolean
   groupId: string
   groups: GitFolderPreviewGroup[]
   /** Previously chosen paths that the repository still has. */

@@ -137,3 +137,31 @@ export function pruneTree(
 
   return { groupId: folderId, groups, sessions, memberships }
 }
+
+/** Visible Git folders and host placement; stored auth inheritance stays intact. */
+export function gitFolderLayout(
+  trees: GitFolderTree[],
+  folders: SessionGroup[]
+): {
+  visibleGroupIds: Set<string>
+  hostsByGroup: Map<string, Set<string>>
+} {
+  const visibleGroupIds = new Set<string>()
+  const hostsByGroup = new Map<string, Set<string>>()
+  for (const tree of trees) {
+    const grouped = folders.find((g) => g.id === tree.groupId)?.git?.showGroupFolders
+    if (!grouped) {
+      hostsByGroup.set(tree.groupId, new Set(tree.sessions.map((s) => s.id)))
+      continue
+    }
+    for (const group of tree.groups) {
+      visibleGroupIds.add(group.id)
+      hostsByGroup.set(group.id, new Set())
+    }
+    for (const host of tree.sessions) {
+      const claims = tree.memberships?.[host.id] ?? (host.groupId ? [host.groupId] : [])
+      for (const id of claims) hostsByGroup.get(id)?.add(host.id)
+    }
+  }
+  return { visibleGroupIds, hostsByGroup }
+}

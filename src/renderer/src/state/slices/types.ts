@@ -147,7 +147,11 @@ export interface GitFoldersSlice {
    * undefined means the repository could not be read.
    */
   previewGitFolder: (groupId: string) => Promise<GitFolderPreview | undefined>
-  applyGitFolder: (groupId: string, includedGroups: string[]) => Promise<void>
+  applyGitFolder: (
+    groupId: string,
+    includedGroups: string[],
+    showGroupFolders?: boolean
+  ) => Promise<void>
   saveGitFolderOverride: (
     override: InventoryOverride,
     secret?: string | null,

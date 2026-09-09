@@ -47,6 +47,11 @@ interface LiveConnection {
   followCwd: boolean
   /** Swallows the echo of the setup line we typed in, so it never shows. */
   echoSuppressor?: EchoSuppressor
+  /**
+   * Set while the setup line is waiting for the shell to stop talking, with
+   * the means to put the wait off again when it has not.
+   */
+  setupWait?: { timer: NodeJS.Timeout; restart: () => void }
 }
 
 const OPENSSH_PIPE = '\\\\.\\pipe\\openssh-ssh-agent'
@@ -74,6 +79,24 @@ const FLUSH_BYTES = 64 * 1024
  */
 const HIGH_WATER = 1024 * 1024
 const LOW_WATER = 256 * 1024
+
+/**
+ * How long the shell has to stay quiet before the setup line is typed in.
+ *
+ * Typing it the instant the channel opens looked simplest and was wrong. A
+ * login shell that is still working through `/etc/profile` has not started its
+ * line editor yet, so the tty driver echoes the line straight back into the
+ * middle of the banner — and the editor then draws it a second time once the
+ * prompt appears. Worse, anything in the profile that reads from the terminal
+ * would eat the line instead of the shell running it.
+ *
+ * Waiting for a pause means the line goes to a shell sitting at its prompt,
+ * where it is echoed once, in one piece, and can be taken back out cleanly.
+ */
+const SETUP_QUIET_MS = 400
+
+/** A host that never stops talking still gets the line, just late. */
+const SETUP_WAIT_CAP_MS = 5000
 
 /**
  * Locates an SSH agent. An explicit SSH_AUTH_SOCK always wins. On Windows the
@@ -566,6 +589,8 @@ class SSHManager {
         let lastCwd: string | undefined
 
         stream.on('data', (raw: Buffer) => {
+          // Still mid-login, or mid-anything: the setup line can wait.
+          connection.setupWait?.restart()
           // The setup line is ours, not the user's, so its echo is taken back
           // out before anyone sees it. Scanning still runs on the full stream:
           // the sequence we are looking for rides in that same echo.
@@ -622,11 +647,34 @@ class SSHManager {
   }
 
   /**
+   * Waits for the shell to draw breath, then types the setup line in.
+   *
+   * The wait is pushed back by every chunk that arrives, so a long banner or a
+   * slow profile simply delays it, up to a cap past which the line is sent
+   * anyway rather than never.
+   */
+  private sendSetupQuietly(conn: LiveConnection): void {
+    if (conn.setupWait) return
+    const deadline = Date.now() + SETUP_WAIT_CAP_MS
+    const fire = (): void => {
+      conn.setupWait = undefined
+      this.writeSetup(conn)
+    }
+    const restart = (): void => {
+      const wait = conn.setupWait
+      if (!wait) return
+      clearTimeout(wait.timer)
+      wait.timer = setTimeout(fire, Math.max(0, Math.min(SETUP_QUIET_MS, deadline - Date.now())))
+    }
+    conn.setupWait = { timer: setTimeout(fire, SETUP_QUIET_MS), restart }
+  }
+
+  /**
    * Types the setup line in without showing it. If the shell never echoes it —
    * echo disabled, or a shell that swallows it — the suppressor is released
    * shortly after, so nothing of the user's is held back for long.
    */
-  private sendSetupQuietly(conn: LiveConnection): void {
+  private writeSetup(conn: LiveConnection): void {
     const line = `${OSC7_SHELL_SETUP}\n`
     conn.echoSuppressor = new EchoSuppressor(Buffer.from(OSC7_SHELL_SETUP, 'utf8'))
     conn.stream.write(line)
@@ -729,6 +777,7 @@ class SSHManager {
     const conn = this.connections.get(connectionId)
     if (!conn) return
     if (conn.flushTimer) clearTimeout(conn.flushTimer)
+    if (conn.setupWait) clearTimeout(conn.setupWait.timer)
     conn.logStream?.end()
     try {
       conn.stream.close()

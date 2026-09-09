@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   descendantPaths,
+  gitFolderLayout,
   gitGroupId,
   gitHostId,
   groupPathOf,
@@ -139,5 +140,38 @@ describe('pruneTree', () => {
     const pruned = pruneTree(FOLDER, tree(), ['all/dev'])
     const web1 = pruned.sessions.find((s) => s.name === 'web1')
     expect(web1?.groupId).toBe(gitGroupId(FOLDER, 'all/dev'))
+  })
+})
+
+describe('Git folder layout', () => {
+  const folder = {
+    id: FOLDER,
+    name: 'Infra',
+    parentId: null,
+    git: { repoUrl: 'repo', paths: [], includedGroups: [] }
+  }
+
+  it('keeps existing folders flat by default', () => {
+    const layout = gitFolderLayout([tree()], [folder])
+    expect([...layout.visibleGroupIds]).toEqual([])
+    expect([...layout.hostsByGroup.get(FOLDER)!]).toEqual(tree().sessions.map((s) => s.id))
+  })
+
+  it('shows selected groups and places shared hosts in each membership', () => {
+    const pruned = pruneTree(FOLDER, tree(), ['all/dev', 'all/prod/web'])
+    const layout = gitFolderLayout(
+      [pruned],
+      [{ ...folder, git: { ...folder.git, showGroupFolders: true } }]
+    )
+    expect([...layout.visibleGroupIds]).toEqual(pruned.groups.map((g) => g.id))
+    expect(pruned.groups.every((g) => g.parentId === FOLDER)).toBe(true)
+    expect(layout.hostsByGroup.has(FOLDER)).toBe(false)
+    expect([...layout.hostsByGroup.get(gitGroupId(FOLDER, 'all/dev'))!]).toEqual([
+      gitHostId(FOLDER, 'web1'),
+      gitHostId(FOLDER, 'dev1')
+    ])
+    expect([...layout.hostsByGroup.get(gitGroupId(FOLDER, 'all/prod/web'))!]).toEqual([
+      gitHostId(FOLDER, 'web1')
+    ])
   })
 })

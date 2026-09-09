@@ -993,6 +993,9 @@ export const ru: Record<string, string> = {
   'Ticking a group takes its subgroups too. Only what is ticked appears in “{folder}” — anything untied here is left in the repository, not deleted from it.':
     'Отметка на группе берёт и её подгруппы. В «{folder}» попадает только отмеченное — снятое здесь остаётся в репозитории, а не удаляется из него.',
   'This repository holds no groups.': 'В этом репозитории нет групп.',
+  'Arrange hosts in group folders': 'Разложить хосты по папкам групп',
+  'Keep the selected group hierarchy inside this folder. Hosts belonging to several groups appear in each of them.':
+    'Сохранить вложенность выбранных групп внутри этой папки. Хосты из нескольких групп будут видны в каждой из них.',
   'Select none': 'Снять всё',
   '{count} new since the last sync': 'Новых с прошлой синхронизации: {count}',
   'Gone from the repository, and about to go from this folder: {groups}':

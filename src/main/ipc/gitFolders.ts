@@ -30,8 +30,10 @@ export function registerGitFolderHandlers(): void {
   // until the window comes back with an answer.
   ipcMain.handle(IPC.gitFolderPreview, (_e, groupId: string) => gitFolderStore.preview(groupId))
 
-  ipcMain.handle(IPC.gitFolderApply, (_e, groupId: string, includedGroups: string[]) =>
-    gitFolderStore.apply(groupId, includedGroups, forgetBoth)
+  ipcMain.handle(
+    IPC.gitFolderApply,
+    (_e, groupId: string, includedGroups: string[], showGroupFolders?: boolean) =>
+      gitFolderStore.apply(groupId, includedGroups, forgetBoth, showGroupFolders)
   )
 
   ipcMain.handle(

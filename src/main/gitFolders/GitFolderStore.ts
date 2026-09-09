@@ -287,6 +287,7 @@ class GitFolderStore {
     return {
       groupId: folderId,
       groups,
+      showGroupFolders: link.showGroupFolders ?? false,
       included,
       removedGroups,
       removedHosts,
@@ -307,7 +308,8 @@ class GitFolderStore {
   apply(
     folderId: string,
     includedGroups: string[],
-    forgetSecret: (override: InventoryOverride) => void
+    forgetSecret: (override: InventoryOverride) => void,
+    showGroupFolders?: boolean
   ): GitFolderTree {
     const found = this.linkOf(folderId)
     if (!found) throw new Error('This folder is not linked to a repository')
@@ -326,6 +328,7 @@ class GitFolderStore {
 
     this.saveLink(found.folder, {
       includedGroups: included,
+      showGroupFolders: showGroupFolders ?? found.link.showGroupFolders ?? false,
       knownGroups: repo.paths,
       lastSyncedAt: Date.now(),
       lastRevision: repo.revision,

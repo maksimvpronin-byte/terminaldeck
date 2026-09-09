@@ -127,8 +127,12 @@ const api = {
       ipcRenderer.invoke(IPC.gitFolderForgetRepo, url, branch),
     preview: (groupId: string): Promise<GitFolderPreview> =>
       ipcRenderer.invoke(IPC.gitFolderPreview, groupId),
-    apply: (groupId: string, includedGroups: string[]): Promise<GitFolderTree> =>
-      ipcRenderer.invoke(IPC.gitFolderApply, groupId, includedGroups),
+    apply: (
+      groupId: string,
+      includedGroups: string[],
+      showGroupFolders?: boolean
+    ): Promise<GitFolderTree> =>
+      ipcRenderer.invoke(IPC.gitFolderApply, groupId, includedGroups, showGroupFolders),
     saveOverride: (
       override: InventoryOverride,
       secret?: string | null,

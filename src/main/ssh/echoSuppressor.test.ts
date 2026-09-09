@@ -8,7 +8,8 @@ describe('EchoSuppressor', () => {
   it('removes the echoed line and lets the rest through', () => {
     const s = new EchoSuppressor(buf('__td7 setup'))
     expect(text(s.push(buf('__td7 setup\r\nmax@box:~$ ')))).toBe('max@box:~$ ')
-    expect(s.done).toBe(true)
+    // Still watching: a shell that echoed once may yet echo again.
+    expect(s.done).toBe(false)
   })
 
   it('takes the newline with it, so no blank line is left behind', () => {
@@ -31,21 +32,50 @@ describe('EchoSuppressor', () => {
     expect(text(s.push(buf('__td7 se')))).toBe('')
     expect(s.done).toBe(false)
     expect(text(s.push(buf('tup\r\nrest')))).toBe('rest')
+    expect(s.done).toBe(false)
+  })
+
+  it('passes everything through once it has been released', () => {
+    const s = new EchoSuppressor(buf('__td7 setup'))
+    s.push(buf('__td7 setup\r\n'))
+    s.flush()
+    expect(text(s.push(buf('__td7 setup')))).toBe('__td7 setup')
+  })
+
+  /**
+   * Until the shell reaches its first prompt the tty driver does the echoing;
+   * the line editor then draws the same line again after the prompt. Stopping
+   * at the first occurrence left the second one on screen, which is exactly
+   * what the user saw on a host with a slow login.
+   */
+  it('removes the echo again when the shell sends it twice', () => {
+    const s = new EchoSuppressor(buf('__td7 setup'))
+    expect(text(s.push(buf('__td7 setup\r\nbanner\r\n')))).toBe('banner\r\n')
+    expect(s.done).toBe(false)
+    expect(text(s.push(buf('prompt$ __td7 setup\r\n')))).toBe('prompt$ ')
+  })
+
+  it('does not hold a banner back behind a match that has not come', () => {
+    // A login banner can run to screenfuls before the shell says anything of
+    // its own. None of it can begin the echo, so none of it waits.
+    const s = new EchoSuppressor(buf('__td7 setup'), 16)
+    const banner = '0123456789'.repeat(10)
+    expect(text(s.push(buf(banner)))).toBe(banner)
+    expect(s.done).toBe(false)
+    expect(text(s.push(buf('__td7 setup\r\nafter')))).toBe('after')
+  })
+
+  it('gives up on a partial match that grows past the budget', () => {
+    const s = new EchoSuppressor(buf('__td7 setup and more'), 8)
+    expect(text(s.push(buf('__td7 se')))).toBe('')
+    expect(text(s.push(buf('tup and')))).toBe('__td7 setup and')
     expect(s.done).toBe(true)
   })
 
-  it('passes everything through once it is done', () => {
-    const s = new EchoSuppressor(buf('X'))
-    s.push(buf('X\r\n'))
-    expect(text(s.push(buf('X again')))).toBe('X again')
-  })
-
-  it('gives up rather than swallowing a screenful that never matches', () => {
-    // A shell with echo disabled never sends it back; the user must still see
-    // their output.
-    const s = new EchoSuppressor(buf('never-appears'), 16)
-    expect(text(s.push(buf('012345678901234567890')))).toBe('012345678901234567890')
-    expect(s.done).toBe(true)
+  it('waits for the newline rather than leaving a blank line behind', () => {
+    const s = new EchoSuppressor(buf('__td7'))
+    expect(text(s.push(buf('__td7')))).toBe('')
+    expect(text(s.push(buf('\r\nafter')))).toBe('after')
   })
 
   it('releases what it was holding when flushed', () => {
@@ -77,7 +107,6 @@ describe('EchoSuppressor', () => {
       const s = new EchoSuppressor(buf(setup))
       const wrapped = '__td7(){ printf; }; \r\nfi; __td7'
       expect(text(s.push(buf(`prompt$ ${wrapped}\r\nafter`)))).toBe('prompt$ after')
-      expect(s.done).toBe(true)
     })
 
     it('removes it when the redraw moved the cursor', () => {
@@ -96,7 +125,6 @@ describe('EchoSuppressor', () => {
       expect(text(s.push(buf('__td7(){ printf; }; \r')))).toBe('')
       expect(s.done).toBe(false)
       expect(text(s.push(buf('\nfi; __td7\r\nrest')))).toBe('rest')
-      expect(s.done).toBe(true)
     })
   })
 

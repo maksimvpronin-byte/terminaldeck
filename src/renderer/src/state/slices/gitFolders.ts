@@ -51,8 +51,8 @@ export const createGitFoldersSlice: StateCreator<AppState, [], [], GitFoldersSli
     }
   },
 
-  applyGitFolder: async (groupId, includedGroups) => {
-    await window.td.gitFolder.apply(groupId, includedGroups)
+  applyGitFolder: async (groupId, includedGroups, showGroupFolders) => {
+    await window.td.gitFolder.apply(groupId, includedGroups, showGroupFolders)
     await Promise.all([get().loadGitFolders(), get().loadStore()])
   },
 
