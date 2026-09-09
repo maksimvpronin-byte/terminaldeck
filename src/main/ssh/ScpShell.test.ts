@@ -166,8 +166,22 @@ describe.skipIf(!canRun)('SCP over SSH', () => {
       await shell.download(`${dir}/data`, destination)
       expect(readFileSync(destination)).toEqual(readFileSync(source))
       await shell.rename(`${dir}/data`, `${dir}/renamed`)
+      const replacement = Buffer.from('replacement must stay separate')
+      writeFileSync(source, replacement)
       await shell.upload(source, `${dir}/data`)
-      await expect(shell.rename(`${dir}/data`, `${dir}/renamed`)).rejects.toThrow(/exists/)
+      // GNU mv versions differ in the diagnostic and exit status for -n.
+      // The contract is a rejected rename with both files left intact.
+      await expect(shell.rename(`${dir}/data`, `${dir}/renamed`)).rejects.toThrow()
+      for (const [name, expected] of [
+        ['data', replacement],
+        ['renamed', Buffer.from('hello\0binary')]
+      ] as const) {
+        const chunks: Buffer[] = []
+        for await (const chunk of shell.createReadStream(`${dir}/${name}`)) {
+          chunks.push(Buffer.from(chunk))
+        }
+        expect(Buffer.concat(chunks)).toEqual(expected)
+      }
       await shell.remove(`${dir}/data`, false)
       expect((await shell.list(dir)).map((e) => e.name).sort()).toEqual(['nested', 'renamed'])
       expect(await shell.statPath(`${dir}/missing`)).toBeNull()
