@@ -514,16 +514,6 @@ export interface QuickConnectParams {
   passphrase?: string
 }
 
-export interface ConnectResult {
-  connectionId: string
-}
-
-export interface TerminalResizePayload {
-  connectionId: string
-  cols: number
-  rows: number
-}
-
 export interface AuthPromptField {
   prompt: string
   /** false for secrets, so the field masks input */

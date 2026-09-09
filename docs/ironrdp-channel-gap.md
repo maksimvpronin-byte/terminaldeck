@@ -1,5 +1,9 @@
 # IronRDP and the Remote Assistance channel
 
+> Historical notes. Version 0.12.2 removes the retired TypeScript RDP gateway
+> and the standalone Remote Assistance experiments referenced below. The app
+> uses FreeRDP and ShadowHost; old source remains available in Git history.
+
 > **Correction, 25 August 2026.** The claim below that the package "covers
 > clipboard, CredSSP, file transfer and other built-in capabilities — not
 > `RC_CTL` or `remdesk`" is right about *arbitrary* channels, but it was read

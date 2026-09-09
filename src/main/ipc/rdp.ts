@@ -1,7 +1,4 @@
-import { app, ipcMain } from 'electron'
-import { join } from 'path'
-import { existsSync, mkdirSync } from 'fs'
-import { writeFile } from 'fs/promises'
+import { ipcMain } from 'electron'
 import { IPC } from '../../shared/ipc-channels'
 import { resolveAuth } from '../../shared/authResolution'
 import { applyCredential } from '../../shared/credentials'
@@ -99,9 +96,7 @@ function authFor(
 /**
  * The gateway for one host, in the form the desktop client takes it.
  *
- * There were two of these until the loopback gateway's handler went: one
- * answering in the shape this application's own gateway wanted, one in the
- * shape the client wants. Only the second has a caller now.
+ * Resolved in the main process and passed directly to FreeRDP.
  */
 function desktopGateway(
   profile: SessionProfile,
@@ -204,37 +199,6 @@ export function registerRdpHandlers(): void {
       freeRdpBridge.send(id, fields)
   )
   ipcMain.handle(IPC.desktopStop, (_e, id: string) => freeRdpBridge.stop(id))
-
-  /**
-   * The desktop client's own log, written beside the session logs.
-   *
-   * Kept in the main process as it arrives and written only when asked for,
-   * which is the lesson the last client taught the hard way: forwarding it live
-   * to a console took the renderer to four gigabytes inside a minute.
-   */
-  ipcMain.handle(IPC.desktopLog, async (_e, id: string) => {
-    const dir = join(app.getPath('userData'), 'logs')
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-    const target = join(dir, `desktop-${new Date().toISOString().replace(/[:.]/g, '-')}.log`)
-    await writeFile(target, freeRdpBridge.logFor(id).join('\n'), 'utf8')
-    return target
-  })
-
-  // --- Graphical sessions ---
-  /**
-   * Four handlers stood here and are gone with the client that used them.
-   *
-   * `rdp:reserve` and `rdp:failure` served the loopback gateway the embedded
-   * WebAssembly client insisted on dialling; `rdp:tracing` and `rdp:saveLog`
-   * carried that client's own logging back out of the window. The desktop is
-   * drawn by a separate process now, which signs in itself and keeps its own
-   * log in the main process — so nothing asked for any of them, and a door
-   * nobody walks through is still a door.
-   *
-   * This removes the way in, not the gateway. `Gateway.ts`, `TsGateway.ts` and
-   * the [MS-TSGU] implementation under them are untouched and still tested;
-   * whether to retire them is a decision of its own. See PLAN-freerdp.md.
-   */
 
   /**
    * The desktop settings for one host: how big it should be, and how the

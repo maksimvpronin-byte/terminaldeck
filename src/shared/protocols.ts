@@ -98,14 +98,3 @@ export function traitsOf(protocol: Protocol): ProtocolTraits {
 
 /** Every protocol, in the order they should appear in a menu. */
 export const PROTOCOLS: Protocol[] = ['ssh', 'rdp']
-
-/**
- * Whether a graphical protocol is carried for this session.
- *
- * Both RDP and VNC reach the far end through the same proxy, so anything that
- * has to ask "is this a desktop rather than a shell" should ask here rather
- * than listing protocols and falling behind when one is added.
- */
-export function isGraphical(protocol: Protocol): boolean {
-  return !traitsOf(protocol).textual
-}

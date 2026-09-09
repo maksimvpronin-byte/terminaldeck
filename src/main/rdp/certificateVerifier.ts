@@ -1,11 +1,8 @@
 /**
  * Where the desktop code asks whether a TLS certificate should be trusted.
  *
- * The question needs a window to put a dialog in and a file to remember the
- * answer in, both of which mean Electron — and `Gateway.ts` and `TsGateway.ts`
- * are covered by tests that run under plain Node, where importing Electron
- * fails at load time. So they ask through here, and the main process installs
- * the implementation at startup.
+ * FreeRDP asks through this boundary; the main process installs the dialog
+ * and certificate-store implementation at startup.
  */
 
 export interface CertificateQuestion {

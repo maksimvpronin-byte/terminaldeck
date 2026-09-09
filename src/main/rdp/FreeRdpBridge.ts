@@ -59,14 +59,9 @@ export interface DesktopGateway {
 interface Session {
   child: ChildProcess
   window: BrowserWindow
-  /** The last lines the client wrote about itself, for when it fails. */
-  log: string[]
   host: string
   port: number
 }
-
-/** How much of the client's own log to keep. */
-const LOG_LINES = 400
 
 function executable(): string {
   const name = process.platform === 'win32' ? 'td-rdp.exe' : 'td-rdp'
@@ -119,7 +114,7 @@ class FreeRdpBridge {
       }
     })
 
-    const session: Session = { child, window, log: [], host: request.host, port }
+    const session: Session = { child, window, host: request.host, port }
     this.sessions.set(id, session)
 
     const reader = createRecordReader(
@@ -129,20 +124,8 @@ class FreeRdpBridge {
     )
     child.stdout?.on('data', (chunk: Buffer) => reader.push(chunk))
 
-    /**
-     * The client's own log, kept rather than printed.
-     *
-     * It goes to a file only when someone asks for it. What matters here is
-     * that the last lines survive the process that wrote them: a session that
-     * fails has usually said why, one line before it stopped.
-     */
-    child.stderr?.on('data', (chunk: Buffer) => {
-      for (const line of chunk.toString('utf8').split('\n')) {
-        if (!line.trim()) continue
-        session.log.push(line)
-        if (session.log.length > LOG_LINES) session.log.shift()
-      }
-    })
+    // Drain diagnostics so the child cannot block on a full stderr pipe.
+    child.stderr?.resume()
 
     child.on('exit', (code) => {
       this.sessions.delete(id)
@@ -208,11 +191,6 @@ class FreeRdpBridge {
 
   stopAll(): void {
     for (const id of [...this.sessions.keys()]) this.stop(id)
-  }
-
-  /** What the client said about itself, for saving beside the session logs. */
-  logFor(id: string): string[] {
-    return this.sessions.get(id)?.log ?? []
   }
 
   private write(id: string, fields: Record<string, string | number | boolean | undefined>): void {

@@ -127,27 +127,10 @@ export function registerSftpHandlers(): void {
         reportTransfer(connectionId, remotePath, transferred, total)
       )
   )
-  handleWhileUnlocked(
-    IPC.sftpDownloadDir,
-    (_e, connectionId: string, remotePath: string, localDir: string) =>
-      sftpManager.downloadDirectory(connectionId, remotePath, localDir, (t, total, path) =>
-        reportTransfer(connectionId, path, t, total)
-      )
-  )
-  handleWhileUnlocked(
-    IPC.sftpUploadPath,
-    (_e, connectionId: string, localPath: string, remoteParent: string) =>
-      sftpManager.uploadPath(connectionId, localPath, remoteParent, (t, total, path) =>
-        reportTransfer(connectionId, path, t, total)
-      )
-  )
 
   handleWhileUnlocked(
     IPC.sftpEdit,
     (_e, connectionId: string, remotePath: string, editorCommand?: string) =>
       remoteEdit.open(focusedWin(), connectionId, remotePath, editorCommand)
-  )
-  handleWhileUnlocked(IPC.sftpStopEdit, (_e, connectionId: string, remotePath: string) =>
-    remoteEdit.stop(connectionId, remotePath)
   )
 }

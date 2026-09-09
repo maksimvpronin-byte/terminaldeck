@@ -1,12 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  DEFAULT_PROTOCOL,
-  PROTOCOLS,
-  isGraphical,
-  protocolOf,
-  traitsOf,
-  type Protocol
-} from './protocols'
+import { DEFAULT_PROTOCOL, PROTOCOLS, protocolOf, traitsOf, type Protocol } from './protocols'
 
 describe('protocolOf', () => {
   it('treats a host saved before protocols existed as SSH', () => {
@@ -66,13 +59,6 @@ describe('traitsOf', () => {
     // A protocol read back from a file written by a newer version.
     const traits = traitsOf('telnet' as Protocol)
     expect(traits).toEqual(traitsOf(DEFAULT_PROTOCOL))
-  })
-})
-
-describe('isGraphical', () => {
-  it('separates desktops from shells', () => {
-    expect(isGraphical('ssh')).toBe(false)
-    expect(isGraphical('rdp')).toBe(true)
   })
 })
 

@@ -91,8 +91,6 @@ export const IPC = {
   sftpMkdir: 'sftp:mkdir',
   sftpDelete: 'sftp:delete',
   sftpRename: 'sftp:rename',
-  sftpDownloadDir: 'sftp:downloadDir',
-  sftpUploadPath: 'sftp:uploadPath',
   sftpPlanUpload: 'sftp:planUpload',
   sftpPlanDownload: 'sftp:planDownload',
   /** Host to host, through us: neither server can reach the other directly. */
@@ -100,7 +98,6 @@ export const IPC = {
   sftpRunPlan: 'sftp:runPlan',
   sftpCompare: 'sftp:compare',
   sftpEdit: 'sftp:edit',
-  sftpStopEdit: 'sftp:stopEdit',
   /** main -> renderer, suffixed with connectionId */
   sftpEdited: 'sftp:edited',
   /** main -> renderer, suffixed with connectionId */
@@ -143,8 +140,6 @@ export const IPC = {
    */
   desktopSend: 'desktop:send',
   desktopStop: 'desktop:stop',
-  /** What the client wrote about itself, for saving where it can be read. */
-  desktopLog: 'desktop:log',
   /** main -> renderer, each suffixed with the desktop session id */
   desktopEvent: 'desktop:event',
   desktopFrame: 'desktop:frame',

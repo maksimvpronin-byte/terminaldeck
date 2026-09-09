@@ -1,5 +1,9 @@
 # Embedded shadow: how far it gets, and what has been ruled out
 
+> Historical notes. Version 0.12.2 removes the retired TypeScript RDP gateway
+> and the standalone Remote Assistance experiments referenced below. The app
+> uses FreeRDP and ShadowHost; old source remains available in Git history.
+
 The shipping path is still `mstsc` adopted into the pane by ShadowHost. This
 note records how far the embedded client gets and, more usefully, which
 explanations have been tested and eliminated — so the next session does not

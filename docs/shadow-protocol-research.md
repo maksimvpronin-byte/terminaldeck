@@ -1,5 +1,9 @@
 # Research: implementing RDS shadowing in the embedded client
 
+> Historical notes. Version 0.12.2 removes the retired TypeScript RDP gateway
+> and the standalone Remote Assistance experiments referenced below. The app
+> uses FreeRDP and ShadowHost; old source remains available in Git history.
+
 > **Status: research complete.** The sequence is known end to end and the work
 > is staged below. Nothing is implemented yet — the shipping path is still
 > `mstsc` adopted into the pane.

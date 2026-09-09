@@ -118,16 +118,3 @@ export function appearanceSource(
 ): SessionGroup | undefined {
   return appearanceInheritedFrom({ inheritAppearance: own.inheritAppearance }, groupId, groups, key)
 }
-
-/** True when the item sets any appearance of its own, for marking it in the UI. */
-export function hasOwnAppearance(own: AppearanceDefaults): boolean {
-  return (
-    own.inheritAppearance === false ||
-    isSet(own.fontFamily) ||
-    isSet(own.fontSize) ||
-    isSet(own.themeName) ||
-    isSet(own.cursorStyle) ||
-    own.cursorBlink !== undefined ||
-    isSet(own.scrollback)
-  )
-}

@@ -72,10 +72,7 @@ export default tseslint.config(
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }
       ],
 
-      // The three `trace()` helpers in src/main/rdp opt out by hand and are
-      // gated behind TERMINALDECK_RDP_TRACE. Nothing else should log to a
-      // console the packaged app has no window onto; a real problem belongs in
-      // console.error, which stays allowed.
+      // Diagnostics belong in warnings or errors.
       'no-console': ['error', { allow: ['warn', 'error'] }]
     }
   },

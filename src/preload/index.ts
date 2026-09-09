@@ -317,8 +317,6 @@ const api = {
       fields: Record<string, string | number | boolean | undefined>
     ): void => ipcRenderer.send(IPC.desktopSend, id, fields),
     desktopStop: (id: string): Promise<void> => ipcRenderer.invoke(IPC.desktopStop, id),
-    /** Writes what the client said about itself where it can be read. */
-    desktopLog: (id: string): Promise<string> => ipcRenderer.invoke(IPC.desktopLog, id),
     onDesktopEvent: (id: string, cb: (p: Record<string, unknown>) => void): (() => void) => {
       const channel = `${IPC.desktopEvent}:${id}`
       const listener = (_e: unknown, p: Record<string, unknown>): void => cb(p)
@@ -382,13 +380,6 @@ const api = {
       ipcRenderer.invoke(IPC.sftpDownload, connectionId, remotePath, localPath),
     upload: (connectionId: string, localPath: string, remotePath: string): Promise<void> =>
       ipcRenderer.invoke(IPC.sftpUpload, connectionId, localPath, remotePath),
-    downloadDirectory: (
-      connectionId: string,
-      remotePath: string,
-      localDir: string
-    ): Promise<void> => ipcRenderer.invoke(IPC.sftpDownloadDir, connectionId, remotePath, localDir),
-    uploadPath: (connectionId: string, localPath: string, remoteParent: string): Promise<void> =>
-      ipcRenderer.invoke(IPC.sftpUploadPath, connectionId, localPath, remoteParent),
     planUpload: (
       connectionId: string,
       localPath: string,
@@ -425,8 +416,6 @@ const api = {
       ipcRenderer.invoke(IPC.sftpCompare, connectionId, remotePath, localPath),
     edit: (connectionId: string, remotePath: string, editorCommand?: string): Promise<string> =>
       ipcRenderer.invoke(IPC.sftpEdit, connectionId, remotePath, editorCommand),
-    stopEdit: (connectionId: string, remotePath: string): Promise<void> =>
-      ipcRenderer.invoke(IPC.sftpStopEdit, connectionId, remotePath),
     onEdited: (
       connectionId: string,
       cb: (p: { remotePath: string; savedAt?: number; error?: string }) => void

@@ -3,7 +3,7 @@ name: Checks
 # The release workflow only runs on a `v*` tag, so until this existed the first
 # compile of a commit happened after the tag was already pushed — and the tests
 # never ran at all unless someone remembered to type `npm test`. That matters
-# here more than usual: the Windows paths (WinSessions, ntlm, md4, TsGateway,
+# here more than usual: the Windows paths (WinSessions,
 # ShadowHostBridge, the named-pipe agent) are developed on a Mac and never
 # execute there, so their tests are the only thing that can say they still work.
 on:
@@ -50,9 +50,7 @@ jobs:
       - name: Type-check
         run: npm run typecheck
 
-      # Errors fail the job; `exhaustive-deps` is still a warning and does not,
-      # which is why this step could be added the day the first run was read
-      # rather than waiting for the rule to be promoted.
+      # Both unused variables and React hook violations fail the job.
       - name: Lint
         run: npm run lint
 

@@ -6,6 +6,22 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.12.2
+
+### Maintenance
+
+- Update the transitive `js-yaml` dependency to address its merge-key CPU
+  exhaustion advisory (GHSA-2883-xcg3-v3hh).
+
+- Remove the retired IronRDP loopback gateway, its MS-TSGU/NTLM transport
+  implementation and tests. Desktop connections continue to use FreeRDP.
+- Remove unused Remote Assistance prototypes and standalone shadow probes;
+  preserve the research notes as historical documentation.
+- Remove unused SFTP transfer and editor IPC endpoints, the unused desktop log
+  export endpoint and its unread buffer, obsolete types, helpers and transfer CSS.
+  Planned SFTP transfers and editor cleanup remain in place.
+- Drop the direct `ws`, `@types/ws` and `@electron-toolkit/preload` dependencies.
+
 ## 0.12.1
 
 ### Fixed

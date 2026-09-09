@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  appearanceSource,
-  hasOwnAppearance,
-  inheritedAppearance,
-  resolveAppearance
-} from './appearance'
+import { appearanceSource, inheritedAppearance, resolveAppearance } from './appearance'
 import type { AppearanceDefaults, AuthDefaults, ResolvedAppearance, SessionGroup } from './types'
 
 const globals: ResolvedAppearance = {
@@ -106,23 +101,6 @@ describe('appearanceSource', () => {
 
   it('is undefined when nothing above sets one and the globals apply', () => {
     expect(appearanceSource({}, 'prod', groups, 'fontFamily')).toBeUndefined()
-  })
-})
-
-describe('hasOwnAppearance', () => {
-  it('is false for a host that customises nothing', () => {
-    expect(hasOwnAppearance({})).toBe(false)
-    // Credential fields are a separate axis and must not mark it as customised.
-    const authOnly: AppearanceDefaults & AuthDefaults = { username: 'root' }
-    expect(hasOwnAppearance(authOnly)).toBe(false)
-  })
-
-  it('counts a switched-off blink, which is a real choice', () => {
-    expect(hasOwnAppearance({ cursorBlink: false })).toBe(true)
-  })
-
-  it('counts opting out even with no values of its own', () => {
-    expect(hasOwnAppearance({ inheritAppearance: false })).toBe(true)
   })
 })
 

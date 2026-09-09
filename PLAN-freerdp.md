@@ -1,5 +1,9 @@
 # Plan: replacing IronRDP with FreeRDP
 
+> Historical notes. Version 0.12.2 removes the retired TypeScript RDP gateway
+> and the standalone Remote Assistance experiments referenced below. The app
+> uses FreeRDP and ShadowHost; old source remains available in Git history.
+
 > **Status: route B is written, unproven, and not yet compiled.**
 > FreeRDP is built for macOS, the shim is written against it, and the
 > application no longer imports IronRDP anywhere. What has not happened is a
