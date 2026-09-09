@@ -216,3 +216,15 @@ describe('followTerminalCwd', () => {
     ).toBe(false)
   })
 })
+
+describe('file access', () => {
+  it('inherits the whole configuration and lets a host select ordinary SFTP', () => {
+    const fileAccess = { protocol: 'scp' as const, shell: 'sudo -n -i -u postgres' }
+    const groups = [{ id: 'g', name: 'g', parentId: null, fileAccess }]
+    expect(resolveAuth({}, 'g', groups).fileAccess).toEqual(fileAccess)
+    expect(resolveAuth({ fileAccess: { protocol: 'sftp' } }, 'g', groups).fileAccess).toEqual({
+      protocol: 'sftp'
+    })
+    expect(resolveAuth({ inheritAuth: false }, 'g', groups).fileAccess).toBeUndefined()
+  })
+})

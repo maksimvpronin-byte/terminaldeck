@@ -43,6 +43,7 @@ export function resolveAuth(
 ): ResolvedAuth {
   const chain = authChain(own, groupId, groups)
   return {
+    ...(pick(chain, 'fileAccess') ? { fileAccess: pick(chain, 'fileAccess') } : {}),
     port: pick(chain, 'port') ?? AUTH_FALLBACK.port,
     username: pick(chain, 'username') ?? AUTH_FALLBACK.username,
     authMethod: pick(chain, 'authMethod') ?? AUTH_FALLBACK.authMethod,

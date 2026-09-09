@@ -324,6 +324,7 @@ all:
       varsToAuth({
         ansible_user: 'deploy',
         onConnectCommand: 'sudo -i',
+        fileAccess: { protocol: 'scp', shell: 'sudo -n -i -u root' },
         ansible_become: true,
         ansible_python_interpreter: '/usr/bin/python3'
       })

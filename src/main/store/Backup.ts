@@ -147,6 +147,11 @@ function optionalStringArray(record: UnknownRecord, key: string, path: string): 
 }
 
 function validateDefaults(record: UnknownRecord, path: string): void {
+  if (record.fileAccess !== undefined) {
+    const access = asRecord(record.fileAccess, `${path}.fileAccess`)
+    enumField(access, 'protocol', `${path}.fileAccess`, ['sftp', 'scp'], true)
+    optionalString(access, 'shell', `${path}.fileAccess`)
+  }
   for (const key of [
     'username',
     'privateKeyPath',

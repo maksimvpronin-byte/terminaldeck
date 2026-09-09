@@ -57,6 +57,7 @@ interface MenuState {
 export default function SftpPanel({ connectionId }: { connectionId?: string }): JSX.Element {
   const t = useT()
   const externalEditor = useStore((s) => s.settings.externalEditor)
+  const [fileAccess, setFileAccess] = useState<import('../../../shared/types').FileAccess>()
   const [path, setPath] = useState('.')
   /** What is in the path box, which may differ from `path` while being edited. */
   const [draftPath, setDraftPath] = useState('.')
@@ -232,6 +233,21 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
       return new Set([...prev].filter((p) => alive.has(p)))
     })
   }
+
+  useEffect(() => {
+    let active = true
+    setFileAccess(undefined)
+    if (connectionId)
+      void window.td.ssh
+        .getFileAccess(connectionId)
+        .then((access) => {
+          if (active) setFileAccess(access)
+        })
+        .catch(() => undefined)
+    return () => {
+      active = false
+    }
+  }, [connectionId])
 
   // The host's setting decided how this connection started; ask what it is now.
   useEffect(() => {
@@ -624,6 +640,11 @@ export default function SftpPanel({ connectionId }: { connectionId?: string }): 
           startDrag(e, width, -1, PANEL_MIN, PANEL_MAX, setWidth, (final) => savePanelWidth(final))
         }
       />
+      {fileAccess?.protocol === 'scp' && (
+        <div className="settings-note" style={{ margin: '4px 8px', overflowWrap: 'anywhere' }}>
+          SCP/Shell · {fileAccess.shell}
+        </div>
+      )}
       <div className="sftp-path" onClick={(e) => e.stopPropagation()}>
         <button
           className={treeOpen ? 'active' : ''}

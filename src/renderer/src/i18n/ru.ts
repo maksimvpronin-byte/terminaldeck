@@ -996,6 +996,12 @@ export const ru: Record<string, string> = {
   'Arrange hosts in group folders': 'Разложить хосты по папкам групп',
   'Keep the selected group hierarchy inside this folder. Hosts belonging to several groups appear in each of them.':
     'Сохранить вложенность выбранных групп внутри этой папки. Хосты из нескольких групп будут видны в каждой из них.',
+  'File access': 'Доступ к файлам',
+  'File transfer method': 'Способ передачи файлов',
+  'Shell launch command': 'Команда запуска оболочки',
+  'Enter a single-line shell launch command.': 'Введите команду запуска оболочки в одну строку.',
+  'Linux server with scp and GNU coreutils/find required. The command must allow non-interactive execution; sudo password prompts are not supported. Applies to files after reconnecting, independently of the terminal login.':
+    'Нужен Linux-сервер с scp и GNU coreutils/find. Команда должна выполняться без диалога: запрос пароля sudo не поддерживается. Применяется к файлам после переподключения, независимо от входа в терминал.',
   'Select none': 'Снять всё',
   '{count} new since the last sync': 'Новых с прошлой синхронизации: {count}',
   'Gone from the repository, and about to go from this folder: {groups}':

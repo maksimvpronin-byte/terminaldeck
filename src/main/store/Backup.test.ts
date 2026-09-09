@@ -77,6 +77,7 @@ const session: SessionProfile = {
   updatedAt: 2,
   username: 'root',
   authMethod: 'password',
+  fileAccess: { protocol: 'scp', shell: 'sudo -n -i -u postgres' },
   secretRef: 'secret-session'
 }
 

@@ -6,6 +6,18 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## Unreleased
+
+### Added
+
+- Add SCP/Shell file access to saved hosts and local Git inventory overrides.
+  A command such as `sudo -n -i -u postgres` runs file operations as the permitted
+  account without changing the SSH terminal login. Includes directory browsing,
+  file transfers, host-to-host copies and external-editor uploads. Requires a
+  Linux server with GNU tools and non-interactive command authorization.
+- Preserve file-access settings in backups and show the active SCP/Shell command
+  in the file panel. Existing connections continue to use SFTP by default.
+
 ## 0.13.0
 
 ### Added

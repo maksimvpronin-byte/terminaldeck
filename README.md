@@ -322,6 +322,20 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
 
 ### Files and networking
 
+- **SCP/Shell as another user (Linux servers):** in the host's settings, under
+  **File access**, select **SCP / Shell** and set **Shell launch command** to
+  `sudo -n -i -u postgres` (replace `postgres` with the intended account).
+  Reconnect for the change to apply. Git inventory hosts support the same setting
+  in their local overrides; repositories cannot supply this command. The file
+  panel displays the configured command, while the terminal keeps its own login.
+  Directory operations and SCP transfers run through that command on separate SSH
+  channels, including uploads from the external editor and host-to-host copies.
+  The server needs `scp`, GNU coreutils (including `stat`, `realpath`, `base64`),
+  GNU `find`, and permission to run the command without an interactive password or
+  a TTY. An authorization failure is reported; it never falls back to the SSH user.
+  Commands are launched afresh for each operation, so shell state is not shared
+  with the terminal. Select **SFTP** to return to the default file access mode.
+
 - SFTP browser: multi-select, context menu, rename, delete, mkdir, whole-directory transfers,
   Finder drag-and-drop upload, transfer progress, and auto-refresh
 - **Host-to-host copying**: drag files or folders from one open SFTP panel onto another and they

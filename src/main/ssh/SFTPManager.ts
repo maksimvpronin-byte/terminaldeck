@@ -1,3 +1,5 @@
+import { ScpShell } from './ScpShell'
+import type { Writable } from 'stream'
 import type { SFTPWrapper } from 'ssh2'
 import { readdir, mkdir, stat, lstat, readFile } from 'fs/promises'
 import { renameSync, rmSync } from 'fs'
@@ -58,6 +60,19 @@ function localChild(parent: string, name: string): string {
 }
 
 class SFTPManager {
+  private shells = new Map<string, ScpShell>()
+  private getShell(connectionId: string): ScpShell | undefined {
+    const access = sshManager.getFileAccess(connectionId)
+    if (access?.protocol !== 'scp') return undefined
+    let shell = this.shells.get(connectionId)
+    if (!shell) {
+      const chain = sshManager.getClientChain(connectionId)
+      if (!chain?.length) throw new Error('No active SSH connection')
+      shell = new ScpShell(chain[chain.length - 1], access.shell ?? '')
+      this.shells.set(connectionId, shell)
+    }
+    return shell
+  }
   private sessions = new Map<string, SFTPWrapper>()
   /** Makes each in-progress download's temporary name its own. */
   private nextTransfer = 0
@@ -78,6 +93,8 @@ class SFTPManager {
   }
 
   async list(connectionId: string, remotePath: string): Promise<SftpEntry[]> {
+    const shell = this.getShell(connectionId)
+    if (shell) return shell.list(remotePath)
     const sftp = await this.getSftp(connectionId)
     const entries = await new Promise<import('ssh2').FileEntry[]>((resolve, reject) => {
       sftp.readdir(remotePath, (err, list) => (err ? reject(err) : resolve(list)))
@@ -107,6 +124,8 @@ class SFTPManager {
    * show where that actually is.
    */
   async realpath(connectionId: string, remotePath: string): Promise<string> {
+    const shell = this.getShell(connectionId)
+    if (shell) return shell.realpath(remotePath)
     const sftp = await this.getSftp(connectionId)
     return new Promise((resolve, reject) => {
       sftp.realpath(remotePath, (err, resolved) => (err ? reject(err) : resolve(resolved)))
@@ -115,6 +134,8 @@ class SFTPManager {
 
   /** A stat that answers "missing" rather than throwing, for existence checks. */
   async statPath(connectionId: string, remotePath: string): Promise<SftpEntry | null> {
+    const shell = this.getShell(connectionId)
+    if (shell) return shell.statPath(remotePath)
     const sftp = await this.getSftp(connectionId)
     return new Promise((resolve, reject) => {
       sftp.lstat(remotePath, (err, stats) => {
@@ -144,6 +165,8 @@ class SFTPManager {
   }
 
   async mkdir(connectionId: string, remotePath: string): Promise<void> {
+    const shell = this.getShell(connectionId)
+    if (shell) return shell.mkdir(remotePath)
     const sftp = await this.getSftp(connectionId)
     await new Promise<void>((resolve, reject) => {
       sftp.mkdir(remotePath, (err) => (err ? reject(err) : resolve()))
@@ -156,20 +179,24 @@ class SFTPManager {
    * tree can't take its target with it.
    */
   async delete(connectionId: string, remotePath: string, isDirectory: boolean): Promise<void> {
-    const sftp = await this.getSftp(connectionId)
+    const shell = this.getShell(connectionId)
+    const sftp = shell ? undefined : await this.getSftp(connectionId)
     if (isDirectory) {
       for (const entry of await this.list(connectionId, remotePath)) {
         await this.delete(connectionId, entry.path, entry.isDirectory && !entry.isSymlink)
       }
     }
+    if (shell) return shell.remove(remotePath, isDirectory)
     await new Promise<void>((resolve, reject) => {
       const cb = (err: Error | undefined | null): void => (err ? reject(err) : resolve())
-      if (isDirectory) sftp.rmdir(remotePath, cb)
-      else sftp.unlink(remotePath, cb)
+      if (isDirectory) sftp!.rmdir(remotePath, cb)
+      else sftp!.unlink(remotePath, cb)
     })
   }
 
   async rename(connectionId: string, oldPath: string, newPath: string): Promise<void> {
+    const shell = this.getShell(connectionId)
+    if (shell) return shell.rename(oldPath, newPath)
     const sftp = await this.getSftp(connectionId)
     await new Promise<void>((resolve, reject) => {
       sftp.rename(oldPath, newPath, (err) => (err ? reject(err) : resolve()))
@@ -182,7 +209,8 @@ class SFTPManager {
     localPath: string,
     onProgress?: (transferred: number, total: number) => void
   ): Promise<void> {
-    const sftp = await this.getSftp(connectionId)
+    const shell = this.getShell(connectionId)
+    const sftp = shell ? undefined : await this.getSftp(connectionId)
 
     /**
      * Written beside the destination and moved onto it at the end.
@@ -198,14 +226,16 @@ class SFTPManager {
      */
     const partial = `${localPath}.part-${process.pid}-${this.nextTransfer++}`
     try {
-      await new Promise<void>((resolve, reject) => {
-        sftp.fastGet(
-          remotePath,
-          partial,
-          { step: (transferred, _chunk, total) => onProgress?.(transferred, total) },
-          (err) => (err ? reject(err) : resolve())
-        )
-      })
+      if (shell) await shell.download(remotePath, partial, onProgress)
+      else
+        await new Promise<void>((resolve, reject) => {
+          sftp!.fastGet(
+            remotePath,
+            partial,
+            { step: (transferred, _chunk, total) => onProgress?.(transferred, total) },
+            (err) => (err ? reject(err) : resolve())
+          )
+        })
       renameSync(partial, localPath)
     } catch (err) {
       // Nothing half-finished is left lying beside the file it failed to become.
@@ -241,6 +271,8 @@ class SFTPManager {
     remotePath: string,
     onProgress?: (transferred: number, total: number) => void
   ): Promise<void> {
+    const shell = this.getShell(connectionId)
+    if (shell) return shell.upload(localPath, remotePath, onProgress)
     const sftp = await this.getSftp(connectionId)
     await new Promise<void>((resolve, reject) => {
       sftp.fastPut(
@@ -268,16 +300,29 @@ class SFTPManager {
     onProgress?: (transferred: number, total: number) => void
   ): Promise<void> {
     const [srcSftp, dstSftp] = await Promise.all([
-      this.getSftp(srcConnectionId),
-      this.getSftp(dstConnectionId)
+      this.getShell(srcConnectionId) ?? this.getSftp(srcConnectionId),
+      this.getShell(dstConnectionId) ?? this.getSftp(dstConnectionId)
     ])
     // Read once up front: the progress bar needs a denominator, and the source
     // stream never reports one.
-    const total = (await this.statPath(srcConnectionId, srcPath))?.size ?? 0
+    const sourceInfo =
+      srcSftp instanceof ScpShell
+        ? await srcSftp.statPath(srcPath, true)
+        : await this.statPath(srcConnectionId, srcPath)
+    const total =
+      sourceInfo?.isSymlink && !(srcSftp instanceof ScpShell)
+        ? await new Promise<number>((resolve, reject) =>
+            srcSftp.stat(srcPath, (err, info) => (err ? reject(err) : resolve(info.size)))
+          )
+        : (sourceInfo?.size ?? 0)
+    const destinationMode =
+      dstSftp instanceof ScpShell
+        ? ((await dstSftp.statPath(dstPath, true))?.permissions ?? '0644')
+        : undefined
 
     await new Promise<void>((resolve, reject) => {
       const read = srcSftp.createReadStream(srcPath)
-      let write: ReturnType<SFTPWrapper['createWriteStream']> | null = null
+      let write: Writable | null = null
       let settled = false
 
       // Either end can fail on its own. Whichever speaks first wins, and the
@@ -296,7 +341,10 @@ class SFTPManager {
       // every time a permission error stopped the read — a copy that looks like
       // it worked until someone opens the result.
       read.on('open', () => {
-        write = dstSftp.createWriteStream(dstPath)
+        write =
+          dstSftp instanceof ScpShell
+            ? dstSftp.createWriteStream(dstPath, total, destinationMode)
+            : dstSftp.createWriteStream(dstPath)
         write.on('error', fail)
         // 'close', not 'finish': ssh2 emits it once the remote handle is really
         // closed, and resolving earlier races whatever reads the file next.
@@ -603,7 +651,7 @@ class SFTPManager {
 
   /** Reads a remote file into memory, refusing anything past the diff cap. */
   private async readRemote(connectionId: string, remotePath: string): Promise<Buffer> {
-    const sftp = await this.getSftp(connectionId)
+    const sftp = this.getShell(connectionId) ?? (await this.getSftp(connectionId))
     return new Promise((resolve, reject) => {
       const chunks: Buffer[] = []
       let size = 0
@@ -657,6 +705,8 @@ class SFTPManager {
   }
 
   releaseConnection(connectionId: string): void {
+    this.shells.get(connectionId)?.close()
+    this.shells.delete(connectionId)
     this.sessions.delete(connectionId)
   }
 }

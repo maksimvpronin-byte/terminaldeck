@@ -80,6 +80,7 @@ export const IPC = {
   sshError: 'ssh:error',
   sshCwd: 'ssh:cwd',
   sshSetFollowCwd: 'ssh:setFollowCwd',
+  sshGetFileAccess: 'ssh:getFileAccess',
   sshGetFollowCwd: 'ssh:getFollowCwd',
 
   // SFTP

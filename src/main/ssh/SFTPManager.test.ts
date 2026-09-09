@@ -37,6 +37,8 @@ vi.mock('electron', () => ({
 
 userData = mkdtempSync(join(tmpdir(), 'terminaldeck-sftp-'))
 const { sftpManager } = await import('./SFTPManager')
+const { sshManager } = await import('./SSHManager')
+const { ScpShell } = await import('./ScpShell')
 
 const localDir = mkdtempSync(join(tmpdir(), 'terminaldeck-sftp-local-'))
 
@@ -370,5 +372,67 @@ describe('running a transfer plan', () => {
     ).rejects.toThrow(/permission denied/i)
 
     expect(destCalls.some((c) => c.op === 'write')).toBe(false)
+  })
+})
+
+describe('SCP/Shell routing', () => {
+  it.each(['source', 'destination'])(
+    'relays between SFTP and SCP with the SCP endpoint as %s',
+    async (side) => {
+      const received: Record<string, string> = {}
+      const calls: Call[] = []
+      const stub = stubSession(calls, { '/file': { size: 8 } }, { received })
+      vi.spyOn(sshManager, 'getFileAccess').mockImplementation((id) =>
+        id === side ? { protocol: 'scp', shell: 'sudo -n -i -u postgres' } : undefined
+      )
+      vi.spyOn(sshManager, 'getClientChain').mockReturnValue([{} as import('ssh2').Client])
+      vi.spyOn(ScpShell.prototype, 'statPath').mockResolvedValue({
+        name: 'file',
+        path: '/file',
+        size: 8,
+        mtime: 0,
+        permissions: '640',
+        isDirectory: false,
+        isSymlink: false,
+        owner: '1',
+        group: '1'
+      })
+      vi.spyOn(ScpShell.prototype, 'createReadStream').mockImplementation(
+        (path) => stub.createReadStream(path) as unknown as PassThrough
+      )
+      const write = vi
+        .spyOn(ScpShell.prototype, 'createWriteStream')
+        .mockImplementation((path) => stub.createWriteStream(path))
+      attach(side === 'source' ? 'destination' : 'source', stub)
+      await sftpManager.relay('source', '/file', 'destination', '/copy')
+      expect(received['/copy']).toBe('the file')
+      if (side === 'destination') expect(write).toHaveBeenCalledWith('/copy', 8, '640')
+      sftpManager.releaseConnection('source')
+      sftpManager.releaseConnection('destination')
+    }
+  )
+
+  it('uses shell operations for a configured connection and never opens SFTP', async () => {
+    const sftp = vi.fn()
+    vi.spyOn(sshManager, 'getFileAccess').mockReturnValue({
+      protocol: 'scp',
+      shell: 'sudo -n -i -u postgres'
+    })
+    vi.spyOn(sshManager, 'getClientChain').mockReturnValue([
+      { sftp } as unknown as import('ssh2').Client
+    ])
+    const list = vi.spyOn(ScpShell.prototype, 'list').mockResolvedValue([])
+    const mkdir = vi.spyOn(ScpShell.prototype, 'mkdir').mockResolvedValue()
+    const remove = vi.spyOn(ScpShell.prototype, 'remove').mockResolvedValue()
+    const close = vi.spyOn(ScpShell.prototype, 'close')
+    await sftpManager.list('scp-routing', '/srv/private')
+    await sftpManager.mkdir('scp-routing', '/srv/private/new')
+    await sftpManager.delete('scp-routing', '/srv/private/new', true)
+    expect(list).toHaveBeenCalledWith('/srv/private')
+    expect(mkdir).toHaveBeenCalledWith('/srv/private/new')
+    expect(remove).toHaveBeenCalledWith('/srv/private/new', true)
+    expect(sftp).not.toHaveBeenCalled()
+    sftpManager.releaseConnection('scp-routing')
+    expect(close).toHaveBeenCalled()
   })
 })

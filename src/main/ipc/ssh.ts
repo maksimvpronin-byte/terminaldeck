@@ -79,6 +79,9 @@ export function registerSshHandlers(): void {
   ipcMain.handle(IPC.sshSetFollowCwd, (_e, connectionId: string, enabled: boolean) =>
     sshManager.setFollowCwd(connectionId, enabled)
   )
+  ipcMain.handle(IPC.sshGetFileAccess, (_e, connectionId: string) =>
+    sshManager.getFileAccess(connectionId)
+  )
   ipcMain.handle(IPC.sshGetFollowCwd, (_e, connectionId: string) =>
     sshManager.isFollowingCwd(connectionId)
   )

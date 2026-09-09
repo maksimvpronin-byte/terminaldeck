@@ -1,5 +1,11 @@
 import type { Protocol } from './protocols'
 
+export interface FileAccess {
+  protocol: 'sftp' | 'scp'
+  /** Local configuration only: prefix that launches sh -c on the remote host. */
+  shell?: string
+}
+
 export type AuthMethod = 'password' | 'privateKey' | 'agent'
 
 /**
@@ -8,6 +14,8 @@ export type AuthMethod = 'password' | 'privateKey' | 'agent'
  * absent field means "inherit"; a present one overrides everything above it.
  */
 export interface AuthDefaults {
+  /** File panel identity, independent of commands typed into the terminal. */
+  fileAccess?: FileAccess
   /**
    * Whether to fall back to the parent group for anything left unset. Defaults
    * to true; set false to stand alone inside a group that defines credentials.
@@ -345,6 +353,7 @@ export interface SessionProfile extends AuthDefaults, AppearanceDefaults, RdpDef
 
 /** An AuthDefaults chain collapsed into concrete values ready to connect with. */
 export interface ResolvedAuth {
+  fileAccess?: FileAccess
   port: number
   username: string
   authMethod: AuthMethod

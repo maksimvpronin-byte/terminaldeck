@@ -1,3 +1,4 @@
+import FileAccessFields from './FileAccessFields'
 import { useState } from 'react'
 import type {
   AppearanceDefaults,
@@ -61,6 +62,7 @@ export default function InventoryOverrideDialog({
   const t = useT()
 
   const [override, setOverride] = useState<InventoryOverride>(existing ?? { nodeId: node.id })
+  const [error, setError] = useState<string>()
   const [secret, setSecret] = useState('')
   // A credential kept here wins over anything the inventory says, so dropping it
   // has to be possible without throwing the rest of the override away.
@@ -159,6 +161,13 @@ export default function InventoryOverrideDialog({
   }
 
   async function submit(): Promise<void> {
+    if (
+      override.fileAccess?.protocol === 'scp' &&
+      (!override.fileAccess.shell?.trim() || /[\r\n\0]/.test(override.fileAccess.shell))
+    ) {
+      setError(t('Enter a single-line shell launch command.'))
+      return
+    }
     const toSave: InventoryOverride = forgetSecret
       ? { ...override, secretRef: undefined }
       : override
@@ -190,6 +199,11 @@ export default function InventoryOverrideDialog({
   return (
     <ModalBackdrop onClose={onClose}>
       <div className="modal-card">
+        {error && (
+          <p className="error-text" role="alert">
+            {error}
+          </p>
+        )}
         <h2>
           {isHost(node)
             ? t('Local settings for {name}', { name: node.name })
@@ -280,6 +294,13 @@ export default function InventoryOverrideDialog({
             />
             {t('Forward SSH agent to remote host')}
           </label>
+        )}
+
+        {traits.files && (
+          <FileAccessFields
+            value={auth.effective.fileAccess}
+            onChange={(value) => set('fileAccess', value)}
+          />
         )}
 
         {traits.textual && (

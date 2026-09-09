@@ -224,6 +224,10 @@ const api = {
     },
     setFollowCwd: (connectionId: string, enabled: boolean): Promise<boolean> =>
       ipcRenderer.invoke(IPC.sshSetFollowCwd, connectionId, enabled),
+    getFileAccess: (
+      connectionId: string
+    ): Promise<import('../shared/types').FileAccess | undefined> =>
+      ipcRenderer.invoke(IPC.sshGetFileAccess, connectionId),
     getFollowCwd: (connectionId: string): Promise<boolean> =>
       ipcRenderer.invoke(IPC.sshGetFollowCwd, connectionId),
     /** Fires only while this connection is tracking the shell's directory. */

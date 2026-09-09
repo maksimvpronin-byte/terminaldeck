@@ -27,6 +27,7 @@ import { requireUnlocked } from '../vault/locked'
 import { requestAuth } from './authPrompt'
 
 interface LiveConnection {
+  fileAccess?: import('../../shared/types').FileAccess
   id: string
   clients: Client[] // chain of clients, last one is the target
   stream: ClientChannel
@@ -573,6 +574,7 @@ class SSHManager {
         // The saved setting is only the starting point; the SFTP panel can turn
         // it on and off afterwards. Scanning is skipped entirely while it is off.
         const connection: LiveConnection = {
+          fileAccess: auth?.fileAccess,
           id: connectionId,
           clients: chain,
           stream,
@@ -717,6 +719,10 @@ class SSHManager {
 
   disconnect(connectionId: string): void {
     this.teardown(connectionId)
+  }
+
+  getFileAccess(connectionId: string): import('../../shared/types').FileAccess | undefined {
+    return this.connections.get(connectionId)?.fileAccess
   }
 
   getClientChain(connectionId: string): Client[] | undefined {

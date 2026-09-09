@@ -1,3 +1,4 @@
+import FileAccessFields from './FileAccessFields'
 import { useState } from 'react'
 import { nanoid } from 'nanoid'
 import type {
@@ -161,6 +162,13 @@ export default function SessionDialog({
   }
 
   async function submit(): Promise<void> {
+    if (
+      profile.fileAccess?.protocol === 'scp' &&
+      (!profile.fileAccess.shell?.trim() || /[\r\n\0]/.test(profile.fileAccess.shell))
+    ) {
+      setError(t('Enter a single-line shell launch command.'))
+      return
+    }
     if (!profile.name.trim() || !profile.host.trim()) {
       setError(t('Name and host are required'))
       return
@@ -362,6 +370,13 @@ export default function SessionDialog({
               </Hint>
             </label>
           </>
+        )}
+
+        {traits.files && (
+          <FileAccessFields
+            value={auth.effective.fileAccess}
+            onChange={(value) => set('fileAccess', value)}
+          />
         )}
 
         {traits.textual && (
