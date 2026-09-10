@@ -1,9 +1,8 @@
 # IronRDP and the Remote Assistance channel
 
 > Historical notes. Version 0.12.2 removed the retired TypeScript RDP gateway and
-> the standalone Remote Assistance experiments referenced below; the version after
-> 0.13.2 removed joining a session altogether, along with the native experiment
-> this page cites. The app draws desktops with FreeRDP and does not shadow at all.
+> the standalone Remote Assistance experiments referenced below; 0.14.0 removed
+> joining a session altogether, along with the native experiment this page cites. The app draws desktops with FreeRDP and does not shadow at all.
 > Everything named here remains in Git history. Kept because the reading of
 > IronRDP below is still why the client was replaced.
 

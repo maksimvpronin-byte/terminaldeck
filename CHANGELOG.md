@@ -6,7 +6,7 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
-## Unreleased
+## 0.14.0
 
 ### Added
 
@@ -58,6 +58,8 @@ the other produces a version nobody can install, which is how 0.1.10 through
 
 ### Documentation
 
+- Rename the Russian manual to `docs/terminaldeck-manual.html`, without the
+  version it had gone out of date against, and bring it up to this one.
 - Say in the help what pausing in a background tab looks like: the file listing,
   the monitor and the desktop picture stop while a tab is not being looked at,
   and what happens on return.
