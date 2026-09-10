@@ -43,6 +43,7 @@ cmake -S "$here/shim" -B "$here/shim/build" -G Ninja \
   -DCMAKE_INSTALL_PREFIX="$prefix" \
   "${extra[@]}"
 cmake --build "$here/shim/build" --parallel
+ctest --test-dir "$here/shim/build" --output-on-failure
 cmake --install "$here/shim/build"
 
 say "Built $prefix/bin/td-rdp"

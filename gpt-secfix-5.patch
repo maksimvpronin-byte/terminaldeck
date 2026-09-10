@@ -1,0 +1,395 @@
+diff --git a/src/main/store/Backup.ts b/src/main/store/Backup.ts
+--- a/src/main/store/Backup.ts
++++ b/src/main/store/Backup.ts
+@@ -44,11 +44,344 @@
+   credentials?: Credential[]
+   /** Present only when secrets were included; encrypted under its own password. */
+   secrets?: { salt: string; payload: EncryptedPayload }
+ }
+
++type UnknownRecord = Record<string, unknown>
++
++function invalid(path: string): never {
++  throw new Error(`Invalid TerminalDeck export: ${path}`)
++}
++
++function asRecord(value: unknown, path: string): UnknownRecord {
++  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
++    return invalid(`${path} must be an object`)
++  }
++  return value as UnknownRecord
++}
++
++function requiredString(record: UnknownRecord, key: string, path: string): string {
++  const value = record[key]
++  if (typeof value !== 'string') return invalid(`${path}.${key} must be a string`)
++  return value
++}
++
++function optionalString(record: UnknownRecord, key: string, path: string): void {
++  const value = record[key]
++  if (value !== undefined && typeof value !== 'string') {
++    invalid(`${path}.${key} must be a string`)
++  }
++}
++
++function requiredNumber(record: UnknownRecord, key: string, path: string): number {
++  const value = record[key]
++  if (typeof value !== 'number' || !Number.isFinite(value)) {
++    return invalid(`${path}.${key} must be a finite number`)
++  }
++  return value
++}
++
++function optionalNumber(record: UnknownRecord, key: string, path: string): void {
++  const value = record[key]
++  if (value !== undefined && (typeof value !== 'number' || !Number.isFinite(value))) {
++    invalid(`${path}.${key} must be a finite number`)
++  }
++}
++
++function requiredBoolean(record: UnknownRecord, key: string, path: string): void {
++  if (typeof record[key] !== 'boolean') invalid(`${path}.${key} must be a boolean`)
++}
++
++function optionalBoolean(record: UnknownRecord, key: string, path: string): void {
++  const value = record[key]
++  if (value !== undefined && typeof value !== 'boolean') {
++    invalid(`${path}.${key} must be a boolean`)
++  }
++}
++
++function requiredNullableString(record: UnknownRecord, key: string, path: string): void {
++  const value = record[key]
++  if (value !== null && typeof value !== 'string') {
++    invalid(`${path}.${key} must be a string or null`)
++  }
++}
++
++function optionalNullableString(record: UnknownRecord, key: string, path: string): void {
++  const value = record[key]
++  if (value !== undefined && value !== null && typeof value !== 'string') {
++    invalid(`${path}.${key} must be a string or null`)
++  }
++}
++
++function enumField(
++  record: UnknownRecord,
++  key: string,
++  path: string,
++  allowed: readonly string[],
++  required = false
++): void {
++  const value = record[key]
++  if (value === undefined && !required) return
++  if (typeof value !== 'string' || !allowed.includes(value)) {
++    invalid(`${path}.${key} has an unsupported value`)
++  }
++}
++
++function validatedArray<T>(
++  value: unknown,
++  path: string,
++  validate: (item: unknown, itemPath: string) => T
++): T[] {
++  if (!Array.isArray(value)) return invalid(`${path} must be an array`)
++  return value.map((item, index) => validate(item, `${path}[${index}]`))
++}
++
++function stringArray(value: unknown, path: string): string[] {
++  return validatedArray(value, path, (item, itemPath) => {
++    if (typeof item !== 'string') return invalid(`${itemPath} must be a string`)
++    return item
++  })
++}
++
++function optionalStringArray(record: UnknownRecord, key: string, path: string): void {
++  if (record[key] !== undefined) stringArray(record[key], `${path}.${key}`)
++}
++
++function validateDefaults(record: UnknownRecord, path: string): void {
++  for (const key of [
++    'username',
++    'privateKeyPath',
++    'secretRef',
++    'onConnectCommand',
++    'gatewayHost',
++    'gatewayUsername',
++    'gatewaySecretRef',
++    'fontFamily',
++    'themeName'
++  ]) {
++    optionalString(record, key, path)
++  }
++  for (const key of [
++    'port',
++    'gatewayPort',
++    'desktopWidth',
++    'desktopHeight',
++    'pixelBudget',
++    'magnification',
++    'fontSize',
++    'scrollback'
++  ]) {
++    optionalNumber(record, key, path)
++  }
++  for (const key of [
++    'inheritAuth',
++    'agentForward',
++    'followTerminalCwd',
++    'inheritRdp',
++    'gatewayBypassLocal',
++    'sound',
++    'sendDensity',
++    'commandAsControl',
++    'inheritAppearance',
++    'cursorBlink'
++  ]) {
++    optionalBoolean(record, key, path)
++  }
++  optionalNullableString(record, 'jumpHostId', path)
++  enumField(record, 'authMethod', path, ['password', 'privateKey', 'agent'])
++  enumField(record, 'resolution', path, ['fit', 'fixed'])
++  enumField(record, 'cursorStyle', path, ['block', 'underline', 'bar'])
++}
++
++function validateGitFolderLink(value: unknown, path: string): void {
++  const record = asRecord(value, path)
++  requiredString(record, 'repoUrl', path)
++  optionalString(record, 'branch', path)
++  stringArray(record.paths, `${path}.paths`)
++  stringArray(record.includedGroups, `${path}.includedGroups`)
++  optionalStringArray(record, 'knownGroups', path)
++  optionalStringArray(record, 'lastFiles', path)
++  optionalNumber(record, 'lastSyncedAt', path)
++  optionalString(record, 'lastRevision', path)
++  optionalString(record, 'lastError', path)
++}
++
++function validatePortForward(value: unknown, path: string): void {
++  const record = asRecord(value, path)
++  requiredString(record, 'id', path)
++  enumField(record, 'type', path, ['local', 'remote', 'dynamic'], true)
++  requiredString(record, 'srcHost', path)
++  requiredNumber(record, 'srcPort', path)
++  optionalString(record, 'dstHost', path)
++  optionalNumber(record, 'dstPort', path)
++}
++
++function validateSessionGroup(value: unknown, path: string): SessionGroup {
++  const record = asRecord(value, path)
++  const id = requiredString(record, 'id', path)
++  if (id.length === 0 || id.length > 128 || id === '.' || id === '..' || /[\\/\0]/.test(id)) {
++    invalid(`${path}.id is not a safe identifier`)
++  }
++  requiredString(record, 'name', path)
++  requiredNullableString(record, 'parentId', path)
++  validateDefaults(record, path)
++  if (record.git !== undefined) validateGitFolderLink(record.git, `${path}.git`)
++  return record as unknown as SessionGroup
++}
++
++function validateSessionProfile(value: unknown, path: string): SessionProfile {
++  const record = asRecord(value, path)
++  requiredString(record, 'id', path)
++  requiredString(record, 'name', path)
++  requiredString(record, 'host', path)
++  requiredNullableString(record, 'groupId', path)
++  stringArray(record.tags, `${path}.tags`)
++  requiredBoolean(record, 'logToFile', path)
++  validatedArray(record.portForwards, `${path}.portForwards`, (item, itemPath) => {
++    validatePortForward(item, itemPath)
++    return item
++  })
++  requiredNumber(record, 'createdAt', path)
++  requiredNumber(record, 'updatedAt', path)
++  optionalString(record, 'color', path)
++  enumField(record, 'protocol', path, ['ssh', 'rdp'])
++  validateDefaults(record, path)
++  return record as unknown as SessionProfile
++}
++
++function validateInventorySource(value: unknown, path: string): InventorySource {
++  const record = asRecord(value, path)
++  const id = requiredString(record, 'id', path)
++  if (!/^[A-Za-z0-9_-]{1,128}$/.test(id)) invalid(`${path}.id is not a safe identifier`)
++  requiredString(record, 'name', path)
++  requiredString(record, 'repoUrl', path)
++  stringArray(record.paths, `${path}.paths`)
++  optionalString(record, 'branch', path)
++  optionalString(record, 'color', path)
++  optionalNumber(record, 'lastSyncedAt', path)
++  optionalString(record, 'lastRevision', path)
++  optionalString(record, 'lastError', path)
++  optionalStringArray(record, 'lastFiles', path)
++  validateDefaults(record, path)
++  return record as unknown as InventorySource
++}
++
++function validateInventoryOverride(value: unknown, path: string): InventoryOverride {
++  const record = asRecord(value, path)
++  requiredString(record, 'nodeId', path)
++  optionalString(record, 'color', path)
++  validateDefaults(record, path)
++  return record as unknown as InventoryOverride
++}
++
++function validateCredential(value: unknown, path: string): Credential {
++  const record = asRecord(value, path)
++  requiredString(record, 'id', path)
++  requiredString(record, 'name', path)
++  requiredString(record, 'username', path)
++  enumField(record, 'authMethod', path, ['password', 'privateKey', 'agent'], true)
++  optionalString(record, 'privateKeyPath', path)
++  optionalString(record, 'secretRef', path)
++  requiredNumber(record, 'createdAt', path)
++  requiredNumber(record, 'updatedAt', path)
++  return record as unknown as Credential
++}
++
++function validateSnippet(value: unknown, path: string): Snippet {
++  const record = asRecord(value, path)
++  requiredString(record, 'id', path)
++  requiredString(record, 'name', path)
++  requiredString(record, 'command', path)
++  stringArray(record.tags, `${path}.tags`)
++  requiredNumber(record, 'createdAt', path)
++  requiredNumber(record, 'updatedAt', path)
++  return record as unknown as Snippet
++}
++
++function validateCollection(value: unknown, path: string): HostCollection {
++  const record = asRecord(value, path)
++  requiredString(record, 'id', path)
++  requiredString(record, 'name', path)
++  stringArray(record.hostIds, `${path}.hostIds`)
++  requiredNumber(record, 'createdAt', path)
++  requiredNumber(record, 'updatedAt', path)
++  optionalString(record, 'color', path)
++  validateDefaults(record, path)
++  return record as unknown as HostCollection
++}
++
++function validateEncryptedPayload(value: unknown, path: string): EncryptedPayload {
++  const record = asRecord(value, path)
++  return {
++    iv: requiredString(record, 'iv', path),
++    tag: requiredString(record, 'tag', path),
++    data: requiredString(record, 'data', path)
++  }
++}
++
++function validateBackupFile(value: unknown): BackupFile {
++  const record = asRecord(value, 'backup')
++  if (record.format !== 'terminaldeck-backup') {
++    return invalid('backup.format is not terminaldeck-backup')
++  }
++  if (record.version !== 1) return invalid('backup.version is unsupported')
++
++  let secrets: BackupFile['secrets']
++  if (record.secrets !== undefined) {
++    const envelope = asRecord(record.secrets, 'backup.secrets')
++    secrets = {
++      salt: requiredString(envelope, 'salt', 'backup.secrets'),
++      payload: validateEncryptedPayload(envelope.payload, 'backup.secrets.payload')
++    }
++  }
++
++  return {
++    format: 'terminaldeck-backup',
++    version: 1,
++    exportedAt: requiredNumber(record, 'exportedAt', 'backup'),
++    groups: validatedArray(record.groups, 'backup.groups', validateSessionGroup),
++    sessions: validatedArray(record.sessions, 'backup.sessions', validateSessionProfile),
++    snippets: validatedArray(record.snippets, 'backup.snippets', validateSnippet),
++    collections: validatedArray(record.collections, 'backup.collections', validateCollection),
++    inventorySources: validatedArray(
++      record.inventorySources,
++      'backup.inventorySources',
++      validateInventorySource
++    ),
++    inventoryOverrides: validatedArray(
++      record.inventoryOverrides,
++      'backup.inventoryOverrides',
++      validateInventoryOverride
++    ),
++    gitFolderOverrides:
++      record.gitFolderOverrides === undefined
++        ? undefined
++        : validatedArray(
++            record.gitFolderOverrides,
++            'backup.gitFolderOverrides',
++            validateInventoryOverride
++          ),
++    credentials:
++      record.credentials === undefined
++        ? undefined
++        : validatedArray(record.credentials, 'backup.credentials', validateCredential),
++    secrets
++  }
++}
++
++function validateSecretMap(value: unknown): Record<string, string> {
++  const record = asRecord(value, 'credentials payload')
++  const out = Object.create(null) as Record<string, string>
++  for (const [ref, secret] of Object.entries(record)) {
++    if (!/^[A-Za-z0-9_-]{1,128}$/.test(ref)) invalid('credentials payload contains an invalid id')
++    if (typeof secret !== 'string') invalid(`credentials payload.${ref} must be a string`)
++    out[ref] = secret
++  }
++  return out
++}
++
+ /**
+  * Writes everything but the terminal look-and-feel to one file. Credentials are
+  * optional and, when included, are re-encrypted under a password given here —
+  * they are never written in the clear, and the master password is not reused so
+  * the file can be shared with a different machine without handing over the vault.
+  */
+@@ -121,14 +454,11 @@
+     properties: ['openFile'],
+     filters: [{ name: 'JSON', extensions: ['json'] }]
+   })
+   if (res.canceled || res.filePaths.length === 0) return undefined
+-
+-  const parsed = JSON.parse(readFileSync(res.filePaths[0], 'utf8')) as Partial<BackupFile>
+-  if (parsed.format !== 'terminaldeck-backup') {
+-    throw new Error('That file is not a TerminalDeck export')
+-  }
++  const parsed = validateBackupFile(JSON.parse(readFileSync(res.filePaths[0], 'utf8')) as unknown)
+
+   const summary: ImportSummary = {
+     groups: 0,
+     sessions: 0,
+     snippets: 0,
+@@ -143,20 +473,28 @@
+   // Secrets first: a session is useless if its credential lands later and fails.
+   if (parsed.secrets) {
+     if (!password) throw new Error('This export contains credentials and needs its password')
+-    let secrets: Record<string, string>
+     // Derived outside the try: deriving cannot fail for a wrong password, and
+     // reporting an out-of-memory as "wrong password" would send someone hunting
+     // for a password that was right all along.
+     const key = await deriveKey(password, parsed.secrets.salt)
++    let decrypted: string
+     try {
+-      secrets = JSON.parse(decrypt(key, parsed.secrets.payload)) as Record<string, string>
++      decrypted = decrypt(key, parsed.secrets.payload)
+     } catch {
+       throw new Error('Wrong password for the credentials in this export')
+     } finally {
+       wipe(key)
+     }
++
++    let decoded: unknown
++    try {
++      decoded = JSON.parse(decrypted) as unknown
++    } catch {
++      throw new Error('The credentials payload in this export is invalid')
++    }
++    const secrets = validateSecretMap(decoded)
+     for (const [ref, value] of Object.entries(secrets)) {
+       vault.setSecret(ref, value)
+       summary.secrets++
+     }
+   }

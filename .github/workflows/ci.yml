@@ -83,3 +83,6 @@ jobs:
       # pushed, on the runner that was about to publish it.
       - name: Build
         run: npm run build
+
+      - name: Verify the built inventory worker
+        run: npm run verify:performance

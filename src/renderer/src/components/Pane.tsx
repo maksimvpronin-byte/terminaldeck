@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { memo, useRef, useState } from 'react'
 import type { DragEvent as ReactDragEvent } from 'react'
 import type { PaneNode, PaneTarget } from '../state/store'
 import {
@@ -11,6 +11,7 @@ import {
 } from '../state/store'
 import { DRAG_MIME, edgeFromPoint, edgeToSplit, type DragItem, type DropEdge } from '../state/dnd'
 import TerminalHost from './TerminalHost'
+import { useDocumentVisible } from '../hooks/useDocumentVisible'
 import GraphicalHost, { toggleFullscreen } from './GraphicalHost'
 import SftpPanel from './SftpPanel'
 import TunnelsPanel from './TunnelsPanel'
@@ -21,7 +22,7 @@ import Hint from './Hint'
 import { keyHint } from '../state/keys'
 import { useT } from '../i18n'
 
-export default function Pane({
+function Pane({
   tabId,
   node
 }: {
@@ -77,6 +78,8 @@ export default function Pane({
    */
   const [measured, setMeasured] = useState('')
 
+  const documentVisible = useDocumentVisible()
+  const visible = isActiveTab && documentVisible
   const isActive = isActiveTab && activePaneId === node.id
 
   function onDragOver(e: ReactDragEvent): void {
@@ -250,10 +253,12 @@ export default function Pane({
             sessionId={sessionId ?? undefined}
             credentialId={credentialId}
             onMeasured={setMeasured}
-            paneVisible={isActiveTab}
+            paneVisible={visible}
           />
         )}
-        {traits.files && node.sftpOpen && <SftpPanel connectionId={node.connectionId} />}
+        {traits.files && node.sftpOpen && (
+          <SftpPanel connectionId={node.connectionId} visible={visible} />
+        )}
         {traits.tunnels && node.tunnelsOpen && (
           <TunnelsPanel
             connectionId={node.connectionId}
@@ -263,7 +268,11 @@ export default function Pane({
       </div>
       {/* Below the body, not inside it: the strip is about the host, so it
           spans the terminal and any panel open beside it. */}
-      {traits.monitor && node.monitorOpen && <MonitorBar connectionId={node.connectionId} />}
+      {traits.monitor && node.monitorOpen && (
+        <MonitorBar connectionId={node.connectionId} visible={visible} />
+      )}
     </div>
   )
 }
+
+export default memo(Pane)

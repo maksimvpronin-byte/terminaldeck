@@ -82,6 +82,46 @@ export function wheelUnits(delta: number, deltaMode: number): number {
   return Math.max(-255, Math.min(255, units))
 }
 
+export interface WheelTurn {
+  units: number
+  horizontal: boolean
+}
+
+/**
+ * Split a browser wheel event into the RDP turns it should carry.
+ *
+ * Trackpads rarely keep a gesture perfectly on one axis: a vertical swipe can
+ * contain a few pixels of `deltaX`. Sending that small cross-axis value as a
+ * second RDP event makes a remote document drift diagonally. Keep an explicit
+ * horizontal gesture, but discard a secondary axis when it is at most 35% of
+ * the main one. A gesture with comparable movement on both axes remains
+ * diagonal.
+ */
+export function wheelTurns(deltaX: number, deltaY: number, deltaMode: number): WheelTurn[] {
+  const vertical = wheelUnits(deltaY, deltaMode)
+  const horizontal = wheelUnits(deltaX, deltaMode)
+
+  if (vertical === 0 && horizontal === 0) return []
+  if (vertical === 0) return [{ units: horizontal, horizontal: true }]
+  if (horizontal === 0) return [{ units: vertical, horizontal: false }]
+
+  const verticalMagnitude = Math.abs(vertical)
+  const horizontalMagnitude = Math.abs(horizontal)
+  const major = Math.max(verticalMagnitude, horizontalMagnitude)
+  const minor = Math.min(verticalMagnitude, horizontalMagnitude)
+
+  if (minor <= major * 0.35) {
+    return verticalMagnitude >= horizontalMagnitude
+      ? [{ units: vertical, horizontal: false }]
+      : [{ units: horizontal, horizontal: true }]
+  }
+
+  return [
+    { units: vertical, horizontal: false },
+    { units: horizontal, horizontal: true }
+  ]
+}
+
 /**
  * A wheel turn, as the flags field that carries it.
  *

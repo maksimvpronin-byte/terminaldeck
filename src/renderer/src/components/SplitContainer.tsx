@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import type { PaneNode } from '../state/store'
-import { useStore } from '../state/store'
+import { useStore, flushLayout } from '../state/store'
 import Pane from './Pane'
 
 type LeafNode = Extract<PaneNode, { type: 'leaf' }>
@@ -88,14 +88,10 @@ function computeLayout(
   }
 }
 
-export default function SplitContainer({
-  tabId,
-  node
-}: {
-  tabId: string
-  node: PaneNode
-}): JSX.Element {
+function SplitContainer({ tabId, node }: { tabId: string; node: PaneNode }): JSX.Element {
   const resizeSplit = useStore((s) => s.resizeSplit)
+  const dragCleanup = useRef<(() => void) | undefined>(undefined)
+  useEffect(() => () => dragCleanup.current?.(), [])
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
 
@@ -126,9 +122,17 @@ export default function SplitContainer({
 
   function onDragStart(divider: DividerLayout, e: React.MouseEvent): void {
     e.preventDefault()
+    dragCleanup.current?.()
     const isRow = divider.dir === 'row'
     const { parentRect } = divider
 
+    let frame = 0
+    let latest: [number, number] | undefined
+    function apply(): void {
+      frame = 0
+      if (latest) resizeSplit(tabId, divider.splitId, latest)
+      latest = undefined
+    }
     function onMove(ev: MouseEvent): void {
       const containerBox = containerRef.current?.getBoundingClientRect()
       if (!containerBox) return
@@ -138,12 +142,21 @@ export default function SplitContainer({
       const total = isRow ? parentRect.width : parentRect.height
       let pct = (pos / total) * 100
       pct = Math.min(80, Math.max(20, pct))
-      resizeSplit(tabId, divider.splitId, [pct, 100 - pct])
+      latest = [pct, 100 - pct]
+      if (!frame) frame = requestAnimationFrame(apply)
     }
     function onUp(): void {
+      cancelAnimationFrame(frame)
+      apply()
+      flushLayout()
+      cleanup()
+    }
+    function cleanup(): void {
+      cancelAnimationFrame(frame)
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
     }
+    dragCleanup.current = cleanup
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
   }
@@ -170,3 +183,5 @@ export default function SplitContainer({
     </div>
   )
 }
+
+export default memo(SplitContainer)

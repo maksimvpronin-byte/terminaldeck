@@ -18,9 +18,11 @@ const HISTORY = 40
  * read as an idle server rather than an unanswered question.
  */
 export default function MonitorBar({
-  connectionId
+  connectionId,
+  visible = true
 }: {
   connectionId?: string
+  visible?: boolean
 }): JSX.Element | null {
   const t = useT()
   const [stats, setStats] = useState<RemoteStats | null>(null)
@@ -28,7 +30,7 @@ export default function MonitorBar({
   const history = useRef<number[]>([])
 
   useEffect(() => {
-    if (!connectionId) return
+    if (!connectionId || !visible) return
     setStopped(false)
     history.current = []
     window.td.monitor.start(connectionId)
@@ -46,7 +48,7 @@ export default function MonitorBar({
       off()
       window.td.monitor.stop(connectionId)
     }
-  }, [connectionId])
+  }, [connectionId, visible])
 
   if (!connectionId) return null
   if (stopped) {

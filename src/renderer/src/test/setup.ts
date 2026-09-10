@@ -55,6 +55,7 @@ if (typeof window !== 'undefined') {
       clipboard: stub({ read: () => '', write: () => undefined }),
       ssh: stub(),
       sftp: stub(),
+      monitor: stub(),
       rdp: stub(),
       ui: stub({ onZoom: () => () => undefined, onForwardKey: () => () => undefined }),
       updates: stub({

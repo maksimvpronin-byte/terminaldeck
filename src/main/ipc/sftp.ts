@@ -4,6 +4,7 @@ import type { TransferDecisions, TransferPlan } from '../../shared/types'
 import { remoteEdit } from '../ssh/RemoteEdit'
 import { sftpManager } from '../ssh/SFTPManager'
 import { requireUnlocked } from '../vault/locked'
+import { transferProgress } from '../ssh/transferProgress'
 import { focusedWin } from './win'
 
 /** The file browser: listing, transfers, and editing a remote file locally. */
@@ -73,21 +74,32 @@ export function registerSftpHandlers(): void {
       plan: TransferPlan,
       decisions: TransferDecisions,
       destConnectionId?: string
-    ) =>
-      sftpManager.runPlan(
-        connectionId,
-        plan,
-        decisions,
-        (transferred, total, path) => {
-          reportTransfer(connectionId, path, transferred, total)
-          // A relay concerns two panels, and the one the files were dropped on
-          // is the one the user is watching. Both get the bar.
-          if (destConnectionId && destConnectionId !== connectionId) {
-            reportTransfer(destConnectionId, path, transferred, total)
+    ) => {
+      let lastProgress: { path: string; transferred: number; total: number } | undefined
+      const report = transferProgress<{ path: string; transferred: number; total: number }>((p) => {
+        reportTransfer(connectionId, p.path, p.transferred, p.total)
+        if (destConnectionId && destConnectionId !== connectionId) {
+          reportTransfer(destConnectionId, p.path, p.transferred, p.total)
+        }
+      })
+      return sftpManager
+        .runPlan(
+          connectionId,
+          plan,
+          decisions,
+          (transferred, total, path) => {
+            lastProgress = { transferred, total, path }
+            report(lastProgress)
+          },
+          destConnectionId
+        )
+        .finally(() => {
+          // Clear both relay panels after a failed transfer too.
+          if (lastProgress && lastProgress.transferred < lastProgress.total) {
+            report({ ...lastProgress, transferred: lastProgress.total })
           }
-        },
-        destConnectionId
-      )
+        })
+    }
   )
   handleWhileUnlocked(
     IPC.sftpCompare,

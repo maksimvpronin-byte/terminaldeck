@@ -254,6 +254,7 @@ export default function GraphicalHost({
     <div className="graphical-host">
       {running && sessionId && (
         <RemoteScreen
+          visible={paneVisible}
           key={attempt}
           sessionId={sessionId}
           credentialId={credentialId}

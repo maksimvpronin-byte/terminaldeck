@@ -18,6 +18,13 @@ import { gitGroupId, gitHostId } from '../../shared/gitFolders'
 let userData = ''
 vi.mock('electron', () => ({ app: { getPath: (): string => userData } }))
 
+vi.mock('../inventory/parseInWorker', async () => {
+  const { readInventory } = await import('../inventory/readInventory')
+  return {
+    parseInWorker: async (request: Parameters<typeof readInventory>[0]) => readInventory(request)
+  }
+})
+
 userData = mkdtempSync(join(tmpdir(), 'terminaldeck-gitfolder-'))
 const { sessionStore } = await import('../store/SessionStore')
 const { gitFolderStore } = await import('./GitFolderStore')

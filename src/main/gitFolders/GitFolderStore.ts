@@ -1,8 +1,6 @@
 import { app } from 'electron'
 import { createHash } from 'crypto'
-import { readFileSync } from 'fs'
-import { basename, dirname, join, relative } from 'path'
-import { parse } from 'yaml'
+import { basename, join, relative } from 'path'
 import type {
   GitFolderData,
   GitFolderLink,
@@ -16,8 +14,8 @@ import type {
 } from '../../shared/types'
 import { gitNodePrefix, groupPathOf, pruneTree, reconcileSelection } from '../../shared/gitFolders'
 import { applyOverride } from '../../shared/overrides'
-import { parseAnsibleInventory } from '../inventory/ansible'
-import { noInventoryFound, readVarsFor, resolveInventoryFiles } from '../inventory/files'
+import { parseInWorker } from '../inventory/parseInWorker'
+import { noInventoryFound } from '../inventory/files'
 import { headRevision, syncRepo } from '../inventory/GitRepo'
 import { removeTree } from './removeTree'
 import { readJson, writeJson } from '../store/jsonFile'
@@ -175,60 +173,44 @@ class GitFolderStore {
     const checkout = checkoutFor(link.repoUrl, link.branch)
     // One at a time per working copy: a sync resets and cleans it, and two
     // folders sharing a repository can ask at the same moment.
-    const dir = await this.queue(checkout, () =>
-      syncRepo(reposRoot(), basename(checkout), link.repoUrl, link.branch)
-    )
-    /*
-     * The clone this folder had to itself, before checkouts were shared. Left
-     * behind it is a whole repository per folder that nothing will ever read
-     * again — and on an inventory of any size that is the largest thing this
-     * application keeps.
-     */
-    const legacyCheckout = legacyCheckoutFor(folderId)
-    if (legacyCheckout && legacyCheckout !== checkout) removeTree(legacyCheckout)
+    return this.queue(checkout, async () => {
+      const dir = await syncRepo(reposRoot(), basename(checkout), link.repoUrl, link.branch)
+      /*
+       * The clone this folder had to itself, before checkouts were shared. Left
+       * behind it is a whole repository per folder that nothing will ever read
+       * again — and on an inventory of any size that is the largest thing this
+       * application keeps.
+       */
+      const legacyCheckout = legacyCheckoutFor(folderId)
+      if (legacyCheckout && legacyCheckout !== checkout) removeTree(legacyCheckout)
 
-    const files = resolveInventoryFiles(dir, link.paths)
-
-    const tree: GitFolderTree = { groupId: folderId, groups: [], sessions: [], memberships: {} }
-    for (const file of files) {
-      const baseDir = dirname(file)
-      const doc = parse(readFileSync(file, 'utf8'))
-      const parsed = parseAnsibleInventory(
-        doc,
-        folderId,
-        (kind, name) => readVarsFor(baseDir, kind === 'group' ? 'group_vars' : 'host_vars', name),
-        'git'
-      )
-      // Several inventory files can describe the same groups; keep the first.
-      for (const g of parsed.groups) {
-        if (tree.groups.some((x) => x.id === g.id)) continue
-        // The folder itself stands where the inventory's own root would be, so
-        // what is set on it is inherited by everything the repository produces.
-        tree.groups.push({ ...g, parentId: g.parentId ?? folderId })
+      const parsed = await parseInWorker({
+        dir,
+        paths: link.paths,
+        sourceId: folderId,
+        prefix: 'git',
+        rootId: folderId
+      })
+      const { files } = parsed
+      const tree: GitFolderTree = {
+        groupId: folderId,
+        groups: parsed.groups,
+        sessions: parsed.hosts,
+        memberships: parsed.memberships
       }
-      for (const h of parsed.hosts) {
-        if (!tree.sessions.some((x) => x.id === h.id)) tree.sessions.push(h)
-      }
-      // Unioned rather than kept from the first file: a host named in two files
-      // belongs to the groups of both.
-      for (const [hostKey, groupIds] of Object.entries(parsed.memberships)) {
-        tree.memberships[hostKey] = [
-          ...new Set([...(tree.memberships[hostKey] ?? []), ...groupIds])
-        ]
-      }
-    }
 
-    const paths = tree.groups
-      .map((g) => groupPathOf(folderId, g.id))
-      .filter((p): p is string => p !== undefined)
+      const paths = tree.groups
+        .map((g) => groupPathOf(folderId, g.id))
+        .filter((p): p is string => p !== undefined)
 
-    return {
-      tree,
-      paths,
-      revision: await headRevision(dir).catch(() => undefined),
-      files: files.map((f) => relative(dir, f)),
-      warning: files.length === 0 ? noInventoryFound(link.paths) : undefined
-    }
+      return {
+        tree,
+        paths,
+        revision: await headRevision(dir).catch(() => undefined),
+        files: files.map((f) => relative(dir, f)),
+        warning: files.length === 0 ? noInventoryFound(link.paths) : undefined
+      }
+    })
   }
 
   /**

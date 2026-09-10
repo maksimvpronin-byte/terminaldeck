@@ -1,3 +1,4 @@
+import { forEachConcurrent } from './parallel'
 import { ScpShell } from './ScpShell'
 import type { Writable } from 'stream'
 import type { SFTPWrapper } from 'ssh2'
@@ -74,6 +75,7 @@ class SFTPManager {
     return shell
   }
   private sessions = new Map<string, SFTPWrapper>()
+  private opening = new Map<string, Promise<SFTPWrapper>>()
   /** Makes each in-progress download's temporary name its own. */
   private nextTransfer = 0
 
@@ -85,11 +87,25 @@ class SFTPManager {
     if (!chain || chain.length === 0) throw new Error('No active SSH connection')
     const target = chain[chain.length - 1]
 
-    const sftp = await new Promise<SFTPWrapper>((resolve, reject) => {
+    const pending = this.opening.get(connectionId)
+    if (pending) return pending
+    const opening = new Promise<SFTPWrapper>((resolve, reject) => {
       target.sftp((err, sftp) => (err ? reject(err) : resolve(sftp)))
     })
-    this.sessions.set(connectionId, sftp)
-    return sftp
+      .then((sftp) => {
+        if (this.opening.get(connectionId) !== opening) {
+          sftp.end()
+          throw new Error('SSH connection closed while opening SFTP')
+        }
+        this.sessions.set(connectionId, sftp)
+        return sftp
+      })
+      .finally(() => {
+        if (this.opening.get(connectionId) === opening) this.opening.delete(connectionId)
+      })
+    // Every waiter shares validation and cleanup, not just the raw open callback.
+    this.opening.set(connectionId, opening)
+    return opening
   }
 
   async list(connectionId: string, remotePath: string): Promise<SftpEntry[]> {
@@ -477,8 +493,8 @@ class SFTPManager {
   ): Promise<TransferPlan> {
     const items = await this.localTree(localPath, remoteParent)
     const found = new Map<string, DestInfo | null>()
-    for (const item of items) {
-      if (found.has(item.destPath)) continue
+    const unique = [...new Map(items.map((item) => [item.destPath, item])).values()]
+    await forEachConcurrent(unique, async (item) => {
       try {
         const info = await this.statPath(connectionId, item.destPath)
         found.set(
@@ -502,7 +518,7 @@ class SFTPManager {
           unreadable: true
         })
       }
-    }
+    })
     return buildTransferPlan('upload', items, (p) => found.get(p) ?? null)
   }
 
@@ -521,8 +537,8 @@ class SFTPManager {
       ? await this.singleRemoteItem(connectionId, remotePath, localTarget)
       : await this.remoteTree(connectionId, remotePath, localTarget)
     const found = new Map<string, DestInfo | null>()
-    for (const item of items) {
-      if (found.has(item.destPath)) continue
+    const unique = [...new Map(items.map((item) => [item.destPath, item])).values()]
+    await forEachConcurrent(unique, async (item) => {
       try {
         const info = await lstat(item.destPath)
         found.set(item.destPath, {
@@ -540,7 +556,7 @@ class SFTPManager {
             : { size: 0, mtime: 0, isDirectory: false, isSymlink: false, unreadable: true }
         )
       }
-    }
+    })
     return buildTransferPlan('download', items, (p) => found.get(p) ?? null)
   }
 
@@ -563,8 +579,8 @@ class SFTPManager {
     const items = await this.remoteTree(srcConnectionId, srcPath, destDir, joinRemote)
 
     const found = new Map<string, DestInfo | null>()
-    for (const item of items) {
-      if (found.has(item.destPath)) continue
+    const unique = [...new Map(items.map((item) => [item.destPath, item])).values()]
+    await forEachConcurrent(unique, async (item) => {
       try {
         const info = await this.statPath(dstConnectionId, item.destPath)
         found.set(
@@ -588,7 +604,7 @@ class SFTPManager {
           unreadable: true
         })
       }
-    }
+    })
     return buildTransferPlan('relay', items, (p) => found.get(p) ?? null)
   }
 
@@ -618,20 +634,17 @@ class SFTPManager {
         skipped++
         continue
       }
+      let totalBytes = item.sourceSize
+      const report = (transferred: number, total: number): void => {
+        totalBytes = total
+        onProgress?.(transferred, total, item.sourcePath)
+      }
       if (plan.direction === 'relay') {
         await this.ensureRemoteDir(destConnectionId!, parentOf(item.destPath))
-        await this.relay(
-          connectionId,
-          item.sourcePath,
-          destConnectionId!,
-          item.destPath,
-          (t, total) => onProgress?.(t, total, item.sourcePath)
-        )
+        await this.relay(connectionId, item.sourcePath, destConnectionId!, item.destPath, report)
       } else if (plan.direction === 'upload') {
         await this.ensureRemoteDir(connectionId, parentOf(item.destPath))
-        await this.upload(connectionId, item.sourcePath, item.destPath, (t, total) =>
-          onProgress?.(t, total, item.sourcePath)
-        )
+        await this.upload(connectionId, item.sourcePath, item.destPath, report)
       } else {
         // dirname, not a hand-rolled search for the last '/'. This is a local
         // path, and on Windows it holds no forward slash at all: the search
@@ -640,10 +653,9 @@ class SFTPManager {
         // called C:\...\a.tx. It went unnoticed because that same call, being
         // recursive, made the real parent on the way past.
         await mkdir(dirname(item.destPath), { recursive: true })
-        await this.download(connectionId, item.sourcePath, item.destPath, (t, total) =>
-          onProgress?.(t, total, item.sourcePath)
-        )
+        await this.download(connectionId, item.sourcePath, item.destPath, report)
       }
+      report(totalBytes, totalBytes)
       written++
     }
     return { written, skipped }
@@ -705,6 +717,7 @@ class SFTPManager {
   }
 
   releaseConnection(connectionId: string): void {
+    this.opening.delete(connectionId)
     this.shells.get(connectionId)?.close()
     this.shells.delete(connectionId)
     this.sessions.delete(connectionId)

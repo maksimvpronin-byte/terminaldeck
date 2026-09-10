@@ -12,9 +12,11 @@ import { segmentsOf } from '../../../shared/remotePath'
 export default function SftpTree({
   connectionId,
   path,
-  onOpen
+  onOpen,
+  visible = true
 }: {
   connectionId?: string
+  visible?: boolean
   /** Where the list pane is; the tree reveals and highlights it. */
   path: string
   onOpen: (path: string) => void
@@ -57,7 +59,7 @@ export default function SftpTree({
   // Reveal wherever the list pane went, however it got there — a click here, a
   // typed path, or the terminal's own cd.
   useEffect(() => {
-    if (!connectionId || !path.startsWith('/')) return
+    if (!connectionId || !visible || !path.startsWith('/')) return
     const ancestors = segmentsOf(path).map((s) => s.path)
     setExpanded((cur) => {
       const next = new Set(cur)
@@ -72,7 +74,7 @@ export default function SftpTree({
     // fetch that completes. A stale read costs one redundant fetch, which the
     // loading set then swallows; listing them costs a loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path, connectionId])
+  }, [path, connectionId, visible])
 
   // A reconnect gets a fresh tree rather than another host's folders.
   useEffect(() => {

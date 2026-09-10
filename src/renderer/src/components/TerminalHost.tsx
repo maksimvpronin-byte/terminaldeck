@@ -229,12 +229,23 @@ export default function TerminalHost({
     else if (restored) setClosed(true)
     else connect(generation)
 
+    let resizeFrame = 0
+    let lastCols = term.cols
+    let lastRows = term.rows
     const resizeObserver = new ResizeObserver((entries) => {
       const box = entries[0]?.contentRect
       // Skip while the pane is hidden (0x0) — fitting then yields bogus cols/rows.
       if (!box || box.width === 0 || box.height === 0) return
-      fit.fit()
-      if (connIdRef.current) window.td.ssh.resize(connIdRef.current, term.cols, term.rows)
+      if (resizeFrame) return
+      resizeFrame = requestAnimationFrame(() => {
+        resizeFrame = 0
+        if (!hostRef.current?.clientWidth || !hostRef.current.clientHeight) return
+        fit.fit()
+        if (term.cols === lastCols && term.rows === lastRows) return
+        lastCols = term.cols
+        lastRows = term.rows
+        if (connIdRef.current) window.td.ssh.resize(connIdRef.current, term.cols, term.rows)
+      })
     })
     resizeObserver.observe(hostRef.current)
 
@@ -248,6 +259,7 @@ export default function TerminalHost({
       generationRef.current++
       detachListeners()
       resizeObserver.disconnect()
+      cancelAnimationFrame(resizeFrame)
       term.dispose()
       if (connIdRef.current) window.td.ssh.disconnect(connIdRef.current)
     }

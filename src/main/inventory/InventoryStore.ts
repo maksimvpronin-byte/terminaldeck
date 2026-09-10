@@ -1,15 +1,13 @@
 import { app } from 'electron'
-import { join, dirname, relative } from 'path'
-import { readFileSync } from 'fs'
-import { parse } from 'yaml'
+import { join, relative } from 'path'
 import type {
   InventoryData,
   InventoryOverride,
   InventorySource,
   InventoryTree
 } from '../../shared/types'
-import { parseAnsibleInventory } from './ansible'
-import { noInventoryFound, readVarsFor, resolveInventoryFiles } from './files'
+import { parseInWorker } from './parseInWorker'
+import { noInventoryFound } from './files'
 import { syncRepo, headRevision } from './GitRepo'
 import { applyOverride, withoutBlanks } from '../../shared/overrides'
 import { readJson, writeJson } from '../store/jsonFile'
@@ -110,13 +108,21 @@ class InventoryStore {
       )
   }
 
-  async sync(sourceId: string): Promise<InventoryTree> {
+  private syncing = new Map<string, Promise<InventoryTree>>()
+  sync(sourceId: string): Promise<InventoryTree> {
+    const pending = this.syncing.get(sourceId)
+    if (pending) return pending
+    const next = this.syncSource(sourceId).finally(() => this.syncing.delete(sourceId))
+    this.syncing.set(sourceId, next)
+    return next
+  }
+
+  private async syncSource(sourceId: string): Promise<InventoryTree> {
     const source = this.data.sources.find((s) => s.id === sourceId)
     if (!source) throw new Error('Unknown inventory source')
 
     try {
       const dir = await syncRepo(reposRoot(), source.id, source.repoUrl, source.branch)
-      const files = resolveInventoryFiles(dir, source.paths)
 
       // The source itself is the tree's root group, so credentials set on it are
       // inherited by every group and host the repository produces.
@@ -128,29 +134,17 @@ class InventoryStore {
         sessions: [],
         memberships: {}
       }
-      for (const file of files) {
-        const baseDir = dirname(file)
-        const doc = parse(readFileSync(file, 'utf8'))
-        const parsed = parseAnsibleInventory(doc, sourceId, (kind, name) =>
-          readVarsFor(baseDir, kind === 'group' ? 'group_vars' : 'host_vars', name)
-        )
-        // Several inventory files can describe the same groups; keep the first.
-        for (const g of parsed.groups) {
-          if (tree.groups.some((x) => x.id === g.id)) continue
-          // Top-level groups hang off the source rather than off nothing.
-          tree.groups.push({ ...g, parentId: g.parentId ?? rootId })
-        }
-        for (const h of parsed.hosts) {
-          if (!tree.sessions.some((x) => x.id === h.id)) tree.sessions.push(h)
-        }
-        // Memberships are unioned rather than kept from the first file: a host
-        // named in two files belongs to the groups of both.
-        for (const [hostKey, groupIds] of Object.entries(parsed.memberships)) {
-          tree.memberships[hostKey] = [
-            ...new Set([...(tree.memberships[hostKey] ?? []), ...groupIds])
-          ]
-        }
-      }
+      const parsed = await parseInWorker({
+        dir,
+        paths: source.paths,
+        sourceId,
+        prefix: 'inv',
+        rootId
+      })
+      const { files } = parsed
+      tree.groups.push(...parsed.groups)
+      tree.sessions = parsed.hosts
+      tree.memberships = parsed.memberships
 
       this.trees.set(sourceId, tree)
       source.lastSyncedAt = Date.now()

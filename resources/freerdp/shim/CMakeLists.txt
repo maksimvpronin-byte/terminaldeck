@@ -43,3 +43,16 @@ elseif(UNIX)
 endif()
 
 install(TARGETS td-rdp RUNTIME DESTINATION bin)
+
+include(CTest)
+if(BUILD_TESTING)
+  add_executable(td-frame-test td_frame_test.c td_proto.c)
+  target_link_libraries(td-frame-test PRIVATE freerdp-client freerdp winpr)
+  # Assertions must stay active in the release configuration used by CI.
+  if(MSVC)
+    target_compile_options(td-frame-test PRIVATE /UNDEBUG)
+  else()
+    target_compile_options(td-frame-test PRIVATE -UNDEBUG -Wall -Wextra)
+  endif()
+  add_test(NAME frame-visibility COMMAND td-frame-test)
+endif()

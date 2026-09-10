@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { desktopSizeFor, type DesktopSize } from '../../../shared/desktopSize'
-import { buttonEvent, PTR, wheelFlags, wheelUnits } from '../../../shared/rdpInput'
+import { buttonEvent, PTR, wheelFlags, wheelTurns } from '../../../shared/rdpInput'
 import { rdpKeyFor, substituteCommand, unicodeKey } from '../../../shared/rdpScancodes'
 import { modifierFixes } from '../../../shared/modifierSync'
 import type { ForwardedKey, RdpView } from '../../../shared/types'
@@ -37,6 +37,7 @@ interface PointerImage {
 }
 
 interface Props {
+  visible: boolean
   /** The saved host. Where it is reached, and as whom, is settled in main. */
   sessionId: string
   /**
@@ -90,6 +91,7 @@ function asPixels(bytes: Uint8Array): Uint8ClampedArray<ArrayBuffer> {
 }
 
 export default function RemoteScreen({
+  visible,
   sessionId,
   credentialId,
   look,
@@ -98,6 +100,8 @@ export default function RemoteScreen({
   onNotice,
   onMeasured
 }: Props): JSX.Element {
+  const visibleRef = useRef(visible)
+  visibleRef.current = visible
   const containerRef = useRef<HTMLDivElement | null>(null)
   /**
    * What the far end has been told to hold, so a release that never arrives can
@@ -387,7 +391,12 @@ export default function RemoteScreen({
       height: number
       pixels: Uint8Array
     }): void => {
-      if (!context) return
+      // Even a frame already in the pipe when hidden must be acknowledged.
+      // The client stops producing pixels while hidden, keeping its framebuffer.
+      if (!context || !visibleRef.current) {
+        tell({ a: 'ack' })
+        return
+      }
       const view = asPixels(frame.pixels)
       try {
         context.putImageData(new ImageData(view, frame.width, frame.height), frame.x, frame.y)
@@ -430,6 +439,7 @@ export default function RemoteScreen({
           return
         }
         idRef.current = id
+        tell({ a: 'visible', value: visibleRef.current })
         askedRef.current = size ? `${size.width}×${size.height}` : ''
         scaleRef.current =
           size && look?.sendDensity
@@ -447,7 +457,7 @@ export default function RemoteScreen({
               container.style.cursor = cursor.kind === 'hidden' ? 'none' : 'default'
             } else {
               cursorRef.current = cursor
-              applyCursor()
+              if (visibleRef.current) applyCursor()
             }
           }),
           window.td.rdp.onDesktopEvent(id, (event) => {
@@ -522,6 +532,13 @@ export default function RemoteScreen({
     // the callbacks read is held in a ref above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    tell({ a: 'visible', value: visible })
+    if (visible) applyCursor()
+    // Session starts separately and sends the current visibility after it opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible])
 
   /* ------------------------------------------------------------- the resize */
 
@@ -914,16 +931,15 @@ export default function RemoteScreen({
       // The far side's own menu, not this machine's.
       onContextMenu={(e) => e.preventDefault()}
       onWheel={(e) => {
+        e.preventDefault()
         const at = pointOf(e)
         if (!at) return
         // A wheel turn is an ordinary pointer event with the rotation folded
         // into its flags; see wheelFlags, which is where the folding is stated
-        // and tested. Both axes, because a trackpad turns both at once.
-        const turns = [
-          wheelFlags(wheelUnits(e.deltaY, e.deltaMode)),
-          wheelFlags(wheelUnits(e.deltaX, e.deltaMode), true)
-        ]
-        for (const flags of turns) {
+        // and tested. wheelTurns filters the small cross-axis noise a trackpad
+        // adds to an otherwise one-dimensional gesture.
+        for (const turn of wheelTurns(e.deltaX, e.deltaY, e.deltaMode)) {
+          const flags = wheelFlags(turn.units, turn.horizontal)
           if (flags !== null) tell({ a: 'mouse', flags, x: at.x, y: at.y })
         }
       }}

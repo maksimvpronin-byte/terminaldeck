@@ -308,7 +308,10 @@ describe('running a transfer plan', () => {
       (transferred, total, path) => seen.push([transferred, total, path])
     )
 
-    expect(seen).toEqual([[512, 1024, '/local/a.txt']])
+    expect(seen).toEqual([
+      [512, 1024, '/local/a.txt'],
+      [1024, 1024, '/local/a.txt']
+    ])
   })
 
   it('refuses a host-to-host copy with nowhere to put it', async () => {
@@ -434,5 +437,68 @@ describe('SCP/Shell routing', () => {
     expect(sftp).not.toHaveBeenCalled()
     sftpManager.releaseConnection('scp-routing')
     expect(close).toHaveBeenCalled()
+  })
+})
+
+describe('parallel transfer planning', () => {
+  it('checks metadata concurrently while preserving unreadable conflicts', async () => {
+    mkdirSync(localDir, { recursive: true })
+    for (let i = 0; i < 24; i++) writeFileSync(join(localDir, `file-${i}`), 'data')
+    let active = 0,
+      peak = 0
+    const stat = vi.spyOn(sftpManager, 'statPath').mockImplementation(async (_id, path) => {
+      peak = Math.max(peak, ++active)
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      active--
+      if (path.endsWith('/file-3')) throw new Error('Permission denied')
+      return null
+    })
+    const planned = await sftpManager.planUpload('conn', localDir, '/remote')
+    expect(peak).toBe(8)
+    expect(stat).toHaveBeenCalledTimes(24)
+    expect(planned.items).toHaveLength(24)
+    expect(planned.conflicts).toHaveLength(1)
+    expect(planned.conflicts[0]).toMatchObject({ reason: 'unreadable' })
+    expect(planned.conflicts[0].destPath).toMatch(/\/file-3$/)
+  })
+  it('opens only one SFTP channel for concurrent requests', async () => {
+    let complete!: (error: Error | null, sftp: SFTPWrapper) => void
+    const open = vi.fn((callback: typeof complete) => {
+      complete = callback
+    })
+    vi.spyOn(sshManager, 'getClientChain').mockReturnValue([
+      { sftp: open }
+    ] as unknown as ReturnType<typeof sshManager.getClientChain>)
+    const pending = Promise.all(
+      Array.from({ length: 8 }, (_, i) => sftpManager.statPath('new', `/file-${i}`))
+    )
+    expect(open).toHaveBeenCalledTimes(1)
+    complete(null, stubSession([]))
+    expect(await pending).toEqual(Array(8).fill(null))
+    sftpManager.releaseConnection('new')
+  })
+  it('does not cache a channel that finishes opening after disconnect', async () => {
+    let complete!: (error: Error | null, sftp: SFTPWrapper) => void
+    vi.spyOn(sshManager, 'getClientChain').mockReturnValue([
+      {
+        sftp: (callback: typeof complete) => {
+          complete = callback
+        }
+      }
+    ] as unknown as ReturnType<typeof sshManager.getClientChain>)
+    const pending = Promise.allSettled([
+      sftpManager.statPath('closing', '/file'),
+      sftpManager.statPath('closing', '/other')
+    ])
+    sftpManager.releaseConnection('closing')
+    const sftp = stubSession([])
+    sftp.end = vi.fn()
+    complete(null, sftp)
+    const results = await pending
+    expect(results.every((r) => r.status === 'rejected')).toBe(true)
+    expect(sftp.end).toHaveBeenCalledTimes(1)
+    expect(
+      (sftpManager as unknown as { sessions: Map<string, SFTPWrapper> }).sessions.has('closing')
+    ).toBe(false)
   })
 })

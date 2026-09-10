@@ -284,9 +284,9 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
 
   markActivity: (tabId) => {
     set((s) => {
-      if (activeTab(s)?.id === tabId) return {}
+      if (activeTab(s)?.id === tabId) return s
       const tab = allTabs(s).find((t) => t.id === tabId)
-      if (!tab || tab.hasActivity) return {}
+      if (!tab || tab.hasActivity) return s
       return { workspaces: mapTab(s.workspaces, tabId, (t) => ({ ...t, hasActivity: true })) }
     })
   },

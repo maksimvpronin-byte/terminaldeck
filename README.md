@@ -3,6 +3,19 @@
 Cross-platform SSH/SFTP terminal manager — an in-progress alternative to MobaXterm / Royal TSX.
 Built with Electron + React + TypeScript + [xterm.js](https://xtermjs.org/) + [ssh2](https://github.com/mscdex/ssh2).
 
+The user manual, in Russian, is [docs/terminaldeck-0.13-manual.html](docs/terminaldeck-0.13-manual.html) —
+a single self-contained page that opens in a browser and prints. What follows here is the feature
+list and the developer's side of the project.
+
+## Performance (0.13.2)
+
+Large file directories render visible rows only, and transfer progress is capped at ten
+updates per second with an immediate final update. Hidden tabs pause file polling,
+monitoring and RDP pixel transport; returning refreshes their contents without reconnecting.
+SSH output and file transfers continue in the background. Inventory parsing runs in a
+worker thread. Transfer planning checks up to eight destinations at once; writes stay
+sequential and retain the conflict dialog.
+
 ## Features
 
 ### Machine inventories from git

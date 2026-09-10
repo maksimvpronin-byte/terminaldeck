@@ -1,0 +1,2308 @@
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TerminalDeck 0.13.2 — руководство</title>
+
+<style>
+  :root {
+    /* Взято из палитры самого приложения: src/renderer/src/styles.css */
+    --bg: #121317;
+    --panel: #1e2025;
+    --panel-2: #26282e;
+    --ink: #e4e6eb;
+    --ink-soft: #a8aeb9;
+    --ink-faint: #767d89;
+    --rule: #383b42;
+    --rule-soft: #2a2d33;
+    --accent: #5b9dff;
+    --accent-ink: #8fbcff;
+    --accent-wash: #1c2b44;
+    --ok: #3fb950;
+    --ok-wash: #14301a;
+    --warn: #d9a441;
+    --warn-wash: #332711;
+    --crit: #e5534b;
+    --crit-wash: #3a1a18;
+    --link: #4dd0d8;
+    --plate: #0c0d10;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 20px 48px -18px rgba(0, 0, 0, 0.8);
+    --serif: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+    --sans:
+      -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    --mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+    color-scheme: dark;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 24px;
+  }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- каркас: оглавление слева, текст справа ---------- */
+  #wrap {
+    display: grid;
+    grid-template-columns: 290px minmax(0, 1fr);
+    gap: 0;
+    max-width: 1280px;
+    margin: 0 auto;
+  }
+
+  #toc {
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: 100dvh;
+    overflow-y: auto;
+    padding: 28px 20px 48px 24px;
+    border-right: 1px solid var(--rule-soft);
+  }
+  #toc .brand {
+    font-family: var(--serif);
+    font-size: 19px;
+    letter-spacing: 0.2px;
+    margin: 0 0 2px;
+  }
+  #toc .brand b {
+    color: var(--accent-ink);
+    font-weight: 600;
+  }
+  #toc .ver {
+    color: var(--ink-faint);
+    font-size: 12px;
+    margin: 0 0 20px;
+    font-variant-numeric: tabular-nums;
+  }
+  #toc ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    counter-reset: toc;
+  }
+  #toc li {
+    counter-increment: toc;
+  }
+  #toc a {
+    display: block;
+    padding: 5px 10px 5px 30px;
+    margin: 1px 0;
+    position: relative;
+    color: var(--ink-soft);
+    text-decoration: none;
+    font-size: 13.5px;
+    line-height: 1.35;
+    border-radius: 6px;
+    border-left: 2px solid transparent;
+  }
+  #toc a::before {
+    content: counter(toc);
+    position: absolute;
+    left: 8px;
+    top: 5px;
+    color: var(--ink-faint);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+  #toc a:hover {
+    background: var(--panel);
+    color: var(--ink);
+  }
+  #toc a.on {
+    background: var(--accent-wash);
+    color: var(--accent-ink);
+    border-left-color: var(--accent);
+  }
+  #toc a.on::before {
+    color: var(--accent-ink);
+  }
+
+  main {
+    padding: 0 40px 120px;
+    min-width: 0;
+  }
+
+  /* ---------- шапка ---------- */
+  header.top {
+    padding: 64px 0 40px;
+    border-bottom: 1px solid var(--rule-soft);
+    margin-bottom: 8px;
+  }
+  header.top h1 {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: clamp(32px, 4vw, 46px);
+    margin: 0 0 10px;
+    letter-spacing: -0.4px;
+  }
+  header.top .sub {
+    color: var(--ink-soft);
+    font-size: 17px;
+    margin: 0 0 22px;
+    max-width: 62ch;
+  }
+  .platform {
+    display: none;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 18px;
+  }
+  .platform-label {
+    color: var(--ink-faint);
+    font-size: 13px;
+    margin-right: 2px;
+  }
+  .platform button {
+    font: inherit;
+    font-size: 13px;
+    padding: 5px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    color: var(--ink-soft);
+  }
+  .platform button:hover {
+    background: var(--panel-2);
+    color: var(--ink);
+  }
+  .platform button[aria-pressed='true'] {
+    background: var(--accent-wash);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+  }
+  .badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .badge {
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    color: var(--ink-soft);
+  }
+  .badge.b-new {
+    background: var(--ok-wash);
+    border-color: #2b5c33;
+    color: #8ee49a;
+  }
+
+  /* ---------- секции ---------- */
+  section {
+    padding: 44px 0 8px;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  section:last-of-type {
+    border-bottom: 0;
+  }
+  h2 {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: 28px;
+    margin: 0 0 6px;
+    letter-spacing: -0.2px;
+    scroll-margin-top: 20px;
+  }
+  h2 .num {
+    color: var(--ink-faint);
+    font-size: 15px;
+    font-family: var(--sans);
+    margin-right: 10px;
+    font-variant-numeric: tabular-nums;
+  }
+  h3 {
+    font-size: 17px;
+    margin: 30px 0 8px;
+    color: var(--ink);
+    font-weight: 600;
+  }
+  h4 {
+    font-size: 14.5px;
+    margin: 20px 0 6px;
+    color: var(--ink-soft);
+    font-weight: 600;
+    text-transform: none;
+  }
+  p {
+    margin: 10px 0;
+    max-width: 78ch;
+  }
+  ul,
+  ol {
+    margin: 10px 0;
+    padding-left: 22px;
+    max-width: 78ch;
+  }
+  li {
+    margin: 5px 0;
+  }
+  a {
+    color: var(--link);
+  }
+  strong {
+    color: #fff;
+    font-weight: 600;
+  }
+  em {
+    color: var(--ink-soft);
+    font-style: italic;
+  }
+  .lede {
+    color: var(--ink-soft);
+    font-size: 16.5px;
+    max-width: 72ch;
+    margin: 0 0 8px;
+  }
+
+  /* ---------- мелочи оформления ---------- */
+  kbd {
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 2px 7px;
+    border-radius: 5px;
+    background: var(--panel-2);
+    border: 1px solid var(--rule);
+    border-bottom-width: 2px;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+  code {
+    font-family: var(--mono);
+    font-size: 13px;
+    background: var(--panel);
+    border: 1px solid var(--rule-soft);
+    border-radius: 4px;
+    padding: 1px 5px;
+    color: var(--accent-ink);
+  }
+  pre {
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.5;
+    background: var(--plate);
+    border: 1px solid var(--rule-soft);
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    margin: 12px 0;
+    max-width: 78ch;
+  }
+  pre code {
+    background: none;
+    border: 0;
+    padding: 0;
+    color: var(--ink);
+  }
+  .ui {
+    font-size: 13.5px;
+    padding: 1px 7px;
+    border-radius: 5px;
+    background: var(--panel-2);
+    border: 1px solid var(--rule);
+    color: var(--ink);
+  }
+
+  /* врезки */
+  .note,
+  .warn,
+  .new {
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin: 16px 0;
+    max-width: 78ch;
+    border: 1px solid var(--rule);
+    background: var(--panel);
+    font-size: 14.5px;
+  }
+  .note {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-wash);
+  }
+  .warn {
+    border-left: 3px solid var(--crit);
+    background: var(--crit-wash);
+  }
+  .new {
+    border-left: 3px solid var(--ok);
+    background: var(--ok-wash);
+  }
+  .note p,
+  .warn p,
+  .new p {
+    margin: 6px 0;
+    max-width: none;
+  }
+  .note :first-child,
+  .warn :first-child,
+  .new :first-child {
+    margin-top: 0;
+  }
+  .note :last-child,
+  .warn :last-child,
+  .new :last-child {
+    margin-bottom: 0;
+  }
+  .tag {
+    display: inline-block;
+    font-size: 10.5px;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 4px;
+    margin-right: 8px;
+    vertical-align: 2px;
+    font-weight: 600;
+  }
+  .tag.t-new {
+    background: #2b5c33;
+    color: #c9f3d0;
+  }
+  .tag.t-warn {
+    background: #5a3a12;
+    color: #f0d19a;
+  }
+
+  /* таблицы */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    max-width: 900px;
+    margin: 14px 0;
+    font-size: 14.5px;
+  }
+  th,
+  td {
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--rule-soft);
+    vertical-align: top;
+  }
+  th {
+    color: var(--ink-faint);
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom-color: var(--rule);
+  }
+  td:first-child {
+    white-space: nowrap;
+    color: var(--ink);
+  }
+  tbody tr:hover {
+    background: var(--panel);
+  }
+  table.keys td:first-child {
+    width: 170px;
+  }
+
+  /* шаги */
+  ol.steps {
+    counter-reset: step;
+    list-style: none;
+    padding-left: 0;
+  }
+  ol.steps > li {
+    counter-increment: step;
+    position: relative;
+    padding-left: 38px;
+    margin: 14px 0;
+  }
+  ol.steps > li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: -1px;
+    width: 25px;
+    height: 25px;
+    border-radius: 50%;
+    background: var(--panel-2);
+    border: 1px solid var(--rule);
+    color: var(--accent-ink);
+    font-size: 12.5px;
+    display: grid;
+    place-items: center;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* схема наследования */
+  .chain {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+  .chain .box {
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: 7px;
+    padding: 8px 14px;
+  }
+  .chain .box b {
+    display: block;
+    color: var(--ink);
+    font-size: 14px;
+  }
+  .chain .box span {
+    color: var(--ink-faint);
+    font-size: 12px;
+  }
+  .chain .arr {
+    color: var(--ink-faint);
+  }
+
+  footer {
+    padding: 40px 0 0;
+    color: var(--ink-faint);
+    font-size: 13px;
+  }
+
+  @media (max-width: 900px) {
+    #wrap {
+      grid-template-columns: 1fr;
+    }
+    #toc {
+      position: static;
+      height: auto;
+      border-right: 0;
+      border-bottom: 1px solid var(--rule-soft);
+    }
+    main {
+      padding: 0 20px 80px;
+    }
+  }
+
+  @media print {
+    :root {
+      color-scheme: light;
+    }
+    body {
+      background: #fff;
+      color: #111;
+      font-size: 11pt;
+    }
+    #toc {
+      display: none;
+    }
+    .platform {
+      display: none;
+    }
+    #wrap {
+      display: block;
+      max-width: none;
+    }
+    main {
+      padding: 0;
+    }
+    section {
+      break-inside: auto;
+      border-bottom: 1px solid #ddd;
+      padding: 18pt 0 6pt;
+    }
+    h2 {
+      break-after: avoid;
+      color: #000;
+    }
+    h3,
+    h4 {
+      break-after: avoid;
+      color: #000;
+    }
+    pre,
+    table,
+    .note,
+    .warn,
+    .new {
+      break-inside: avoid;
+    }
+    pre {
+      background: #f6f6f6;
+      border-color: #ddd;
+    }
+    pre code,
+    code {
+      color: #0b4f8a;
+    }
+    code,
+    kbd,
+    .ui {
+      background: #f1f1f1;
+      border-color: #ccc;
+      color: #111;
+    }
+    .note {
+      background: #eef4fd;
+    }
+    .warn {
+      background: #fdeeee;
+    }
+    .new {
+      background: #eefaf0;
+    }
+    a {
+      color: #0b4f8a;
+      text-decoration: none;
+    }
+    strong {
+      color: #000;
+    }
+  }
+</style>
+
+<div id="wrap">
+  <nav id="toc">
+    <p class="brand"><b>TerminalDeck</b></p>
+    <p class="ver">Руководство пользователя · 0.13.2</p>
+    <ol>
+      <li><a href="#about">Что это такое</a></li>
+      <li><a href="#install">Установка и первый запуск</a></li>
+      <li><a href="#window">Устройство окна</a></li>
+      <li><a href="#first">Первое подключение</a></li>
+      <li><a href="#tree">Дерево, группы и наследование</a></li>
+      <li><a href="#creds">Учётные данные и хранилище</a></li>
+      <li><a href="#terminal">Терминал</a></li>
+      <li><a href="#layout">Вкладки, панели, области, наборы</a></li>
+      <li><a href="#files">Файлы: SFTP и SCP/Shell</a></li>
+      <li><a href="#tunnels">Туннели и мониторинг</a></li>
+      <li><a href="#inventory">Инвентарь из git</a></li>
+      <li><a href="#rdp">Удалённые рабочие столы</a></li>
+      <li><a href="#look">Оформление</a></li>
+      <li><a href="#backup">Резервная копия и обновления</a></li>
+      <li><a href="#keys">Сочетания клавиш</a></li>
+      <li><a href="#whatsnew">Что нового в 0.13</a></li>
+      <li><a href="#trouble">Если что-то не работает</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <header class="top">
+      <h1>TerminalDeck — руководство пользователя</h1>
+      <p class="sub">
+        Менеджер SSH-подключений, файлов и удалённых рабочих столов: дерево хостов, терминалы, SFTP,
+        туннели и RDP-сессии в одних и тех же панелях. Пароли — в локальном зашифрованном хранилище,
+        инвентарь — из вашего git.
+      </p>
+      <div class="platform" id="platform">
+        <span class="platform-label">Сочетания клавиш показывать для:</span>
+        <button type="button" data-os="mac">macOS</button>
+        <button type="button" data-os="win">Windows · Linux</button>
+      </div>
+      <div class="badges">
+        <span class="badge">версия 0.13.2</span>
+        <span class="badge">macOS · Windows · Linux</span>
+        <span class="badge b-new">новое: SCP/Shell и папки групп</span>
+        <span class="badge">интерфейс: русский и английский</span>
+      </div>
+    </header>
+
+    <section id="about">
+      <h2><span class="num">01</span>Что это такое</h2>
+      <p class="lede">
+        Одно окно вместо четырёх программ: клиента SSH, файлового менеджера, клиента RDP и того
+        места, где лежат пароли.
+      </p>
+      <p>
+        Всё, что вы открываете, живёт в одном дереве и подчиняется одной модели наследования:
+        <b>хост → группа → родительская группа</b>. Общий логин, ключ, порт, промежуточный хост,
+        шлюз RDP и оформление задаются один раз на группе, а хосты внутри их наследуют.
+      </p>
+
+      <h3>Из чего оно состоит</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Часть</th>
+            <th>Что делает</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Сессии</td>
+            <td>Ваше собственное дерево хостов и групп, отсортированное вручную</td>
+          </tr>
+          <tr>
+            <td>Инвентарь</td>
+            <td>Хосты из git-репозитория с инвентарём Ansible, только на чтение</td>
+          </tr>
+          <tr>
+            <td>Наборы</td>
+            <td>Произвольные подборки хостов, которые открываются одной командой</td>
+          </tr>
+          <tr>
+            <td>Терминал</td>
+            <td>xterm.js: поиск по истории, темы, сниппеты, трансляция ввода</td>
+          </tr>
+          <tr>
+            <td>Файлы</td>
+            <td>
+              Панель рядом с терминалом: SFTP или, с 0.13.1, SCP/Shell от другого пользователя
+            </td>
+          </tr>
+          <tr>
+            <td>Рабочий стол</td>
+            <td>RDP в той же панели, через настоящий клиент FreeRDP в отдельном процессе</td>
+          </tr>
+          <tr>
+            <td>Хранилище</td>
+            <td>AES-256-GCM, мастер-пароль, блокировка по бездействию</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="note">
+        <p>
+          <b>Про клавиши.</b> Переключатель в шапке страницы задаёт, в какой записи показывать
+          сочетания: <kbd data-fixed>⌘</kbd> для macOS или <kbd>Ctrl</kbd>+<kbd>Shift</kbd> для
+          Windows и Linux. Он меняет запись во всём тексте сразу и запоминается; при первом открытии
+          выбирается по вашей системе. Полные таблицы в <a href="#keys">разделе 15</a> в любом
+          случае показывают обе раскладки — вместе с тремя исключениями, где вне мака сочетание
+          совсем другое.
+        </p>
+        <p>
+          Голый <kbd>Ctrl</kbd> всегда принадлежит оболочке: <kbd>Ctrl+C</kbd> прерывает команду,
+          <kbd>Ctrl+D</kbd> завершает сессию, <kbd>Ctrl+K</kbd>, <kbd>Ctrl+W</kbd> и
+          <kbd>Ctrl+L</kbd> делают то, что положено readline. Приложение их не перехватывает.
+        </p>
+      </div>
+    </section>
+
+    <section id="install">
+      <h2><span class="num">02</span>Установка и первый запуск</h2>
+
+      <h3>macOS</h3>
+      <p>
+        Откройте <code>.dmg</code> и перетащите TerminalDeck в «Программы». Сборка подписана
+        <b>ad-hoc</b> — этого хватает, чтобы приложение запускалось, и не хватает, чтобы macOS
+        считала разработчика проверенным. При первом запуске система скажет, что разработчик не
+        проверен: откройте
+        <span class="ui">Системные настройки → Конфиденциальность и безопасность</span>, там будет
+        названо заблокированное приложение, и нажмите <span class="ui">Открыть всё равно</span>.
+        Дальше оно открывается обычным двойным кликом.
+      </p>
+      <div class="warn">
+        <p>
+          Если macOS говорит <em>«TerminalDeck повреждён и не может быть открыт»</em> — это сборка
+          старее 0.9.0, вообще без подписи; на Apple Silicon ядро отказывается запускать такой файл
+          и выдаёт именно это сообщение. Ничего не повреждено. Лечится один раз в терминале:
+        </p>
+        <pre><code>xattr -dr com.apple.quarantine /Applications/TerminalDeck.app &amp;&amp; codesign --force --deep --sign - /Applications/TerminalDeck.app</code></pre>
+      </div>
+
+      <h3>Windows</h3>
+      <p>
+        Установщик <code>TerminalDeck-Setup-0.13.x.exe</code> ставит программу обычным образом. Есть
+        и портативная сборка одним файлом — она ничего не пишет в реестр и подходит, когда ставить
+        нельзя. Неподписанную сборку SmartScreen может предупредить:
+        <span class="ui">Подробнее → Выполнить в любом случае</span>.
+      </p>
+
+      <h3>Linux</h3>
+      <p>
+        Есть <code>.AppImage</code> (сделайте файл исполняемым и запустите) и <code>.deb</code>.
+      </p>
+
+      <h3>Первый запуск: мастер-пароль</h3>
+      <p>
+        При первом старте появится экран <span class="ui">Добро пожаловать в TerminalDeck</span>
+        с просьбой придумать мастер-пароль. Им шифруется всё, что вы сохраните: пароли хостов,
+        парольные фразы ключей, пароли шлюзов и сохранённых учётных записей.
+      </p>
+      <ul>
+        <li>
+          Не короче 8 символов; этот пароль <b>никогда не покидает вашу машину</b> и не пишется на
+          диск.
+        </li>
+        <li>
+          Потом его можно сменить:
+          <span class="ui">Настройки → Безопасность → Сменить пароль</span>. Все секреты
+          перешифровываются под новый, ничего не теряется.
+        </li>
+        <li>
+          Хранилище можно и не наполнять: вход по ключу или через агент SSH его вообще не
+          спрашивает.
+        </li>
+      </ul>
+
+      <h3>Язык интерфейса</h3>
+      <p>
+        <span class="ui">Настройки → Язык</span> — русский или английский, применяется сразу, без
+        перезапуска, и только к этому окну. Никуда ничего не отправляется. Непереведённые места
+        показываются по-английски, а не заглушкой.
+      </p>
+    </section>
+
+    <section id="window">
+      <h2><span class="num">03</span>Устройство окна</h2>
+      <p class="lede">Слева дерево, сверху рабочие области и вкладки, в середине панели.</p>
+
+      <h3>Боковая панель</h3>
+      <ul>
+        <li><b>Сессии</b> — ваше дерево: хосты, группы, подгруппы, ниже — наборы.</li>
+        <li><b>Инвентарь</b> — хосты из подключённых git-репозиториев.</li>
+        <li>
+          Сверху — <span class="ui">Быстрое подключение…</span>, кнопки
+          <span class="ui">+ Сессия</span> и <span class="ui">+ Группа</span>, поле
+          <span class="ui">Фильтр хостов…</span>.
+        </li>
+        <li>
+          Внизу — <span class="ui">Заблокировать хранилище (⌘L)</span>,
+          <span class="ui">Сниппеты (⌘K)</span>, <span class="ui">Настройки</span> и
+          <span class="ui">Сочетания клавиш и возможности (⌘/)</span>.
+        </li>
+        <li>Внутренний край панели можно тянуть — ширина запоминается для этого окна.</li>
+      </ul>
+
+      <h3>Рабочие области и вкладки</h3>
+      <p>
+        Верхняя полоса — рабочие области; у каждой свой ряд вкладок под ней. Вкладка — это один
+        экран, внутри которого может быть одна панель или несколько, разделённых по вертикали и
+        горизонтали.
+      </p>
+
+      <h3>Панель инструментов панели</h3>
+      <p>Над каждой панелью — её собственные кнопки:</p>
+      <table>
+        <tbody>
+          <tr>
+            <td><span class="ui">SFTP</span></td>
+            <td>Показать или скрыть файловый браузер</td>
+          </tr>
+          <tr>
+            <td><span class="ui">Туннели</span></td>
+            <td>Показать или скрыть проброс портов</td>
+          </tr>
+          <tr>
+            <td><span class="ui">Монитор</span></td>
+            <td>Показать или скрыть мониторинг</td>
+          </tr>
+          <tr>
+            <td><span class="ui">Трансляция</span></td>
+            <td>Включить этот терминал в трансляцию ввода</td>
+          </tr>
+          <tr>
+            <td>⇱</td>
+            <td>Вынести панель в отдельную вкладку</td>
+          </tr>
+          <tr>
+            <td>⌘D / ⌘⇧D</td>
+            <td>Разделить панель вправо и вниз</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        У сессии рабочего стола файлового браузера, туннелей, мониторинга и трансляции нет — они не
+        выключены, а просто не показываются: по RDP их взять неоткуда.
+      </p>
+    </section>
+
+    <section id="first">
+      <h2><span class="num">04</span>Первое подключение</h2>
+
+      <h3>Быстрое подключение</h3>
+      <p>
+        Самый короткий путь: <span class="ui">Быстрое подключение…</span> над деревом. Нужны адрес и
+        логин; всё остальное — по умолчанию. Ничего не сохраняется, это разовый заход.
+      </p>
+
+      <h3>Сохранённая сессия</h3>
+      <ol class="steps">
+        <li>
+          Нажмите <span class="ui">+ Сессия</span> (или правый клик по группе →
+          <span class="ui">Новая сессия здесь</span>).
+        </li>
+        <li>
+          Заполните <span class="ui">Имя</span> и <span class="ui">Хост</span> — без них сохранить
+          не даст. <span class="ui">Протокол</span> — SSH или RDP.
+        </li>
+        <li>
+          Логин и способ входа: <span class="ui">Пароль</span>,
+          <span class="ui">Закрытый ключ</span> (с парольной фразой, если она есть) или
+          <span class="ui">Агент SSH</span>. Пустое поле означает наследование от группы.
+        </li>
+        <li><span class="ui">Сохранить</span>. Хост появится в дереве.</li>
+        <li>
+          <b>Двойной клик</b> подключает. Одиночный только выделяет — случайным кликом терминал не
+          откроется.
+        </li>
+      </ol>
+
+      <h3>Импорт из ~/.ssh/config</h3>
+      <p>
+        <span class="ui">Импорт из ~/.ssh/config</span> в меню дерева забирает хосты из вашего
+        конфига SSH, включая связи <code>ProxyJump</code> — они станут промежуточными хостами.
+      </p>
+
+      <h3>Что ещё есть в правом клике по хосту</h3>
+      <table>
+        <tbody>
+          <tr>
+            <td><span class="ui">Подключиться</span></td>
+            <td>То же, что двойной клик</td>
+          </tr>
+          <tr>
+            <td><span class="ui">Подключиться в разделении</span></td>
+            <td>Рядом с текущей панелью</td>
+          </tr>
+          <tr>
+            <td><span class="ui">Дублировать</span></td>
+            <td>Копия хоста со всеми настройками</td>
+          </tr>
+          <tr>
+            <td><span class="ui">Изменить</span></td>
+            <td>Диалог сессии</td>
+          </tr>
+          <tr>
+            <td><span class="ui">Удалить…</span></td>
+            <td>Только отсюда и только с подтверждением — кнопки на строке нет</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        Там же — <span class="ui">Подключиться как…</span> (вход под сохранённой учётной записью,
+        см. <a href="#creds">раздел 6</a>) и <span class="ui">Подключиться несколько раз…</span>:
+        один хост открывается сразу в нескольких окнах — отдельными вкладками, плиткой в одной
+        вкладке или в собственной рабочей области. Каждое окно — отдельное соединение, они
+        нумеруются; предел — двадцать за раз, потому что каждое из них является настоящим входом на
+        той стороне.
+      </p>
+    </section>
+
+    <section id="tree">
+      <h2><span class="num">05</span>Дерево, группы и наследование</h2>
+      <p class="lede">
+        Главная идея приложения: настройка задаётся один раз на группе, а хосты внутри её наследуют.
+        Побеждает всегда <b>ближайшее заданное значение</b>.
+      </p>
+
+      <div class="chain">
+        <span class="box"><b>Хост</b><span>своё значение</span></span>
+        <span class="arr">→</span>
+        <span class="box"><b>Группа</b><span>общее для среды</span></span>
+        <span class="arr">→</span>
+        <span class="box"><b>Родительская группа</b><span>общее для всего</span></span>
+        <span class="arr">→</span>
+        <span class="box"><b>Настройки</b><span>значения по умолчанию</span></span>
+      </div>
+
+      <h3>Как это выглядит на практике</h3>
+      <ul>
+        <li>
+          Пустое поле у хоста означает «взять от группы». Пустой логин берёт логин группы, а если и
+          там пусто — вашу учётную запись на этой машине.
+        </li>
+        <li>
+          Каждое поле подписывает, что именно оно унаследует и откуда:
+          <span class="ui">{значение} — из {источник}</span>.
+        </li>
+        <li>
+          Наследование выключается флажком — и <b>тремя независимыми переключателями</b>:
+          <span class="ui">Наследовать настройки подключения от группы</span>,
+          <span class="ui">Наследовать оформление от группы</span>,
+          <span class="ui">Наследовать настройки рабочего стола от группы</span>. Учётные данные и
+          внешний вид отвязываются отдельно.
+        </li>
+        <li>
+          Хост со <b>своим</b> паролем сохраняет его при переносе в группу — побеждает ближайшее.
+          Диалог об этом прямо предупреждает; чтобы отдать приоритет группе, верните способу входа
+          значение <span class="ui">Наследовать</span> — это одним движением забудет собственный
+          пароль хоста, и до сохранения решение обратимо.
+        </li>
+      </ul>
+
+      <h3>Что задаётся на группе</h3>
+      <p>
+        Логин, способ входа и ключ, порт, промежуточный хост, проброс агента, команды
+        <span class="ui">При подключении</span>, цвет, оформление терминала и весь раздел
+        <span class="ui">Рабочий стол</span> — включая шлюз RD, который ради этого на группе и
+        задают.
+      </p>
+
+      <h3>Порядок и перетаскивание</h3>
+      <ul>
+        <li>
+          Хосты и папки сортируются <b>вручную</b>: бросьте строку на
+          <b>верхний или нижний край</b> другой — она встанет в этот промежуток, линия покажет куда.
+        </li>
+        <li>Бросок в <b>середину</b> папки кладёт внутрь неё.</li>
+        <li>
+          Бросок на пустое место выносит на верхний уровень (есть и пункт
+          <span class="ui">Вынести на верхний уровень</span>).
+        </li>
+        <li>
+          Порядок хранится в базе приложения и переживает перезапуск, переименование и перенос.
+        </li>
+      </ul>
+
+      <h3>Пометки на строках</h3>
+      <ul>
+        <li>
+          <b>Цвет</b> — чтобы отличать продакшн с одного взгляда; наследуется группой целиком.
+        </li>
+        <li><b>Зелёная точка</b> — у хоста уже открыт терминал.</li>
+        <li><b>Точка на вкладке или области</b> — там появился новый вывод.</li>
+        <li>
+          <span class="ui">Не наследует настройки группы</span> — у хоста снят флажок наследования.
+        </li>
+      </ul>
+    </section>
+
+    <section id="creds">
+      <h2><span class="num">06</span>Учётные данные и хранилище</h2>
+
+      <h3>Хранилище</h3>
+      <p>
+        Секреты лежат в локальном файле в каталоге пользователя ОС, зашифрованные AES-256-GCM; ключ
+        выводится из мастер-пароля через scrypt и живёт только в памяти главного процесса. Удаление
+        хоста, группы, репозитория или локального переопределения
+        <b>забирает с собой и его секрет</b>, а не оставляет его в хранилище.
+      </p>
+
+      <h4>Блокировка</h4>
+      <ul>
+        <li><kbd>⌘L</kbd> — заблокировать сейчас.</li>
+        <li>
+          <span class="ui">Настройки → Безопасность → Блокировать после бездействия</span> — от
+          минуты до восьми часов, по умолчанию пятнадцать минут, можно выключить совсем (<span
+            class="ui"
+            >Никогда — оставаться разблокированным</span
+          >).
+        </li>
+        <li>
+          Бездействие — это отсутствие набора, движения мыши и прокрутки во всём окне, включая
+          терминал.
+        </li>
+      </ul>
+      <div class="note">
+        <p>
+          <b>Блокировка останавливает приложение, а не только картинку.</b> Открытые сессии остаются
+          подключёнными и продолжают работать, но до них не достаёт ни мышь, ни клавиатура, и
+          главный процесс отказывается начинать что-либо новое: ни SSH-сессию, ни рабочий стол, ни
+          список файлов. Это важно именно потому, что хост, входящий по ключу, у хранилища ничего не
+          спрашивает — иначе его ничто бы не остановило. Редактор, сохраняющий файл, открытый до
+          блокировки, всё равно его отправит.
+        </p>
+      </div>
+
+      <h3>Способы входа</h3>
+      <table>
+        <tbody>
+          <tr>
+            <td><span class="ui">Пароль</span></td>
+            <td>Хранится в хранилище; если не сохранён — спросят при подключении</td>
+          </tr>
+          <tr>
+            <td><span class="ui">Закрытый ключ</span></td>
+            <td>Файл ключа плюс парольная фраза, если она есть</td>
+          </tr>
+          <tr>
+            <td><span class="ui">Агент SSH</span></td>
+            <td>Берёт ключи у агента системы</td>
+          </tr>
+          <tr>
+            <td>keyboard-interactive</td>
+            <td>Поддерживается — так работает двухфакторный вход</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Сохранённые учётные записи</h3>
+      <p>
+        <span class="ui">Настройки → Учётные записи</span> — логины, которые не принадлежат ни
+        хосту, ни группе. У каждой есть имя, логин и пароль, ключ или агент. Дальше правый клик по
+        любому хосту — хоть сохранённому, хоть инвентарному — и
+        <span class="ui">Подключиться как…</span>.
+      </p>
+      <ul>
+        <li>
+          Это касается <b>только новой вкладки</b>: обратно ничего не пишется, хост сохраняет свой
+          логин, остальные подключения к нему не затрагиваются.
+        </li>
+        <li>
+          Выбор едет вместе с панелью, поэтому переподключение входит под той же записью, а панель
+          называется именем записи — окно, вошедшее кем-то другим, об этом говорит.
+        </li>
+        <li>
+          Заменяется только то, <b>кто вы</b>. Порт, промежуточный хост, команды при подключении и
+          шлюз остаются хостовыми. Шлюзу, настроенному «брать учётные данные подключения», предложат
+          выбранную запись; промежуточные хосты по дороге достигаются как настроены.
+        </li>
+        <li>
+          Запись без сохранённого пароля — это не незаконченная настройка, а намеренная: имя и логин
+          помнятся, пароль спрашивается каждый раз.
+        </li>
+        <li>Работает и для рабочих столов. Пароли лежат в хранилище так же, как хостовые.</li>
+      </ul>
+
+      <h3>Ключи хостов и сертификаты</h3>
+      <ul>
+        <li>
+          Ключ хоста сверяется с локальным <code>known_hosts</code>: при первой встрече спрашивают,
+          при изменении — предупреждают громко.
+        </li>
+        <li>
+          <span class="ui">Настройки → Безопасность → Доверенные ключи хостов</span> — список и
+          кнопка <span class="ui">Забыть</span>. Забывайте, когда сервер законно пересобрали.
+        </li>
+        <li>
+          <span class="ui">Доверенные сертификаты</span> — только для сессий рабочего стола и только
+          для тех, которые машина не смогла проверить сама. Сертификат от публичного центра
+          проверяется системой и в список не попадает, поэтому плановый перевыпуск ничего не ломает.
+        </li>
+      </ul>
+
+      <h3>Промежуточный хост и проброс агента</h3>
+      <p>
+        <span class="ui">Промежуточный хост (ProxyJump)</span> достаёт до машины через другую.
+        Переход делает само приложение — на промежуточной машине ничего не выполняется. Работает и
+        для сохранённых сессий, и для хостов из инвентаря.
+      </p>
+      <div class="warn">
+        <p>
+          <span class="tag t-warn">осторожно</span>
+          <span class="ui">Пробрасывать агент SSH</span> позволяет дальнему хосту просить подпись у
+          этой машины, независимо от того, чем вы вошли. Ключ никуда не уезжает, но root на том
+          хосте может им воспользоваться, пока вы там. Включайте для машин, которым доверяете.
+        </p>
+      </div>
+
+      <h3>Команды при подключении</h3>
+      <p>
+        <span class="ui">При подключении</span> — строки, которые вводятся в оболочку сразу, как она
+        готова: <code>sudo -i</code>, <code>cd /var/log</code>, <code>tmux attach</code>. По одной
+        команде в строке, выполняются по порядку, повторяются при каждом переподключении. Вы видите
+        их выполнение, и <code>cd</code> действительно остаётся в силе. Наследуются по той же
+        цепочке, поэтому вся группа может начинать одинаково.
+      </p>
+      <div class="note">
+        <p>
+          Из инвентаря эти команды <b>не читаются никогда</b> — только из локальной конфигурации.
+          Иначе любой, кто может коммитить в репозиторий, запускал бы команды на ваших машинах.
+        </p>
+      </div>
+    </section>
+
+    <section id="terminal">
+      <h2><span class="num">07</span>Терминал</h2>
+
+      <h3>Ctrl принадлежит оболочке</h3>
+      <p>
+        Все сочетания приложения — на <kbd data-fixed>⌘</kbd> в macOS и на <kbd>Ctrl</kbd>+<kbd
+          >Shift</kbd
+        >
+        в других системах, как в Windows Terminal и MobaXterm. Поэтому <kbd>Ctrl+C</kbd>,
+        <kbd>Ctrl+D</kbd>, <kbd>Ctrl+K</kbd>, <kbd>Ctrl+W</kbd>, <kbd>Ctrl+L</kbd> и
+        <kbd>Ctrl+F</kbd> доходят до той стороны и значат то, что значат в readline.
+      </p>
+      <p>
+        Исключения намеренные, и их три. <kbd>Ctrl+1</kbd>…<kbd>Ctrl+9</kbd> по-прежнему переключают
+        вкладки, потому что оболочкам они никогда не были нужны. Масштаб шрифта тоже сидит на голом
+        <kbd>Ctrl</kbd> — его перехватывает главный процесс раньше, чем до клавиши доберётся
+        кто-либо ещё. А разделение вниз — это <kbd>Ctrl+Shift+E</kbd>, а не <kbd>D</kbd> с шифтом:
+        <kbd>Shift</kbd> там уже часть модификатора и не может ещё и выбирать направление. Отметить
+        хост или файл <kbd data-win="Ctrl">⌘</kbd>-кликом тоже можно голым <kbd>Ctrl</kbd>: клик
+        смотрит на обе клавиши.
+      </p>
+
+      <h3>Повседневное</h3>
+      <table class="keys">
+        <tbody>
+          <tr>
+            <td><kbd>⌘F</kbd></td>
+            <td>Поиск по истории; <kbd>⏎</kbd> и <kbd>⇧⏎</kbd> ходят по совпадениям</td>
+          </tr>
+          <tr>
+            <td><kbd>⌘+</kbd> <kbd>⌘−</kbd> <kbd>⌘0</kbd></td>
+            <td>Размер шрифта; меняется общий размер — или размер хоста, если у него задан свой</td>
+          </tr>
+          <tr>
+            <td><kbd>⌘C</kbd> <kbd>⌘V</kbd></td>
+            <td>Копировать и вставить</td>
+          </tr>
+          <tr>
+            <td>Выделение</td>
+            <td>Копирует сразу; правый клик вставляет. Оба поведения переключаются в настройках</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Сниппеты</h3>
+      <p>
+        <kbd>⌘K</kbd> открывает палитру сохранённых команд: <kbd>⏎</kbd> выполняет,
+        <kbd>⇧⏎</kbd> кладёт в строку не запуская. Палитра сообщает, <b>куда</b> попадёт команда,
+        ещё до отправки.
+      </p>
+
+      <h3>Трансляция ввода</h3>
+      <p>
+        <span class="ui">Трансляция</span> повторяет ваш ввод во всех отмеченных терминалах — во
+        всех вкладках и рабочих областях сразу. Отмечается каждый терминал кнопкой на своей панели
+        инструментов.
+      </p>
+
+      <h3>Запись сессии</h3>
+      <p>
+        <span class="ui">Записывать вывод сессии в файл</span> в диалоге хоста держит расшифровку
+        каждого подключения в папке журналов (<span class="ui"
+          >Настройки → Безопасность → Открыть папку журналов</span
+        >). В записи есть всё, что показывал терминал, — обращайтесь с ней как с секретом.
+      </p>
+    </section>
+
+    <section id="layout">
+      <h2><span class="num">08</span>Вкладки, панели, рабочие области и наборы</h2>
+
+      <h3>Панели</h3>
+      <ul>
+        <li><kbd>⌘D</kbd> — разделить вправо, <kbd>⌘⇧D</kbd> — вниз.</li>
+        <li>
+          Перетащите хост или целую вкладку на панель, чтобы поставить их рядом; ближайший край при
+          отпускании решает, какую половину займёт новая панель.
+        </li>
+        <li>Кнопка ⇱ возвращает панель в отдельную вкладку.</li>
+        <li>Разделитель между панелями тянется мышью.</li>
+        <li><kbd>⌘W</kbd> закрывает активную панель, а если она последняя — вкладку.</li>
+      </ul>
+
+      <h3>Рабочие области</h3>
+      <ul>
+        <li>
+          Верхняя полоса; <span class="ui">+</span> создаёт пустую, двойной клик переименовывает.
+        </li>
+        <li>
+          Правый клик по группе или репозиторию — <b>открыть всё в новой области</b>, по вкладке на
+          хост.
+        </li>
+        <li>
+          Вкладку можно перетащить в другую область — терминал при этом не разорвёт соединение.
+        </li>
+        <li>
+          <kbd>⌘⇧1</kbd>…<kbd>⌘⇧9</kbd> — переход к области, <kbd>⌘1</kbd>…<kbd>⌘9</kbd> — к вкладке
+          внутри неё.
+        </li>
+        <li>Закрытие области закрывает все терминалы в ней.</li>
+      </ul>
+
+      <h3>Открыть несколько хостов сразу</h3>
+      <ul>
+        <li>
+          <kbd data-win="Ctrl">⌘</kbd>-клик отмечает ещё хост, <kbd data-win="Shift">⇧</kbd>-клик —
+          всё между прошлым кликом и этим. Выделение общее для вкладок «Сессии» и «Инвентарь», они
+          смешиваются свободно.
+        </li>
+        <li>
+          Появляется полоса с <span class="ui">Открыть</span> (по вкладкам) и
+          <span class="ui">Плиткой</span> (в одной вкладке).
+        </li>
+        <li>
+          <kbd>⌘P</kbd> — палитра хостов: поиск по имени сразу по сохранённым сессиям и инвентарям.
+          <kbd>Tab</kbd> отмечает несколько, <kbd>⇧⏎</kbd> открывает плиткой, <kbd>⌥⏎</kbd> — в
+          отдельной рабочей области.
+        </li>
+      </ul>
+
+      <h3>Наборы</h3>
+      <p>
+        Набор — это ваша собственная подборка хостов, живущая под группами на вкладке
+        <span class="ui">Сессии</span>. В отличие от группы, один хост может входить в сколько
+        угодно наборов, и членство <b>не меняет учётных данных</b> — они по-прежнему приходят от
+        группы.
+      </p>
+      <ul>
+        <li>
+          Отметьте хосты на любой вкладке и нажмите <span class="ui">Собрать</span>; либо правый
+          клик по рабочей области сверху → <span class="ui">Сохранить как набор…</span>.
+        </li>
+        <li>Сохранение под существующим именем предложит дополнить набор или заменить его.</li>
+        <li>
+          Рабочую область можно спокойно закрывать — <span class="ui">Открыть</span> вернёт весь
+          набор.
+        </li>
+        <li>
+          Набор несёт <b>цвет и тему терминала</b>, и оформление действует <b>по контексту</b>: хост
+          носит вид набора там, где вы видите его под этим набором, и там, где открыли его оттуда.
+          Одна и та же машина в наборах «Прод» и «Базы» выглядит так, откуда вы пришли; открытая из
+          обычного дерева — по своим группам. Хост со своими настройками сохраняет их в любом
+          случае.
+        </li>
+        <li>
+          Удалённый или исчезнувший из инвентаря хост помечается как отсутствующий, а не
+          выбрасывается молча.
+        </li>
+      </ul>
+    </section>
+
+    <section id="files">
+      <h2><span class="num">09</span>Файлы: SFTP и SCP/Shell</h2>
+      <p class="lede">
+        Файловая панель открывается кнопкой <span class="ui">SFTP</span> на панели инструментов и
+        живёт на том же соединении, что и терминал.
+      </p>
+
+      <h3>Как ходить по каталогам</h3>
+      <ul>
+        <li>
+          <b>Строка пути</b> принимает набранный путь: <kbd>⏎</kbd> переходит,
+          <kbd>esc</kbd> возвращает как было. <code>~</code> и <code>..</code> разрешает
+          <b>сервер</b>, поэтому они ведут себя как в оболочке, а не как приложение о них думает.
+          Путь к файлу открывает его папку и выделяет сам файл.
+        </li>
+        <li>
+          <b>Хлебные крошки</b> — клик по элементу переходит туда, ↑ поднимает на уровень выше.
+        </li>
+        <li>
+          <b>Дерево папок</b> сбоку заполняется по мере открытия и подсвечивает то место, куда ушёл
+          листинг, — независимо от того, кликнули вы, вписали путь или <code>cd</code> сделали в
+          терминале.
+        </li>
+        <li>
+          Листинг перечитывается каждые пять секунд, пока панель видна и не занята передачей или
+          действием с файлами. В скрытой вкладке и скрытом окне опрос приостанавливается; при
+          возвращении список обновляется. Медленный ответ сервера не запускает очередь повторных
+          опросов.
+        </li>
+      </ul>
+
+      <h3>Следование за каталогом терминала</h3>
+      <p>
+        Кнопка <b>⇉</b> в строке пути заставляет панель ходить за <code>cd</code> в терминале.
+        Работает на живом соединении — включается и выключается сразу, без диалога и
+        переподключения.
+      </p>
+      <p>
+        Под этим лежит последовательность <code>OSC 7</code>, которую оболочка печатает на каждом
+        приглашении; хостам, не настроенным на это, приложение вводит одну настроечную строку, и её
+        эхо вырезается из потока, поэтому на экран она не попадает. Выключено по умолчанию: это даёт
+        удалённому хосту двигать ваш файловый браузер. Настройка
+        <span class="ui">Панель SFTP следует за каталогом терминала</span> в диалоге хоста или
+        группы решает только то, как <b>начнётся</b> новое соединение.
+      </p>
+
+      <h3>Операции</h3>
+      <table>
+        <tbody>
+          <tr>
+            <td>Двойной клик</td>
+            <td>Открывает папку или скачивает файл</td>
+          </tr>
+          <tr>
+            <td><kbd data-win="Ctrl">⌘</kbd> / <kbd data-win="Shift">⇧</kbd> клик</td>
+            <td>Переключить один файл или растянуть выделение до диапазона</td>
+          </tr>
+          <tr>
+            <td>Правый клик</td>
+            <td>Скачать, переименовать, удалить, создать папку, сравнить</td>
+          </tr>
+          <tr>
+            <td>Перетаскивание из Finder</td>
+            <td>Загрузка файлов и целых папок</td>
+          </tr>
+          <tr>
+            <td>Перетаскивание между панелями</td>
+            <td>Копирование <b>с хоста на хост</b></td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        <b>Копирование между хостами</b> идёт потоком из сокета в сокет: двум серверам не нужен
+        маршрут друг к другу, и ничего не оседает на вашем диске по дороге. Бросок на строку папки
+        кладёт внутрь неё, а не в текущий каталог.
+      </p>
+
+      <h3>Столбцы и вид</h3>
+      <p>
+        Размер, время изменения, <b>права</b> (<code>rwxr-xr-x</code>, включая setuid, setgid и
+        sticky), владелец и группа. Имя, режим и владелец красятся по типу: синие каталоги, голубые
+        символические ссылки, красные исполняемые. Тянется всё — панель за левый край, дерево за
+        разделитель, каждый столбец за заголовок; ширины запоминаются. Если ширины не хватает,
+        листинг прокручивается вбок, а не теряет столбец.
+      </p>
+
+      <h3>Перезапись и сравнение</h3>
+      <ul>
+        <li>
+          Передача <b>планируется до того, как двинется первый байт</b>: всё, что будет заменено,
+          показывается списком с размером и датой с обеих сторон.
+        </li>
+        <li>
+          Каждое совпадение начинается на <span class="ui">Пропустить</span>, ответы
+          <b>не запоминаются</b> — каждая передача спрашивает заново.
+        </li>
+        <li>Папка на месте файла не заменяется, а отклоняется.</li>
+        <li>
+          <span class="ui">Сравнить</span> прямо в диалоге показывает построчную разницу. Любой
+          удалённый файл можно сравнить с локальным через контекстное меню. Двоичные файлы и всё,
+          что больше 2 МБ, так и говорят вместо того, чтобы тянуться по сети; разница только в
+          переводах строк CRLF сообщается именно так, а не как переписанный файл.
+        </li>
+      </ul>
+
+      <h3>Правка в локальном редакторе</h3>
+      <p>
+        <span class="ui">Править локально</span> в контекстном меню открывает файл в вашем редакторе
+        и отправляет его обратно <b>при каждом сохранении</b>. Редактор выбирается в
+        <span class="ui">Настройки → Файлы → Внешний редактор</span>.
+      </p>
+      <div class="note">
+        <p>
+          Указывайте <b>полный путь</b> к программе: оконное приложение не наследует
+          <code>PATH</code> из вашей оболочки, поэтому просто <code>code</code> или
+          <code>subl</code> может не найтись. Подстановка <code>{file}</code> в команде заменяется
+          на путь; без неё путь дописывается в конец. Пустое поле отдаёт файл тому, чем его
+          открывает система.
+        </p>
+      </div>
+
+      <h3>
+        <span class="tag t-new">0.13.1</span>Доступ к файлам от другого пользователя (SCP/Shell)
+      </h3>
+      <p class="lede">
+        Файлы можно читать и писать не тем пользователем, которым вы вошли в терминал.
+      </p>
+      <p>
+        Обычная ситуация: SSH пускает вас как <code>ivanov</code>, а лежат файлы у
+        <code>postgres</code>, и <code>sudo</code> вам разрешён. Раньше файловая панель этого не
+        умела — SFTP работает от логина сессии и никак иначе. Теперь у хоста есть раздел
+        <span class="ui">Доступ к файлам</span>:
+      </p>
+      <ol class="steps">
+        <li>Откройте диалог хоста, найдите <span class="ui">Доступ к файлам</span>.</li>
+        <li>
+          <span class="ui">Способ передачи файлов</span> — выберите <b>SCP / Shell</b> вместо
+          <b>SFTP</b>.
+        </li>
+        <li>
+          В поле <span class="ui">Команда запуска оболочки</span> впишите команду в одну строку,
+          например <code>sudo -n -i -u postgres</code>.
+        </li>
+        <li>Сохраните и <b>переподключитесь</b> — настройка применяется к новому соединению.</li>
+      </ol>
+      <p>
+        Дальше файловая панель показывает заданную команду, а терминал продолжает жить под вашим
+        собственным логином. Через эту команду идут листинг каталогов, передачи по <code>scp</code>,
+        копирование с хоста на хост и отправка из внешнего редактора — каждая операция на отдельном
+        канале SSH.
+      </p>
+
+      <h4>Что требуется от сервера</h4>
+      <ul>
+        <li>
+          Linux с <code>scp</code>, GNU coreutils (в том числе <code>stat</code>,
+          <code>realpath</code>, <code>base64</code>) и GNU <code>find</code>.
+        </li>
+        <li>
+          Право выполнить команду <b>без интерактивного пароля и без TTY</b> — отсюда
+          <code>-n</code> в <code>sudo -n -i -u postgres</code>. Запрос пароля sudo не
+          поддерживается.
+        </li>
+      </ul>
+
+      <h4>Что нужно знать</h4>
+      <ul>
+        <li>
+          Отказ в авторизации <b>сообщается</b>, а не приводит к тихому откату на вашего
+          пользователя SSH: если команда не разрешена, вы это увидите.
+        </li>
+        <li>
+          Команда запускается заново для каждой операции, поэтому состояние оболочки с терминалом не
+          разделяется.
+        </li>
+        <li>
+          Хосты из git-инвентаря поддерживают ту же настройку в <b>локальных переопределениях</b>.
+          Из самого репозитория эта команда не читается — как и «При подключении», по той же
+          причине.
+        </li>
+        <li>Настройка едет вместе с резервной копией.</li>
+        <li>
+          Возврат к обычному поведению — выбрать <b>SFTP</b> обратно. Существующие подключения по
+          умолчанию продолжают работать через SFTP.
+        </li>
+      </ul>
+    </section>
+
+    <section id="tunnels">
+      <h2><span class="num">10</span>Туннели и мониторинг</h2>
+
+      <h3>Проброс портов</h3>
+      <p>
+        Кнопка <span class="ui">Туннели</span> на панели инструментов пробрасывает порты через это
+        подключение.
+      </p>
+      <table>
+        <tbody>
+          <tr>
+            <td><span class="ui">Локальный</span></td>
+            <td>Отправляет порт отсюда туда, куда достаёт хост</td>
+          </tr>
+          <tr>
+            <td><span class="ui">Обратный</span></td>
+            <td>Наоборот: порт на хосте появляется здесь</td>
+          </tr>
+          <tr>
+            <td><span class="ui">Динамический (SOCKS)</span></td>
+            <td>Прокси SOCKS5, чтобы браузер достал до целой сети</td>
+          </tr>
+        </tbody>
+      </table>
+      <ul>
+        <li>
+          Правило, сохранённое на сессии (<span class="ui">Проброс портов</span> в её диалоге),
+          запускается <b>само</b> при каждом её подключении.
+        </li>
+        <li>
+          <span class="ui">Разовый туннель</span> работает только для этого подключения и не
+          сохраняется.
+        </li>
+      </ul>
+
+      <h3>Мониторинг</h3>
+      <p>
+        <span class="ui">Монитор</span> в той же панели показывает полосу под панелью: загрузку
+        процессора с короткой историей, занятую память, скорость сети, время работы, вошедшего
+        пользователя и заполненность каждого смонтированного диска — жёлтым после 75 % и красным
+        после 90 %.
+      </p>
+      <ul>
+        <li>Опрашивает хост каждые три секунды и останавливается после трёх неудач подряд.</li>
+        <li>Идёт по <b>своему каналу</b>: в вашу оболочку ничего не печатается.</li>
+        <li>На хост ничего не устанавливается — это одна команда.</li>
+        <li>
+          Работает, только пока полоса открыта и видна. При переключении на другую вкладку или
+          скрытии окна опрос приостанавливается, при возвращении начинается заново.
+        </li>
+      </ul>
+    </section>
+
+    <section id="inventory">
+      <h2><span class="num">11</span>Инвентарь из git</h2>
+      <p class="lede">
+        Хосты можно не заводить руками, а взять из репозитория с инвентарём Ansible. Только на
+        чтение: обратно не отправляется ничего и никогда.
+      </p>
+
+      <h3>Два способа</h3>
+      <table>
+        <tbody>
+          <tr>
+            <td>Вкладка <span class="ui">Инвентарь</span></td>
+            <td>Отдельное место со своим деревом групп из репозитория</td>
+          </tr>
+          <tr>
+            <td>Папка на вкладке <span class="ui">Сессии</span></td>
+            <td>Та же идея внутри обычного дерева: хосты стоят рядом с вашими собственными</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Что читается</h3>
+      <ul>
+        <li>
+          Группы Ansible, <code>children</code>, встроенные <code>vars</code>,
+          <code>group_vars/</code> и <code>host_vars/</code> становятся группами и настройками
+          подключения.
+        </li>
+        <li>
+          Только YAML: <code>.yml</code> и <code>.yaml</code>. Каталог читается на один уровень
+          вглубь; инвентарь в формате INI не читается вовсе. Соседние <code>group_vars/</code> и
+          <code>host_vars/</code> подхватываются автоматически.
+        </li>
+        <li>
+          Клонирование идёт <b>системным git</b>, поэтому работают ваши ключи SSH, агенты, помощники
+          учётных данных и прокси — ровно как в терминале.
+        </li>
+      </ul>
+
+      <h3>Ветка — частая причина «ничего не изменилось»</h3>
+      <div class="warn">
+        <p>
+          Источник следует <b>одной ветке</b>. Пустое поле <span class="ui">Ветка</span> означает
+          ветку по умолчанию, обычно <code>main</code>. Работа, закоммиченная в другую ветку, здесь
+          не появится, пока вы не назовёте эту ветку или не вольёте её, — и синхронизация в обоих
+          случаях <b>проходит успешно</b>, поэтому выглядит так, будто ничего не изменилось. Строка
+          под источником называет ветку, ревизию, число хостов и групп и прочитанные файлы — именно
+          чтобы это было видно.
+        </p>
+      </div>
+
+      <h3>Хост в нескольких группах</h3>
+      <p>
+        Такой хост показывается под каждой из них с пометкой количества и остаётся
+        <b>одним хостом</b>: один набор локальных настроек, одна запись в наборе, один терминал.
+        Настройки подключения он наследует от <b>одной</b> группы — самой глубокой, а при равенстве
+        последней по алфавиту: это та группа, которой дал бы победить сам Ansible.
+      </p>
+      <div class="note">
+        <p>
+          Полный порядок приоритета переменных Ansible по всем группам <b>не реализован</b>. Там,
+          где это важно, задайте хосту собственное локальное переопределение.
+        </p>
+      </div>
+
+      <h3>Папка на вкладке «Сессии», привязанная к git</h3>
+      <ol class="steps">
+        <li>
+          Откройте диалог папки и включите
+          <span class="ui">Отражать инвентарь из git-репозитория</span>.
+        </li>
+        <li>
+          Укажите адрес, ветку и пути к инвентарю. Репозиторий, уже использованный один раз,
+          предлагается списком всем папкам, созданным потом.
+        </li>
+        <li>
+          Сохраните. Ничего не скачивается само: вызовите
+          <span class="ui">Синхронизировать с git…</span> на папке или кнопку <b>⟳</b> в её строке.
+        </li>
+      </ol>
+      <ul>
+        <li>
+          <b>Один репозиторий на папку</b>, но папка может держать и ваши собственные сессии и
+          подпапки — синхронизация их не трогает.
+        </li>
+        <li>
+          Несколько папок на одном репозитории <b>делят клон</b>: он скачивается один раз, и каждая
+          папка берёт из него свои пути — продакшн из одного файла инвентаря, стенд из другого.
+          Рабочая копия исчезает вместе с последней читающей её папкой.
+        </li>
+        <li>
+          <b>Само ничего не происходит.</b> Взятое в прошлый раз лежит на диске, поэтому папка
+          показывает свои хосты на первом же кадре после открытия окна, не заглядывая в сеть.
+        </li>
+      </ul>
+
+      <h3>Диалог синхронизации</h3>
+      <p>
+        Каждая синхронизация спрашивает, <b>какие группы взять</b>, — до того, как на диске что-то
+        изменится.
+      </p>
+      <ul>
+        <li>
+          Прошлый выбор отмечен; появившиеся с прошлого раза группы приходят отмеченными и с
+          пометкой <em>новая</em>. Отметка на группе берёт и её подгруппы. Снятая вами подгруппа
+          остаётся снятой — как новую её больше не предложат.
+        </li>
+        <li>
+          Синхронизация приводит папку к тому, что репозиторий говорит <b>сейчас</b>, поэтому
+          ушедшие из него группа или хост уходят и из папки. Диалог перечисляет, что именно исчезнет
+          и у скольких из этих хостов есть локальные настройки — они удаляются вместе с хостом,
+          включая сохранённые для них пароли.
+        </li>
+        <li>
+          До нажатия <span class="ui">Применить</span> на диске не меняется ничего;
+          <span class="ui">Отмена</span> оставляет папку как была.
+        </li>
+      </ul>
+
+      <h3><span class="tag t-new">0.13.0</span>Разложить хосты по папкам групп</h3>
+      <p>
+        По умолчанию хосты попадают в папку <b>одним плоским списком</b>, как бы глубоко их ни
+        вкладывал инвентарь. Новый флажок <span class="ui">Разложить хосты по папкам групп</span>
+        в диалоге синхронизации сохраняет вложенность выбранных групп внутри папки.
+      </p>
+      <ul>
+        <li>
+          Хост, входящий в несколько выбранных групп, виден в каждой из них; открытие всей папки всё
+          равно открывает каждый хост <b>один раз</b>.
+        </li>
+        <li>Выбор раскладки запоминается для будущих синхронизаций.</li>
+        <li>
+          Настройки подключения в любой раскладке наследуются через группы репозитория —
+          расположение на экране на это не влияет.
+        </li>
+      </ul>
+
+      <h3>Локальные настройки поверх инвентаря</h3>
+      <p>
+        Хосты приезжают как производные узлы, поверх которых лежат ваши правки: правый клик →
+        <span class="ui">Локальные настройки…</span>. Заданное там
+        <b>переживает каждую следующую синхронизацию</b>. Настройки подключения наследуются через
+        группы репозитория и дальше вверх — в вашу папку, поэтому логин, заданный на папке,
+        покрывает всё, что под ней. <span class="ui">Сбросить локальные настройки</span> возвращает
+        хост к тому, что говорит репозиторий.
+      </p>
+      <p>
+        Резервная копия несёт репозиторий, ветку, выбранные группы и ваши локальные настройки — но
+        не сами отражённые хосты: их восстановит одна синхронизация на новой машине. Отвязка или
+        удаление папки убирает отражённые хосты вместе с локальными настройками и паролями к ним;
+        сам репозиторий не трогается.
+      </p>
+    </section>
+
+    <section id="rdp">
+      <h2><span class="num">12</span>Удалённые рабочие столы</h2>
+      <p class="lede">
+        RDP открывается <b>в панели</b>, рядом с терминалами, а не в отдельном окне.
+      </p>
+
+      <h3>Как это включить</h3>
+      <p>
+        В диалоге хоста поставьте <span class="ui">Протокол</span> в RDP — он станет открываться
+        рабочим столом. Логин берётся от хоста или группы над ним, как любые другие учётные данные;
+        домен едет в имени пользователя как <code>DOMAIN\user</code>.
+      </p>
+
+      <h3>Раздел «Рабочий стол»</h3>
+      <p>
+        Есть у хоста, у группы и у локального переопределения инвентаря; наследуется по той же
+        цепочке, что и логин, и каждое поле подписывает, что унаследует и откуда.
+      </p>
+      <table>
+        <tbody>
+          <tr>
+            <td><span class="ui">Шлюз RD</span></td>
+            <td>Через какую машину достаётся хост. Пусто — напрямую</td>
+          </tr>
+          <tr>
+            <td><span class="ui">Разрешение</span></td>
+            <td>
+              <span class="ui">По размеру панели</span> или
+              <span class="ui">Фиксированный размер</span>
+            </td>
+          </tr>
+          <tr>
+            <td><span class="ui">Сколько пикселей запрашивать</span></td>
+            <td>Бюджет: от «медленного канала» до «столько, сколько у экрана»</td>
+          </tr>
+          <tr>
+            <td><span class="ui">Как рабочий стол приводится к нужному размеру</span></td>
+            <td>Попросить ту сторону, растянуть здесь или не подгонять</td>
+          </tr>
+          <tr>
+            <td><span class="ui">Проигрывать звук удалённой машины здесь</span></td>
+            <td>Отдельный канал; выключается для хоста или группы</td>
+          </tr>
+          <tr>
+            <td><span class="ui">Отправлять ⌘ как Ctrl</span></td>
+            <td>macOS: копирование и вставка как в Windows</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        Шлюз говорит, <b>где машина живёт</b>, а не кто вы на ней, — поэтому его задают один раз на
+        группе, а ниже оставляют пустым. Шлюз берёт логин хоста, если ему не дали своего. Пароль
+        шлюза разрешается в главном процессе и <b>никогда не попадает в окно</b>.
+      </p>
+
+      <h3>Размер и резкость</h3>
+      <p>Это самое неочевидное место, и оно стоит трёх абзацев.</p>
+      <ul>
+        <li>
+          <b>Размер считается в пикселях экрана, а не в точках панели.</b> Панель шириной 1400 точек
+          на Retina — это 2800 пикселей, и от того, что именно запросить у той стороны, зависит,
+          рисуется картинка пиксель в пиксель или увеличивается.
+        </li>
+        <li>
+          <b>Бюджет пикселей</b> ограничивает запрос: за его пределом стол просят о меньшем размере,
+          чем хотелось. На обычном мониторе с одним пикселем на точку панель и есть запрос, что бы
+          тут ни стояло.
+        </li>
+        <li>
+          <b>Приведение к размеру.</b> Стол, запрошенный в собственных пикселях Retina, выходит
+          резким <em>и вдвое мельче</em>, чем нужно, потому что Windows раскладывает меню в 20
+          пикселей одинаково при любой плотности. Поэтому по умолчанию картинка увеличивается
+          <b>здесь</b>: панель Retina запрашивает ровно свои точки, и каждый пиксель рисуется
+          четырьмя. Либо можно <span class="ui">попросить ту сторону</span> — тогда она сама
+          раскладывается крупнее, и это единственный способ получить нужный размер при полной
+          резкости. Windows 8.1 и Server 2012 R2 и новее это учитывают, старее — игнорируют.
+        </li>
+      </ul>
+      <div class="note">
+        <p>
+          Запрос плотности выключен по умолчанию, потому что это всё-таки просьба к той стороне
+          разложить себя иначе, а присоединённая сессия принадлежит тому, кто в ней работает, и не
+          масштабируется вовсе.
+        </p>
+      </div>
+
+      <h3>Полный экран</h3>
+      <ul>
+        <li><kbd>F11</kbd> входит и выходит; <b>удержание</b> <kbd>Escape</kbd> тоже выходит.</li>
+        <li>
+          Панель инструментов убирается <b>совсем</b> — верхний край экрана принадлежит той стороне,
+          вместе с её собственной строкой вкладок и кнопками окна. Заодно стол получает размер,
+          который у монитора есть, а такой размер и способен лечь пиксель в пиксель.
+        </li>
+        <li>
+          <b>Вся клавиатура уходит сессии.</b> Каждое сочетание приложения — <kbd>⌘W</kbd>, номера
+          вкладок и областей, палитры, блокировка хранилища, масштаб — на время полного экрана
+          умолкает. Списка исключений нет намеренно: клавиша, нацеленная в дальнюю машину и попавшая
+          в эту, — это и есть та беда, которой избегают. Выходов два, и ни один из них не проходит
+          через обработку сочетаний.
+        </li>
+        <li>
+          <kbd>Alt+Tab</kbd> доходит до той стороны только в полном экране. На маке это
+          <kbd data-fixed>⌥Tab</kbd>: <kbd data-fixed>⌘Tab</kbd> принадлежит macOS и отобрать его
+          нельзя.
+        </li>
+        <li>
+          В окне, а не в полном экране, ничего не меняется: сочетания приложения работают, вкладки
+          остаются доступны с клавиатуры.
+        </li>
+      </ul>
+
+      <h3>Присоединиться к уже открытой сессии</h3>
+      <p>
+        При открытии хоста спрашивают, чего вы хотите: <span class="ui">Новая сессия</span> в панели
+        или одна из тех, что уже открыты на этой машине —
+        <span class="ui">Наблюдать, не вмешиваясь</span> либо
+        <span class="ui">Наблюдать и забрать клавиатуру с мышью</span>.
+      </p>
+      <ul>
+        <li>
+          Список приходит от самого хоста и читается
+          <b>по позициям, а не по заголовкам столбцов</b>, поэтому переведённая Windows читается не
+          хуже английской.
+        </li>
+        <li>
+          Присоединённая сессия открывается в <b>окне, которое рисует Windows</b>, а не это
+          приложение: механизм идёт по RPC и SMB, а не по RDP. Только Windows, по той же причине.
+          Такая сессия сохраняет свой размер и не масштабируется.
+        </li>
+        <li>
+          Список сессий запрашивается <b>от имени того, кто запустил приложение</b>:
+          <code>qwinsta</code> аутентифицирует свой RPC сам, и сохранённые учётные данные на это не
+          влияют. Против машины вне вашего домена практичный ответ — запустить TerminalDeck под
+          учётной записью, которую тот хост знает; иначе делается попытка через PowerShell remoting
+          с сохранённым логином, а для этого нужен WinRM на хосте и этот хост в
+          <code>TrustedHosts</code> вашей машины. К обычным сессиям RDP всё это отношения не имеет.
+        </li>
+        <li>
+          <span class="ui">Присоединиться, не спрашивая человека там</span> — флажок, по умолчанию
+          выключенный. Разрешает это политика хоста; где не разрешает — подключение отклоняется, а
+          не переходит тихо к вопросу.
+        </li>
+      </ul>
+
+      <h3>Чего пока нет</h3>
+      <p>
+        Обмен файлами между сторонами рабочего стола пока не вернулся. Файловая панель, туннели,
+        мониторинг и трансляция у сессии рабочего стола не показываются — по RDP их взять неоткуда.
+      </p>
+    </section>
+
+    <section id="look">
+      <h2><span class="num">13</span>Оформление</h2>
+      <p>
+        <span class="ui">Настройки → Терминал</span> задаёт значения, с которых стартует каждый
+        терминал: шрифт, размер, цветовая тема, вид курсора (прямоугольник, подчёркивание, полоса),
+        мигание и глубина истории в строках. Там же — копирование при выделении и поведение правого
+        клика.
+      </p>
+      <ul>
+        <li>
+          Группа, репозиторий или отдельный хост переопределяют любое из этого в своём разделе
+          <span class="ui">Оформление</span>.
+        </li>
+        <li>Каждое поле сообщает, что унаследует и от какой группы.</li>
+        <li>
+          <span class="ui">Наследовать оформление</span> снимается независимо от наследования
+          учётных данных.
+        </li>
+        <li>
+          Тема хоста перекрашивает <b>только его терминал</b> — само приложение сохраняет тему из
+          настроек.
+        </li>
+        <li>
+          Цвет хоста или группы — отдельная пометка в дереве, чтобы отличать продакшн на глаз.
+        </li>
+      </ul>
+    </section>
+
+    <section id="backup">
+      <h2><span class="num">14</span>Резервная копия и обновления</h2>
+
+      <h3>Экспорт</h3>
+      <p>
+        <span class="ui">Настройки → Резервная копия → Экспортировать…</span> записывает сессии,
+        группы, сниппеты, наборы и источники инвентаря в один файл. Оформление терминала и
+        доверенные ключи хостов остаются на этой машине.
+      </p>
+      <ul>
+        <li>
+          <span class="ui">Включить сохранённые учётные данные</span> — по желанию. Они
+          перешифровываются под <b>отдельный</b> пароль по AES-256-GCM, той же схемой, что и
+          хранилище, и никогда не пишутся открытым текстом. Пароль отдельный ровно затем, чтобы файл
+          можно было передать, не отдавая мастер-пароль.
+        </li>
+        <li>Не меньше 12 символов: этот файл можно подбирать офлайн.</li>
+      </ul>
+      <div class="warn">
+        <p>
+          Обращайтесь с файлом как с секретом. В отличие от хранилища он покидает эту машину и
+          защищающую её учётную запись, и подбирать его можно офлайн сколько угодно долго. Возьмите
+          длинный пароль и <b>удалите файл, когда переезд закончен</b>. Потеряете пароль — эти
+          учётные данные не восстановить.
+        </p>
+      </div>
+
+      <h3>Импорт</h3>
+      <p>
+        Записи сопоставляются по идентификатору: существующая заменяется, новая добавляется, и
+        <b>ничего из уже имеющегося не удаляется</b>. По окончании приложение отчитывается, сколько
+        сессий, групп, сниппетов, наборов и репозиториев приехало.
+      </p>
+
+      <h3>Обновления</h3>
+      <p>
+        Когда выходит новая версия, сверху появляется полоса
+        <span class="ui">Доступна версия {версия}</span> с кнопками
+        <span class="ui">Скачать</span> и <span class="ui">Позже</span>. После загрузки —
+        <span class="ui">Перезапустить сейчас</span> или
+        <span class="ui">При следующем выходе</span>.
+      </p>
+      <div class="note">
+        <p>
+          На macOS автообновление работает только на подписанной сборке:
+          <code>electron-updater</code>
+          проверяет подпись перед подменой приложения, поэтому неподписанная сборка обновление
+          скачает и откажется применить.
+        </p>
+      </div>
+    </section>
+
+    <section id="keys">
+      <h2><span class="num">15</span>Сочетания клавиш</h2>
+      <p class="lede">
+        Приложение держит свои сочетания на <kbd data-fixed>⌘</kbd> в macOS и на
+        <kbd>Ctrl</kbd>+<kbd>Shift</kbd> в Windows и Linux, оставляя голый <kbd>Ctrl</kbd> оболочке.
+        Ниже — обе раскладки; переключатель в шапке страницы меняет запись во всём тексте, а эти
+        таблицы всегда показывают оба варианта, чтобы распечатка годилась любому.
+      </p>
+      <p>
+        Три исключения, и все три намеренные: <b>номера вкладок</b> сидят на голом <kbd>Ctrl</kbd> —
+        ни одной оболочке <kbd>Ctrl+1</kbd> никогда не был нужен; <b>масштаб</b> тоже, потому что
+        его перехватывает главный процесс раньше всех; а <b>разделение вниз</b> вне мака — это
+        <kbd>Ctrl+Shift+E</kbd>, а не <kbd>D</kbd> с шифтом: <kbd>Shift</kbd> там уже часть
+        модификатора и не может ещё и выбирать направление.
+      </p>
+
+      <h3>Вкладки, панели, области</h3>
+      <table class="keys">
+        <thead>
+          <tr>
+            <th>macOS</th>
+            <th>Windows · Linux</th>
+            <th>Что делает</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><kbd data-fixed>⌘P</kbd></td>
+            <td><kbd>Ctrl+Shift+P</kbd></td>
+            <td>Палитра хостов: поиск по сессиям и инвентарям сразу</td>
+          </tr>
+          <tr>
+            <td><kbd data-fixed>Tab</kbd></td>
+            <td><kbd>Tab</kbd></td>
+            <td>В этом списке — отметить несколько хостов</td>
+          </tr>
+          <tr>
+            <td><kbd data-fixed>⇧⏎</kbd></td>
+            <td><kbd>Shift+Enter</kbd></td>
+            <td>Открыть отмеченные плиткой в одной вкладке</td>
+          </tr>
+          <tr>
+            <td><kbd data-fixed>⌥⏎</kbd></td>
+            <td><kbd>Alt+Enter</kbd></td>
+            <td>Открыть отмеченные в отдельной рабочей области</td>
+          </tr>
+          <tr>
+            <td><kbd data-fixed>⌘T</kbd></td>
+            <td><kbd>Ctrl+Shift+T</kbd></td>
+            <td>Новая вкладка с тем же хостом, что в активной панели</td>
+          </tr>
+          <tr>
+            <td><kbd data-fixed>⌘W</kbd></td>
+            <td><kbd>Ctrl+Shift+W</kbd></td>
+            <td>Закрыть панель, а если она последняя — вкладку</td>
+          </tr>
+          <tr>
+            <td><kbd data-fixed>⌘D</kbd></td>
+            <td><kbd>Ctrl+Shift+D</kbd></td>
+            <td>Разделить панель вправо</td>
+          </tr>
+          <tr>
+            <td><kbd data-fixed>⌘⇧D</kbd></td>
+            <td><kbd>Ctrl+Shift+E</kbd></td>
+            <td>Разделить панель вниз</td>
+          </tr>
+          <tr>
+            <td><kbd data-fixed>⌘1</kbd>…<kbd data-fixed>⌘9</kbd></td>
+            <td><kbd>Ctrl+1</kbd>…<kbd>Ctrl+9</kbd></td>
+            <td>Перейти к вкладке в текущей области</td>
+          </tr>
+          <tr>
+            <td><kbd data-fixed>⌘⇧1</kbd>…<kbd data-fixed>⌘⇧9</kbd></td>
+            <td><kbd>Ctrl+Shift+1</kbd>…<kbd>Ctrl+Shift+9</kbd></td>
+            <td>Перейти к рабочей области</td>
+          </tr>
+          <tr>
+            <td><kbd data-fixed>⌘</kbd> клик</td>
+            <td><kbd>Ctrl</kbd> клик</td>
+            <td>Отметить ещё один хост или файл</td>
+          </tr>
+          <tr>
+            <td><kbd data-fixed>⇧</kbd> клик</td>
+            <td><kbd>Shift</kbd> клик</td>
+            <td>Растянуть выделение до диапазона</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Терминал</h3>
+      <table class="keys">
+        <thead>
+          <tr>
+            <th>macOS</th>
+            <th>Windows · Linux</th>
+            <th>Что делает</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><kbd data-fixed>⌘F</kbd></td>
+            <td><kbd>Ctrl+Shift+F</kbd></td>
+            <td>
+              Поиск по истории; <kbd data-fixed>⏎</kbd> и <kbd data-fixed>⇧⏎</kbd> — по совпадениям
+            </td>
+          </tr>
+          <tr>
+            <td><kbd data-fixed>⌘+</kbd> <kbd data-fixed>⌘−</kbd> <kbd data-fixed>⌘0</kbd></td>
+            <td><kbd>Ctrl++</kbd> <kbd>Ctrl+−</kbd> <kbd>Ctrl+0</kbd></td>
+            <td>Размер шрифта больше, меньше, обратно</td>
+          </tr>
+          <tr>
+            <td><kbd data-fixed>⌘C</kbd> <kbd data-fixed>⌘V</kbd></td>
+            <td><kbd>Ctrl+Shift+C</kbd> <kbd>Ctrl+Shift+V</kbd></td>
+            <td>Копировать выделенное и вставить</td>
+          </tr>
+          <tr>
+            <td><kbd data-fixed>⌘K</kbd></td>
+            <td><kbd>Ctrl+Shift+K</kbd></td>
+            <td>Палитра сниппетов</td>
+          </tr>
+          <tr>
+            <td><kbd data-fixed>⌘L</kbd></td>
+            <td><kbd>Ctrl+Shift+L</kbd></td>
+            <td>Заблокировать хранилище</td>
+          </tr>
+          <tr>
+            <td><kbd data-fixed>⌘/</kbd></td>
+            <td><kbd>Ctrl+Shift+/</kbd></td>
+            <td>Сочетания клавиш и возможности</td>
+          </tr>
+          <tr>
+            <td colspan="2"><kbd>Ctrl</kbd>+что угодно</td>
+            <td>Уходит в оболочку, а не в приложение — на обеих платформах</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Рабочий стол</h3>
+      <p>Здесь раскладки не расходятся — кроме одной строки про <kbd data-fixed>Alt+Tab</kbd>.</p>
+      <table class="keys">
+        <tbody>
+          <tr>
+            <td><kbd>Ctrl+Alt+End</kbd></td>
+            <td><kbd data-fixed>Ctrl+Alt+Del</kbd> на той стороне</td>
+          </tr>
+          <tr>
+            <td><kbd>F11</kbd></td>
+            <td>Полный экран — и единственный способ передать <kbd data-fixed>Alt+Tab</kbd></td>
+          </tr>
+          <tr>
+            <td>удержать <kbd>Escape</kbd></td>
+            <td>Выйти из полного экрана</td>
+          </tr>
+          <tr>
+            <td><kbd data-fixed>⌥Tab</kbd></td>
+            <td>
+              На маке — то, чем в полном экране становится <kbd data-fixed>Alt+Tab</kbd>; в Windows
+              и Linux это сам <kbd data-fixed>Alt+Tab</kbd>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        Прокрутка внутри RDP следует за преобладающей осью жеста. Небольшое боковое движение
+        трекпада отбрасывается, чтобы вертикальное окно не начинало ехать по диагонали; явная
+        горизонтальная прокрутка и настоящий диагональный жест сохраняются.
+      </p>
+    </section>
+
+    <section id="whatsnew">
+      <h2><span class="num">16</span>Что нового в 0.13</h2>
+
+      <h3><span class="tag t-new">0.13.2</span>Быстродействие</h3>
+      <p>
+        Большие каталоги прокручиваются с отображением только видимых строк; выбор файлов,
+        переименование и перетаскивание сохраняются. Индикатор передачи обновляется отдельно от
+        списка. Подготовка копирования множества файлов проверяет несколько назначений одновременно,
+        сохраняя диалог конфликтов.
+      </p>
+      <p>
+        Скрытые вкладки приостанавливают опрос файлов и мониторинг. Встроенный рабочий стол
+        перестаёт передавать изображение в интерфейс и восстанавливает актуальный полный кадр при
+        возвращении. Соединения, запущенные команды, туннели и передачи файлов продолжают работать.
+        Синхронизация больших inventory разбирает YAML отдельно от основного потока приложения.
+      </p>
+
+      <h3><span class="tag t-new">0.13.1</span>Доступ к файлам от другого пользователя</h3>
+      <p>
+        <span class="ui">Доступ к файлам → SCP / Shell</span> плюс
+        <span class="ui">Команда запуска оболочки</span> вида <code>sudo -n -i -u postgres</code>:
+        файловые операции выполняются от разрешённой учётной записи, а вход в терминал остаётся
+        вашим. Листинг каталогов, передачи, копирование между хостами и отправка из внешнего
+        редактора — всё через эту команду. Поддерживается и в локальных переопределениях хостов из
+        git-инвентаря; настройка едет в резервной копии, а панель показывает действующую команду.
+        Подробности и требования к серверу — <a href="#files">раздел 9</a>.
+      </p>
+
+      <h3><span class="tag t-new">0.13.0</span>Хосты по папкам групп</h3>
+      <p>
+        В диалоге синхронизации git-инвентаря появился флажок
+        <span class="ui">Разложить хосты по папкам групп</span>: выбранные группы становятся
+        вложенными папками, общий хост виден в каждой, выбор запоминается. Выключено — остаётся
+        прежний плоский список. См. <a href="#inventory">раздел 11</a>.
+      </p>
+
+      <h3>Починено</h3>
+      <ul>
+        <li>
+          <b>Настроечная строка отслеживания каталога больше не появляется на экране.</b>
+          На хосте с долгим входом она вводилась, пока login-shell ещё выполнял
+          <code>/etc/profile</code>, и её эхо приходило дважды — из драйвера терминала и из
+          редактора строки. Теперь она отправляется, когда оболочка замолкает, и вырезается целиком.
+        </li>
+        <li>
+          <b>Не открывшийся рабочий стол объясняет причину.</b> Панель показывает не только шаг, на
+          котором всё встало, но и последнюю жалобу клиента и числовой код ошибки — снимок экрана с
+          ошибкой теперь стоит столько же, сколько стоил бы журнал.
+        </li>
+      </ul>
+    </section>
+
+    <section id="trouble">
+      <h2><span class="num">17</span>Если что-то не работает</h2>
+
+      <h3>Синхронизация прошла, но изменений нет</h3>
+      <p>
+        Почти всегда это ветка. Источник следует одной ветке, и пустое поле означает ветку по
+        умолчанию. Посмотрите строку под источником: там названы ветка, ревизия и число прочитанных
+        файлов. См. <a href="#inventory">раздел 11</a>.
+      </p>
+
+      <h3>«Ключ хоста изменился»</h3>
+      <p>
+        Приложение предупреждает громко и не подключается молча. Если сервер законно пересобрали,
+        удалите запись в
+        <span class="ui">Настройки → Безопасность → Доверенные ключи хостов</span> — при следующем
+        подключении спросят заново. Если сервер не пересобирали, разбирайтесь с сетью, а не с
+        приложением.
+      </p>
+
+      <h3>SCP/Shell: отказ в доступе</h3>
+      <ul>
+        <li>
+          Команда должна выполняться <b>без запроса пароля и без TTY</b>:
+          <code>sudo -n -i -u ...</code>, и правило в sudoers с <code>NOPASSWD</code>.
+        </li>
+        <li>
+          На сервере нужны <code>scp</code>, GNU coreutils (<code>stat</code>,
+          <code>realpath</code>, <code>base64</code>) и GNU <code>find</code>. На BusyBox или
+          не-Linux это не работает.
+        </li>
+        <li>Настройка применяется <b>после переподключения</b>.</li>
+        <li>Отката на вашего пользователя SSH не происходит намеренно — отказ вы увидите.</li>
+      </ul>
+
+      <h3>Рабочий стол не подключается</h3>
+      <ul>
+        <li>Панель называет шаг, последнюю жалобу клиента и числовой код — начните с них.</li>
+        <li>
+          Шлюз: реализован только <b>NTLM</b>. Шлюз, предлагающий один Kerberos через SPNEGO, так и
+          скажет, а не притворится неверным паролем.
+        </li>
+        <li>
+          Сертификат, который машина не смогла проверить, спрашивается один раз и запоминается;
+          отказ останавливает сессию, а не переводит её в незащищённый режим.
+        </li>
+        <li>
+          Нужно больше — запустите приложение с <code>TERMINALDECK_RDP_TRACE=1</code>: клиент
+          рабочего стола пойдёт на уровне <code>DEBUG</code> FreeRDP, где названы согласованные
+          кодеки и каналы, и всё это будет печататься в терминал, где запущено приложение.
+        </li>
+      </ul>
+      <pre><code>TERMINALDECK_RDP_TRACE=1 /Applications/TerminalDeck.app/Contents/MacOS/TerminalDeck</code></pre>
+
+      <h3>Хранилище заблокировано, и ничего не открывается</h3>
+      <p>
+        Так и задумано: заблокированное приложение не начинает ни сессию, ни рабочий стол, ни
+        листинг файлов. Уже открытые сессии при этом живы. Введите мастер-пароль (<span class="ui"
+          >Разблокировать</span
+        >), и всё вернётся. Срок автоблокировки — <span class="ui">Настройки → Безопасность</span>.
+      </p>
+
+      <h3>Внешний редактор не открывается</h3>
+      <p>
+        Укажите <b>полный путь</b> к программе в <span class="ui">Настройки → Файлы</span>: оконное
+        приложение не наследует <code>PATH</code> из вашей оболочки.
+      </p>
+
+      <h3>Посторонние сообщения от сервера</h3>
+      <p>
+        Строки вроде <code>-bash: TMOUT: readonly variable</code> печатает профиль самого хоста
+        (<code>/etc/profile</code> и <code>/etc/profile.d/</code>) — они появятся в любом клиенте
+        SSH и лечатся на стороне сервера.
+      </p>
+    </section>
+
+    <footer>
+      <p>
+        TerminalDeck 0.13 · руководство пользователя · интерфейс переключается в
+        <span class="ui">Настройки → Язык</span> · полный список сочетаний — <kbd>⌘/</kbd> в
+        приложении.
+      </p>
+    </footer>
+  </main>
+</div>
+
+<script>
+  // Подсветка текущего раздела в оглавлении: следим за тем, что видно.
+  ;(function () {
+    var links = Array.prototype.slice.call(document.querySelectorAll('#toc a'))
+    var byId = {}
+    links.forEach(function (a) {
+      byId[a.getAttribute('href').slice(1)] = a
+    })
+    var sections = Array.prototype.slice.call(document.querySelectorAll('section[id]'))
+
+    function mark(id) {
+      links.forEach(function (a) {
+        a.classList.toggle('on', a === byId[id])
+      })
+    }
+
+    if ('IntersectionObserver' in window) {
+      var seen = {}
+      var io = new IntersectionObserver(
+        function (entries) {
+          entries.forEach(function (e) {
+            seen[e.target.id] = e.isIntersecting
+          })
+          for (var i = sections.length - 1; i >= 0; i--) {
+            if (seen[sections[i].id]) {
+              mark(sections[i].id)
+              break
+            }
+          }
+        },
+        { rootMargin: '-10% 0px -70% 0px' }
+      )
+      sections.forEach(function (s) {
+        io.observe(s)
+      })
+    }
+
+    // Клик по оглавлению помечает раздел сразу, не дожидаясь прокрутки.
+    links.forEach(function (a) {
+      a.addEventListener('click', function () {
+        mark(a.getAttribute('href').slice(1))
+      })
+    })
+  })()
+
+  /*
+   * Переключатель раскладки сочетаний.
+   *
+   * Текст написан в маковой записи — так же, как она написана в самом приложении
+   * (src/renderer/src/state/keys.ts), — и переписывается здесь для остальных систем.
+   * Правила те же, что в keyHint, плюс три исключения, которые keyHint не знает,
+   * потому что в интерфейсе они разнесены по отдельным строкам:
+   *
+   *   ⌘⇧D → Ctrl+Shift+E   разделение вниз: Shift там уже часть модификатора
+   *   ⌘1…⌘9 → Ctrl+1…Ctrl+9  и ⌘0 ⌘+ ⌘− → Ctrl+0 Ctrl++ Ctrl+−
+   *                          номера вкладок и масштаб сидят на голом Ctrl
+   *   ⌘ клик → Ctrl клик     клик смотрит на metaKey || ctrlKey
+   *
+   * Последнее правилами не выразить, поэтому такие места несут data-win с готовым
+   * ответом, а места, где ⌘ обсуждается как символ, — data-fixed и не трогаются.
+   */
+  ;(function () {
+    var box = document.getElementById('platform')
+    if (!box) return
+    // Скрыт разметкой: без работающего скрипта эти кнопки ничего не переключают,
+    // а обе раскладки и так стоят рядом в таблицах раздела 15.
+    box.style.display = 'flex'
+    var keys = Array.prototype.slice.call(document.querySelectorAll('kbd:not([data-fixed])'))
+    var buttons = Array.prototype.slice.call(box.querySelectorAll('button'))
+
+    function toWindows(text) {
+      var out = text
+        .replace(/⌘⇧D/g, 'Ctrl+Shift+E')
+        .replace(/⌘⇧([1-9])/g, 'Ctrl+Shift+$1')
+        .replace(/⌘([1-9])/g, 'Ctrl+$1')
+        .replace(/⌘([0+\u2212\u2013-])/g, 'Ctrl+$1')
+        .replace(/⌘⇧/g, 'Ctrl+Shift+')
+        .replace(/⌘/g, 'Ctrl+Shift+')
+        .replace(/⌥/g, 'Alt+')
+        .replace(/⇧/g, 'Shift+')
+        .replace(/⏎/g, 'Enter')
+      // Одинокий модификатор не должен кончаться плюсом — но Ctrl++ должен.
+      if (out.charAt(out.length - 1) === '+' && out.charAt(out.length - 2) !== '+') {
+        out = out.slice(0, -1)
+      }
+      return out
+    }
+
+    keys.forEach(function (k) {
+      if (!k.hasAttribute('data-mac')) k.setAttribute('data-mac', k.textContent)
+    })
+
+    function apply(os) {
+      keys.forEach(function (k) {
+        var mac = k.getAttribute('data-mac')
+        k.textContent = os === 'win' ? k.getAttribute('data-win') || toWindows(mac) : mac
+      })
+      buttons.forEach(function (b) {
+        b.setAttribute('aria-pressed', String(b.getAttribute('data-os') === os))
+      })
+      try {
+        localStorage.setItem('td-manual-os', os)
+      } catch (e) {
+        /* приватное окно */
+      }
+    }
+
+    buttons.forEach(function (b) {
+      b.addEventListener('click', function () {
+        apply(b.getAttribute('data-os'))
+      })
+    })
+
+    var saved = null
+    try {
+      saved = localStorage.getItem('td-manual-os')
+    } catch (e) {
+      /* приватное окно */
+    }
+    if (!saved) {
+      var platform = (navigator.platform || '') + ' ' + (navigator.userAgent || '')
+      saved = /mac/i.test(platform) ? 'mac' : 'win'
+    }
+    apply(saved === 'win' ? 'win' : 'mac')
+  })()
+</script>

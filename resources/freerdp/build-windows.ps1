@@ -198,6 +198,14 @@ Ran 'configuring td-rdp'
 
 cmake --build (Join-Path $shim 'build') --config Release --parallel
 Ran 'building td-rdp'
+$testPath = $env:PATH
+try {
+  $env:PATH = "$(Join-Path $out 'bin');$(Join-Path $vcpkg "installed\$triplet\bin");$testPath"
+  ctest --test-dir (Join-Path $shim 'build') -C Release --output-on-failure
+  Ran 'testing td-rdp frame visibility'
+} finally {
+  $env:PATH = $testPath
+}
 cmake --install (Join-Path $shim 'build') --config Release
 
 # ------------------------------------------------------------------ the result

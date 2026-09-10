@@ -170,6 +170,9 @@ jobs:
       - name: Build
         run: npm run ${{ matrix.script }} -- --publish never
 
+      - name: Verify the built inventory worker
+        run: npm run verify:performance
+
       # What travels inside the application, which the payload check at the end
       # cannot see: it reads the release directory, and `if-no-files-found:
       # error` proves a disk image exists rather than what is in it. The desktop

@@ -6,7 +6,62 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.13.2
+
+### Performance
+
+- Avoid notifying the global UI store for terminal output when the tab is already
+  visible or already marked unread. SSH batching, flow control and WebGL rendering
+  remain in use.
+- Limit file-transfer progress updates to ten per second, with immediate final
+  notifications, and render the progress bar independently of the file list.
+  Large directories now render only visible rows, preserving selection, rename
+  editors and drag sources while scrolling.
+- Pause automatic file listings and monitoring in hidden tabs and when the window
+  is hidden. Refresh when returning; SSH connections and transfers stay alive.
+  Slow file listings no longer accumulate overlapping polling requests.
+- Stop transporting RDP pixels while a desktop pane is hidden. Restore the full
+  current screen on return without reconnecting or exceeding one frame in flight.
+- Coalesce split resizing to animation frames, skip unchanged terminal dimensions,
+  and save the layout after dragging instead of on every mouse movement. Other
+  layout saves are debounced, with a bounded delay and a flush when closing.
+- Check transfer destinations with up to eight concurrent metadata requests while
+  preserving conflict handling and sequential file writes. Concurrent requests
+  share one SFTP channel-opening operation.
+- Read and parse inventory YAML in a worker thread, cache variable files within a
+  parse, and merge hosts and groups with maps instead of repeated linear searches.
+  Shared Git checkouts remain locked through parsing and revision lookup.
+
+### Fixed
+
+- Lock accidental cross-axis trackpad noise to the dominant RDP scroll axis while
+  preserving explicit horizontal and deliberate diagonal gestures.
+- Ignore outdated file listings after changing directory or connection.
+- Preserve the initial selection anchor when Shift-clicking across a large list.
+- Reject SFTP channel creation that completes after its connection was released.
+- Ignore monitoring results from a stopped or replaced watch.
+
+### Validation and documentation
+
+- Add regression coverage for activity notifications, deferred layout saves,
+  10,000-file listings, background panels, transfer progress and concurrency,
+  inventory merging and RDP visibility. Native frame tests run during client builds.
+- Update the Russian 0.13 manual for background polling and desktop behaviour.
+
 ## 0.13.1
+
+### Documentation
+
+- Add a Russian user manual as a single self-contained page,
+  `docs/terminaldeck-0.13-manual.html`: installation and first run, the tree and its
+  inheritance, credentials and the vault, terminals, files over SFTP and the new SCP/Shell
+  access, tunnels, monitoring, git inventories, desktops, backup, the shortcut tables and
+  a troubleshooting section. Its wording follows the Russian interface, so what it names
+  is what is on screen. Shortcuts are written in mac notation and rewritten for Windows and
+  Linux by a switch in the page header, the way `keyHint` does it in the app — including the
+  three places where the other platform's shortcut is not a mechanical translation: tab
+  numbers and zoom sit on plain Ctrl, splitting downwards is Ctrl+Shift+E, and ticking a host
+  is a Ctrl-click. The tables in the shortcut section print both columns either way.
 
 ### Added
 

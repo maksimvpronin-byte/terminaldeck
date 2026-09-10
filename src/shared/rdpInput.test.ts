@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buttonEvent, PTR, PTR_X, wheelFlags, wheelUnits } from './rdpInput'
+import { buttonEvent, PTR, PTR_X, wheelFlags, wheelTurns, wheelUnits } from './rdpInput'
 
 describe('buttonEvent', () => {
   it('does not confuse the middle button with the right one', () => {
@@ -87,5 +87,26 @@ describe('wheelFlags', () => {
       expect(value).toBeGreaterThanOrEqual(0)
       expect(value).toBeLessThanOrEqual(0xff)
     }
+  })
+})
+
+describe('wheelTurns', () => {
+  it('drops small cross-axis trackpad noise', () => {
+    expect(wheelTurns(20, -100, 0)).toEqual([{ units: 120, horizontal: false }])
+  })
+
+  it('keeps an explicit horizontal gesture', () => {
+    expect(wheelTurns(-100, 0, 0)).toEqual([{ units: 120, horizontal: true }])
+  })
+
+  it('keeps a deliberate diagonal gesture', () => {
+    expect(wheelTurns(80, -100, 0)).toEqual([
+      { units: 120, horizontal: false },
+      { units: -96, horizontal: true }
+    ])
+  })
+
+  it('does not create an event for a stationary wheel', () => {
+    expect(wheelTurns(0, 0, 0)).toEqual([])
   })
 })

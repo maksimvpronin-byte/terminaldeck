@@ -1,6 +1,6 @@
 {
   "name": "terminaldeck",
-  "version": "0.13.1",
+  "version": "0.13.2",
   "description": "Cross-platform SSH/SFTP terminal manager (MobaXterm/Royal TSX alternative)",
   "main": "./out/main/index.js",
   "author": "TerminalDeck",
@@ -30,7 +30,8 @@
     "build:freerdp:win:shim": "powershell -NoProfile -ExecutionPolicy Bypass -File resources/freerdp/build-windows.ps1 -ShimOnly",
     "build:freerdp:win:bundle": "powershell -NoProfile -ExecutionPolicy Bypass -File resources/freerdp/bundle-windows.ps1",
     "build:win": "npm run build:shadowhost && npm run build:freerdp:win:bundle && electron-vite build && electron-builder --win",
-    "build:linux": "electron-vite build && electron-builder --linux"
+    "build:linux": "electron-vite build && electron-builder --linux",
+    "verify:performance": "node scripts/verify-performance.cjs"
   },
   "repository": {
     "type": "git",

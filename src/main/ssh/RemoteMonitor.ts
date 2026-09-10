@@ -60,12 +60,14 @@ class RemoteMonitor {
     watch.busy = true
     try {
       const output = await sshManager.exec(connectionId, probeCommand)
+      if (this.watches.get(connectionId) !== watch) return
       const sample = parseProbe(output, Date.now())
       const stats = diffSamples(watch.previous, sample)
       watch.previous = sample
       watch.failures = 0
       this.publish(win, connectionId, stats)
     } catch {
+      if (this.watches.get(connectionId) !== watch) return
       // One failed probe is a blip — a busy host, a dropped channel. Several
       // in a row means the connection is gone, and polling a dead host for
       // ever is worse than stopping and letting the user turn it back on.

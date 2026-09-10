@@ -1,0 +1,178 @@
+diff --git a/src/main/ssh/SFTPManager.ts b/src/main/ssh/SFTPManager.ts
+--- a/src/main/ssh/SFTPManager.ts
++++ b/src/main/ssh/SFTPManager.ts
+@@ -1,9 +1,9 @@
+ import type { SFTPWrapper } from 'ssh2'
+ import { readdir, mkdir, stat, lstat, readFile } from 'fs/promises'
+ import { renameSync, rmSync } from 'fs'
+-import { join, basename, dirname } from 'path'
++import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'path'
+ import { sshManager } from './SSHManager'
+ import {
+   buildTransferPlan,
+   conflictedPaths,
+   shouldWrite,
+@@ -33,10 +33,32 @@
+ /** Text or not: the same test `grep` and `git` use — a NUL byte early on. */
+ function looksBinary(buffer: Buffer): boolean {
+   return buffer.subarray(0, 8192).includes(0)
+ }
+
++/**
++ * Joins one SFTP directory entry to a local directory without letting a remote
++ * filename select a parent, sibling, drive, or UNC path on the local machine.
++ */
++function localChild(parent: string, name: string): string {
++  const root = resolve(parent)
++  const target = resolve(root, name)
++  const rel = relative(root, target)
++  if (
++    !name ||
++    name.includes('\0') ||
++    basename(name) !== name ||
++    rel === '' ||
++    rel === '..' ||
++    rel.startsWith(`..${sep}`) ||
++    isAbsolute(rel)
++  ) {
++    throw new Error(`Refusing unsafe remote file name: ${JSON.stringify(name)}`)
++  }
++  return target
++}
++
+ class SFTPManager {
+   private sessions = new Map<string, SFTPWrapper>()
+   /** Makes each in-progress download's temporary name its own. */
+   private nextTransfer = 0
+
+@@ -319,11 +341,11 @@
+     localDir: string,
+     onProgress?: ProgressFn
+   ): Promise<void> {
+     await mkdir(localDir, { recursive: true })
+     for (const entry of await this.list(connectionId, remotePath)) {
+-      const target = join(localDir, entry.name)
++      const target = localChild(localDir, entry.name)
+       // Symlinked directories are skipped: following them can loop forever and
+       // pull in files from outside the tree.
+       if (entry.isDirectory && !entry.isSymlink) {
+         await this.downloadDirectory(connectionId, entry.path, target, onProgress)
+       } else if (!entry.isDirectory) {
+@@ -420,11 +442,11 @@
+    */
+   private async remoteTree(
+     connectionId: string,
+     remotePath: string,
+     destDir: string,
+-    joinPath: (dir: string, name: string) => string = join
++    joinPath: (dir: string, name: string) => string = localChild
+   ): Promise<TransferItem[]> {
+     const info = await this.statPath(connectionId, remotePath)
+     if (!info) return []
+     if (!info.isDirectory) {
+       return [
+diff --git a/src/main/gitFolders/GitFolderStore.ts b/src/main/gitFolders/GitFolderStore.ts
+--- a/src/main/gitFolders/GitFolderStore.ts
++++ b/src/main/gitFolders/GitFolderStore.ts
+@@ -61,10 +61,19 @@
+     .digest('hex')
+     .slice(0, 16)
+   return join(reposRoot(), key)
+ }
+
++/**
++ * Legacy checkouts were keyed directly by a folder id. Imported data can supply
++ * that id, so only a single filesystem-safe component is eligible for cleanup.
++ */
++function legacyCheckoutFor(folderId: string): string | undefined {
++  if (!/^[A-Za-z0-9_-]{1,128}$/.test(folderId)) return undefined
++  return join(reposRoot(), folderId)
++}
++
+ /** The whole repository as parsed, before the chosen groups are cut out of it. */
+ interface ParsedRepo {
+   tree: GitFolderTree
+   paths: string[]
+   revision?: string
+@@ -173,11 +182,12 @@
+      * The clone this folder had to itself, before checkouts were shared. Left
+      * behind it is a whole repository per folder that nothing will ever read
+      * again — and on an inventory of any size that is the largest thing this
+      * application keeps.
+      */
+-    removeTree(join(reposRoot(), folderId))
++    const legacyCheckout = legacyCheckoutFor(folderId)
++    if (legacyCheckout && legacyCheckout !== checkout) removeTree(legacyCheckout)
+
+     const files = resolveInventoryFiles(dir, link.paths)
+
+     const tree: GitFolderTree = { groupId: folderId, groups: [], sessions: [], memberships: {} }
+     for (const file of files) {
+diff --git a/src/main/inventory/GitRepo.ts b/src/main/inventory/GitRepo.ts
+--- a/src/main/inventory/GitRepo.ts
++++ b/src/main/inventory/GitRepo.ts
+@@ -56,11 +56,18 @@
+ function refuseOption(what: string, value: string): void {
+   if (value.startsWith('-')) {
+     throw new Error(`The ${what} may not begin with a dash: git would read it as an option`)
+   }
+ }
+
++function checkoutDir(root: string, sourceId: string): string {
++  if (!/^[A-Za-z0-9_-]{1,128}$/.test(sourceId)) {
++    throw new Error('The repository id is not a safe filesystem component')
++  }
++  return join(root, sourceId)
++}
++
+ /** Clones on first use, then fast-forwards. Returns the checkout directory. */
+ export async function syncRepo(
+   root: string,
+   sourceId: string,
+   repoUrl: string,
+@@ -67,10 +74,10 @@
+   branch?: string
+ ): Promise<string> {
+   refuseOption('repository address', repoUrl)
+   if (branch) refuseOption('branch', branch)
+
+-  const dir = join(root, sourceId)
++  const dir = checkoutDir(root, sourceId)
+
+   if (!existsSync(join(dir, '.git'))) {
+     // Shallow and single-branch: we only ever read the current tree.
+     const args = ['clone', '--depth', '1', '--single-branch']
+diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
+--- a/.github/workflows/release.yml
++++ b/.github/workflows/release.yml
+@@ -2,14 +2,14 @@
+   push:
+     tags:
+       - 'v*'
+   workflow_dispatch:
+
+-# electron-builder creates the release and uploads to it; the default token is
+-# read-only in repositories created after the permissions change.
++# Build jobs compile npm packages and third-party native code, so their token is
++# deliberately read-only. The final release job gets the one write permission.
+ permissions:
+-  contents: write
++  contents: read
+
+ jobs:
+   build:
+     strategy:
+       fail-fast: false
+@@ -207,10 +207,12 @@
+   #
+   # So nothing publishes until everything is built, and then one job does it
+   # with one command. A run that is not a tag skips this and leaves the packages
+   # on the run itself, which is what makes Run workflow a way to test a build.
+   release:
++    permissions:
++      contents: write
+     needs: build
+     if: startsWith(github.ref, 'refs/tags/v')
+     runs-on: ubuntu-latest
+
+     steps:

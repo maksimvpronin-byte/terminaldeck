@@ -79,6 +79,7 @@ typedef struct
 	 * case that actually costs bandwidth — video — dirties everything anyway.
 	 */
 	int dirty;
+	int hidden; /* No pixel transport while the pane is off screen. */
 	UINT32 dx1, dy1, dx2, dy2;
 
 	/**
@@ -185,7 +186,7 @@ static void flush_frame(tdContext* td)
 {
 	/* Caller holds td->paint. */
 	rdpGdi* gdi = td->common.context.gdi;
-	if (!gdi || !gdi->primary_buffer || !td->dirty || td->inflight)
+	if (!gdi || !gdi->primary_buffer || !td->dirty || td->inflight || td->hidden)
 		return;
 
 	/**
@@ -727,6 +728,18 @@ static void apply_command(tdContext* td, const td_cmd* cmd)
 	else if (strcmp(action, "ack") == 0)
 	{
 		paint_taken(td);
+	}
+	else if (strcmp(action, "visible") == 0)
+	{
+		EnterCriticalSection(&td->paint);
+		const int hidden = !td_cmd_int(cmd, "value", 1);
+		if (td->hidden && !hidden && context->gdi)
+			note_damage(td, 0, 0, context->gdi->width, context->gdi->height);
+		td->hidden = hidden;
+		/* Keep inflight: an old frame may still be travelling. Its ack will
+		 * release the full refresh without allowing two frames in flight. */
+		flush_frame(td);
+		LeaveCriticalSection(&td->paint);
 	}
 	else if (strcmp(action, "refresh") == 0)
 	{

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { saveLayout } from './layout'
+import { deferredSave } from './deferredSave'
 import { createVaultSlice } from './slices/vault'
 import { createSettingsSlice } from './slices/settings'
 import { createSessionsSlice } from './slices/sessions'
@@ -51,9 +52,18 @@ export const useStore = create<AppState>()((...a) => ({
 // see layout.ts.
 let lastWorkspaces = useStore.getState().workspaces
 let lastActive = useStore.getState().activeWorkspaceId
+const persistLayout = deferredSave(() => {
+  const state = useStore.getState()
+  saveLayout(state.workspaces, state.activeWorkspaceId)
+})
+export const flushLayout = persistLayout.flush
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', flushLayout)
+  window.addEventListener('beforeunload', flushLayout)
+}
 useStore.subscribe((state) => {
   if (state.workspaces === lastWorkspaces && state.activeWorkspaceId === lastActive) return
   lastWorkspaces = state.workspaces
   lastActive = state.activeWorkspaceId
-  saveLayout(state.workspaces, state.activeWorkspaceId)
+  persistLayout.schedule()
 })
