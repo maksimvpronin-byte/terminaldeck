@@ -119,6 +119,8 @@ const SECTIONS: Section[] = [
       { what: 'Settings → Security lists what was trusted by hand, and forgets it on request' },
       { what: 'The far end’s sound plays here, and can be turned off per host or group' },
       { what: 'The picture is decoded by a client of its own, so H.264 hosts are drawn as such' },
+      { what: 'A desktop in a tab you are not looking at stops being sent its picture' },
+      { what: 'Returning draws the whole screen again, without reconnecting' },
       { what: 'Nothing types the password into the window: the client signs in outside it' },
       { what: 'Copying files between the two sides is not back yet — see the release notes' }
     ]
@@ -225,6 +227,7 @@ const SECTIONS: Section[] = [
       { what: '"Ad-hoc tunnel" runs one for this connection only and is not saved' },
       { what: 'Monitor in the same toolbar shows load, memory, network, uptime and disks' },
       { what: 'It asks the host every three seconds and stops after three failures in a row' },
+      { what: 'It stops asking while its tab is in the background, and picks up on return' },
       { what: 'Nothing is installed there: it is one command on a channel of its own' }
     ]
   },
@@ -254,7 +257,9 @@ const SECTIONS: Section[] = [
       { what: 'Binary files and anything past 2 MB are not diffed, and say so' },
       {
         what: 'The listing re-reads itself every few seconds, so changes made in the shell show up'
-      }
+      },
+      { what: 'In a tab you are not looking at, and in a hidden window, it stops re-reading' },
+      { what: 'Coming back re-reads at once; the connection and any transfer carry on regardless' }
     ]
   },
   {

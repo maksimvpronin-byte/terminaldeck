@@ -216,6 +216,10 @@ export const ru: Record<string, string> = {
     'Двоичные файлы и всё больше 2 МБ не сравниваются и сообщают об этом',
   'The listing re-reads itself every few seconds, so changes made in the shell show up':
     'Список перечитывается каждые несколько секунд, поэтому изменения из оболочки видны',
+  'In a tab you are not looking at, and in a hidden window, it stops re-reading':
+    'Во вкладке, на которую вы не смотрите, и в скрытом окне он перестаёт перечитывать',
+  'Coming back re-reads at once; the connection and any transfer carry on regardless':
+    'При возврате список перечитывается сразу; соединение и передача файлов идут в любом случае',
   'Add a repository holding an Ansible inventory to get its hosts here':
     'Добавьте репозиторий с инвентарём Ansible, чтобы его хосты появились здесь',
   'Cloned read-only through your own git, so your keys and helpers are used':
@@ -431,6 +435,8 @@ export const ru: Record<string, string> = {
     '«Монитор» в той же панели показывает загрузку, память, сеть, время работы и диски',
   'It asks the host every three seconds and stops after three failures in a row':
     'Он опрашивает хост каждые три секунды и останавливается после трёх неудач подряд',
+  'It stops asking while its tab is in the background, and picks up on return':
+    'Пока его вкладка в фоне, он не опрашивает и продолжает при возврате',
   'Nothing is installed there: it is one command on a channel of its own':
     'Ничего туда не ставится: это одна команда на отдельном канале',
   'Filter by host or fingerprint…': 'Фильтр по хосту или отпечатку…',
@@ -469,6 +475,10 @@ export const ru: Record<string, string> = {
     'Звук той стороны слышен здесь; выключается для хоста или для всей группы',
   'The picture is decoded by a client of its own, so H.264 hosts are drawn as such':
     'Картинку разбирает отдельный клиент, поэтому хосты с H.264 так и рисуются',
+  'A desktop in a tab you are not looking at stops being sent its picture':
+    'Рабочий стол во вкладке, на которую вы не смотрите, перестаёт получать картинку',
+  'Returning draws the whole screen again, without reconnecting':
+    'При возврате экран отрисовывается целиком, без переподключения',
   'Nothing types the password into the window: the client signs in outside it':
     'Пароль не попадает в окно: клиент входит в систему за его пределами',
   'Copying files between the two sides is not back yet — see the release notes':
