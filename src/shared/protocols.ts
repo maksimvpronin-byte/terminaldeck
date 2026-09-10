@@ -30,8 +30,22 @@ export const DEFAULT_PROTOCOL: Protocol = 'ssh'
  * it back verbatim would leave a pane dispatching on a value nothing handles.
  */
 export function protocolOf(host: { protocol?: Protocol } | null | undefined): Protocol {
-  const stated = host?.protocol
-  return stated && PROTOCOLS.includes(stated) ? stated : DEFAULT_PROTOCOL
+  return asProtocol(host?.protocol) ?? DEFAULT_PROTOCOL
+}
+
+/**
+ * A protocol named by something outside this application — a repository's
+ * inventory, or a store written by another version.
+ *
+ * Undefined rather than the default when it is not one we speak: the caller
+ * needs to tell "this says RDP" from "this says nothing", because a host that
+ * states nothing inherits the default while one that states nonsense should not
+ * quietly become an SSH host under a name that says otherwise.
+ */
+export function asProtocol(value: unknown): Protocol | undefined {
+  if (typeof value !== 'string') return undefined
+  const named = value.trim().toLowerCase() as Protocol
+  return PROTOCOLS.includes(named) ? named : undefined
 }
 
 export interface ProtocolTraits {

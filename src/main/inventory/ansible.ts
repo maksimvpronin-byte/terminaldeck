@@ -1,3 +1,4 @@
+import { asProtocol, type Protocol } from '../../shared/protocols'
 import type { AuthDefaults, SessionGroup, SessionProfile } from '../../shared/types'
 
 export interface ParsedInventory {
@@ -59,6 +60,46 @@ export function varsToAuth(vars: AnsibleVars): AuthDefaults {
   }
 }
 
+/**
+ * What a host in this repository speaks, when the repository says so.
+ *
+ * Ansible has no word for this. Its own `ansible_connection` describes how
+ * *Ansible* reaches a machine to run tasks on it, which is a different question
+ * from how a person sits down in front of one — a Windows box is managed over
+ * WinRM and used over RDP, and plenty of inventories say neither. So this reads
+ * a variable of our own, `terminaldeck_protocol`, and reads nothing else:
+ * guessing a protocol from a management transport would be right often enough
+ * to be trusted and wrong often enough to strand somebody.
+ *
+ * Unset means the host is left alone, and `protocolOf` then calls it SSH — the
+ * same answer every inventory host got before this existed.
+ */
+export function protocolFromVars(vars: AnsibleVars): Protocol | undefined {
+  return asProtocol(vars.terminaldeck_protocol)
+}
+
+/**
+ * The port such a host is reached on, which for a desktop is not the one
+ * Ansible states.
+ *
+ * `ansible_port` is where *Ansible* connects: WinRM's 5985, or SSH's. Carrying
+ * it into a desktop session dials the management port for a screen and fails in
+ * a way that reads as a broken host rather than a mislabelled port. So an RDP
+ * host takes `terminaldeck_port` when the inventory names one and otherwise
+ * nothing at all, which leaves the client on 3389.
+ */
+function portForProtocol(
+  auth: AuthDefaults,
+  protocol: Protocol | undefined,
+  vars: AnsibleVars
+): AuthDefaults {
+  if (protocol !== 'rdp') return auth
+  const withoutAnsiblePort: AuthDefaults = { ...auth }
+  delete withoutAnsiblePort.port
+  const stated = num(vars.terminaldeck_port)
+  return stated ? { ...withoutAnsiblePort, port: stated } : withoutAnsiblePort
+}
+
 interface RawGroup {
   hosts?: Record<string, AnsibleVars | null> | null
   children?: Record<string, RawGroup | null> | null
@@ -90,6 +131,8 @@ export function parseAnsibleInventory(
     depth: number
     name: string
     vars: AnsibleVars
+    /** The group's own vars, kept for the one setting a host cannot inherit. */
+    groupVars: AnsibleVars
   }
   const seen = new Map<string, { name: string; claims: Claim[] }>()
 
@@ -108,7 +151,13 @@ export function parseAnsibleInventory(
     for (const [hostName, inlineVars] of Object.entries(raw?.hosts ?? {})) {
       const key = hostId(sourceId, hostName, prefix)
       const entry = seen.get(key) ?? { name: hostName, claims: [] }
-      entry.claims.push({ id, depth: path.split('/').length, name, vars: inlineVars ?? {} })
+      entry.claims.push({
+        id,
+        depth: path.split('/').length,
+        name,
+        vars: inlineVars ?? {},
+        groupVars: vars
+      })
       seen.set(key, entry)
     }
 
@@ -159,9 +208,21 @@ export function parseAnsibleInventory(
     const inline = ordered.reduce<AnsibleVars>((acc, claim) => ({ ...acc, ...claim.vars }), {})
     const hostVars = { ...lookupVars('host', entry.name), ...inline }
 
+    /*
+     * Protocol is resolved here rather than inherited, and the difference
+     * matters. Our own groups do not carry one — a group holds a Linux box and
+     * a Windows one alike, which is why `protocolOf` asks only the host — but an
+     * inventory states it once for a group and plainly means every host in it.
+     * So the group chain is read at parse time and the answer written onto the
+     * host, along the same order that decides which group's settings it takes.
+     */
+    const fromGroups = ordered.reduce<AnsibleVars>((acc, c) => ({ ...acc, ...c.groupVars }), {})
+    const protocol = protocolFromVars(hostVars) ?? protocolFromVars(fromGroups)
+
     hosts.push({
       id: key,
       name: entry.name,
+      ...(protocol ? { protocol } : {}),
       host: str(hostVars.ansible_host) ?? entry.name,
       groupId: primary.id,
       tags: [],
@@ -169,7 +230,7 @@ export function parseAnsibleInventory(
       portForwards: [],
       createdAt: now,
       updatedAt: now,
-      ...varsToAuth(hostVars)
+      ...portForProtocol(varsToAuth(hostVars), protocol, { ...fromGroups, ...hostVars })
     })
     memberships[key] = [...new Set(ordered.map((c) => c.id))]
   }

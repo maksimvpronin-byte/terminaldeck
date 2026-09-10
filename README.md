@@ -26,6 +26,15 @@ sequential and retain the conflict dialog.
   and proxies apply as they do in a terminal; nothing is ever pushed
 - Ansible groups, `children`, inline `vars`, `group_vars/` and `host_vars/` become groups and
   connection settings
+- **Every host arrives as an SSH host unless the inventory says otherwise**, and Ansible has no
+  word for what a machine is — `ansible_connection` says how *Ansible* manages one, which for a
+  Windows box is WinRM while a person sits down in front of it over RDP. So the reader takes
+  `terminaldeck_protocol: rdp` on a host or a group, and nothing else: a protocol guessed from a
+  management transport would be right often enough to be trusted and wrong often enough to strand
+  somebody. Such a host also ignores `ansible_port`, which is the management port and not the
+  desktop's, and takes `terminaldeck_port` if the desktop is not on 3389. An inventory you cannot
+  edit is corrected in the host's **local settings**, which state a protocol like anything else
+  there and survive every sync
 - A host named by **several groups appears under each of them**, marked with the count, and stays
   a single host throughout — one set of local overrides, one entry in a collection, one terminal.
   Its connection settings are inherited from one group: the deepest, and alphabetically last

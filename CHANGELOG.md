@@ -8,6 +8,21 @@ the other produces a version nobody can install, which is how 0.1.10 through
 
 ## Unreleased
 
+### Added
+
+- Read a host's protocol from a git inventory. Every host from a repository was
+  an SSH host with no way to say otherwise: a Windows machine opened a terminal,
+  took the port the inventory stated and dialled it as SSH, which fails as a
+  connection reset rather than as anything a person could act on. The reader now
+  takes `terminaldeck_protocol: rdp` on a host or a group, and only that —
+  `ansible_connection` describes how Ansible manages a machine, not how somebody
+  uses one. Such a host ignores `ansible_port`, which is the management port, and
+  takes `terminaldeck_port` when the desktop is not on 3389.
+- State the protocol in a host's local settings, for a repository you cannot
+  edit. It is the one setting in that dialog that is not inherited — a group
+  holds a Linux box and a Windows one alike — and switching it reveals the
+  Desktop section without saving and reopening.
+
 ### Removed
 
 - Joining a session somebody else is already working in, and everything under it:

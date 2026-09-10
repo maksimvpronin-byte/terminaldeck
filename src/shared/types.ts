@@ -389,6 +389,15 @@ export interface InventoryOverride extends AuthDefaults, AppearanceDefaults, Rdp
   /** Derived id of the host or group it applies to, stable across syncs. */
   nodeId: string
   color?: string
+  /**
+   * What the machine actually is, when the repository does not say.
+   *
+   * Not part of `AuthDefaults` and not inherited, for the reason
+   * `shared/protocols.ts` gives: only a host knows. An inventory can state it
+   * with `terminaldeck_protocol`, but plenty are written by people who never
+   * heard of this application, and then this is the only place to say so.
+   */
+  protocol?: Protocol
 }
 
 export interface InventoryData {

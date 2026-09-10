@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { parse } from 'yaml'
-import { parseAnsibleInventory, varsToAuth, groupId, hostId } from './ansible'
+import { parseAnsibleInventory, protocolFromVars, varsToAuth, groupId, hostId } from './ansible'
 
 const SRC = 'src1'
 
@@ -28,6 +28,128 @@ describe('varsToAuth', () => {
 
   it('sets nothing for unrelated or blank vars', () => {
     expect(varsToAuth({ some_var: 'x', ansible_user: '   ' })).toEqual({})
+  })
+})
+
+describe('protocolFromVars', () => {
+  it('reads the protocol the inventory states', () => {
+    expect(protocolFromVars({ terminaldeck_protocol: 'rdp' })).toBe('rdp')
+    expect(protocolFromVars({ terminaldeck_protocol: 'RDP' })).toBe('rdp')
+  })
+
+  /**
+   * Undefined, not SSH. A host that says nothing is left without a protocol so
+   * an override can still state one; a host that says something we do not speak
+   * is treated the same way rather than silently becoming a terminal.
+   */
+  it('says nothing for an absent or unknown protocol', () => {
+    expect(protocolFromVars({})).toBeUndefined()
+    expect(protocolFromVars({ terminaldeck_protocol: 'vnc' })).toBeUndefined()
+  })
+
+  /** `ansible_connection` is how Ansible manages a box, not how a person uses it. */
+  it('does not guess from the Ansible connection plugin', () => {
+    expect(protocolFromVars({ ansible_connection: 'winrm' })).toBeUndefined()
+  })
+})
+
+describe('an inventory that names a protocol', () => {
+  const inventory = (body: string) =>
+    parseAnsibleInventory(parse(body), SRC).hosts.map((h) => ({
+      name: h.name,
+      protocol: h.protocol,
+      port: h.port
+    }))
+
+  it('marks the host the inventory says is a desktop', () => {
+    expect(
+      inventory(`
+all:
+  children:
+    win:
+      hosts:
+        dc1:
+          terminaldeck_protocol: rdp
+`)
+    ).toEqual([{ name: 'dc1', protocol: 'rdp', port: undefined }])
+  })
+
+  /**
+   * Our own groups carry no protocol — only a host knows what it is — but an
+   * inventory that states it on a group plainly means every host in it, so the
+   * group chain is read while parsing and the answer written onto each host.
+   */
+  it('takes it from the group when the group is what states it', () => {
+    expect(
+      inventory(`
+all:
+  children:
+    win:
+      vars:
+        terminaldeck_protocol: rdp
+      hosts:
+        dc1:
+        dc2:
+`)
+    ).toEqual([
+      { name: 'dc1', protocol: 'rdp', port: undefined },
+      { name: 'dc2', protocol: 'rdp', port: undefined }
+    ])
+  })
+
+  it('lets the host disagree with its group', () => {
+    expect(
+      inventory(`
+all:
+  children:
+    win:
+      vars:
+        terminaldeck_protocol: rdp
+      hosts:
+        jump1:
+          terminaldeck_protocol: ssh
+`)
+    ).toEqual([{ name: 'jump1', protocol: 'ssh', port: undefined }])
+  })
+
+  /**
+   * The trap this exists for: `ansible_port` is WinRM's, not the desktop's, and
+   * carrying it dials the management port for a screen.
+   */
+  it('drops the Ansible port on a desktop host', () => {
+    expect(
+      inventory(`
+all:
+  hosts:
+    dc1:
+      terminaldeck_protocol: rdp
+      ansible_port: 5985
+`)
+    ).toEqual([{ name: 'dc1', protocol: 'rdp', port: undefined }])
+  })
+
+  it('takes terminaldeck_port when the desktop is not on 3389', () => {
+    expect(
+      inventory(`
+all:
+  hosts:
+    dc1:
+      terminaldeck_protocol: rdp
+      ansible_port: 5985
+      terminaldeck_port: 33890
+`)
+    ).toEqual([{ name: 'dc1', protocol: 'rdp', port: 33890 }])
+  })
+
+  it('leaves an ordinary host exactly as it was', () => {
+    expect(
+      inventory(`
+all:
+  hosts:
+    web1:
+      ansible_port: 2222
+`)
+    ).toEqual([{ name: 'web1', protocol: undefined, port: 2222 }])
   })
 })
 

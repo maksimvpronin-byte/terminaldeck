@@ -13,7 +13,7 @@ import { authFieldsState, secretToSave } from '../../../shared/authFields'
 import { applyOverride, isSet } from '../../../shared/overrides'
 import { appearanceSource, resolveAppearance } from '../../../shared/appearance'
 import { resolveRdp } from '../../../shared/rdpResolution'
-import { protocolOf, traitsOf } from '../../../shared/protocols'
+import { asProtocol, PROTOCOLS, protocolOf, traitsOf } from '../../../shared/protocols'
 import { useStore } from '../state/store'
 import { SESSION_COLOURS } from '../state/colours'
 import AppearanceFields from './AppearanceFields'
@@ -92,8 +92,13 @@ export default function InventoryOverrideDialog({
    * What this node can use. A group is not asked and gets everything: an
    * inventory group holds Linux and Windows hosts alike, and protocol is not
    * inherited. Only a host knows what it speaks.
+   *
+   * The override is read first, so ticking RDP on a host the repository calls
+   * nothing in particular reveals the Desktop section and hides the settings a
+   * desktop has no use for, without saving and reopening.
    */
-  const traits = isHost(node) ? traitsOf(protocolOf(node)) : traitsOf('ssh')
+  const protocol = isHost(node) ? (override.protocol ?? protocolOf(node)) : 'ssh'
+  const traits = traitsOf(protocol)
   // What the repository alone would give this node, ignoring the override.
   const fromRepo = resolveAuth(node, parentId, groups)
 
@@ -216,6 +221,27 @@ export default function InventoryOverrideDialog({
           {!isHost(node) && ` ${t('Everything in this group inherits what you set here.')}`}
         </p>
 
+        {isHost(node) && (
+          <label>
+            {t('Protocol')}
+            <select
+              value={override.protocol ?? ''}
+              onChange={(e) => set('protocol', asProtocol(e.target.value))}
+            >
+              <option value="">
+                {t('From the inventory ({protocol})', {
+                  protocol: traitsOf(protocolOf(node)).label
+                })}
+              </option>
+              {PROTOCOLS.map((name) => (
+                <option key={name} value={name}>
+                  {traitsOf(name).label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
         <div className="form-row">
           <label style={{ flex: 3 }}>
             {t('Username')}
@@ -231,7 +257,10 @@ export default function InventoryOverrideDialog({
             <input
               type="number"
               value={override.port ?? ''}
-              placeholder={String(fromRepo.port)}
+              /* A desktop does not inherit a port from its groups — see the
+                 handler in ipc/rdp.ts, which reads the host's own — so the
+                 placeholder is the protocol's rather than the chain's. */
+              placeholder={String(protocol === 'ssh' ? fromRepo.port : traits.port)}
               onChange={(e) => set('port', e.target.value ? Number(e.target.value) : undefined)}
             />
           </label>

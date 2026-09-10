@@ -228,6 +228,16 @@ export const ru: Record<string, string> = {
     'Настройки берутся из одной: самой глубокой и последней по алфавиту',
   'Credentials set on the repository are inherited by every host in it':
     'Учётные данные репозитория наследует каждый его хост',
+  'Every host is an SSH host unless the inventory says otherwise':
+    'Каждый хост считается SSH-хостом, пока инвентарь не скажет иначе',
+  'terminaldeck_protocol: rdp on a host or a group makes those hosts desktops':
+    'terminaldeck_protocol: rdp на хосте или группе делает эти хосты рабочими столами',
+  'Ansible has no word for this, and its connection plugin is not one':
+    'У Ansible для этого нет своего слова, а плагин подключения им не является',
+  'A desktop ignores ansible_port — that is WinRM’s — and takes terminaldeck_port':
+    'Рабочий стол игнорирует ansible_port — это порт WinRM — и берёт terminaldeck_port',
+  'An inventory that says nothing is corrected in the host’s local settings':
+    'Молчащий инвентарь поправляется в локальных настройках хоста',
   'A source follows one branch — empty means the default, usually main':
     'Источник следует одной ветке — пусто означает ветку по умолчанию, обычно main',
   'The line under a repository states the branch, revision and what was read':
@@ -513,6 +523,7 @@ export const ru: Record<string, string> = {
   Passphrase: 'Парольная фраза',
   'SSH agent': 'Агент SSH',
   'From the inventory': 'Из инвентаря',
+  'From the inventory ({protocol})': 'Из инвентаря ({protocol})',
   'SFTP panel follows the terminal’s directory': 'Панель SFTP следует за каталогом терминала',
   'Keeps the SFTP panel on the directory the shell is in. Types one setup line into the shell on connect so it reports where it is; its echo is hidden. Off by default: it lets the host move the file browser. The ⇉ button in the panel switches it at any time.':
     'Держит панель SFTP в том каталоге, где находится оболочка. При подключении вводит в неё одну настроечную строку, чтобы она сообщала своё положение; её эхо скрыто. По умолчанию выключено: это позволяет хосту двигать файловый браузер. Кнопка ⇉ в панели переключает это в любой момент.',
