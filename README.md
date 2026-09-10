@@ -457,10 +457,14 @@ paths have only ever been exercised by unit tests or by hand on a local stand-in
   are the next piece of work rather than a decision against them. Said plainly here because it
   is a step backwards, and a real one: text copied in a desktop session does not paste out of
   it today.
-- Joining an existing session **inside a pane**. It is offered, but the window belongs to
-  Windows: the mechanism goes over RPC and SMB rather than RDP, and the embedded client does
-  not implement it. Drawing it here would mean implementing Remote Desktop Services shadowing
-  from scratch.
+- **Joining a session somebody else is already working in.** It was offered until 0.13.2 and has
+  been removed. The mechanism goes over RPC and SMB rather than RDP, so no client this app can
+  embed speaks it: the picture came from `mstsc` in a window of its own, which this app could
+  position but never draw. It kept its own size rather than the pane's, could not be reached by
+  Alt+Tab even full screen, and needed the session list read over RPC as whoever started the
+  application — so nearly every feature of a desktop pane had an exception written for it. Doing
+  it properly means implementing Remote Desktop Services shadowing from scratch, which is not
+  planned. See [the channel notes](docs/ironrdp-channel-gap.md) for what that would take.
 - The console session (`/admin`). FreeRDP carries the flag and nothing but a setting stands in
   the way now, so this is a small piece of work rather than an impossibility — it is simply not
   done. Connecting as the same user already reconnects to that user's existing session, which

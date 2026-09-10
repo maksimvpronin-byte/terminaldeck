@@ -7,9 +7,8 @@
  * This file is the thin part around it: it takes instructions on stdin, hands
  * back the pixels that changed on stdout, and forwards input the other way.
  *
- * Out of process on purpose. The precedent is ShadowHost.exe, already shipped
- * and driven the same way, and the reason is the same: a decoder fault ends a
- * pane rather than the window, and nothing here is tied to Electron's ABI.
+ * Out of process on purpose: a decoder fault ends a pane rather than the
+ * window, and nothing here is tied to Electron's ABI.
  *
  * What this file deliberately does not do: re-encode. The renderer is handed
  * the very bytes the decoder produced, in the byte order a canvas wants, so

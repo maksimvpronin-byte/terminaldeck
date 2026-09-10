@@ -1,8 +1,11 @@
 # IronRDP and the Remote Assistance channel
 
-> Historical notes. Version 0.12.2 removes the retired TypeScript RDP gateway
-> and the standalone Remote Assistance experiments referenced below. The app
-> uses FreeRDP and ShadowHost; old source remains available in Git history.
+> Historical notes. Version 0.12.2 removed the retired TypeScript RDP gateway and
+> the standalone Remote Assistance experiments referenced below; the version after
+> 0.13.2 removed joining a session altogether, along with the native experiment
+> this page cites. The app draws desktops with FreeRDP and does not shadow at all.
+> Everything named here remains in Git history. Kept because the reading of
+> IronRDP below is still why the client was replaced.
 
 > **Correction, 25 August 2026.** The claim below that the package "covers
 > clipboard, CredSSP, file transfer and other built-in capabilities — not
@@ -28,10 +31,11 @@ So `remoteAssistanceProtocol.ts` holds the protocol and the boundary a transport
 has to satisfy, rather than pretending a pre-connection blob can stand in for the
 channel. It cannot: a pre-connection blob is not a virtual channel.
 
-The Rust crates are a different matter. `resources/remoteassistance-native` does
-register `remdesk` as a static channel and speaks the control messages on it,
-using `ironrdp-connector` and `ironrdp-svc` directly. The gap is in the
-WebAssembly package the renderer embeds, not in IronRDP as a whole.
+The Rust crates are a different matter. The native experiment that once sat in
+`resources/remoteassistance-native` did register `remdesk` as a static channel
+and speak the control messages on it, using `ironrdp-connector` and `ironrdp-svc`
+directly. The gap was in the WebAssembly package the renderer embedded, not in
+IronRDP as a whole.
 
 ## What a backend has to provide
 
@@ -41,7 +45,9 @@ An implementation of `RemoteAssistanceChannelTransport` needs to:
 2. carry channel PDUs in both directions;
 3. open channels `70` and `71` after the handshake, for chat and share control.
 
-Until the renderer's client can do that, the shipping path stays `ShadowHost.exe`
-running `mstsc /shadow` and adopting its window into the pane. See
-[the shadow notes](shadow-rpc-implementation.md) for how far the native client
-gets and what has been ruled out.
+No client this application embeds ever did that. The shipping path was
+`ShadowHost.exe` running `mstsc /shadow` and adopting its window into the pane —
+a picture the app positioned rather than drew, and never scaled, captured or
+shared a clipboard with. That was the compromise the feature always was, and it
+is why the feature was removed rather than finished. What is written above is
+what implementing it properly would still cost.

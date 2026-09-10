@@ -100,9 +100,7 @@ const SECTIONS: Section[] = [
       {
         what: 'There is nothing of this app over the picture — the top edge belongs to the far side'
       },
-      { what: 'A watched session cannot take Alt+Tab even full screen — Windows draws it' },
       { what: 'The desktop takes the size of the pane, so dragging a split resizes it' },
-      { what: 'A joined session keeps its own size: Windows draws it, and will not scale it' },
       { what: 'A host’s dialog holds a Desktop section: gateway, size, and the ⌘ key' },
       { what: 'Set the gateway on the group and every RDP host in it goes through it' },
       { what: 'Fixed resolution pins the far end and scales it into the pane instead' },

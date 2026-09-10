@@ -145,17 +145,6 @@ export const IPC = {
   desktopEvent: 'desktop:event',
   desktopFrame: 'desktop:frame',
   desktopCursor: 'desktop:cursor',
-  /** Who is logged on to a Windows host, for the shadow picker. */
-  rdpListSessions: 'rdp:listSessions',
-  /** Opens the Windows client on an existing session, in a window of its own. */
-  rdpShadow: 'rdp:shadow',
-  /** Shows a shadow session inside a pane, through ShadowHost.exe. */
-  shadowStart: 'shadow:start',
-  shadowPlace: 'shadow:place',
-  shadowVisible: 'shadow:visible',
-  shadowStop: 'shadow:stop',
-  /** main -> renderer, suffixed with the shadow session id */
-  shadowEvent: 'shadow:event',
 
   // Remote monitoring
   monitorStart: 'monitor:start',

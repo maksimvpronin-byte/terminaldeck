@@ -251,10 +251,7 @@ const PACKAGED = {
   },
   win: {
     resources: 'win-unpacked/resources',
-    carry: [
-      { file: 'freerdp/bin/td-rdp.exe', what: 'the desktop client' },
-      { file: 'shadowhost/ShadowHost.exe', what: 'the shadow-session host' }
-    ],
+    carry: [{ file: 'freerdp/bin/td-rdp.exe', what: 'the desktop client' }],
     // Windows looks for a binary's libraries beside it, so these share the
     // client's directory rather than having a lib/ of their own.
     libraries: { directory: 'freerdp/bin', extension: '.dll' }
@@ -267,7 +264,7 @@ const PACKAGED = {
 /**
  * What lives next to the things that ship and must never ship itself.
  *
- * All four are one edited `extraResources` filter away from travelling, and
+ * All three are one edited `extraResources` filter away from travelling, and
  * none of them would break anything on the way out — they would just make the
  * download several times larger than it needs to be, which is the kind of
  * mistake that survives a release or two before anybody notices.
@@ -275,8 +272,7 @@ const PACKAGED = {
 const FORBIDDEN = [
   { pattern: /(^|[\\/])sdl\d*-freerdp/i, why: 'an SDL client exists to prove a build by hand' },
   { pattern: /(^|[\\/])(winpr-hash|winpr-makecert)/i, why: 'a FreeRDP developer tool' },
-  { pattern: /(^|[\\/])vcpkg[\\/]/i, why: "vcpkg is a package manager's working directory" },
-  { pattern: /(^|[\\/])shadowprobe[\\/]/i, why: 'shadowprobe is an experiment, not a feature' }
+  { pattern: /(^|[\\/])vcpkg[\\/]/i, why: "vcpkg is a package manager's working directory" }
 ]
 
 function walk(directory) {

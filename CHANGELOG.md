@@ -8,6 +8,24 @@ the other produces a version nobody can install, which is how 0.1.10 through
 
 ## Unreleased
 
+### Removed
+
+- Joining a session somebody else is already working in, and everything under it:
+  the session picker in a desktop pane, the listing of who is logged on to a
+  Windows host, `ShadowHost.exe` and the `mstsc /shadow` window it held open.
+  The picture was never this application's to draw — the mechanism goes over RPC
+  and SMB rather than RDP — so the pane positioned a window Windows drew, which
+  kept its own size, could not be reached by Alt+Tab even full screen, and needed
+  the host queried as whoever started the application rather than as the saved
+  login. Nearly every feature of a desktop pane had an exception written for it.
+- The research the feature grew out of: the `shadowprobe` and Remote Assistance
+  native experiments and the two notes describing them. The reading of IronRDP's
+  channels stays in `docs/ironrdp-channel-gap.md`, since it is still why the
+  drawn client is FreeRDP.
+- With them, the `build:shadowhost` script, the packaging entry that carried
+  `ShadowHost.exe` into the Windows build, and the two release-contract rules
+  that existed to keep those two honest.
+
 ### Fixed
 
 - Stop offering an in-place update on macOS to a build that cannot install one.

@@ -28,7 +28,6 @@ import type {
   RdpView
 } from '../shared/types'
 import type { RemoteStats } from '../shared/remoteStats'
-import type { WinSession } from '../shared/winSessions'
 
 /**
  * The far end's pointer: the image it wants shown, or that it wants none.
@@ -253,48 +252,6 @@ const api = {
     ): Promise<{ username: string; hasPassword: boolean }> =>
       ipcRenderer.invoke(IPC.rdpLogin, sessionId, credentialId),
     /**
-     * Who is logged on to a host, by host id: the query needs that host's own
-     * login, which main resolves without handing it here. Never rejects; says
-     * why it found nobody.
-     */
-    listSessions: (
-      sessionId: string,
-      credentialId?: string
-    ): Promise<{ sessions: WinSession[]; problem?: string }> =>
-      ipcRenderer.invoke(IPC.rdpListSessions, sessionId, credentialId),
-    /**
-     * Shows a shadow session inside a pane. The picture belongs to a window
-     * this app positions rather than draws, so the pane has to keep reporting
-     * where it is.
-     */
-    shadowStart: (request: {
-      host: string
-      sessionId: number
-      control: boolean
-      noPrompt: boolean
-      /** The saved connection, so the main process can find the host's
-       *  credentials. The password never comes back through here. */
-      profileId?: string
-      /** A stored account to authenticate the viewer as instead. */
-      credentialId?: string
-    }): Promise<string> => ipcRenderer.invoke(IPC.shadowStart, request),
-    shadowPlace: (
-      id: string,
-      rect: { x: number; y: number; width: number; height: number }
-    ): void => ipcRenderer.send(IPC.shadowPlace, id, rect),
-    shadowVisible: (id: string, visible: boolean): void =>
-      ipcRenderer.send(IPC.shadowVisible, id, visible),
-    shadowStop: (id: string): Promise<void> => ipcRenderer.invoke(IPC.shadowStop, id),
-    onShadowEvent: (
-      id: string,
-      cb: (p: { event: string; detail?: string }) => void
-    ): (() => void) => {
-      const channel = `${IPC.shadowEvent}:${id}`
-      const listener = (_e: unknown, p: { event: string; detail?: string }): void => cb(p)
-      ipcRenderer.on(channel, listener)
-      return () => ipcRenderer.removeListener(channel, listener)
-    },
-    /**
      * Opens a desktop, drawn by a client in a process of its own.
      *
      * A host is named and an id comes back. Where that host is reached and as
@@ -364,12 +321,6 @@ const api = {
       ipcRenderer.on(channel, listener)
       return () => ipcRenderer.removeListener(channel, listener)
     },
-    /** Opens the Windows client on an existing session, in a window of its own. */
-    shadow: (
-      host: string,
-      sessionId: number,
-      options: { control: boolean; skipPrompt: boolean }
-    ): Promise<void> => ipcRenderer.invoke(IPC.rdpShadow, host, sessionId, options)
   },
   sftp: {
     list: (connectionId: string, path: string): Promise<SftpEntry[]> =>

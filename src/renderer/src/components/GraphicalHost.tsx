@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { traitsOf, type Protocol } from '../../../shared/protocols'
 import type { RdpView } from '../../../shared/types'
-import { shadowable, type WinSession } from '../../../shared/winSessions'
 import RemoteScreen, { type ScreenPhase } from './RemoteScreen'
 import { useStore } from '../state/store'
-import ShadowView from './ShadowView'
 import { useT } from '../i18n'
 
 type Phase = { at: 'loading' } | { at: 'choosing' } | { at: 'password' } | ScreenPhase
@@ -12,10 +10,10 @@ type Phase = { at: 'loading' } | { at: 'choosing' } | { at: 'password' } | Scree
 /**
  * The pane body for a desktop session.
  *
- * What it does is choose: a new desktop, or a seat at one somebody is already
- * working in. A new one is drawn by `RemoteScreen`, which owns everything about
- * a live session; a joined one belongs to a window Windows draws and this app
- * only positions.
+ * It starts a desktop of this pane's own, drawn by `RemoteScreen`, which owns
+ * everything about a live session. Joining a session somebody else is already
+ * working in used to be the other half of this screen; it was taken out because
+ * its picture was never ours to draw — see the release notes.
  *
  * Credentials are not asked for here unless the host has none saved. The client
  * runs in a process of its own and authenticates there, so a stored password
@@ -54,8 +52,8 @@ export default function GraphicalHost({
    * swallowing every click inside it.
    */
   onMeasured?: (text: string) => void
-  /** False while another tab is in front: a window over a hidden pane would
-   *  sit on top of whatever replaced it. */
+  /** False while another tab is in front: a pane nobody is looking at is not
+   *  sent any pixels until it comes back. */
   paneVisible: boolean
 }): JSX.Element {
   const [phase, setPhase] = useState<Phase>({ at: 'loading' })
@@ -99,18 +97,6 @@ export default function GraphicalHost({
    * is indistinguishable from asking for the wrong size.
    */
   const [asked, setAsked] = useState('')
-  const [sessions, setSessions] = useState<WinSession[]>([])
-  const [sessionsLoading, setSessionsLoading] = useState(true)
-  const [sessionsProblem, setSessionsProblem] = useState<string | undefined>()
-  /**
-   * Whether to join without asking the person at the far end.
-   *
-   * Off by default, because taking someone's screen unannounced should be a
-   * decision rather than a default. The host has the final say either way.
-   */
-  const [skipPrompt, setSkipPrompt] = useState(false)
-  /** The session being watched in this pane, once one has been chosen. */
-  const [joined, setJoined] = useState<{ session: WinSession; control: boolean } | null>(null)
   const t = useT()
 
   const traits = traitsOf(protocol)
@@ -177,23 +163,6 @@ export default function GraphicalHost({
         if (alive) setPhase({ at: 'failed', reason: err.message })
       })
 
-    // Who is already on the host, asked alongside rather than before: the query
-    // goes over RPC and can take seconds or never answer, and a new session
-    // must not wait on the optional half of the choice.
-    window.td.rdp
-      .listSessions(sessionId, credentialId)
-      .then((found) => {
-        if (!alive) return
-        setSessions(shadowable(found.sessions))
-        setSessionsProblem(found.problem)
-      })
-      .catch(() => {
-        if (alive) setSessionsProblem('Could not ask the host who is logged on')
-      })
-      .finally(() => {
-        if (alive) setSessionsLoading(false)
-      })
-
     return () => {
       alive = false
     }
@@ -210,29 +179,6 @@ export default function GraphicalHost({
     setAttempt((n) => n + 1)
     setNotice('')
     setPhase({ at: 'connecting' })
-  }
-
-  /** Someone else's desktop, shown in this pane. */
-  function shadow(session: WinSession, control: boolean): void {
-    if (!host) return
-    setJoined({ session, control })
-  }
-
-  // A joined session takes the pane over entirely: its picture belongs to a
-  // window sitting on top, and anything rendered here would be hidden by it.
-  if (joined && host) {
-    return (
-      <ShadowView
-        host={host}
-        session={joined.session}
-        control={joined.control}
-        noPrompt={skipPrompt}
-        profileId={sessionId}
-        credentialId={credentialId}
-        visible={paneVisible}
-        onClose={() => setJoined(null)}
-      />
-    )
   }
 
   if (protocol === 'ssh') {
@@ -287,68 +233,6 @@ export default function GraphicalHost({
                 <button className="primary" onClick={connectFresh}>
                   {t('New session')}
                 </button>
-
-                <div className="session-pick-head">
-                  <span>{t('Or join a session already open')}</span>
-                  {sessionsLoading && <span className="settings-note">{t('looking…')}</span>}
-                </div>
-
-                {sessions.length > 0 && (
-                  <div className="session-pick-list">
-                    {sessions.map((s) => (
-                      <div className="session-pick-row" key={s.id}>
-                        <span className="session-pick-who">
-                          {s.user}
-                          <span className="settings-note">
-                            {' '}
-                            {s.name} · {s.state}
-                          </span>
-                        </span>
-                        <button
-                          title={t('Watch without touching')}
-                          onClick={() => void shadow(s, false)}
-                        >
-                          Watch
-                        </button>
-                        <button
-                          title={t('Watch and take the keyboard and mouse')}
-                          onClick={() => void shadow(s, true)}
-                        >
-                          Control
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {!sessionsLoading && sessions.length === 0 && (
-                  <p className="settings-note">
-                    {sessionsProblem ?? t('Nobody is logged on to that host right now.')}
-                  </p>
-                )}
-
-                {sessions.length > 0 && (
-                  <>
-                    <label className="checkbox-row session-pick-quiet">
-                      <input
-                        type="checkbox"
-                        checked={skipPrompt}
-                        onChange={(e) => setSkipPrompt(e.target.checked)}
-                      />
-                      {t('Join without asking the person there')}
-                    </label>
-                    <p className="settings-note">
-                      {t(
-                        'A joined session opens in a window of its own — Windows draws it, not this app.'
-                      )}{' '}
-                      {skipPrompt
-                        ? t(
-                            'The host allows this only where its policy says so; where it does not, the connection is refused rather than falling back to asking.'
-                          )
-                        : t('The person at the far end is asked to allow it.')}
-                    </p>
-                  </>
-                )}
               </>
             )}
 

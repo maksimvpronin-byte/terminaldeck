@@ -13,10 +13,9 @@ import { complaintIn, failureText } from './clientLog'
  *
  * The client is FreeRDP, in a process of its own, and this is the whole of the
  * seam: instructions down its stdin, pixels back up its stdout. The reasons for
- * a separate process are the ones ShadowHost.exe was given — a decoder fault
- * ends a pane rather than the window, and nothing is bound to Electron's ABI —
- * and one more that only applies here: authentication happens in that process,
- * so a stored password now goes vault → main → pipe and never enters the
+ * a separate process are worth stating: a decoder fault ends a pane rather than
+ * the window, nothing is bound to Electron's ABI, and authentication happens
+ * out there, so a stored password goes vault → main → pipe and never enters the
  * window at all. The client it replaced authenticated in the renderer, which
  * forced the one exception this app made to that rule.
  *
@@ -229,8 +228,8 @@ class FreeRdpBridge {
     const session = this.sessions.get(id)
     if (!session) return
     this.write(id, { a: 'stop' })
-    // Closing the pipe is the backstop, the same one the shadow host has: the
-    // client exits on end-of-input whether or not the message arrived.
+    // Closing the pipe is the backstop: the client exits on end-of-input
+    // whether or not the message arrived.
     session.child.stdin?.end()
   }
 

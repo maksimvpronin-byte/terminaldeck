@@ -98,12 +98,8 @@ export const ru: Record<string, string> = {
     'Полный экран — единственный способ передать Alt+Tab на ту сторону',
   'Hold Escape to leave full screen: while there, it belongs to the session':
     'Удерживайте Escape для выхода из полного экрана: там он принадлежит сессии',
-  'A watched session cannot take Alt+Tab even full screen — Windows draws it':
-    'Наблюдаемая сессия не получит Alt+Tab даже в полном экране — её рисует Windows',
   'The desktop takes the size of the pane, so dragging a split resizes it':
     'Рабочий стол принимает размер панели, поэтому перетаскивание разделителя меняет его',
-  'A joined session keeps its own size: Windows draws it, and will not scale it':
-    'Присоединённая сессия сохраняет свой размер: её рисует Windows и не масштабирует',
   'A host’s dialog holds a Desktop section: gateway, size, and the ⌘ key':
     'В диалоге хоста есть раздел «Рабочий стол»: шлюз, размер и клавиша ⌘',
   'Set the gateway on the group and every RDP host in it goes through it':
@@ -493,23 +489,11 @@ export const ru: Record<string, string> = {
   'Not a desktop': 'Это не рабочий стол',
   'Negotiating with the server.': 'Согласование с сервером.',
   'Reading the login for this host.': 'Читаю логин для этого хоста.',
-  'Or join a session already open': 'Или присоединиться к уже открытой сессии',
-  'Nobody is logged on to that host right now.': 'Сейчас на этом хосте никого нет.',
-  'The person at the far end is asked to allow it.':
-    'У человека на той стороне спросят разрешения.',
-  'Watch without touching': 'Наблюдать, не вмешиваясь',
-  'Watch and take the keyboard and mouse': 'Наблюдать и забрать клавиатуру с мышью',
   Password: 'Пароль',
   Cancel: 'Отмена',
   Save: 'Сохранить',
   'no host': 'нет хоста',
   'New session': 'Новая сессия',
-  'looking…': 'ищу…',
-  'Join without asking the person there': 'Присоединиться, не спрашивая человека там',
-  'A joined session opens in a window of its own — Windows draws it, not this app.':
-    'Присоединённая сессия открывается в отдельном окне — его рисует Windows, а не это приложение.',
-  'The host allows this only where its policy says so; where it does not, the connection is refused rather than falling back to asking.':
-    'Хост разрешает это только там, где так говорит его политика; где не разрешает — подключение отклоняется, а не переходит к вопросу.',
   'Password for': 'Пароль для',
   'No password is saved for this host. Save one in its dialog to stop being asked.':
     'Для этого хоста пароль не сохранён. Сохраните его в диалоге хоста, чтобы больше не спрашивали.',
@@ -868,7 +852,6 @@ export const ru: Record<string, string> = {
   'Cursor blink': 'Мигание курсора',
   Blinking: 'Мигает',
   Steady: 'Не мигает',
-  Back: 'Назад',
   Copy: 'Копировать',
   Paste: 'Вставить',
   'Select all': 'Выделить всё',

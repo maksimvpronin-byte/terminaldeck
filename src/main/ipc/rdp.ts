@@ -6,44 +6,15 @@ import { protocolOf } from '../../shared/protocols'
 import { resolveRdp } from '../../shared/rdpResolution'
 import type { ResolvedAuth, RdpView, SessionGroup, SessionProfile } from '../../shared/types'
 import { splitLogin } from '../../shared/rdpLogin'
-import { qualifyUser } from '../../shared/winSessions'
 import { gitFolderStore } from '../gitFolders/GitFolderStore'
 import { inventoryStore } from '../inventory/InventoryStore'
 import { type DesktopGateway, type DesktopRequest, freeRdpBridge } from '../rdp/FreeRdpBridge'
-import { type PaneRect, type ShadowRequest, shadowHostBridge } from '../rdp/ShadowHostBridge'
-import { listSessions, shadowSession } from '../rdp/WinSessions'
 import { credentialStore } from '../store/CredentialStore'
 import { sessionStore } from '../store/SessionStore'
 import { vault } from '../vault/Vault'
 import { focusedWin } from './win'
 
-/** Desktop sessions: the gateway, the credentials they resolve, and shadowing. */
-
-/**
- * The host's credentials for the shadow viewer, if the vault holds any.
- *
- * `mstsc` carries none of its own: shadowing authenticates over RPC with the
- * identity of whoever started it, so a viewer started as the signed-in Windows
- * user is refused by any host that does not know that account. The account name
- * is qualified with the host for the same reason the session listing qualifies
- * it — a bare name means this machine's domain, not the target's.
- */
-function shadowCredentials(
-  profileId: string | undefined,
-  host: string,
-  credentialId?: string
-): { username: string; password: string } | undefined {
-  if (!profileId) return undefined
-
-  const found = findHost(profileId)
-  if (!found) return undefined
-
-  const auth = authFor(found.profile, found.groups, credentialId)
-  const password = auth.secretRef ? vault.getSecret(auth.secretRef) : undefined
-  if (!auth.username || !password) return undefined
-
-  return { username: qualifyUser(auth.username, host), password }
-}
+/** Desktop sessions: the gateway and the credentials they resolve. */
 
 /**
  * A host, wherever it is saved, and the groups its settings inherit along.
@@ -242,46 +213,4 @@ export function registerRdpHandlers(): void {
       hasPassword: Boolean(auth.secretRef && vault.getSecret(auth.secretRef))
     }
   })
-
-  /**
-   * Takes a host id rather than an address so the credentials can be resolved
-   * here: the query signs in as the Windows account running this app, which is
-   * the wrong one for any host outside its domain, and the right one is already
-   * in the vault. The password is used and dropped without reaching the window.
-   */
-  ipcMain.handle(IPC.shadowStart, (_e, request: ShadowRequest) => {
-    const win = focusedWin()
-    if (!win) throw new Error('No window to draw into')
-    return shadowHostBridge.start(
-      win,
-      request,
-      shadowCredentials(request.profileId, request.host, request.credentialId)
-    )
-  })
-  ipcMain.on(IPC.shadowPlace, (_e, id: string, rect: PaneRect) => shadowHostBridge.place(id, rect))
-  ipcMain.on(IPC.shadowVisible, (_e, id: string, visible: boolean) =>
-    shadowHostBridge.setVisible(id, visible)
-  )
-  ipcMain.handle(IPC.shadowStop, (_e, id: string) => shadowHostBridge.stop(id))
-
-  ipcMain.handle(IPC.rdpListSessions, (_e, sessionId: string, credentialId?: string) => {
-    const found = findHost(sessionId)
-    if (!found) throw new Error('Unknown session')
-
-    // Asked as whoever this pane is connecting as: a host outside this
-    // machine's domain answers the query for one account and refuses it for
-    // another, and the pane offering to join a session it cannot reach is a
-    // worse answer than an empty list.
-    const auth = authFor(found.profile, found.groups, credentialId)
-    const password = auth.secretRef ? vault.getSecret(auth.secretRef) : undefined
-    return listSessions(
-      found.profile.host,
-      password ? { username: auth.username, password } : undefined
-    )
-  })
-  ipcMain.handle(
-    IPC.rdpShadow,
-    (_e, host: string, sessionId: number, options: { control: boolean; skipPrompt: boolean }) =>
-      shadowSession(host, sessionId, options)
-  )
 }
