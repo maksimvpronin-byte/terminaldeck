@@ -6,6 +6,24 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## Unreleased
+
+### Fixed
+
+- Stop offering an in-place update on macOS to a build that cannot install one.
+  Without a Developer ID the bundle is signed ad-hoc, and Squirrel.Mac replaces
+  the application only when the new signature satisfies the running one's
+  requirement — which an ad-hoc signature never does. Such a build now reports
+  the new version with a link to the downloads instead of fetching the whole
+  package and failing at the last step. The signing hook marks the bundle, and
+  the release contract checks the marker against the signature both ways.
+
+### Documentation
+
+- Say in the help what pausing in a background tab looks like: the file listing,
+  the monitor and the desktop picture stop while a tab is not being looked at,
+  and what happens on return.
+
 ## 0.13.2
 
 ### Performance

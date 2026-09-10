@@ -560,6 +560,9 @@ export const ru: Record<string, string> = {
 
   // Update banner
   'Version {version} is available.': 'Доступна версия {version}.',
+  'Version {version} is out. This build cannot install it over itself.':
+    'Вышла версия {version}. Эта сборка не может установить её поверх себя.',
+  'Open the downloads': 'Открыть загрузки',
   Download: 'Скачать',
   Later: 'Позже',
   'Downloading update… {percent}%': 'Загрузка обновления… {percent}%',

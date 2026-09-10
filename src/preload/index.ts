@@ -473,6 +473,8 @@ const api = {
   updates: {
     getState: (): Promise<UpdateState> => ipcRenderer.invoke(IPC.updateGetState),
     download: (): Promise<void> => ipcRenderer.invoke(IPC.updateDownload),
+    // Takes no address: which page opens is decided in main, not here.
+    openPage: (): Promise<void> => ipcRenderer.invoke(IPC.updateOpenPage),
     install: (): Promise<void> => ipcRenderer.invoke(IPC.updateInstall),
     onState: (cb: (state: UpdateState) => void): (() => void) => {
       const listener = (_e: unknown, state: UpdateState): void => cb(state)

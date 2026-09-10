@@ -174,6 +174,8 @@ export const IPC = {
   // Auto-update
   updateGetState: 'update:getState',
   updateDownload: 'update:download',
+  /** Sends a build that cannot install an update to the downloads in a browser. */
+  updateOpenPage: 'update:openPage',
   updateInstall: 'update:install',
   /** main -> renderer */
   updateState: 'update:state',

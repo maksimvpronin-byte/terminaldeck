@@ -590,6 +590,9 @@ export interface Snippet {
 export type UpdateState =
   | { status: 'idle' }
   | { status: 'available'; version: string }
+  /** A version is out, and this build cannot install it over itself — see
+   *  `src/shared/adhocSigned.ts`. The download page is offered instead. */
+  | { status: 'manual'; version: string }
   | { status: 'downloading'; percent: number }
   | { status: 'ready'; version: string }
   | { status: 'error'; message: string }

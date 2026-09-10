@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { join } from 'path'
+import { ADHOC_MARKER } from '../shared/adhocSigned'
 
 /**
  * The build hook that signs a macOS bundle ad-hoc, tested for the two things it
@@ -27,8 +28,19 @@ describe('the ad-hoc signing hook', () => {
     expect(signingPlan(context('darwin'), {})).toEqual({
       command: 'codesign',
       args: ['--force', '--deep', '--sign', '-', join('/tmp/out', 'TerminalDeck.app')],
-      app: join('/tmp/out', 'TerminalDeck.app')
+      app: join('/tmp/out', 'TerminalDeck.app'),
+      marker: join('/tmp/out', 'TerminalDeck.app', 'Contents', 'Resources', ADHOC_MARKER)
     })
+  })
+
+  /**
+   * The hook writes the marker and the updater looks for it, and the two name it
+   * separately — the hook is CommonJS loaded by path and cannot import the
+   * constant. A rename on one side alone is what this catches.
+   */
+  it('leaves the marker where the updater looks for it', () => {
+    const plan = signingPlan(context('darwin'), {})
+    expect(plan?.marker.endsWith(join('Contents', 'Resources', ADHOC_MARKER))).toBe(true)
   })
 
   it('leaves a properly signed build alone', () => {

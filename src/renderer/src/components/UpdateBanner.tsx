@@ -29,6 +29,21 @@ export default function UpdateBanner(): JSX.Element | null {
           </span>
         </>
       )}
+      {state.status === 'manual' && (
+        <>
+          <span>
+            {t('Version {version} is out. This build cannot install it over itself.', {
+              version: state.version
+            })}
+          </span>
+          <span className="banner-actions">
+            <button className="primary" onClick={() => window.td.updates.openPage()}>
+              {t('Open the downloads')}
+            </button>
+            <button onClick={() => setDismissed(true)}>{t('Later')}</button>
+          </span>
+        </>
+      )}
       {state.status === 'downloading' && (
         <span>{t('Downloading update… {percent}%', { percent: state.percent ?? 0 })}</span>
       )}

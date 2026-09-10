@@ -15,6 +15,8 @@ export interface SigningPlan {
   command: string
   args: string[]
   app: string
+  /** Written into the bundle before it is signed; see `src/shared/adhocSigned.ts`. */
+  marker: string
 }
 
 export function signingPlan(

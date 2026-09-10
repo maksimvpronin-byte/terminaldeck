@@ -466,8 +466,9 @@ paths have only ever been exercised by unit tests or by hand on a local stand-in
   done. Connecting as the same user already reconnects to that user's existing session, which
   is most of what it is wanted for.
 - PuTTY session import — Windows-only value, deferred since the MVP.
-- Code signing and notarization. Configured and documented below, but no certificate is in use,
-  which also means macOS auto-update downloads an update it cannot apply.
+- Code signing and notarization. Configured and documented below, but no certificate is in use.
+  On macOS that also rules out updating in place, so the application now says as much instead of
+  offering one: an ad-hoc signed build shows the new version and a button to the downloads page.
 
 ## Development
 
@@ -790,6 +791,15 @@ xattr -dr com.apple.quarantine /Applications/TerminalDeck.app && codesign --forc
 
 The real answer to both is a Developer ID certificate and notarization, below — which is also what
 macOS auto-update needs.
+
+**Updating an ad-hoc build is a download, not a button.** Squirrel.Mac replaces the running
+application only when the new bundle's signature satisfies the old one's designated requirement,
+and an ad-hoc signature is its own hash and nothing else, so no later build can ever satisfy it —
+whatever the two versions are. The application knows: the signing hook leaves an `adhoc-signed`
+marker inside the bundle, and a build carrying it reports the new version with a link to the
+downloads instead of offering an install that would fetch the whole package and fail on the step
+after. `npm run verify:release -- --app <bundle>` checks the marker against the signature both
+ways, so a properly signed build cannot inherit the restriction either.
 
 ## Code signing and notarization
 

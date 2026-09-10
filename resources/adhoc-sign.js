@@ -1,4 +1,5 @@
 const { execFileSync } = require('child_process')
+const { writeFileSync } = require('fs')
 const { join } = require('path')
 
 /**
@@ -21,6 +22,10 @@ const { join } = require('path')
  *
  * Skipped when a certificate *is* configured: electron-builder then signs the
  * bundle properly, and re-signing it here would throw that away.
+ *
+ * It also leaves a marker inside the bundle saying which of the two happened,
+ * because the updater has to know: an ad-hoc signature cannot be updated over.
+ * See `src/shared/adhocSigned.ts`, which names the file and explains why.
  */
 
 /**
@@ -40,12 +45,23 @@ exports.signingPlan = function signingPlan(context, env) {
   if (env.CSC_LINK) return null
 
   const app = join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`)
-  return { command: 'codesign', args: ['--force', '--deep', '--sign', '-', app], app }
+  return {
+    command: 'codesign',
+    args: ['--force', '--deep', '--sign', '-', app],
+    app,
+    // Written first and signed with everything else: adding a file to a sealed
+    // bundle is exactly the tampering the seal exists to report.
+    marker: join(app, 'Contents', 'Resources', 'adhoc-signed')
+  }
 }
 
 exports.default = async function adhocSign(context) {
   const plan = exports.signingPlan(context, process.env)
   if (!plan) return
+  writeFileSync(
+    plan.marker,
+    'Signed ad-hoc: this build has no Developer ID, so it cannot update itself.\n'
+  )
   execFileSync(plan.command, plan.args, { stdio: 'inherit' })
   console.log(`  • signed ad-hoc  reason=no certificate configured, file=${plan.app}`)
 }

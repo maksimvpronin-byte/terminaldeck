@@ -359,6 +359,14 @@ function verifyPackage(directory, platform) {
  * difference between "unidentified developer", which a user can get past, and
  * "damaged", which tells them to throw the download away. With a certificate
  * configured the bar is the real one: a Developer ID, and not ad-hoc.
+ *
+ * And whichever it is, the bundle has to say so. An ad-hoc build cannot be
+ * updated over — Squirrel.Mac checks the new signature against the old one's
+ * requirement, and ad-hoc satisfies nothing but itself — so the application
+ * offers the download page instead of an install. It decides which by looking
+ * for the marker the signing hook leaves; without it, an ad-hoc build goes back
+ * to offering an update that downloads in full and fails at the last step. The
+ * name is `ADHOC_MARKER` in src/shared/adhocSigned.ts.
  */
 function verifyApp(appPath) {
   const target = path.resolve(root, appPath)
@@ -380,9 +388,19 @@ function verifyApp(appPath) {
       `${appPath} is only ad-hoc signed although a certificate is configured`
     )
   }
-  ok(
-    `${path.basename(target)} is signed (${/Signature=adhoc/.test(info) ? 'ad-hoc' : 'certificate'})`
-  )
+  const adhoc = /Signature=adhoc/.test(info)
+  const marker = path.join(target, 'Contents', 'Resources', 'adhoc-signed')
+  if (adhoc)
+    assert(
+      fs.existsSync(marker),
+      `${appPath} is ad-hoc signed but carries no adhoc-signed marker; it would offer an update it cannot install`
+    )
+  else
+    assert(
+      !fs.existsSync(marker),
+      `${appPath} is properly signed but carries the adhoc-signed marker; it would refuse to update itself`
+    )
+  ok(`${path.basename(target)} is signed (${adhoc ? 'ad-hoc' : 'certificate'}) and says which`)
 }
 
 try {
