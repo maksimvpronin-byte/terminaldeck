@@ -18,6 +18,11 @@ the other produces a version nobody can install, which is how 0.1.10 through
   `ansible_connection` describes how Ansible manages a machine, not how somebody
   uses one. Such a host ignores `ansible_port`, which is the management port, and
   takes `terminaldeck_port` when the desktop is not on 3389.
+- Worked inventory examples in the help and in the Russian manual, since the
+  variable is only useful to somebody who can see where it goes: the group form
+  that covers a whole set of machines, a host disagreeing with its group, the
+  `group_vars` file that says the same thing, and the port pair that shows which
+  of the two is read.
 - State the protocol in a host's local settings, for a repository you cannot
   edit. It is the one setting in that dialog that is not inherited — a group
   holds a Linux box and a Windows one alike — and switching it reveals the

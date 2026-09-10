@@ -5,6 +5,16 @@ import { useT } from '../i18n'
 interface Row {
   keys?: string
   what: string
+  /**
+   * A line or two to type somewhere else — a variable in an inventory, say.
+   *
+   * Shown under the row exactly as written and deliberately not translated:
+   * it is not prose about the product, it is what has to appear in a file, and
+   * a translated key name would be a key that does not work. `keys` is the
+   * wrong home for these — that column is a keyboard shortcut, 130px wide,
+   * drawn as a key cap.
+   */
+  example?: string
 }
 
 interface Section {
@@ -270,10 +280,30 @@ const SECTIONS: Section[] = [
       { what: 'Its settings come from one of them: the deepest, alphabetically last' },
       { what: 'Credentials set on the repository are inherited by every host in it' },
       { what: 'Every host is an SSH host unless the inventory says otherwise' },
-      { what: 'terminaldeck_protocol: rdp on a host or a group makes those hosts desktops' },
+      {
+        what: 'terminaldeck_protocol: rdp on a host or a group makes those hosts desktops',
+        example: `windows:
+  vars:
+    terminaldeck_protocol: rdp
+  hosts:
+    dc1:
+    dc2:`
+      },
+      { what: 'On a group it covers every host in it, and a host may disagree with its group' },
+      {
+        what: 'A group_vars file beside the inventory says the same thing',
+        example: `# group_vars/windows.yml
+terminaldeck_protocol: rdp`
+      },
       { what: 'Ansible has no word for this, and its connection plugin is not one' },
-      { what: 'A desktop ignores ansible_port — that is WinRM’s — and takes terminaldeck_port' },
+      {
+        what: 'A desktop ignores ansible_port — that is WinRM’s — and takes terminaldeck_port',
+        example: `dc1:
+  terminaldeck_protocol: rdp
+  terminaldeck_port: 33890`
+      },
       { what: 'An inventory that says nothing is corrected in the host’s local settings' },
+      { what: 'Right-click the host → Local settings…, and set Protocol there' },
       { what: 'A source follows one branch — empty means the default, usually main' },
       { what: 'The line under a repository states the branch, revision and what was read' },
       { what: 'Work on another branch will not appear until you name it or merge it' },
@@ -330,7 +360,10 @@ export default function HelpDialog({ onClose }: { onClose: () => void }): JSX.El
                   <span className="help-keys">
                     {row.keys ? <kbd>{keyHint(row.keys)}</kbd> : null}
                   </span>
-                  <span className="help-what">{t(row.what)}</span>
+                  <span className="help-what">
+                    {t(row.what)}
+                    {row.example ? <code className="help-example">{row.example}</code> : null}
+                  </span>
                 </div>
               ))}
             </div>

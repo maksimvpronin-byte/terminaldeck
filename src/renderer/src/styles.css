@@ -1909,6 +1909,22 @@ textarea:focus {
   color: var(--text-dim);
   line-height: 1.45;
 }
+/* A line to be typed into a file somewhere else, under the row that explains
+   it. `pre-wrap` rather than `pre`: the card is a fixed 460px and does not
+   scroll sideways, so a long line has to fold rather than be sliced off. */
+.help-example {
+  display: block;
+  margin-top: 4px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg-0);
+  color: var(--text);
+  font-family: Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
 kbd {
   display: inline-block;
   padding: 1px 6px;

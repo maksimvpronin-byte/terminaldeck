@@ -232,12 +232,18 @@ export const ru: Record<string, string> = {
     'Каждый хост считается SSH-хостом, пока инвентарь не скажет иначе',
   'terminaldeck_protocol: rdp on a host or a group makes those hosts desktops':
     'terminaldeck_protocol: rdp на хосте или группе делает эти хосты рабочими столами',
+  'On a group it covers every host in it, and a host may disagree with its group':
+    'На группе он накрывает все хосты в ней, а хост вправе не согласиться со своей группой',
+  'A group_vars file beside the inventory says the same thing':
+    'Файл group_vars рядом с инвентарём говорит то же самое',
   'Ansible has no word for this, and its connection plugin is not one':
     'У Ansible для этого нет своего слова, а плагин подключения им не является',
   'A desktop ignores ansible_port — that is WinRM’s — and takes terminaldeck_port':
     'Рабочий стол игнорирует ansible_port — это порт WinRM — и берёт terminaldeck_port',
   'An inventory that says nothing is corrected in the host’s local settings':
     'Молчащий инвентарь поправляется в локальных настройках хоста',
+  'Right-click the host → Local settings…, and set Protocol there':
+    'Правый клик по хосту → «Локальные настройки…», поле «Протокол»',
   'A source follows one branch — empty means the default, usually main':
     'Источник следует одной ветке — пусто означает ветку по умолчанию, обычно main',
   'The line under a repository states the branch, revision and what was read':
