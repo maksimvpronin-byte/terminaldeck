@@ -320,7 +320,7 @@ const api = {
       const listener = (_e: unknown, cursor: DesktopCursor): void => cb(cursor)
       ipcRenderer.on(channel, listener)
       return () => ipcRenderer.removeListener(channel, listener)
-    },
+    }
   },
   sftp: {
     list: (connectionId: string, path: string): Promise<SftpEntry[]> =>
