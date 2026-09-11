@@ -347,16 +347,29 @@ label {
 .tree-item.tinted.selected {
   background: var(--accent-dim);
 }
-/* Sits where the dot sat, and inherits the row's colour rather than the host's:
-   it says what the row opens, not which environment it belongs to. */
+/* Sits where the dot sat, and says two things at once: what the row opens, and
+   whether it is open right now. The padding is there whether or not it is, so
+   the name does not shift by two pixels when a session comes up. */
 .session-kind {
   display: inline-block;
-  margin-right: 7px;
+  padding: 1px;
+  margin-right: 6px;
+  border-radius: 4px;
   vertical-align: -2px;
   color: var(--text-dim);
 }
 .tree-item.selected .session-kind {
   color: var(--text);
+}
+/* Open right now. This replaced a 6px green dot after the name, which lived
+   inside the ellipsised span — so it vanished exactly in the rows whose names
+   were too long, which are the rows in a deep folder, which is where most
+   hosts are. A plate in a fixed position at the left cannot be clipped, and it
+   reads at a glance whether one host is open or twenty. */
+.session-kind.live,
+.tree-item.selected .session-kind.live {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 18%, transparent);
 }
 .selection-bar {
   display: flex;
@@ -560,15 +573,6 @@ label {
   min-height: 0;
   min-width: 0;
   flex-direction: column;
-}
-.live-dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin-left: 6px;
-  border-radius: 50%;
-  background: var(--success);
-  vertical-align: middle;
 }
 .no-inherit {
   margin-left: 6px;

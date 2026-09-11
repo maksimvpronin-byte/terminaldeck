@@ -308,6 +308,15 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
     }))
   },
 
+  setPaneDesktop: (tabId, paneId, desktopId) => {
+    set((s) => ({
+      workspaces: mapTab(s.workspaces, tabId, (t) => ({
+        ...t,
+        root: mapPane(t.root, paneId, (leaf) => ({ ...leaf, desktopId }))
+      }))
+    }))
+  },
+
   splitPane: (tabId, paneId, dir) => {
     const tab = allTabs(get()).find((t) => t.id === tabId)
     const source = findPane(tab?.root ?? null, paneId)

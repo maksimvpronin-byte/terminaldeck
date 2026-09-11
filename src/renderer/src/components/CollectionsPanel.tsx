@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import type { HostCollection } from '../../../shared/types'
 import { useStore, collectConnectedSessionIds, allRoots } from '../state/store'
 import { colorOf, findHost } from '../state/hosts'
+import { DEFAULT_PROTOCOL, protocolOf, type Protocol } from '../../../shared/protocols'
+import { DesktopIcon, TerminalIcon } from './icons'
 import ContextMenu, { type MenuItem } from './ContextMenu'
 import { useT } from '../i18n'
 import CollectionDialog from './CollectionDialog'
@@ -67,17 +69,19 @@ export default function CollectionsPanel({ query }: { query: string }): JSX.Elem
     name: string
     address?: string
     color?: string
+    protocol: Protocol
     missing: boolean
   }> {
     return collection.hostIds.map((id) => {
       const found = findHost(useStore.getState(), id)
-      if (!found) return { id, name: id, missing: true }
+      if (!found) return { id, name: id, protocol: DEFAULT_PROTOCOL, missing: true }
       return {
         id,
         name: found.host.name,
         address: found.host.host,
         // Seen through this collection, so it wears this collection's colour.
         color: colorOf(found.host, collection),
+        protocol: protocolOf(found.host),
         missing: false
       }
     })
@@ -245,10 +249,17 @@ export default function CollectionsPanel({ query }: { query: string }): JSX.Elem
                   >
                     <span className="name">
                       <span
-                        className="session-dot"
-                        style={m.color ? { background: m.color } : undefined}
-                        aria-hidden="true"
-                      />
+                        className={`session-kind ${connected.has(m.id) ? 'live' : ''}`}
+                        title={
+                          connected.has(m.id)
+                            ? t('Open now')
+                            : m.protocol === 'rdp'
+                              ? t('Opens a desktop')
+                              : t('Opens a terminal')
+                        }
+                      >
+                        {m.protocol === 'rdp' ? <DesktopIcon /> : <TerminalIcon />}
+                      </span>
                       {m.missing ? (
                         <span style={{ color: 'var(--text-dim)' }}>
                           {t('{name} — no longer exists', { name: m.name })}
@@ -256,7 +267,6 @@ export default function CollectionsPanel({ query }: { query: string }): JSX.Elem
                       ) : (
                         m.name
                       )}
-                      {connected.has(m.id) && <span className="live-dot" />}
                     </span>
                   </div>
                 ))}

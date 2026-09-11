@@ -37,6 +37,7 @@ function Pane({
   const setActivePane = useStore((s) => s.setActivePane)
   const markActivity = useStore((s) => s.markActivity)
   const setPaneConnection = useStore((s) => s.setPaneConnection)
+  const setPaneDesktop = useStore((s) => s.setPaneDesktop)
   const splitPane = useStore((s) => s.splitPane)
   const closePane = useStore((s) => s.closePane)
   const detachPane = useStore((s) => s.detachPane)
@@ -264,6 +265,7 @@ function Pane({
             sessionId={sessionId ?? undefined}
             credentialId={credentialId}
             onMeasured={setMeasured}
+            onSession={(desktopId) => setPaneDesktop(tabId, node.id, desktopId)}
             paneVisible={visible}
           />
         )}

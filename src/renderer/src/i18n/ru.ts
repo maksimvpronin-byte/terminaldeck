@@ -132,6 +132,8 @@ export const ru: Record<string, string> = {
     'Тема хоста перекрашивает только его терминал — приложение сохраняет свою',
   'The mark in front of a name says what it opens: a terminal or a desktop':
     'Значок перед именем говорит, что откроется: терминал или рабочий стол',
+  'It turns green while that machine is open, desktops and terminals alike':
+    'Пока машина открыта, он горит зелёным — и для терминалов, и для рабочих столов',
   'A host given a colour wears it as its own background and a coloured edge':
     'Хост, которому задан цвет, носит его как собственный фон и цветную полосу слева',
   'The edge stays while the row is selected, so the colour survives the click':
@@ -310,7 +312,6 @@ export const ru: Record<string, string> = {
   'A new workspace with a tab per host': 'Новая рабочая область, по вкладке на хост',
   'All tiled in one tab': 'Всё плиткой в одной вкладке',
   Clear: 'Очистить',
-  Connected: 'Подключено',
   'Does not inherit settings from its group': 'Не наследует настройки группы',
   'Double-click to connect · drag to sort or to move between groups':
     'Двойной клик — подключиться · перетаскивание — порядок или перенос между группами',
@@ -720,6 +721,7 @@ export const ru: Record<string, string> = {
   'Has local settings': 'Есть локальные настройки',
   'Has a local override': 'Есть локальное переопределение',
   'Copy {address}': 'Скопировать {address}',
+  'Open now': 'Открыт сейчас',
   'Opens a terminal': 'Открывает терминал',
   'Opens a desktop': 'Открывает рабочий стол',
   'Double-click to connect': 'Двойной щелчок — подключиться',

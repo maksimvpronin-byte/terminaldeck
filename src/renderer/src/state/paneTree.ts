@@ -22,6 +22,14 @@ export type PaneNode =
       /** Copied from the session profile so tabs and panes can be tinted. */
       color?: string
       connectionId?: string
+      /**
+       * A live desktop, which is not a connection id and must not be mistaken
+       * for one: `connectionId` is an SSH handle, and everything that reads it
+       * — SFTP, tunnels, monitoring, broadcast — writes over SSH. Broadcast is
+       * the sharp one, since a new pane opts in by default: an RDP session id
+       * in that list would be typed into.
+       */
+      desktopId?: string
       /** Came back from a saved layout: show it idle instead of dialling out on launch. */
       restored?: boolean
       sftpOpen: boolean
@@ -161,7 +169,10 @@ export function collectLeaves(node: PaneNode): LeafNode[] {
 /** Session ids that currently have a live terminal somewhere. */
 export function collectConnectedSessionIds(node: PaneNode): string[] {
   if (node.type === 'leaf') {
-    return node.connectionId && node.target.kind === 'session' ? [node.target.sessionId] : []
+    // Either kind of live session counts: the tree is saying "this machine is
+    // open somewhere", and a desktop is as open as a shell.
+    const live = node.connectionId ?? node.desktopId
+    return live && node.target.kind === 'session' ? [node.target.sessionId] : []
   }
   return [
     ...collectConnectedSessionIds(node.children[0]),

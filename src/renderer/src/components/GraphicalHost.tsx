@@ -28,6 +28,7 @@ export default function GraphicalHost({
   sessionId,
   credentialId,
   onMeasured,
+  onSession,
   paneVisible
 }: {
   protocol: Protocol
@@ -52,6 +53,9 @@ export default function GraphicalHost({
    * swallowing every click inside it.
    */
   onMeasured?: (text: string) => void
+  /** Passed straight through to the screen: which live desktop this pane holds,
+   *  so the tree can say the machine is open. */
+  onSession?: (id: string | undefined) => void
   /** False while another tab is in front: a pane nobody is looking at is not
    *  sent any pixels until it comes back. */
   paneVisible: boolean
@@ -227,6 +231,7 @@ export default function GraphicalHost({
           look={look}
           password={lastTyped.current}
           onPhase={setPhase}
+          onSession={onSession}
           onNotice={setNotice}
           onMeasured={(text) => {
             setAsked(text)

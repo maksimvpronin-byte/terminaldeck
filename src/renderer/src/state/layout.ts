@@ -36,6 +36,7 @@ function sanitise(node: PaneNode): PaneNode | null {
       ? {
           ...n,
           connectionId: undefined,
+          desktopId: undefined,
           restored: true,
           sftpOpen: false,
           tunnelsOpen: false,

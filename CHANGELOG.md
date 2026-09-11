@@ -20,6 +20,16 @@ the other produces a version nobody can install, which is how 0.1.10 through
   monitor for RDP, drawn rather than typed. It is the first thing worth knowing
   about a Windows machine in a list of Linux ones, and until now the tree did not
   say it anywhere. Both trees, Sessions and Inventory.
+- Say whether a machine is open on the icon in front of its name, which turns
+  green on a faint green plate, instead of on a 6px green dot after it. The dot
+  lived inside the ellipsised name, so it vanished exactly in the rows whose
+  names did not fit — the rows in a deep folder, which is where most hosts are.
+  A desktop counts as open now too: only a terminal ever reported its session,
+  so an open desktop was indistinguishable from a closed one. It reports through
+  a field of its own rather than the connection id, which is an SSH handle that
+  SFTP, tunnels, monitoring and broadcast all write over — and a new pane opts
+  into broadcast by default, so an RDP session id in that list would be typed
+  into.
 - Tighten the tree's indentation, which compounded faster than it looked: a base
   of 8, a step of 12 and a whole extra step for a host put a name 58px into a
   260px panel three levels down, with nothing left to read it in. The base is 4,

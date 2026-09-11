@@ -49,6 +49,9 @@ interface Props {
   /** Typed in the pane, for a host with nothing saved. */
   password?: string
   onPhase: (phase: ScreenPhase) => void
+  /** The live session, and undefined once it has ended — the tree marks the
+   *  host as open on the strength of it. */
+  onSession?: (id: string | undefined) => void
   /**
    * What was asked for and what came back, for the pane's tooltip.
    *
@@ -97,6 +100,7 @@ export default function RemoteScreen({
   look,
   password,
   onPhase,
+  onSession,
   onNotice,
   onMeasured
 }: Props): JSX.Element {
@@ -131,6 +135,8 @@ export default function RemoteScreen({
   lookRef.current = look
   const onPhaseRef = useRef(onPhase)
   onPhaseRef.current = onPhase
+  const onSessionRef = useRef(onSession)
+  onSessionRef.current = onSession
   const onMeasuredRef = useRef(onMeasured)
   onMeasuredRef.current = onMeasured
   const onNoticeRef = useRef(onNotice)
@@ -439,6 +445,7 @@ export default function RemoteScreen({
           return
         }
         idRef.current = id
+        onSessionRef.current?.(id)
         tell({ a: 'visible', value: visibleRef.current })
         askedRef.current = size ? `${size.width}×${size.height}` : ''
         scaleRef.current =
@@ -525,6 +532,7 @@ export default function RemoteScreen({
       for (const stop of stopSubscriptions) stop()
       const id = idRef.current
       idRef.current = null
+      onSessionRef.current?.(undefined)
       if (id) void window.td.rdp.desktopStop(id)
     }
     // Deliberately once: a change of host or password is a different session,

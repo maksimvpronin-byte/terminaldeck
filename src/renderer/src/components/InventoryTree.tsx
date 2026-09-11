@@ -385,13 +385,18 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
       >
         <span className="name">
           <span
-            className="session-kind"
-            title={protocolOf(host) === 'rdp' ? t('Opens a desktop') : t('Opens a terminal')}
+            className={`session-kind ${connected.has(host.id) ? 'live' : ''}`}
+            title={
+              connected.has(host.id)
+                ? t('Open now')
+                : protocolOf(host) === 'rdp'
+                  ? t('Opens a desktop')
+                  : t('Opens a terminal')
+            }
           >
             <Kind />
           </span>
           {host.name}
-          {connected.has(host.id) && <span className="live-dot" title={t('Connected')} />}
           {membershipCount(host.id) > 1 && (
             <span
               className="no-inherit"

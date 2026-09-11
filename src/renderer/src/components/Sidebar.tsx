@@ -664,13 +664,18 @@ export default function Sidebar({
       >
         <span className="name">
           <span
-            className="session-kind"
-            title={protocolOf(s) === 'rdp' ? t('Opens a desktop') : t('Opens a terminal')}
+            className={`session-kind ${connected.has(s.id) ? 'live' : ''}`}
+            title={
+              connected.has(s.id)
+                ? t('Open now')
+                : protocolOf(s) === 'rdp'
+                  ? t('Opens a desktop')
+                  : t('Opens a terminal')
+            }
           >
             <Kind />
           </span>
           {s.name}
-          {connected.has(s.id) && <span className="live-dot" title={t('Connected')} />}
           {s.groupId && s.inheritAuth === false && (
             <span className="no-inherit" title={t('Does not inherit settings from its group')}>
               ⊘
