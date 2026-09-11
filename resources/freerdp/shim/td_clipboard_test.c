@@ -55,7 +55,10 @@ static void respond(CliprdrClientContext* ctx, const char* text)
 }
 static UINT receive_local(CliprdrClientContext* ctx, const CLIPRDR_FORMAT_DATA_RESPONSE* response)
 {
-	tdContext* td = (tdContext*)ctx->custom;
+	/* Through the same accessor the callbacks use. Casting `custom` straight to
+	 * a `tdContext` is what crashed here: since the file helper was added it
+	 * holds the helper, and the helper holds us. */
+	tdContext* td = td_of(ctx);
 	assert(response->common.msgFlags == CB_RESPONSE_OK);
 	assert(response->common.dataLen >= 2 && response->common.dataLen % 2 == 0);
 	const BYTE* bytes = response->requestedFormatData;
