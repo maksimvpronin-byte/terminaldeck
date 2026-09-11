@@ -85,12 +85,31 @@ export function registerSshHandlers(): void {
   ipcMain.handle(IPC.sshGetFollowCwd, (_e, connectionId: string) =>
     sshManager.isFollowingCwd(connectionId)
   )
-  ipcMain.handle(IPC.sshDisconnect, (_e, connectionId: string) => {
+  /**
+   * Everything hung off a connection, let go of.
+   *
+   * Registered as an observer rather than called from the disconnect handler,
+   * because a session ends two ways and only one of them came through here. A
+   * shell that ended on its own — `exit`, or a link that dropped — left the
+   * SFTP channels open, the remote edits watched, the monitor polling and, the
+   * one with teeth, the forwarded ports listening: bound to nothing, refusing
+   * to forward, and unavailable to the next connection or to anything else on
+   * the machine.
+   */
+  sshManager.onClosed((connectionId: string) => {
     remoteEdit.stopAllFor(connectionId)
     sftpManager.releaseConnection(connectionId)
     portForwardManager.stopAllForConnection(connectionId)
     remoteMonitor.stop(connectionId)
+  })
+
+  ipcMain.handle(IPC.sshDisconnect, (_e, connectionId: string) => {
+    // The release above runs from inside this, for both ways out.
     sshManager.disconnect(connectionId)
+  })
+
+  ipcMain.on(IPC.sshReady, (_e, connectionId: string) => {
+    sshManager.markReady(focusedWin(), connectionId)
   })
   ipcMain.on(IPC.sshWrite, (_e, connectionId: string, data: string) => {
     sshManager.write(connectionId, data)

@@ -70,7 +70,11 @@ function stubConnection(id: string): { conn: Record<string, unknown>; stream: St
     outbox: [],
     outboxBytes: 0,
     inFlight: 0,
-    paused: false
+    paused: false,
+    // Listening, unless a test says otherwise — every test written before the
+    // handshake existed assumes what it assumed then.
+    ready: true,
+    pending: []
   }
   return { conn, stream }
 }
@@ -80,6 +84,8 @@ interface Innards {
   connections: Map<string, unknown>
   queueOutput: (win: unknown, conn: unknown, data: Buffer) => void
   flushOutput: (win: unknown, conn: unknown) => void
+  send: (win: unknown, connectionId: string, channel: string, payload: unknown) => void
+  teardown: (connectionId: string) => void
 }
 
 function innards(): Innards {
@@ -282,5 +288,93 @@ describe('agent forwarding', () => {
     // there is nothing to say — and saying `agentForward` alone is an error.
     if (process.platform === 'win32') return
     expect(withSock(undefined, () => forwarding(auth(true)))).toEqual({})
+  })
+})
+
+/**
+ * Nothing may be said to a window that is not listening yet.
+ *
+ * The renderer cannot subscribe to a connection's channels until it knows the
+ * id, and it only learns the id when `connect` resolves. Everything sent in
+ * between went to a channel nobody was on, and Electron drops those silently.
+ * The shell's greeting went that way now and then; the message about a tunnel
+ * that refused to come up went that way every time, because it is sent while
+ * `connect` is still working.
+ */
+describe('what is said before the window is listening', () => {
+  it('holds it, and says it in order once the window speaks', () => {
+    const sent: Sent[] = []
+    const win = stubWindow(sent)
+    const { conn } = stubConnection('c-hold')
+    conn.ready = false
+    attach('c-hold', conn)
+
+    innards().send(win, 'c-hold', 'ssh:status', 'connected')
+    innards().send(win, 'c-hold', 'ssh:error', 'tunnel 8080 failed: address in use')
+    expect(sent).toEqual([])
+
+    sshManager.markReady(win as never, 'c-hold')
+
+    expect(sent).toEqual([
+      { channel: 'ssh:status:c-hold', payload: 'connected' },
+      { channel: 'ssh:error:c-hold', payload: 'tunnel 8080 failed: address in use' }
+    ])
+  })
+
+  /**
+   * A session can fail before the window ever subscribes, and what it held is
+   * the reason it failed — the most useful thing it ever had to say.
+   */
+  it('still delivers what a connection held when it died before being heard', () => {
+    const sent: Sent[] = []
+    const win = stubWindow(sent)
+    const { conn } = stubConnection('c-dead')
+    conn.ready = false
+    attach('c-dead', conn)
+
+    innards().send(win, 'c-dead', 'ssh:error', 'tunnel 8080 failed: address in use')
+    innards().teardown('c-dead')
+    expect(sent).toEqual([])
+
+    sshManager.markReady(win as never, 'c-dead')
+
+    expect(sent).toEqual([
+      { channel: 'ssh:error:c-dead', payload: 'tunnel 8080 failed: address in use' }
+    ])
+  })
+
+  it('says nothing twice when the window speaks again', () => {
+    const sent: Sent[] = []
+    const win = stubWindow(sent)
+    const { conn } = stubConnection('c-twice')
+    conn.ready = false
+    attach('c-twice', conn)
+
+    innards().send(win, 'c-twice', 'ssh:status', 'connected')
+    sshManager.markReady(win as never, 'c-twice')
+    sshManager.markReady(win as never, 'c-twice')
+
+    expect(sent).toHaveLength(1)
+  })
+})
+
+/**
+ * A session ends two ways and only one of them went through the disconnect
+ * handler. A shell that ended on its own — `exit`, or a dropped link — left
+ * the SFTP channels open, the remote edits watched, the monitor polling, and
+ * the forwarded ports listening: bound to nothing and unavailable to the next
+ * connection or to anything else on the machine.
+ */
+describe('when a connection ends on its own', () => {
+  it('tells whoever is holding things for it, before anything is closed', () => {
+    const told: string[] = []
+    sshManager.onClosed((id) => told.push(id))
+    const { conn } = stubConnection('c-exit')
+    attach('c-exit', conn)
+
+    innards().teardown('c-exit')
+
+    expect(told).toEqual(['c-exit'])
+    expect(innards().connections.has('c-exit')).toBe(false)
   })
 })

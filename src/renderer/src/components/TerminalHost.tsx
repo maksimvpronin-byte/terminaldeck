@@ -152,6 +152,16 @@ export default function TerminalHost({
         connIdRef.current = result.connectionId
         onConnectedRef.current(result.connectionId)
         attachListeners(result.connectionId)
+        /*
+         * Only now. The id is what the channels are named after, so nothing
+         * could have been listening before this line — and the main process
+         * holds everything it has to say until it hears this, rather than
+         * shouting into a room nobody is in yet. The shell's greeting used to
+         * go that way now and then; a tunnel that refused to come up went that
+         * way every time, since that is reported while `connect` is still
+         * working and the id has not come back.
+         */
+        window.td.ssh.ready(result.connectionId)
       } catch (err) {
         if (generationRef.current !== generation) return
         term.writeln(`\r\n\x1b[31m[failed to connect] ${(err as Error).message}\x1b[0m`)

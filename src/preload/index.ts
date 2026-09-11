@@ -191,6 +191,8 @@ const api = {
       ipcRenderer.invoke(IPC.sshQuickConnect, params, cols, rows),
     disconnect: (connectionId: string): Promise<void> =>
       ipcRenderer.invoke(IPC.sshDisconnect, connectionId),
+    /** Said once the listeners are on; until then the session holds its tongue. */
+    ready: (connectionId: string): void => ipcRenderer.send(IPC.sshReady, connectionId),
     write: (connectionId: string, data: string): void =>
       ipcRenderer.send(IPC.sshWrite, connectionId, data),
     /**

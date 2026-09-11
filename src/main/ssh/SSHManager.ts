@@ -53,6 +53,21 @@ interface LiveConnection {
    * the means to put the wait off again when it has not.
    */
   setupWait?: { timer: NodeJS.Timeout; restart: () => void }
+  /**
+   * Whether the window has said it is listening on this connection's channels.
+   *
+   * Nothing is sent before it does. The renderer cannot subscribe until it
+   * knows the id, and it only learns the id when `connect` resolves — so every
+   * message sent in between was addressed to a channel nobody was on, and
+   * Electron drops those without a word. The shell's greeting went that way
+   * sometimes; a tunnel that failed to come up went that way *always*, since
+   * that message is sent while `connect` is still working.
+   */
+  ready: boolean
+  /** What was said before anybody was listening, in the order it was said. */
+  pending: { channel: string; payload: unknown }[]
+  /** Gives up waiting, in case a window never speaks. */
+  readyTimer?: NodeJS.Timeout
 }
 
 const OPENSSH_PIPE = '\\\\.\\pipe\\openssh-ssh-agent'
@@ -65,6 +80,14 @@ const OPENSSH_PIPE = '\\\\.\\pipe\\openssh-ssh-agent'
  * keystroke echo still arrives on the next paint, while `cat` on a large file
  * becomes a handful of large writes instead of thousands of small ones.
  */
+/**
+ * How long a connection holds its first words for a window that has not spoken.
+ *
+ * Generous on purpose: the cost of waiting is a greeting that arrives late, and
+ * the cost of not waiting is one that never arrives at all.
+ */
+const READY_GRACE_MS = 5000
+
 const FLUSH_INTERVAL_MS = 8
 
 /** Enough held up already: send it now rather than waiting out the interval. */
@@ -410,8 +433,45 @@ class SSHManager {
 
   private send(win: BrowserWindow, connectionId: string, channel: string, payload: unknown): void {
     if (win.isDestroyed()) return
+    const conn = this.connections.get(connectionId)
+    if (conn && !conn.ready) {
+      conn.pending.push({ channel, payload })
+      return
+    }
     win.webContents.send(`${channel}:${connectionId}`, payload)
   }
+
+  /**
+   * The window has subscribed; everything held for it goes now, in order.
+   *
+   * Called again for a connection already running is a no-op, and called for
+   * one that has already closed still delivers — what it held is the reason it
+   * closed, which is the most useful thing it ever had to say.
+   */
+  markReady(win: BrowserWindow, connectionId: string): void {
+    const conn = this.connections.get(connectionId) ?? this.closing.get(connectionId)
+    if (!conn || conn.ready) return
+    if (conn.readyTimer) clearTimeout(conn.readyTimer)
+    conn.readyTimer = undefined
+    conn.ready = true
+    const held = conn.pending
+    conn.pending = []
+    if (win.isDestroyed()) return
+    for (const { channel, payload } of held) {
+      win.webContents.send(`${channel}:${connectionId}`, payload)
+    }
+    this.closing.delete(connectionId)
+  }
+
+  /**
+   * Connections that have ended with something still unsaid.
+   *
+   * A session can fail before the window ever subscribes — a refused tunnel on
+   * a host that then drops, say — and `teardown` would take the explanation
+   * with it. Held here until the window asks, and dropped either way once it
+   * does.
+   */
+  private closing = new Map<string, LiveConnection>()
 
   /** Holds output for a few milliseconds so a burst travels as one message. */
   private queueOutput(win: BrowserWindow, conn: LiveConnection, data: Buffer): void {
@@ -583,8 +643,18 @@ class SSHManager {
           outbox: [],
           outboxBytes: 0,
           inFlight: 0,
-          paused: false
+          paused: false,
+          ready: false,
+          pending: []
         }
+        /*
+         * A window that never subscribes must not silence a session for good.
+         * The renderer does it within a round trip of learning the id, so this
+         * is only ever reached by one that crashed, was replaced mid-connect,
+         * or belongs to a build that predates the handshake.
+         */
+        connection.readyTimer = setTimeout(() => this.markReady(win, connectionId), READY_GRACE_MS)
+        connection.readyTimer.unref?.()
         this.connections.set(connectionId, connection)
 
         let pending = ''
@@ -782,6 +852,15 @@ class SSHManager {
   private teardown(connectionId: string): void {
     const conn = this.connections.get(connectionId)
     if (!conn) return
+    /*
+     * Announced before anything is closed, so whatever runs here still sees a
+     * connection it can work with — the SFTP channels, the port forwards, the
+     * remote edits and the monitor are all released this way, and they were
+     * released only when somebody closed the pane by hand. A shell that ended
+     * on its own — `exit`, or a dropped link — left every one of them behind,
+     * and a forwarded port left listening is one nothing can bind again.
+     */
+    for (const watcher of this.closedWatchers) watcher(connectionId)
     if (conn.flushTimer) clearTimeout(conn.flushTimer)
     if (conn.setupWait) clearTimeout(conn.setupWait.timer)
     conn.logStream?.end()
@@ -798,6 +877,24 @@ class SSHManager {
       }
     }
     this.connections.delete(connectionId)
+    // Kept only if it never got to speak; `markReady` drops it either way.
+    if (!conn.ready && conn.pending.length > 0) this.closing.set(connectionId, conn)
+    else if (conn.readyTimer) clearTimeout(conn.readyTimer)
+  }
+
+  private closedWatchers: ((connectionId: string) => void)[] = []
+
+  /**
+   * Told whenever a connection ends, however it ended.
+   *
+   * An observer rather than a call into the managers that need to know:
+   * `PortForwardManager` and the SFTP side already import this one, and
+   * importing them back would be a cycle. The wiring lives in `ipc/ssh.ts`,
+   * where the explicit disconnect is handled, so both routes out of a session
+   * run the same cleanup.
+   */
+  onClosed(watcher: (connectionId: string) => void): void {
+    this.closedWatchers.push(watcher)
   }
 }
 

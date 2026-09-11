@@ -70,6 +70,8 @@ export const IPC = {
   sshConnect: 'ssh:connect',
   sshQuickConnect: 'ssh:quickConnect',
   sshDisconnect: 'ssh:disconnect',
+  /** The window has subscribed; anything held back for it may go now. */
+  sshReady: 'ssh:ready',
   sshWrite: 'ssh:write',
   /** The renderer reporting output written to the terminal, so reading can resume. */
   sshAck: 'ssh:ack',
