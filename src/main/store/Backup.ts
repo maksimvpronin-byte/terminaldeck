@@ -425,7 +425,20 @@ export async function exportToFile(
         ...(backup.gitFolderOverrides ?? []),
         ...(backup.credentials ?? [])
       ]
-        .map((item) => item.secretRef)
+        /*
+         * Both refs, not one. A gateway keeps its password under
+         * `gatewaySecretRef` — a separate entry in the vault, because the login
+         * a gateway takes is regularly not the one the host does — and only
+         * `secretRef` was collected here. The export then carried the field and
+         * not the secret it points at, so a restored host said "saved on this
+         * host" about a password the vault had never heard of: not merely lost,
+         * but lost while claiming otherwise, which is the version nobody goes
+         * looking for until the gateway refuses them.
+         */
+        .flatMap((item) => [
+          item.secretRef,
+          (item as { gatewaySecretRef?: string }).gatewaySecretRef
+        ])
         .filter((ref): ref is string => Boolean(ref))
     )
     const all = vault.allSecrets()

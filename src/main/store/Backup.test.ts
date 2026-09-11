@@ -243,6 +243,34 @@ describe('backup export', () => {
     expect(carried).toEqual(SECRETS)
     expect(carried['secret-orphan']).toBeUndefined()
   })
+
+  /**
+   * A gateway keeps its password under a ref of its own, because the login an
+   * RD Gateway takes is regularly not the one the host does. Only `secretRef`
+   * was collected, so the export carried the *field* and not the secret behind
+   * it — and a restored host then said "saved on this host" about a password
+   * the vault had never heard of. Lost while claiming otherwise is the version
+   * nobody goes looking for until the gateway refuses them.
+   */
+  it('carries the password a gateway keeps under its own ref', async () => {
+    populate()
+    sessionStore.saveSession({ ...session, gatewaySecretRef: 'secret-gateway' })
+    vault.setSecret('secret-gateway', 'the gateway password')
+    saveTo = FILE
+
+    await exportToFile(win, true, EXPORT_PASSWORD)
+
+    const file = JSON.parse(readFileSync(FILE, 'utf8')) as {
+      secrets: { salt: string; payload: EncryptedPayload }
+    }
+    const carried = JSON.parse(
+      decrypt(await deriveKey(EXPORT_PASSWORD, file.secrets.salt), file.secrets.payload)
+    ) as Record<string, string>
+
+    expect(carried['secret-gateway']).toBe('the gateway password')
+    // And the host's own is still there: one ref must not displace the other.
+    expect(carried['secret-session']).toBe(SECRETS['secret-session'])
+  })
 })
 
 describe('backup import', () => {
