@@ -37,9 +37,13 @@
 #include <freerdp/log.h>
 #include <freerdp/channels/cliprdr.h>
 #include <freerdp/client/cliprdr.h>
+#include <freerdp/client/client_cliprdr_file.h>
+#include <freerdp/utils/cliprdr_utils.h>
 #include <freerdp/channels/disp.h>
 #include <freerdp/channels/rdpsnd.h>
 
+#include <winpr/clipboard.h>
+#include <winpr/shell.h>
 #include <winpr/crt.h>
 #include <winpr/synch.h>
 #include <winpr/thread.h>
@@ -130,6 +134,20 @@ typedef struct
 	int clipboard;
 	CRITICAL_SECTION clip;
 	char* clip_local;
+	/**
+	 * Files, which are not data and are not carried like data.
+	 *
+	 * `clip_files` is FreeRDP's own helper, and it earns its place: asked for a
+	 * file's bytes it reads them off this disk in ranges, walking directories on
+	 * the way, so nothing is copied anywhere to be offered. `clip_system` is a
+	 * WinPR clipboard kept beside it for one job — turning the list of paths
+	 * into the array of descriptors the far end expects, which means stat'ing
+	 * every one of them, and which WinPR already knows how to do.
+	 */
+	CliprdrFileContext* clip_files;
+	wClipboard* clip_system;
+	/** What this side last copied, as a `text/uri-list`. */
+	char* clip_uris;
 	/* Channel-thread state: responses carry no format id. Keep our outgoing
 	 * request separate from FreeRDP's lastRequestedFormatId (incoming requests). */
 	UINT32 clip_requested, clip_next;
@@ -526,6 +544,22 @@ static void send_size(tdContext* td, UINT32 width, UINT32 height, UINT32 scale)
 
 /* ------------------------------------------------------------- the clipboard */
 
+/** Registered by the far end rather than numbered by Windows. */
+static const char TD_FILE_LIST[] = "FileGroupDescriptorW";
+
+/**
+ * Our own context, reached the long way round.
+ *
+ * `cliprdr_file_context_init` puts *itself* in `cliprdr->custom` and keeps what
+ * we handed it, so after that line the obvious read gets the helper rather than
+ * us. Every callback here goes through this instead, which is what the clients
+ * FreeRDP ships do.
+ */
+static tdContext* td_of(CliprdrClientContext* ctx)
+{
+	return (tdContext*)cliprdr_file_context_get_context(ctx->custom);
+}
+
 /**
  * Announcing what this side holds.
  *
@@ -538,35 +572,49 @@ static UINT td_clip_offer(tdContext* td)
 {
 	CliprdrClientContext* ctx = td->cliprdr;
 	CLIPRDR_FORMAT_LIST list = { 0 };
-	CLIPRDR_FORMAT format = { 0 };
-	int have;
+	CLIPRDR_FORMAT formats[2] = { 0 };
+	UINT32 count = 0;
+	int have, files;
 
 	if (!ctx)
 		return CHANNEL_RC_OK;
 
 	EnterCriticalSection(&td->clip);
 	have = td->clip_local != NULL;
+	files = td->clip_uris != NULL;
 	LeaveCriticalSection(&td->clip);
 
-	format.formatId = CF_UNICODETEXT;
-	format.formatName = NULL;
+	if (have)
+	{
+		formats[count].formatId = CF_UNICODETEXT;
+		formats[count].formatName = NULL;
+		count++;
+	}
+	if (files)
+	{
+		/* By name, not by number: the id of this one is assigned by whichever
+		 * side registers it, so the two ends agree on the spelling instead. */
+		formats[count].formatId = ClipboardGetFormatId(td->clip_system, TD_FILE_LIST);
+		formats[count].formatName = (char*)TD_FILE_LIST;
+		count++;
+	}
 
 	list.common.msgType = CB_FORMAT_LIST;
-	list.numFormats = have ? 1 : 0;
-	list.formats = have ? &format : NULL;
+	list.numFormats = count;
+	list.formats = count ? formats : NULL;
 	/* At INFO, which the driving process only lets through when it is tracing:
 	 * the clipboard is the one part of this whose failures all look identical
 	 * from the outside — nothing pasted, or something pasted wrong — and which
 	 * of the four messages went astray is not guessable from either. */
-	WLog_INFO(TAG, "clipboard: announcing %u format(s), CF_UNICODETEXT=%u", list.numFormats,
-	          (unsigned)CF_UNICODETEXT);
+	WLog_INFO(TAG, "clipboard: announcing %u format(s): %stext%s", list.numFormats,
+	          have ? "" : "no ", files ? ", files" : "");
 	return ctx->ClientFormatList(ctx, &list);
 }
 
 /* The server speaks first; this is the whole of our half of the handshake. */
 static UINT td_clip_monitor_ready(CliprdrClientContext* ctx, const CLIPRDR_MONITOR_READY* ready)
 {
-	tdContext* td = (tdContext*)ctx->custom;
+	tdContext* td = td_of(ctx);
 	CLIPRDR_CAPABILITIES caps = { 0 };
 	CLIPRDR_GENERAL_CAPABILITY_SET general = { 0 };
 	UINT rc;
@@ -577,8 +625,12 @@ static UINT td_clip_monitor_ready(CliprdrClientContext* ctx, const CLIPRDR_MONIT
 	general.capabilitySetLength = CB_CAPSTYPE_GENERAL_LEN;
 	general.version = CB_CAPS_VERSION_2;
 	/* Long names only. Short ones are 32 bytes of UTF-16 and cannot carry the
-	 * names the formats we care about are registered under. */
-	general.generalFlags = CB_USE_LONG_FORMAT_NAMES;
+	 * names the formats we care about are registered under — `FileGroupDescriptorW`
+	 * is 20 characters before its terminator. The rest of the flags come from the
+	 * file helper: they say whether files may travel at all and in what shape, and
+	 * it is the half of this that knows. */
+	general.generalFlags =
+	    CB_USE_LONG_FORMAT_NAMES | cliprdr_file_context_current_flags(td->clip_files);
 
 	caps.common.msgType = CB_CLIP_CAPS;
 	caps.cCapabilitiesSets = 1;
@@ -592,7 +644,7 @@ static UINT td_clip_monitor_ready(CliprdrClientContext* ctx, const CLIPRDR_MONIT
 
 static UINT td_clip_request(CliprdrClientContext* ctx, UINT32 format)
 {
-	tdContext* td = (tdContext*)ctx->custom;
+	tdContext* td = td_of(ctx);
 	CLIPRDR_FORMAT_DATA_REQUEST request = { 0 };
 	UINT rc;
 	if (!format)
@@ -617,7 +669,7 @@ static UINT td_clip_request(CliprdrClientContext* ctx, UINT32 format)
 static UINT td_clip_server_format_list(CliprdrClientContext* ctx, const CLIPRDR_FORMAT_LIST* list)
 {
 	CLIPRDR_FORMAT_LIST_RESPONSE response = { 0 };
-	tdContext* td = (tdContext*)ctx->custom;
+	tdContext* td = td_of(ctx);
 	UINT32 wanted = 0;
 	UINT rc;
 
@@ -656,7 +708,7 @@ static UINT td_clip_server_format_list(CliprdrClientContext* ctx, const CLIPRDR_
 static UINT td_clip_server_format_data_response(CliprdrClientContext* ctx,
                                                 const CLIPRDR_FORMAT_DATA_RESPONSE* response)
 {
-	tdContext* td = (tdContext*)ctx->custom;
+	tdContext* td = td_of(ctx);
 	const UINT32 format = td->clip_requested;
 	const BYTE* data = response->requestedFormatData;
 	const UINT32 length = response->common.dataLen;
@@ -702,15 +754,84 @@ static UINT td_clip_server_format_data_response(CliprdrClientContext* ctx,
 	return CHANNEL_RC_OK;
 }
 
+/**
+ * The far end is pasting files, and wants to know what it is getting.
+ *
+ * Three steps, and none of them moves a byte of content. The helper is told
+ * which local paths back this clipboard, so it can serve their contents later
+ * and walk into directories on the way. WinPR is handed the same list and asked
+ * for it back as an array of descriptors — that is where the names, sizes and
+ * timestamps come from, and it means stat'ing every file, which is why it is
+ * done here and not when the clipboard changed. Then the array is serialised
+ * into the shape the wire wants.
+ */
+static UINT td_clip_answer_files(CliprdrClientContext* ctx, tdContext* td)
+{
+	CLIPRDR_FORMAT_DATA_RESPONSE response = { 0 };
+	const UINT32 uriFormat = ClipboardGetFormatId(td->clip_system, "text/uri-list");
+	const UINT32 listFormat = ClipboardGetFormatId(td->clip_system, TD_FILE_LIST);
+	BYTE* wire = NULL;
+	UINT32 wire_size = 0;
+	char* uris = NULL;
+	UINT rc;
+
+	EnterCriticalSection(&td->clip);
+	if (td->clip_uris)
+		uris = _strdup(td->clip_uris);
+	LeaveCriticalSection(&td->clip);
+
+	response.common.msgType = CB_FORMAT_DATA_RESPONSE;
+	if (uris && uriFormat && listFormat)
+	{
+		const size_t length = strlen(uris);
+		ClipboardLock(td->clip_system);
+		if (cliprdr_file_context_update_client_data(td->clip_files, uris, length) &&
+		    ClipboardSetData(td->clip_system, uriFormat, uris, (UINT32)length))
+		{
+			UINT32 count = 0;
+			const FILEDESCRIPTORW* descriptors =
+			    (const FILEDESCRIPTORW*)ClipboardGetData(td->clip_system, listFormat, &count);
+			if (descriptors)
+			{
+				const UINT32 flags = cliprdr_file_context_remote_get_flags(td->clip_files);
+				if (cliprdr_serialize_file_list_ex(flags, descriptors,
+				                                   count / sizeof(FILEDESCRIPTORW), &wire,
+				                                   &wire_size) != CHANNEL_RC_OK)
+					wire = NULL;
+				free((void*)descriptors);
+			}
+		}
+		ClipboardUnlock(td->clip_system);
+	}
+	free(uris);
+
+	WLog_INFO(TAG, "clipboard: the far end wants the file list, %u byte(s)", (unsigned)wire_size);
+
+	if (!wire)
+	{
+		response.common.msgFlags = CB_RESPONSE_FAIL;
+		return ctx->ClientFormatDataResponse(ctx, &response);
+	}
+	response.common.msgFlags = CB_RESPONSE_OK;
+	response.common.dataLen = wire_size;
+	response.requestedFormatData = wire;
+	rc = ctx->ClientFormatDataResponse(ctx, &response);
+	free(wire);
+	return rc;
+}
+
 /** The far end is pasting, and wants what this side copied. */
 static UINT td_clip_server_format_data_request(CliprdrClientContext* ctx,
                                                const CLIPRDR_FORMAT_DATA_REQUEST* request)
 {
-	tdContext* td = (tdContext*)ctx->custom;
+	tdContext* td = td_of(ctx);
 	CLIPRDR_FORMAT_DATA_RESPONSE response = { 0 };
 	WCHAR* wide = NULL;
 	size_t chars = 0;
 	UINT rc;
+
+	if (request->requestedFormatId == ClipboardGetFormatId(td->clip_system, TD_FILE_LIST))
+		return td_clip_answer_files(ctx, td);
 
 	if (request->requestedFormatId == CF_UNICODETEXT)
 	{
@@ -762,11 +883,27 @@ static void on_channel_connected(void* context, const ChannelConnectedEventArgs*
 	if (strcmp(e->name, CLIPRDR_SVC_CHANNEL_NAME) == 0)
 	{
 		td->cliprdr = (CliprdrClientContext*)e->pInterface;
-		td->cliprdr->custom = td;
+		td->clip_system = ClipboardCreate();
+		td->clip_files = cliprdr_file_context_new(td);
+		if (!td->clip_system || !td->clip_files)
+		{
+			/* Text still works without either; files are what is lost. */
+			WLog_ERR(TAG, "clipboard: no file support this session");
+		}
 		td->cliprdr->MonitorReady = td_clip_monitor_ready;
 		td->cliprdr->ServerFormatList = td_clip_server_format_list;
 		td->cliprdr->ServerFormatDataRequest = td_clip_server_format_data_request;
 		td->cliprdr->ServerFormatDataResponse = td_clip_server_format_data_response;
+		/*
+		 * Last, and it overwrites `custom` with itself — which is why everything
+		 * above reaches us through `td_of`. It also claims
+		 * `ServerFileContentsRequest`, which is the whole of the outgoing
+		 * direction: asked for a file's bytes it reads them off this disk in
+		 * ranges. `ServerFileContentsResponse` it only claims when built with
+		 * FUSE, which this is not, so the incoming direction stays ours.
+		 */
+		if (td->clip_files && !cliprdr_file_context_init(td->clip_files, td->cliprdr))
+			WLog_ERR(TAG, "clipboard: the file helper refused to start");
 		return;
 	}
 
@@ -788,6 +925,17 @@ static void on_channel_disconnected(void* context, const ChannelDisconnectedEven
 
 	if (strcmp(e->name, CLIPRDR_SVC_CHANNEL_NAME) == 0)
 	{
+		if (td->clip_files)
+		{
+			(void)cliprdr_file_context_uninit(td->clip_files, td->cliprdr);
+			cliprdr_file_context_free(td->clip_files);
+			td->clip_files = NULL;
+		}
+		if (td->clip_system)
+		{
+			ClipboardDestroy(td->clip_system);
+			td->clip_system = NULL;
+		}
 		td->cliprdr = NULL;
 		td->clip_requested = 0;
 		td->clip_next_pending = 0;
@@ -939,6 +1087,24 @@ static void td_clip_set_local(tdContext* td, const char* text)
 	(void)td_clip_offer(td);
 }
 
+/**
+ * The paths this side last copied, as a `text/uri-list`.
+ *
+ * Held rather than read: turning them into descriptors means stat'ing every
+ * one, and most of what anybody copies is never pasted into a session.
+ */
+static void td_clip_set_files(tdContext* td, const char* uris)
+{
+	char* copy = uris && *uris ? _strdup(uris) : NULL;
+
+	EnterCriticalSection(&td->clip);
+	free(td->clip_uris);
+	td->clip_uris = copy;
+	LeaveCriticalSection(&td->clip);
+
+	(void)td_clip_offer(td);
+}
+
 static void apply_command(tdContext* td, const td_cmd* cmd)
 {
 	rdpContext* context = &td->common.context;
@@ -949,6 +1115,11 @@ static void apply_command(tdContext* td, const td_cmd* cmd)
 	{
 		if (td->clipboard)
 			td_clip_set_local(td, td_cmd_str(cmd, "text", ""));
+	}
+	else if (strcmp(action, "clipfiles") == 0)
+	{
+		if (td->clipboard)
+			td_clip_set_files(td, td_cmd_str(cmd, "uris", ""));
 	}
 	else if (strcmp(action, "mouse") == 0)
 	{
@@ -1343,6 +1514,8 @@ static void client_free(freerdp* instance, rdpContext* context)
 		(void)CloseHandle(td->answered);
 	free(td->clip_local);
 	td->clip_local = NULL;
+	free(td->clip_uris);
+	td->clip_uris = NULL;
 	DeleteCriticalSection(&td->lock);
 	DeleteCriticalSection(&td->paint);
 	DeleteCriticalSection(&td->clip);

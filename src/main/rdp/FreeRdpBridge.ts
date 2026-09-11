@@ -268,7 +268,39 @@ class FreeRdpBridge {
    * one thing, and two desktops sharing it should agree about what is on it.
    */
   private lastClipboardText = ''
+  /** The same, for the files beside it: copying a file changes neither text. */
+  private lastClipboardFiles = ''
   private clipboardTimer: NodeJS.Timeout | undefined
+
+  /**
+   * The files on the clipboard, as a `text/uri-list`, or an empty string.
+   *
+   * macOS puts several of them on the pasteboard one item at a time, which
+   * Electron's clipboard cannot walk — it reads the first item and stops. The
+   * legacy `NSFilenamesPboardType` is one value holding all of them, written by
+   * Finder to this day for exactly the applications that cannot walk items, and
+   * is read here first for that reason. A single file is the fallback, and the
+   * common case.
+   */
+  private clipboardFiles(): string {
+    const paths: string[] = []
+    try {
+      const plist = clipboard.readBuffer('NSFilenamesPboardType').toString('utf8')
+      for (const match of plist.matchAll(/<string>([^<]*)<\/string>/g)) paths.push(match[1])
+    } catch {
+      // Not on the pasteboard, or not this platform. The single file below.
+    }
+    if (paths.length === 0) {
+      const one = clipboard.read('public.file-url')
+      if (one) paths.push(decodeURIComponent(one.replace(/^file:\/\//, '')))
+    }
+    if (paths.length === 0) return ''
+    // CRLF-separated `file://` URIs, which is what the client's file helper
+    // parses — see `cliprdr_local_stream_update`.
+    return paths
+      .map((path) => `file://${path.split('/').map(encodeURIComponent).join('/')}`)
+      .join('\r\n')
+  }
 
   /** Runs only while at least one open desktop shares a clipboard. */
   private watchClipboard(): void {
@@ -281,12 +313,19 @@ class FreeRdpBridge {
     if (this.clipboardTimer) return
 
     this.lastClipboardText = clipboard.readText()
+    this.lastClipboardFiles = this.clipboardFiles()
     this.clipboardTimer = setInterval(() => {
       const text = clipboard.readText()
-      if (text === this.lastClipboardText) return
+      const files = this.clipboardFiles()
+      if (text === this.lastClipboardText && files === this.lastClipboardFiles) return
+      const textChanged = text !== this.lastClipboardText
+      const filesChanged = files !== this.lastClipboardFiles
       this.lastClipboardText = text
+      this.lastClipboardFiles = files
       for (const [id, session] of this.sessions) {
-        if (session.clipboard) this.write(id, { a: 'clipboard', text })
+        if (!session.clipboard) continue
+        if (textChanged) this.write(id, { a: 'clipboard', text })
+        if (filesChanged) this.write(id, { a: 'clipfiles', uris: files })
       }
     }, CLIPBOARD_POLL_MS)
     // Nothing here should hold the process open by itself.
