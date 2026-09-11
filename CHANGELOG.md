@@ -6,6 +6,21 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.15.4
+
+### Fixed
+
+- Stop the application dying when a desktop pane is closed. A session leaves the
+  bridge's list when its process exits, which is some time after its input has
+  been closed — so between the two there is an entry that looks live and has
+  nowhere to write. The clipboard poll speaks every quarter of a second and
+  found it: writing to a closed pipe raises `ERR_STREAM_WRITE_AFTER_END` on the
+  stream rather than at the call, and a stream nobody is listening to turns that
+  into an uncaught exception, which ends the process rather than the write. A
+  session on its way out is now refused by the one place everything writes
+  through, and saying something to a client that has already gone is treated as
+  the ordinary end of a session rather than as a fault.
+
 ## 0.15.3
 
 ### Added

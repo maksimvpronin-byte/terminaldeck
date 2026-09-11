@@ -65,6 +65,17 @@ interface Session {
   port: number
   /** Whether this desktop shares a clipboard. Off unless the host asked. */
   clipboard: boolean
+  /**
+   * Told to go, and not yet gone.
+   *
+   * A session leaves the map when its process exits, which is some time after
+   * its input is closed — so between the two there is a session that looks
+   * live and has nowhere to write. Anything that speaks on a timer will find
+   * it: the clipboard poll did, wrote into a closed pipe a quarter of a second
+   * after a pane was shut, and took the whole application down with an
+   * uncaught `ERR_STREAM_WRITE_AFTER_END`.
+   */
+  stopping?: boolean
   /** The client's last complaint, which is usually the reason it stopped. */
   complaint?: string
 }
@@ -250,8 +261,11 @@ class FreeRdpBridge {
 
   stop(id: string): void {
     const session = this.sessions.get(id)
-    if (!session) return
+    if (!session || session.stopping) return
     this.write(id, { a: 'stop' })
+    // Marked before the pipe is closed, not after: everything that writes goes
+    // through one place and that place refuses a session in this state.
+    session.stopping = true
     // Closing the pipe is the backstop: the client exits on end-of-input
     // whether or not the message arrived.
     session.child.stdin?.end()
@@ -334,7 +348,19 @@ class FreeRdpBridge {
 
   private write(id: string, fields: Record<string, string | number | boolean | undefined>): void {
     const session = this.sessions.get(id)
-    session?.child.stdin?.write(encodeCommand(fields))
+    const stdin = session?.child.stdin
+    if (!session || session.stopping || !stdin || !stdin.writable) return
+    try {
+      stdin.write(encodeCommand(fields))
+    } catch {
+      /*
+       * A pipe can close between the check above and the line under it — the
+       * client exits on its own account, and nothing here is told first. Saying
+       * something to a session that has gone is not an error worth raising: it
+       * is the ordinary end of every session, and raising it here killed the
+       * application rather than the write.
+       */
+    }
   }
 
   private receive(id: string, session: Session, type: number, payload: Buffer): void {
