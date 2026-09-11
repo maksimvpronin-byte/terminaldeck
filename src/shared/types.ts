@@ -138,9 +138,10 @@ export interface RdpDefaults {
   /**
    * Whether the clipboard is shared with the far end.
    *
-   * Off unless asked for. Everything else under Desktop changes how a picture
-   * is drawn; this one moves what you copied onto somebody else's machine, and
-   * a default that does that quietly is the wrong default.
+   * On unless refused, which is how every Windows client behaves. Everything
+   * else under Desktop changes how a picture is drawn; this one moves what you
+   * copied onto somebody else's machine, which is why it is stated separately
+   * and can be turned off for a host or a whole group.
    */
   clipboard?: boolean
   /**

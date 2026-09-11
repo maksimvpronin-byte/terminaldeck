@@ -490,13 +490,13 @@ export const ru: Record<string, string> = {
   'Played by the desktop client itself, so it costs this side nothing and the link something.':
     'Проигрывает сам клиент рабочего стола: этой стороне бесплатно, каналу — нет.',
   'Share the clipboard with this host': 'Делить буфер обмена с этим хостом',
-  'What you copy here can be pasted there and back again. Off unless asked for: it puts what you copied onto a machine that is not yours, and anything running on it can read the clipboard.':
-    'Скопированное здесь можно вставить там и наоборот. По умолчанию выключено: это кладёт скопированное на чужую машину, а прочитать буфер может всё, что на ней работает.',
+  'What you copy here can be pasted there and back again, as every Windows client does it. Turn it off for a host you would rather not hand what you copied: anything running over there can read the clipboard, not only what you paste into.':
+    'Скопированное здесь можно вставить там и наоборот — так же, как в любом клиенте Windows. Выключите для хоста, которому не хотите отдавать скопированное: прочитать буфер может всё, что на той машине работает, а не только то, куда вы вставляете.',
   'Play the remote sound here': 'Проигрывать звук удалённой машины здесь',
-  'The clipboard can be shared with a host — text both ways, off unless asked':
-    'Буфер обмена можно делить с хостом — текст в обе стороны, по умолчанию выключено',
-  'What you copy leaves this machine when it is on, so it is a per-host decision':
-    'При включении скопированное покидает эту машину, поэтому решение принимается для каждого хоста',
+  'The clipboard is shared with a desktop — text both ways, as Windows clients do':
+    'Буфер обмена делится с рабочим столом — текст в обе стороны, как в клиентах Windows',
+  'Turn it off per host or group for a machine you would rather not hand it to':
+    'Выключается для хоста или группы, если машине не стоит его отдавать',
   'The far end’s sound plays here, and can be turned off per host or group':
     'Звук той стороны слышен здесь; выключается для хоста или для всей группы',
   'The picture is decoded by a client of its own, so H.264 hosts are drawn as such':

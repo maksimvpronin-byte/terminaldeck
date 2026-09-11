@@ -295,7 +295,7 @@ export default function RdpFields({
         />
         <Hint label={t('Share the clipboard with this host')}>
           {t(
-            'What you copy here can be pasted there and back again. Off unless asked for: it puts what you copied onto a machine that is not yours, and anything running on it can read the clipboard.'
+            'What you copy here can be pasted there and back again, as every Windows client does it. Turn it off for a host you would rather not hand what you copied: anything running over there can read the clipboard, not only what you paste into.'
           )}
         </Hint>
       </label>

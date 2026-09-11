@@ -461,9 +461,9 @@ paths have only ever been exercised by unit tests or by hand on a local stand-in
   trade: the client that asked nothing of the build also had no graphics pipeline, and the
   picture was the thing being paid for. There is now a compiled client, built per platform and
   shipped in the application. See **Desktops** above.
-- **Everything on a clipboard except text, for now.** Text crosses in both directions once a
-  host has **Share the clipboard** ticked — off by default, since it puts what you copied onto a
-  machine that is not yours. Images, HTML and RTF are the next piece: they are more entries in
+- **Everything on a clipboard except text, for now.** Text crosses in both directions, as it does
+  in every Windows client; **Share the clipboard** turns that off for a host or a group you would
+  rather not hand what you copied. Images, HTML and RTF are the next piece: they are more entries in
   the same format table the text goes through, not a second mechanism. Files are a third thing
   and the one genuinely hard on this side — RDP hands them over as a descriptor plus
   `FileContentsRequest` in pieces, while macOS wants a path to a file that already exists, so

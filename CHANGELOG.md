@@ -43,10 +43,11 @@ the other produces a version nobody can install, which is how 0.1.10 through
 - Share the clipboard with a desktop, text in both directions. The client speaks
   `cliprdr` now: it announces what this side holds, asks for what the far end
   offers, and answers when the far end pastes. What is copied here is announced
-  rather than sent, because most of it never gets pasted there. Off unless a
-  host or its group asks for it — every other setting under Desktop decides how
-  a picture is drawn, while this one moves what you copied onto a machine that
-  is not yours.
+  rather than sent, because most of it never gets pasted there. On, as every
+  Windows client has it, and turned off per host or group: it is the one setting
+  under Desktop that moves data rather than deciding how a picture is drawn, and
+  anything running on the far machine can read a clipboard, not only the window
+  being pasted into.
 - The help says which build it belongs to, at the top right, where somebody
   writing a bug report will look for it.
 

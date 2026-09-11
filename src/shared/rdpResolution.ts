@@ -22,9 +22,12 @@ export const RDP_FALLBACK: ResolvedRdp = {
   // played by the desktop client's process, so nothing about it crosses into
   // the window.
   sound: true,
-  // Off until somebody says otherwise: sharing a clipboard sends what you
-  // copied here to a machine that is not yours, and that is a decision.
-  clipboard: false,
+  // On, as every Windows client has it: a desktop you cannot paste into is a
+  // desktop people copy out of by hand. It is the one setting here that sends
+  // data rather than deciding how a picture is drawn, so it is also the one
+  // worth turning off per host — a machine you do not trust with what you
+  // copied should not be given it.
+  clipboard: true,
   resolution: 'fit',
   desktopWidth: 1920,
   desktopHeight: 1080,
