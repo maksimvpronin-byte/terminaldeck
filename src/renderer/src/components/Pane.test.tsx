@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import Pane from './Pane'
 import { useStore } from '../state/store'
 import type { GitFolderTree, SessionProfile } from '../../../shared/types'
@@ -55,6 +56,61 @@ describe('a pane on a host mirrored from a repository', () => {
     // The desktop pane names the address it is reaching, and there is no
     // terminal in a pane that opened one.
     expect(screen.getByText(/10\.75\.20\.20:3389/)).toBeInTheDocument()
+  })
+
+  /**
+   * End to end, because every link in it was added at once and a break anywhere
+   * shows up the same way: the tree says the machine is closed while a desktop
+   * is on screen.
+   */
+  it('tells the store which desktop it is holding, so the tree can light up', async () => {
+    useStore.setState({
+      sessions: [],
+      gitFolderTrees: [tree],
+      gitFolderOverrides: [],
+      inventoryTrees: [],
+      inventoryOverrides: [],
+      workspaces: [
+        {
+          id: 'w1',
+          title: 'w',
+          activeTabId: 'tab1',
+          tabs: [{ id: 'tab1', title: 't', activePaneId: leaf.id, root: leaf }]
+        }
+      ]
+    })
+    // What a canvas and a live screen need from a browser jsdom does not have.
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe(): void {}
+        disconnect(): void {}
+      }
+    )
+    window.matchMedia = vi.fn(
+      () => ({ addEventListener() {}, removeEventListener() {} }) as unknown as MediaQueryList
+    )
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
+      {} as unknown as CanvasRenderingContext2D
+    )
+    window.td.rdp.settings = vi.fn().mockResolvedValue(null)
+    window.td.rdp.login = vi.fn().mockResolvedValue({ username: 'solonkin_adm', hasPassword: true })
+    window.td.rdp.desktopStart = vi.fn().mockResolvedValue('desktop-1')
+    window.td.rdp.desktopStop = vi.fn().mockResolvedValue(undefined)
+    window.td.rdp.onDesktopEvent = () => () => undefined
+    window.td.rdp.onDesktopFrame = () => () => undefined
+    window.td.rdp.onDesktopCursor = () => () => undefined
+    window.td.ui.onForwardKey = () => () => undefined
+
+    render(<Pane tabId="tab1" node={leaf} />)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'New session' }))
+    await waitFor(() => expect(window.td.rdp.desktopStart).toHaveBeenCalled())
+
+    await waitFor(() => {
+      const root = useStore.getState().workspaces[0].tabs[0].root
+      expect(root.type === 'leaf' && root.desktopId).toBe('desktop-1')
+    })
   })
 
   /** The local override wins over the repository, here as everywhere else. */
