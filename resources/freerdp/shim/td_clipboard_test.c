@@ -71,8 +71,19 @@ int main(void)
 {
 	tdContext td = { 0 };
 	CliprdrClientContext ctx = { 0 };
-	const char* texts[] = { "Notepad text", "Folder name", "Текст с HTML страницы — тест 😀\r\nСтрока 2", "" };
-	ctx.custom = &td;
+	const char* texts[] = { "Notepad text", "Folder name",
+		                    "Текст с HTML страницы — тест 😀\r\nСтрока 2", "" };
+	/*
+	 * Built the way a live session builds it, and not shortened to
+	 * `ctx.custom = &td`. The file helper takes `custom` for itself and keeps
+	 * what it was handed, so every callback reaches this context through it —
+	 * a test that skipped this step would hand the code a `tdContext` where it
+	 * expects a `CliprdrFileContext`, read one as the other, and crash. It did.
+	 */
+	td.clip_system = ClipboardCreate();
+	td.clip_files = cliprdr_file_context_new(&td);
+	assert(td.clip_system && td.clip_files);
+	ctx.custom = td.clip_files;
 	ctx.ClientFormatListResponse = acknowledge;
 	ctx.ClientFormatDataRequest = request_data;
 	ctx.ClientFormatDataResponse = receive_local;
@@ -108,6 +119,8 @@ int main(void)
 	/* An unsolicited response cannot become text. */
 	respond(&ctx, "unsolicited");
 	assert(records == before_records + 1);
+	cliprdr_file_context_free(td.clip_files);
+	ClipboardDestroy(td.clip_system);
 	DeleteCriticalSection(&td.clip);
 	return 0;
 }

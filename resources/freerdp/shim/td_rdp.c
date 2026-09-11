@@ -882,14 +882,28 @@ static void on_channel_connected(void* context, const ChannelConnectedEventArgs*
 
 	if (strcmp(e->name, CLIPRDR_SVC_CHANNEL_NAME) == 0)
 	{
-		td->cliprdr = (CliprdrClientContext*)e->pInterface;
+		CliprdrClientContext* clip = (CliprdrClientContext*)e->pInterface;
 		td->clip_system = ClipboardCreate();
 		td->clip_files = cliprdr_file_context_new(td);
+		/*
+		 * Both or neither, and that is the whole reason this is written as one
+		 * check: everything below reaches this context back through the file
+		 * helper, so a session that has no helper has no way to find itself.
+		 * Half a clipboard would be a null dereference waiting for the first
+		 * copy, and no clipboard is a session that simply does not share one.
+		 */
 		if (!td->clip_system || !td->clip_files)
 		{
-			/* Text still works without either; files are what is lost. */
-			WLog_ERR(TAG, "clipboard: no file support this session");
+			WLog_ERR(TAG, "clipboard: could not start, this session shares none");
+			if (td->clip_files)
+				cliprdr_file_context_free(td->clip_files);
+			if (td->clip_system)
+				ClipboardDestroy(td->clip_system);
+			td->clip_files = NULL;
+			td->clip_system = NULL;
+			return;
 		}
+		td->cliprdr = clip;
 		td->cliprdr->MonitorReady = td_clip_monitor_ready;
 		td->cliprdr->ServerFormatList = td_clip_server_format_list;
 		td->cliprdr->ServerFormatDataRequest = td_clip_server_format_data_request;
@@ -902,7 +916,7 @@ static void on_channel_connected(void* context, const ChannelConnectedEventArgs*
 		 * ranges. `ServerFileContentsResponse` it only claims when built with
 		 * FUSE, which this is not, so the incoming direction stays ours.
 		 */
-		if (td->clip_files && !cliprdr_file_context_init(td->clip_files, td->cliprdr))
+		if (!cliprdr_file_context_init(td->clip_files, td->cliprdr))
 			WLog_ERR(TAG, "clipboard: the file helper refused to start");
 		return;
 	}
