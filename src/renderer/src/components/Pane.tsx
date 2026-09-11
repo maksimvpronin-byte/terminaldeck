@@ -10,6 +10,7 @@ import {
   findTab
 } from '../state/store'
 import { DRAG_MIME, edgeFromPoint, edgeToSplit, type DragItem, type DropEdge } from '../state/dnd'
+import { findHost } from '../state/hosts'
 import TerminalHost from './TerminalHost'
 import { useDocumentVisible } from '../hooks/useDocumentVisible'
 import GraphicalHost, { toggleFullscreen } from './GraphicalHost'
@@ -55,17 +56,27 @@ function Pane({
   const sessionId = node.target.kind === 'session' ? node.target.sessionId : null
   /** A stored account chosen for this pane, in place of the host's own login. */
   const credentialId = node.target.kind === 'session' ? node.target.credentialId : undefined
-  const protocol = useStore((s) =>
-    sessionId ? protocolOf(s.sessions.find((x) => x.id === sessionId)) : 'ssh'
-  )
-  const host = useStore((s) =>
-    sessionId ? s.sessions.find((x) => x.id === sessionId)?.host : undefined
-  )
+  /*
+   * Through `findHost`, which is the only lookup that knows about the hosts
+   * this app did not save itself.
+   *
+   * These three read `sessions` directly, and `sessions` is what somebody typed
+   * into the Sessions tab — a host mirrored from a repository is not in it. So
+   * every such host answered "no profile", and `protocolOf(undefined)` is SSH
+   * by design: a Windows machine from an inventory opened a terminal and dialled
+   * 3389 as SSH, whatever the inventory said about it. The address and the port
+   * were lost the same way, which is why it reached the host at all.
+   *
+   * Each selector returns a primitive on purpose. `findHost` layers the local
+   * override on top and hands back a fresh object every time it is called, and
+   * a selector returning one of those would re-render this pane on every store
+   * change there is.
+   */
+  const protocol = useStore((s) => (sessionId ? protocolOf(findHost(s, sessionId)?.host) : 'ssh'))
+  const host = useStore((s) => (sessionId ? findHost(s, sessionId)?.host.host : undefined))
   // Unset means the protocol's own default, which GraphicalHost fills in. The
   // SSH inheritance chain is not consulted: it resolves to 22.
-  const port = useStore((s) =>
-    sessionId ? s.sessions.find((x) => x.id === sessionId)?.port : undefined
-  )
+  const port = useStore((s) => (sessionId ? findHost(s, sessionId)?.host.port : undefined))
   const traits = traitsOf(protocol)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const [dropEdge, setDropEdge] = useState<DropEdge | null>(null)

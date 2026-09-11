@@ -48,6 +48,14 @@ the other produces a version nobody can install, which is how 0.1.10 through
 
 ### Fixed
 
+- Open a host mirrored from a repository as what it is. A pane read the protocol,
+  the address and the port out of the saved sessions alone, and a host from an
+  inventory is not in that list — so every one of them answered "no such host",
+  which for a protocol means SSH. A Windows machine from a repository therefore
+  opened a terminal and dialled 3389 as SSH however the inventory described it,
+  and the same lookup lost the address and the port on the way. An open desktop
+  pane now also notices a sync or a local override, which it never did for such a
+  host.
 - Stop offering an in-place update on macOS to a build that cannot install one.
   Without a Developer ID the bundle is signed ad-hoc, and Squirrel.Mac replaces
   the application only when the new signature satisfies the running one's

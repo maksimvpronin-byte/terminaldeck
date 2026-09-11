@@ -117,6 +117,17 @@ export default function GraphicalHost({
    */
   const profile = useStore((s) => s.sessions.find((x) => x.id === sessionId))
   const groups = useStore((s) => s.groups)
+  /*
+   * A host mirrored from a repository is in neither of those, so neither of
+   * them ever changed for one and its open pane kept the size it started with.
+   * What changes for such a host is a sync replacing the tree or a local
+   * override being saved — both whole arrays in the store, so watching them
+   * costs a reference comparison and fires exactly when the answer moved.
+   */
+  const gitFolderTrees = useStore((s) => s.gitFolderTrees)
+  const gitFolderOverrides = useStore((s) => s.gitFolderOverrides)
+  const inventoryTrees = useStore((s) => s.inventoryTrees)
+  const inventoryOverrides = useStore((s) => s.inventoryOverrides)
 
   useEffect(() => {
     if (protocol !== 'rdp' || !sessionId) return
@@ -135,10 +146,19 @@ export default function GraphicalHost({
     return () => {
       alive = false
     }
-    /* `profile` and `groups` are triggers rather than inputs: what they would
-       be read for happens in the main process, and listing them is how this
-       learns that a save happened. */
-  }, [protocol, sessionId, profile, groups])
+    /* Every one of these is a trigger rather than an input: what they would be
+       read for happens in the main process, and listing them is how this learns
+       that a save, or a sync, happened. */
+  }, [
+    protocol,
+    sessionId,
+    profile,
+    groups,
+    gitFolderTrees,
+    gitFolderOverrides,
+    inventoryTrees,
+    inventoryOverrides
+  ])
 
   /**
    * Who this host logs in as, and whether it has a password saved.
