@@ -6,6 +6,32 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.15.0
+
+### Changed
+
+- A host's colour is the ground its row stands on, not a dot beside it: a wash of
+  the colour across the row and a 3px edge down its left side. The edge survives
+  selection, which paints over the wash — the row you just clicked is the one you
+  were hunting for by colour, and it must not lose it at the moment of being
+  found. The wash is deliberately faint: at full strength a tree with half its
+  hosts coloured reads as a striped blanket.
+- The slot the dot left now says what a row *is*: a terminal window for SSH, a
+  monitor for RDP, drawn rather than typed. It is the first thing worth knowing
+  about a Windows machine in a list of Linux ones, and until now the tree did not
+  say it anywhere. Both trees, Sessions and Inventory.
+
+### Fixed
+
+- Open a host mirrored from a repository as what it is. A pane read the protocol,
+  the address and the port out of the saved sessions alone, and a host from an
+  inventory is not in that list — so every one of them answered "no such host",
+  which for a protocol means SSH. A Windows machine from a repository therefore
+  opened a terminal and dialled 3389 as SSH however the inventory described it,
+  and the same lookup lost the address and the port on the way, which is the only
+  reason it reached the host at all. An open desktop pane now also notices a sync
+  or a local override, which it never did for such a host.
+
 ## 0.14.0
 
 ### Added
@@ -48,14 +74,6 @@ the other produces a version nobody can install, which is how 0.1.10 through
 
 ### Fixed
 
-- Open a host mirrored from a repository as what it is. A pane read the protocol,
-  the address and the port out of the saved sessions alone, and a host from an
-  inventory is not in that list — so every one of them answered "no such host",
-  which for a protocol means SSH. A Windows machine from a repository therefore
-  opened a terminal and dialled 3389 as SSH however the inventory described it,
-  and the same lookup lost the address and the port on the way. An open desktop
-  pane now also notices a sync or a local override, which it never did for such a
-  host.
 - Stop offering an in-place update on macOS to a build that cannot install one.
   Without a Developer ID the bundle is signed ad-hoc, and Squirrel.Mac replaces
   the application only when the new signature satisfies the running one's
