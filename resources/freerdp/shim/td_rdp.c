@@ -803,6 +803,7 @@ static UINT td_clip_answer_files(CliprdrClientContext* ctx, tdContext* td)
 	UINT32 wire_size = 0;
 	char* uris = NULL;
 	char why[192] = "Nothing is copied on this computer";
+	char where[200] = "";
 	UINT rc;
 
 	EnterCriticalSection(&td->clip);
@@ -849,17 +850,31 @@ static UINT td_clip_answer_files(CliprdrClientContext* ctx, tdContext* td)
 		}
 		ClipboardUnlock(td->clip_system);
 	}
+	/*
+	 * The first path, kept for the message. Whatever is wrong is a property of
+	 * one of these paths — a share, a name Windows will not have, a file that
+	 * has since gone — and the person who can see that is reading a
+	 * notification on the machine the paths belong to.
+	 */
+	if (uris)
+	{
+		const size_t line = strcspn(uris, "\r\n");
+		const size_t room = sizeof(where) - 1;
+		(void)snprintf(where, sizeof(where), "%.*s", (int)(line < room ? line : room), uris);
+	}
 	free(uris);
 
 	WLog_INFO(TAG, "clipboard: the far end wants the file list, %u byte(s)", (unsigned)wire_size);
 
 	if (!wire)
 	{
-		char escaped[512];
+		char escaped[512], escaped_where[512];
 
-		WLog_ERR(TAG, "clipboard: %s", why);
-		td_event("{\"e\":\"clipboard-transfer\",\"state\":\"error\",\"detail\":\"%s\"}",
-		         td_json_escape(escaped, sizeof(escaped), why));
+		WLog_ERR(TAG, "clipboard: %s (%s)", why, where);
+		td_event("{\"e\":\"clipboard-transfer\",\"state\":\"error\",\"detail\":\"%s\","
+		         "\"where\":\"%s\"}",
+		         td_json_escape(escaped, sizeof(escaped), why),
+		         td_json_escape(escaped_where, sizeof(escaped_where), where));
 		response.common.msgFlags = CB_RESPONSE_FAIL;
 		return ctx->ClientFormatDataResponse(ctx, &response);
 	}

@@ -6,6 +6,22 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.15.7
+
+### Fixed
+
+- Copy a file from a network share into a desktop. The path was written the way
+  the standard writes it — the share as the URI's authority — and the RDP client
+  accepts an empty authority and nothing else, so it refused the whole list
+  before looking at the file. Shares are now named as an absolute path, which is
+  the same location by another spelling.
+
+### Changed
+
+- A copy that fails names the path it failed on. The reason alone leaves four
+  possible causes standing, and the only person who can tell them apart is
+  reading a notification on the machine the files live on.
+
 ## 0.15.6
 
 ### Fixed

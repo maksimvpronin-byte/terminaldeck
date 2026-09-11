@@ -5,6 +5,7 @@ import RemoteScreen from './RemoteScreen'
 import { PTR } from '../../../shared/rdpInput'
 
 let frame: Parameters<typeof window.td.rdp.onDesktopFrame>[1]
+let event: Parameters<typeof window.td.rdp.onDesktopEvent>[1]
 const putImageData = vi.fn()
 const desktopSend = vi.fn()
 beforeEach(() => {
@@ -41,7 +42,10 @@ beforeEach(() => {
     return () => undefined
   }
   window.td.rdp.onDesktopCursor = () => () => undefined
-  window.td.rdp.onDesktopEvent = () => () => undefined
+  window.td.rdp.onDesktopEvent = (_id, cb) => {
+    event = cb
+    return () => undefined
+  }
   window.td.ui.onForwardKey = () => () => undefined
 })
 
@@ -120,5 +124,39 @@ describe('background desktops', () => {
       ['desktop', { a: 'mouse', flags: PTR.wheel | 120, x: 100, y: 100 }]
     ])
     view.unmount()
+  })
+})
+
+describe('a file copy that failed', () => {
+  /**
+   * The reason is translated and the path is not, and both have to survive:
+   * this notification is the whole of what anyone will see, on a machine
+   * nobody can attach a debugger to, and a reason without the path it is about
+   * names four possible causes instead of one.
+   */
+  it('shows the reason and the path the client named', async () => {
+    const view = render(
+      <RemoteScreen
+        sessionId="host"
+        look={null}
+        onPhase={vi.fn()}
+        onNotice={vi.fn()}
+        onMeasured={vi.fn()}
+        visible
+      />
+    )
+    await act(async () => {})
+    await act(async () => {
+      event({
+        e: 'clipboard-transfer',
+        state: 'error',
+        detail: 'Cannot open the copied files on this computer',
+        where: 'file:////server/share/a.txt'
+      })
+    })
+
+    const shown = view.container.textContent ?? ''
+    expect(shown).toContain('file:////server/share/a.txt')
+    expect(shown).toContain('Cannot open the copied files on this computer')
   })
 })

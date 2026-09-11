@@ -63,8 +63,26 @@ function native(action: 'read' | 'write', paths?: string[], version?: string): P
   })
 }
 
+/**
+ * The file list as the RDP client's parser will read it back.
+ *
+ * `pathToFileURL` writes a share as `file://server/share/file`, putting the
+ * server in the authority field — which is correct, and which FreeRDP refuses:
+ * it accepts an empty authority and nothing else, so a file copied from a
+ * network share failed with the host unable to say why. An empty authority
+ * followed by the share as an absolute path — `file:////server/share/file` —
+ * is the same location, survives that parser, and Windows turns the leading
+ * pair of slashes back into a UNC path when it opens the file.
+ *
+ * Split out from the walk over the paths because only Windows produces an
+ * authority to move, and the tests do not run there.
+ */
+export function withEmptyAuthority(href: string): string {
+  return href.startsWith('file:///') ? href : `file://${href.slice('file:'.length)}`
+}
+
 export function pathsToUris(paths: string[]): string {
-  return paths.map((p) => pathToFileURL(p).href).join('\r\n')
+  return paths.map((p) => withEmptyAuthority(pathToFileURL(p).href)).join('\r\n')
 }
 
 export interface FileClipboardSnapshot {

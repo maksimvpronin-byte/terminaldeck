@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useT } from '../i18n'
+import { useT, type Translate } from '../i18n'
 import { desktopSizeFor, type DesktopSize } from '../../../shared/desktopSize'
 import { buttonEvent, PTR, wheelFlags, wheelTurns } from '../../../shared/rdpInput'
 import { rdpKeyFor, substituteCommand, unicodeKey } from '../../../shared/rdpScancodes'
@@ -90,6 +90,20 @@ const RESIZE_SETTLE = 250
  * `Uint8ClampedArray` means `Uint8ClampedArray<ArrayBufferLike>`, which throws
  * away the very narrowing the cast below performs.
  */
+/**
+ * Why a file copy failed, and which path it was about.
+ *
+ * Two lines, because only the first is a phrase-book key: it has to match to
+ * the character to be translated at all, and a path never translates. The
+ * client sends the path because the four things that can go wrong here are all
+ * properties of one — a share, a name Windows will not have, a file that has
+ * gone — and none of them is guessable from the sentence alone.
+ */
+function explainFailure(t: Translate, text: string): string {
+  const [reason, where] = text.split('\n')
+  return where ? `${t(reason)} — ${where}` : t(reason)
+}
+
 function asPixels(bytes: Uint8Array): Uint8ClampedArray<ArrayBuffer> {
   return new Uint8ClampedArray(bytes.buffer as ArrayBuffer, bytes.byteOffset, bytes.byteLength)
 }
@@ -480,7 +494,9 @@ export default function RemoteScreen({
                   : state === 'ready'
                     ? 'ready'
                     : state === 'error'
-                      ? `error:${String(event.detail ?? '')}`
+                      ? `error:${String(event.detail ?? '')}${
+                          event.where ? `\n${String(event.where)}` : ''
+                        }`
                       : `progress:${Number(event.total) > 0 ? Math.floor((Number(event.received) / Number(event.total)) * 100) : 0}`
               )
             } else if (what === 'connected' || what === 'size') {
@@ -989,7 +1005,7 @@ export default function RemoteScreen({
             : clipboardStatus === 'ready'
               ? t('Files ready to paste')
               : clipboardStatus.startsWith('error:')
-                ? `${t('File copy failed')}: ${t(clipboardStatus.slice(6))}`
+                ? `${t('File copy failed')}: ${explainFailure(t, clipboardStatus.slice(6))}`
                 : `${t('Receiving clipboard files')} ${clipboardStatus.slice(9)}%`}
           <button
             aria-label={t('Close')}
