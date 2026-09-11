@@ -426,6 +426,8 @@ const api = {
     download: (): Promise<void> => ipcRenderer.invoke(IPC.updateDownload),
     // Takes no address: which page opens is decided in main, not here.
     openPage: (): Promise<void> => ipcRenderer.invoke(IPC.updateOpenPage),
+    /** The newest version the update feed names, or null if it could not say. */
+    check: (): Promise<string | null> => ipcRenderer.invoke(IPC.updateCheck),
     install: (): Promise<void> => ipcRenderer.invoke(IPC.updateInstall),
     onState: (cb: (state: UpdateState) => void): (() => void) => {
       const listener = (_e: unknown, state: UpdateState): void => cb(state)

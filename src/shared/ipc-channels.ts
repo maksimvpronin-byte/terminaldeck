@@ -165,6 +165,8 @@ export const IPC = {
   updateDownload: 'update:download',
   /** Sends a build that cannot install an update to the downloads in a browser. */
   updateOpenPage: 'update:openPage',
+  /** Asks now rather than waiting for the hour; answers with the version seen. */
+  updateCheck: 'update:check',
   updateInstall: 'update:install',
   /** main -> renderer */
   updateState: 'update:state',

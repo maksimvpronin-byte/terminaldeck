@@ -6,6 +6,31 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.15.1
+
+### Fixed
+
+- Ask for updates again while the application is running. It asked once, at
+  startup, so a copy left open across a release never heard about it — which on
+  a machine nobody reboots means never, and is why 0.15.0 was published and
+  nothing offered it. It asks on the hour now, and stops asking while there is
+  already an answer to act on: re-announcing an update somebody left for later
+  is noise, and asking mid-download would interrupt it.
+- Give a host's name back the width an invisible button was holding. An Edit
+  button sat at the right end of every row in the Sessions tree, hidden until
+  the row was hovered and laid out regardless — which is what `visibility:
+  hidden` does — so every name ended in an ellipsis with visible empty space
+  after it. Forty pixels a row for a host, sixty for a folder, where Sync with
+  git and New subgroup sat. All three have been in the context menu all along,
+  and deleting was only ever there. A folder still says when a sync is running:
+  an ellipsis beside its name, which is what the button turned into.
+
+### Added
+
+- **Check for updates** in Settings → Backup, beside the version this build
+  calls itself. It answers either way — a check by hand that says nothing when
+  the news is good reads as a broken button.
+
 ## 0.15.0
 
 ### Changed
@@ -30,14 +55,6 @@ the other produces a version nobody can install, which is how 0.1.10 through
   SFTP, tunnels, monitoring and broadcast all write over — and a new pane opts
   into broadcast by default, so an RDP session id in that list would be typed
   into.
-- Give a host's name back the width an invisible button was holding. An Edit
-  button sat at the right end of every row in the Sessions tree, hidden until
-  the row was hovered and laid out regardless — which is what `visibility:
-  hidden` does — so every name ended in an ellipsis with visible empty space
-  after it. Forty pixels a row for a host, sixty for a folder, where Sync with
-  git and New subgroup sat. All three have been in the context menu all along,
-  and deleting was only ever there. A folder still says when a sync is running:
-  an ellipsis beside its name, which is what the button turned into.
 - Tighten the tree's indentation, which compounded faster than it looked: a base
   of 8, a step of 12 and a whole extra step for a host put a name 58px into a
   260px panel three levels down, with nothing left to read it in. The base is 4,

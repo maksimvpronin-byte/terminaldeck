@@ -15,6 +15,17 @@ import type { UpdateState } from '../shared/types'
 const RELEASES = 'https://github.com/maksimvpronin-byte/terminaldeck/releases/latest'
 
 /**
+ * How often a running application asks again.
+ *
+ * It asked once, at startup, and that is not often enough for anything: a copy
+ * left open across a release never hears about it, which on a machine somebody
+ * does not reboot means never. An hour is frequent enough that a release
+ * reaches people the day it is published and rare enough to be invisible — one
+ * HTTPS request for a few hundred bytes of YAML.
+ */
+const RECHECK_MS = 60 * 60 * 1000
+
+/**
  * Whether this build can replace itself, asked of the bundle it is running from.
  * The rule itself lives beside the marker it reads, where a test can reach it —
  * this module imports Electron and cannot be loaded outside it.
@@ -50,6 +61,21 @@ export function registerUpdater(win: BrowserWindow): void {
   // is this side's to know. Nothing on the page picks where the browser lands.
   ipcMain.handle(IPC.updateOpenPage, () => shell.openExternal(RELEASES))
 
+  /**
+   * Asked for by hand, and answering with the version found rather than with
+   * nothing.
+   *
+   * The events say what to *do* about an update; this says what was seen, so a
+   * settings screen can tell "checked, nothing newer" from "checked, and the
+   * banner above is about it". Without it a manual check is a button that
+   * appears to do nothing whenever the answer is good news.
+   */
+  ipcMain.handle(IPC.updateCheck, async () => {
+    if (is.dev) return null
+    const found = await autoUpdater.checkForUpdates()
+    return found?.updateInfo?.version ?? null
+  })
+
   ipcMain.handle(IPC.updateInstall, () => {
     // Quits the app and relaunches into the new version.
     autoUpdater.quitAndInstall()
@@ -81,7 +107,20 @@ export function registerUpdater(win: BrowserWindow): void {
     publish(win, { status: 'error', message: err.message })
   })
 
-  autoUpdater.checkForUpdates().catch((err: Error) => {
-    publish(win, { status: 'error', message: err.message })
-  })
+  const ask = (): void => {
+    autoUpdater.checkForUpdates().catch((err: Error) => {
+      publish(win, { status: 'error', message: err.message })
+    })
+  }
+
+  ask()
+  /*
+   * And again, on the hour, unless there is already an answer to act on.
+   * Re-announcing an update somebody has seen and left for later is noise, and
+   * asking while one is downloading would interrupt it.
+   */
+  const timer = setInterval(() => {
+    if (state.status === 'idle' || state.status === 'error') ask()
+  }, RECHECK_MS)
+  timer.unref?.()
 }

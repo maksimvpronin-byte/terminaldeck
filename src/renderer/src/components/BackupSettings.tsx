@@ -13,6 +13,35 @@ export default function BackupSettings(): JSX.Element {
   const loadCollections = useStore((s) => s.loadCollections)
   const loadCredentials = useStore((s) => s.loadCredentials)
 
+  const [checking, setChecking] = useState(false)
+  /** What the last manual check found, said out loud — see below. */
+  const [checked, setChecked] = useState('')
+
+  /**
+   * A check by hand, which has to answer even when the answer is "nothing".
+   *
+   * The banner at the top of the window speaks when there is something to do
+   * about an update and stays silent otherwise, which is right for a check
+   * nobody asked for and wrong for one somebody just pressed a button for: a
+   * button that does nothing visible reads as a broken button.
+   */
+  async function checkForUpdate(): Promise<void> {
+    setChecking(true)
+    setChecked('')
+    try {
+      const found = await window.td.updates.check()
+      setChecked(
+        !found || found === window.td.appVersion
+          ? t('This is the newest version.')
+          : t('Version {version} is available.', { version: found })
+      )
+    } catch (err) {
+      setChecked(String((err as Error).message ?? err))
+    } finally {
+      setChecking(false)
+    }
+  }
+
   // Off by default: an export leaves the machine and the OS account that
   // protects the vault, so including credentials must be a deliberate choice.
   const [includeSecrets, setIncludeSecrets] = useState(false)
@@ -158,6 +187,23 @@ export default function BackupSettings(): JSX.Element {
 
       {error && <span className="error-text">{error}</span>}
       {done && <span className="success-text">{done}</span>}
+
+      <h3 className="settings-heading">
+        <Hint label={t('Updates')}>
+          {t(
+            'Asked for on the hour while the application runs, and at every start. This is the same question asked now, for when a release has just gone out.'
+          )}
+        </Hint>
+      </h3>
+      <p className="settings-note">
+        {t('This is version {version}.', { version: window.td.appVersion })}
+      </p>
+      <div>
+        <button onClick={checkForUpdate} disabled={checking}>
+          {checking ? t('Checking…') : t('Check for updates')}
+        </button>
+      </div>
+      {checked && <span className="success-text">{checked}</span>}
     </>
   )
 }

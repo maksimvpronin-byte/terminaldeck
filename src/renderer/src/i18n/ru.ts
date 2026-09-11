@@ -574,6 +574,13 @@ export const ru: Record<string, string> = {
 
   // Update banner
   'Version {version} is available.': 'Доступна версия {version}.',
+  Updates: 'Обновления',
+  'Asked for on the hour while the application runs, and at every start. This is the same question asked now, for when a release has just gone out.':
+    'Спрашивается раз в час, пока приложение работает, и при каждом запуске. Эта кнопка задаёт тот же вопрос сейчас — на случай, когда релиз только что вышел.',
+  'This is version {version}.': 'Это версия {version}.',
+  'Check for updates': 'Проверить обновления',
+  'Checking…': 'Проверяю…',
+  'This is the newest version.': 'Установлена новейшая версия.',
   'Version {version} is out. This build cannot install it over itself.':
     'Вышла версия {version}. Эта сборка не может установить её поверх себя.',
   'Open the downloads': 'Открыть загрузки',
