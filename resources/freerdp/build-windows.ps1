@@ -131,6 +131,22 @@ if (-not (Test-Path $src)) {
   Write-Host "already at $src"
 }
 
+# WinPR 3.31 opens clipboard files exclusively. A file already open for reading
+# (for example by Explorer preview) then fails after its descriptor was sent.
+# Keep writers excluded, but permit concurrent readers. Check the exact source
+# so a FreeRDP upgrade cannot silently omit this fix.
+$clipboardSource = Join-Path $src 'winpr\libwinpr\clipboard\synthetic_file.c'
+$clipboardCode = [System.IO.File]::ReadAllText($clipboardSource)
+$exclusiveRead = 'CreateFileW(file->local_name, GENERIC_READ, 0, nullptr, OPEN_EXISTING,'
+$sharedRead = 'CreateFileW(file->local_name, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,'
+if ($clipboardCode.Contains($exclusiveRead)) {
+  [System.IO.File]::WriteAllText($clipboardSource, $clipboardCode.Replace($exclusiveRead, $sharedRead), [System.Text.UTF8Encoding]::new($false))
+  # The installed WinPR DLL also needs rebuilding, even for a shim-only request.
+  $ShimOnly = $false
+} elseif (-not $clipboardCode.Contains($sharedRead)) {
+  Die 'FreeRDP clipboard reader changed: review the shared-read fix before building'
+}
+
 # ------------------------------------------------------------------ the build
 $toolchain = Join-Path $vcpkg 'scripts\buildsystems\vcpkg.cmake'
 
@@ -223,4 +239,3 @@ starts it; see src\main\rdp\FreeRdpBridge.ts.
 Before packaging, run bundle-windows.ps1 — it puts the DLLs beside the
 executable, which is where Windows looks for them.
 "@
-

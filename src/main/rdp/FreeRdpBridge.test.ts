@@ -111,6 +111,21 @@ afterEach(() => {
 })
 
 describe('file clipboard coordination', () => {
+  it('forwards a native upload failure to the session UI without ending the session', () => {
+    const { session } = stubSession()
+    const send = vi.fn()
+    session.window = { isDestroyed: () => false, webContents: { send } }
+    session.ready = true
+    const event = {
+      e: 'clipboard-transfer',
+      state: 'error',
+      detail: 'Cannot read local file contents (error 32)'
+    }
+    innards().receive('upload', session, 1, Buffer.from(JSON.stringify(event)))
+    expect(send).toHaveBeenCalledWith(expect.any(String), event)
+    expect(session.ready).toBe(true)
+    expect(session.stopping).toBeUndefined()
+  })
   it('offers files that were copied before the desktop connected', async () => {
     const { session, written } = stubSession()
     session.ready = true

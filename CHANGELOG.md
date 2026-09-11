@@ -6,6 +6,23 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.15.5
+
+### Fixed
+
+- Send a file to a desktop that something here already has open. WinPR opens a
+  file it is about to put on the clipboard with no sharing at all, so a file
+  Explorer was previewing — or an editor was holding — failed *after* its
+  descriptor had been sent, which reads as a paste that half worked. The Windows
+  build now permits other readers while still excluding writers, and refuses to
+  build at all if FreeRDP's own code has moved out from under the change, so an
+  upgrade cannot drop it quietly. The shim's test opens the file first and then
+  asks for it, which is the case that used to fail.
+- Say when sending a file fails instead of failing silently. Three paths that
+  serve a local file's size or contents answered the far end with a refusal and
+  told nobody: a paste in the session did nothing, with no reason anywhere. They
+  reach the pane now, as the transfer status already did.
+
 ## 0.15.4
 
 ### Added

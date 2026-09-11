@@ -155,6 +155,18 @@ static void file_transfers(tdContext* td, CliprdrClientContext* ctx)
 	request.nPositionLow = 3;
 	request.cbRequested = 4;
 	assert(td_clip_local_request(ctx, &request) == CHANNEL_RC_OK);
+#ifdef _WIN32
+	/* Explorer preview and other readers must not prevent sending the bytes.
+	 * Unpatched WinPR opens with share mode zero and fails this request. */
+	WCHAR* wide_path = ConvertUtf8ToWCharAlloc(path, NULL);
+	assert(wide_path);
+	HANDLE reader = CreateFileW(wide_path, GENERIC_READ, FILE_SHARE_READ, NULL,
+	                            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	free(wide_path);
+	assert(reader != INVALID_HANDLE_VALUE);
+	assert(td_clip_local_request(ctx, &request) == CHANNEL_RC_OK);
+	assert(CloseHandle(reader));
+#endif
 	free(td->clip_uris);
 	td->clip_uris = NULL;
 	assert(remove(path) == 0);

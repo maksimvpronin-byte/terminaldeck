@@ -804,6 +804,7 @@ static UINT td_clip_answer_files(CliprdrClientContext* ctx, tdContext* td)
 
 	if (!wire)
 	{
+		td_event("{\"e\":\"clipboard-transfer\",\"state\":\"error\",\"detail\":\"Cannot prepare local files for RDP clipboard\"}");
 		response.common.msgFlags = CB_RESPONSE_FAIL;
 		return ctx->ClientFormatDataResponse(ctx, &response);
 	}
@@ -882,7 +883,7 @@ static UINT td_clip_size_ok(wClipboardDelegate* delegate, const wClipboardFileSi
 }
 static UINT td_clip_size_fail(wClipboardDelegate* delegate, const wClipboardFileSizeRequest* request, UINT error)
 {
-	(void)error;
+	td_event("{\"e\":\"clipboard-transfer\",\"state\":\"error\",\"detail\":\"Cannot read local file size (error %u)\"}", error);
 	return td_clip_local_reply(delegate->custom, request->streamId, NULL, 0, CB_RESPONSE_FAIL);
 }
 static UINT td_clip_range_ok(wClipboardDelegate* delegate, const wClipboardFileRangeRequest* request, const BYTE* data, UINT32 size)
@@ -891,7 +892,7 @@ static UINT td_clip_range_ok(wClipboardDelegate* delegate, const wClipboardFileR
 }
 static UINT td_clip_range_fail(wClipboardDelegate* delegate, const wClipboardFileRangeRequest* request, UINT error)
 {
-	(void)error;
+	td_event("{\"e\":\"clipboard-transfer\",\"state\":\"error\",\"detail\":\"Cannot read local file contents (error %u)\"}", error);
 	return td_clip_local_reply(delegate->custom, request->streamId, NULL, 0, CB_RESPONSE_FAIL);
 }
 static UINT td_clip_local_request(CliprdrClientContext* ctx, const CLIPRDR_FILE_CONTENTS_REQUEST* request)
@@ -917,7 +918,11 @@ static UINT td_clip_local_request(CliprdrClientContext* ctx, const CLIPRDR_FILE_
 		rc = delegate->ClientRequestFileRange(delegate, &range);
 	}
 	ClipboardUnlock(td->clip_system);
-	if (rc != CHANNEL_RC_OK) return td_clip_local_reply(td, request->streamId, NULL, 0, CB_RESPONSE_FAIL);
+	if (rc != CHANNEL_RC_OK)
+	{
+		td_event("{\"e\":\"clipboard-transfer\",\"state\":\"error\",\"detail\":\"Local file request failed (error %u)\"}", rc);
+		return td_clip_local_reply(td, request->streamId, NULL, 0, CB_RESPONSE_FAIL);
+	}
 	return CHANNEL_RC_OK;
 }
 
