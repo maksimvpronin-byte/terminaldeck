@@ -6,6 +6,44 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.15.2
+
+### Fixed
+
+- Read what the far end put on its clipboard as the format we asked for, not as
+  the format it last asked *us* for. `lastRequestedFormatId` belongs to the
+  channel and is set in one place only — when the server requests data from the
+  client — so using it to decode the server's *answer* read one direction's
+  state for the other's. Before the remote had ever asked us for anything it is
+  zero, which is not `CF_UNICODETEXT`, so the very first copy from a session was
+  decoded as bytes: UTF-16 travelled up as if it were text, came back as
+  mojibake, and pasting it into the session showed a space, a box, a digit, a
+  box. The client tracks its own outstanding request now, and keeps one in
+  flight at a time — a format data response carries no format id, so two of them
+  cannot be told apart. A newer offer arriving mid-request replaces what is
+  fetched rather than racing it, and a response nobody asked for is dropped.
+- Let go of everything hanging off a connection when the shell ends on its own.
+  The SFTP channels, the remote edits, the monitor and the forwarded ports were
+  released only when somebody closed the pane by hand; `exit`, or a dropped
+  link, left all four behind. The forwarded port is the one with teeth: it went
+  on listening, bound to a connection that no longer existed, so it forwarded
+  nothing and the next attempt to open the same tunnel was refused the address.
+- Carry the password an RD Gateway keeps in a backup. The export collected
+  `secretRef` and not `gatewaySecretRef`, so the field travelled and the secret
+  behind it did not — and a restored host said "saved on this host" about a
+  password the vault had never heard of. Lost while claiming otherwise is the
+  version nobody goes looking for until the gateway refuses them.
+- Say nothing to a window that is not listening yet. A connection's channels are
+  named after its id, and the renderer only learns the id when `connect`
+  resolves, so everything sent in between went to a channel nobody was on and
+  Electron dropped it. The shell's greeting went that way now and then; the
+  message about a tunnel that failed to come up went that way every time, since
+  it is sent while `connect` is still working. The session holds its first words
+  until the window says it has subscribed, delivers them in the order they were
+  said — including to a window that only asks after the connection has already
+  died, where what was held is the reason it died — and gives up waiting after
+  five seconds, in case no window ever speaks.
+
 ## 0.15.1
 
 ### Fixed
