@@ -19,7 +19,10 @@ export const RECORD = {
   cursor: 3,
   cursorState: 4,
   /** What the far end put on its clipboard, UTF-8, no header of its own. */
-  clipboard: 5
+  clipboard: 5,
+  clipboardFiles: 6,
+  clipboardChunk: 7,
+  clipboardReset: 8
 } as const
 
 const HEADER = 5

@@ -5,14 +5,23 @@
 #undef td_write_record
 #undef main
 #include <assert.h>
+#ifdef _WIN32
+#include <direct.h>
+#define getcwd _getcwd
+#else
+#include <unistd.h>
+#endif
 
 static char captured[1024];
 static size_t captured_length;
 static unsigned records, requests;
 static UINT32 requested;
+static uint8_t captured_type;
 int capture_record(uint8_t type, const void* payload, size_t length)
 {
-	assert(type == TD_REC_CLIPBOARD && length < sizeof(captured));
+	if (type == TD_REC_CLIP_RESET) return 1;
+	assert(length < sizeof(captured));
+	captured_type = type;
 	memcpy(captured, payload, length);
 	captured[length] = 0;
 	captured_length = length;
@@ -70,6 +79,109 @@ static UINT receive_local(CliprdrClientContext* ctx, const CLIPRDR_FORMAT_DATA_R
 	free(decoded);
 	return CHANNEL_RC_OK;
 }
+static UINT capabilities(CliprdrClientContext* ctx, const CLIPRDR_CAPABILITIES* caps)
+{
+	(void)ctx;
+	const CLIPRDR_GENERAL_CAPABILITY_SET* set = (const CLIPRDR_GENERAL_CAPABILITY_SET*)caps->capabilitySets;
+	assert(set->generalFlags & CB_STREAM_FILECLIP_ENABLED);
+	assert(set->generalFlags & CB_FILECLIP_NO_FILE_PATHS);
+	return CHANNEL_RC_OK;
+}
+static UINT offered(CliprdrClientContext* ctx, const CLIPRDR_FORMAT_LIST* list)
+{
+	(void)ctx; (void)list;
+	return CHANNEL_RC_OK;
+}
+static UINT file_list_response(CliprdrClientContext* ctx, const CLIPRDR_FORMAT_DATA_RESPONSE* response)
+{
+	(void)ctx;
+	assert(response->common.msgFlags == CB_RESPONSE_OK);
+	FILEDESCRIPTORW* descriptors = NULL;
+	UINT32 count = 0;
+	assert(cliprdr_parse_file_list(response->requestedFormatData, response->common.dataLen,
+	                             &descriptors, &count) == CHANNEL_RC_OK);
+	assert(count == 1 && descriptors[0].nFileSizeLow == 10);
+	free(descriptors);
+	return CHANNEL_RC_OK;
+}
+static UINT local_file_bytes(CliprdrClientContext* ctx, const CLIPRDR_FILE_CONTENTS_RESPONSE* response)
+{
+	(void)ctx;
+	assert(response->common.msgFlags == CB_RESPONSE_OK);
+	assert(response->streamId == 17 && response->cbRequested == 4);
+	assert(memcmp(response->requestedData, "3456", 4) == 0);
+	return CHANNEL_RC_OK;
+}
+static void file_transfers(tdContext* td, CliprdrClientContext* ctx)
+{
+	td->cliprdr = ctx;
+	assert(cliprdr_file_context_init(td->clip_files, ctx));
+	assert(cliprdr_file_context_set_locally_available(td->clip_files, TRUE));
+	ctx->ClientCapabilities = capabilities;
+	ctx->ClientFormatList = offered;
+	assert(td_clip_monitor_ready(ctx, NULL) == CHANNEL_RC_OK);
+	CLIPRDR_GENERAL_CAPABILITY_SET general = { 0 };
+	general.capabilitySetType = CB_CAPSTYPE_GENERAL;
+	general.capabilitySetLength = CB_CAPSTYPE_GENERAL_LEN;
+	general.generalFlags = CB_STREAM_FILECLIP_ENABLED | CB_FILECLIP_NO_FILE_PATHS;
+	CLIPRDR_CAPABILITIES caps = { 0 };
+	caps.cCapabilitiesSets = 1;
+	caps.capabilitySets = (CLIPRDR_CAPABILITY_SET*)&general;
+	assert(td_clip_caps(ctx, &caps) == CHANNEL_RC_OK);
+	assert(cliprdr_file_context_current_flags(td->clip_files) & CB_STREAM_FILECLIP_ENABLED);
+
+	char temp[4096], path[4200];
+	assert(getcwd(temp, sizeof(temp)));
+	snprintf(path, sizeof(path), "%s/td-clipboard-test-%%20.tmp", temp);
+	FILE* file = fopen(path, "wbx");
+	assert(file && fwrite("0123456789", 1, 10, file) == 10);
+	fclose(file);
+	char uri[4300];
+	for (char* ch = path; *ch; ch++) if (*ch == '\\') *ch = '/';
+	size_t used = (size_t)snprintf(uri, sizeof(uri), "file://%s", path[0] == '/' ? "" : "/");
+	for (const char* ch = path; *ch; ch++)
+	{
+		if (*ch == '%') { memcpy(uri + used, "%25", 3); used += 3; }
+		else { uri[used++] = *ch; }
+	}
+	uri[used] = 0;
+	td->clip_uris = _strdup(uri);
+	ctx->ClientFormatDataResponse = file_list_response;
+	assert(td_clip_answer_files(ctx, td) == CHANNEL_RC_OK);
+	ctx->ClientFileContentsResponse = local_file_bytes;
+	CLIPRDR_FILE_CONTENTS_REQUEST request = { 0 };
+	request.streamId = 17;
+	request.dwFlags = FILECONTENTS_RANGE;
+	request.nPositionLow = 3;
+	request.cbRequested = 4;
+	assert(td_clip_local_request(ctx, &request) == CHANNEL_RC_OK);
+	free(td->clip_uris);
+	td->clip_uris = NULL;
+	assert(remove(path) == 0);
+
+	CLIPRDR_FORMAT formats[] = { { CF_UNICODETEXT, NULL }, { 49201, "FileGroupDescriptorW" } };
+	CLIPRDR_FORMAT_LIST list = { 0 };
+	list.numFormats = 2;
+	list.formats = formats;
+	assert(td_clip_server_format_list(ctx, &list) == CHANNEL_RC_OK);
+	assert(requested == 49201);
+	const BYTE manifest[] = { 0, 0, 0, 0 };
+	CLIPRDR_FORMAT_DATA_RESPONSE response = { 0 };
+	response.common.msgFlags = CB_RESPONSE_OK;
+	response.common.dataLen = sizeof(manifest);
+	response.requestedFormatData = manifest;
+	assert(td_clip_server_format_data_response(ctx, &response) == CHANNEL_RC_OK);
+	assert(captured_type == TD_REC_CLIP_FILES && captured_length == 4);
+	CLIPRDR_FILE_CONTENTS_RESPONSE chunk = { 0 };
+	chunk.streamId = 17;
+	chunk.common.msgFlags = CB_RESPONSE_OK;
+	chunk.cbRequested = 4;
+	chunk.requestedData = (const BYTE*)"3456";
+	assert(td_clip_file_response(ctx, &chunk) == CHANNEL_RC_OK);
+	assert(captured_type == TD_REC_CLIP_CHUNK && captured_length == 12);
+	assert(captured[0] == 17 && captured[4] == 1 && memcmp(captured + 8, "3456", 4) == 0);
+	assert(cliprdr_file_context_uninit(td->clip_files, ctx));
+}
 int main(void)
 {
 	tdContext td = { 0 };
@@ -122,6 +234,7 @@ int main(void)
 	/* An unsolicited response cannot become text. */
 	respond(&ctx, "unsolicited");
 	assert(records == before_records + 1);
+	file_transfers(&td, &ctx);
 	cliprdr_file_context_free(td.clip_files);
 	ClipboardDestroy(td.clip_system);
 	DeleteCriticalSection(&td.clip);

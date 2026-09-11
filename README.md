@@ -461,17 +461,13 @@ paths have only ever been exercised by unit tests or by hand on a local stand-in
   trade: the client that asked nothing of the build also had no graphics pipeline, and the
   picture was the thing being paid for. There is now a compiled client, built per platform and
   shipped in the application. See **Desktops** above.
-- **Copying files *out* of a desktop, and everything on a clipboard that is not text or files.**
-  Text crosses both ways and files cross one way — copy them here, paste them there, directories
-  and all — which matters more than it sounds: a desktop pane has no SFTP, since RDP has no shell
-  to hang one off, so the clipboard is the only route a file has onto a Windows machine from here.
-  **Share the clipboard** turns the whole of it off for a host or a group you would rather not hand
-  what you copied. Images, HTML and RTF are more entries in the same format table the text goes
-  through, not a second mechanism. The other file direction is the genuinely hard one: RDP hands
-  files over as a descriptor plus `FileContentsRequest` in pieces, and FreeRDP's own answer to
-  presenting those locally is FUSE, which macOS does not have. Doing it here means downloading
-  each file before knowing whether anyone will paste it, because macOS wants a path to a file that
-  already exists.
+- **Clipboard formats other than text and files.** Text and files (including folders) cross
+  both ways when **Share the clipboard** is enabled. Files copied out of RDP are downloaded
+  to a private temporary directory first; wait for **Files ready to paste** before pasting in
+  Finder or Explorer. A newer copy cancels an unfinished download. Each incoming batch is
+  limited to 10,000 entries and 20 GB; links and unsafe names are refused. Temporary copies
+  are removed when TerminalDeck quits, so paste files you need before closing the app.
+  Images, HTML formatting and RTF are not transferred; HTML pages can still supply plain text.
 - **Joining a session somebody else is already working in.** It was offered until 0.13.2 and has
   been removed. The mechanism goes over RPC and SMB rather than RDP, so no client this app can
   embed speaks it: the picture came from `mstsc` in a window of its own, which this app could

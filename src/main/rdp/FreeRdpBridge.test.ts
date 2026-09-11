@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { PassThrough } from 'stream'
 
 /**
@@ -22,10 +22,23 @@ vi.mock('electron', () => ({
   BrowserWindow: { getAllWindows: () => [] }
 }))
 
+vi.mock('./clipboardFiles', () => ({
+  readFileClipboard: vi.fn(async () => ({ paths: [], version: '1' })),
+  writeClipboardFiles: vi.fn(async () => '2'),
+  pathsToUris: (paths: string[]) => paths.map((p) => `file://${p}`).join('\r\n')
+}))
+const { readFileClipboard, writeClipboardFiles } = await import('./clipboardFiles')
+const { cleanClipboardDownloads } = await import('./ClipboardDownload')
 const { freeRdpBridge } = await import('./FreeRdpBridge')
 
 interface Innards {
   sessions: Map<string, unknown>
+  lastClipboardText: string
+  lastClipboardFiles: string
+  lastClipboardVersion: string
+  nextFilesPoll: number
+  pollClipboard: () => Promise<void>
+  receive: (id: string, session: unknown, type: number, data: Buffer) => void
   write: (id: string, fields: Record<string, unknown>) => void
 }
 
@@ -89,4 +102,45 @@ describe('speaking to a desktop client', () => {
     expect(Buffer.concat(written).toString('utf8')).toContain('hello')
     innards().sessions.delete('d2')
   })
+})
+
+afterEach(() => {
+  cleanClipboardDownloads()
+  vi.clearAllMocks()
+  innards().sessions.clear()
+})
+
+describe('file clipboard coordination', () => {
+  it('offers files that were copied before the desktop connected', async () => {
+    const { session, written } = stubSession()
+    session.ready = true
+    innards().sessions.set('files', session)
+    innards().nextFilesPoll = 0
+    vi.mocked(readFileClipboard).mockResolvedValueOnce({
+      paths: ['/tmp/existing.txt'],
+      version: '10'
+    })
+    await innards().pollClipboard()
+    expect(Buffer.concat(written).toString()).toContain('existing.txt')
+    expect(Buffer.concat(written).toString()).toContain('clipset')
+    expect(session.clipboardSeeded).toBe(true)
+  })
+  it.each([false, true])(
+    'publishes a completed batch only if the local clipboard is unchanged (changed=%s)',
+    async (changed) => {
+      const { session } = stubSession()
+      innards().sessions.set('receive', session)
+      innards().lastClipboardText = ''
+      innards().lastClipboardFiles = ''
+      innards().lastClipboardVersion = '1'
+      vi.mocked(readFileClipboard).mockResolvedValue({ paths: [], version: changed ? 'new' : '1' })
+      const manifest = Buffer.alloc(596)
+      manifest.writeUInt32LE(1)
+      manifest.writeUInt32LE(0x44, 4)
+      manifest.write('empty.txt', 76, 'utf16le')
+      innards().receive('receive', session, 6, manifest)
+      await new Promise((resolve) => setImmediate(resolve))
+      expect(writeClipboardFiles).toHaveBeenCalledTimes(changed ? 0 : 1)
+    }
+  )
 })

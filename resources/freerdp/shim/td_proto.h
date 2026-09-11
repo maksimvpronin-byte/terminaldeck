@@ -28,6 +28,9 @@
 #define TD_REC_FRAME 2  /* u16 x, y, w, h, then w*h pixels, RGBA, top row first */
 #define TD_REC_CURSOR 3 /* u16 w, h, hotX, hotY, then w*h pixels, RGBA */
 #define TD_REC_CURSOR_STATE 4 /* u8: 0 hidden, 1 the system's own arrow */
+#define TD_REC_CLIP_FILES 6 /* FILEGROUPDESCRIPTORW wire data */
+#define TD_REC_CLIP_CHUNK 7 /* stream id u32, flags u32, bytes */
+#define TD_REC_CLIP_RESET 8 /* remote clipboard changed */
 #define TD_REC_CLIPBOARD 5    /* UTF-8 text, no terminator, no header */
 
 /* A message read from the driving process: a flat bag of fields. */

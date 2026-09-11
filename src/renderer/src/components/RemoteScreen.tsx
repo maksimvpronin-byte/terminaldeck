@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useT } from '../i18n'
 import { desktopSizeFor, type DesktopSize } from '../../../shared/desktopSize'
 import { buttonEvent, PTR, wheelFlags, wheelTurns } from '../../../shared/rdpInput'
 import { rdpKeyFor, substituteCommand, unicodeKey } from '../../../shared/rdpScancodes'
@@ -104,6 +105,8 @@ export default function RemoteScreen({
   onNotice,
   onMeasured
 }: Props): JSX.Element {
+  const [clipboardStatus, setClipboardStatus] = useState('')
+  const t = useT()
   const visibleRef = useRef(visible)
   visibleRef.current = visible
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -469,7 +472,18 @@ export default function RemoteScreen({
           }),
           window.td.rdp.onDesktopEvent(id, (event) => {
             const what = String(event.e ?? '')
-            if (what === 'connected' || what === 'size') {
+            if (what === 'clipboard-transfer') {
+              const state = String(event.state)
+              setClipboardStatus(
+                state === 'cancelled'
+                  ? 'cancelled'
+                  : state === 'ready'
+                    ? 'ready'
+                    : state === 'error'
+                      ? `error:${String(event.detail ?? '')}`
+                      : `progress:${Number(event.total) > 0 ? Math.floor((Number(event.received) / Number(event.total)) * 100) : 0}`
+              )
+            } else if (what === 'connected' || what === 'size') {
               resize(Number(event.width ?? 0), Number(event.height ?? 0))
               // Every delivery, not only the first: a resize is where the two
               // numbers most often stop agreeing.
@@ -953,6 +967,39 @@ export default function RemoteScreen({
       }}
     >
       <canvas ref={canvasRef} className="graphical-canvas" />
+      {clipboardStatus && (
+        <div
+          role="status"
+          onMouseDown={(e) => e.stopPropagation()}
+          onMouseUp={(e) => e.stopPropagation()}
+          onMouseMove={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute',
+            bottom: 8,
+            left: 8,
+            maxWidth: '90%',
+            padding: '6px 10px',
+            background: 'var(--bg-2)',
+            color: 'var(--text)',
+            borderRadius: 4
+          }}
+        >
+          {clipboardStatus === 'cancelled'
+            ? t('File copy cancelled')
+            : clipboardStatus === 'ready'
+              ? t('Files ready to paste')
+              : clipboardStatus.startsWith('error:')
+                ? `${t('File copy failed')}: ${clipboardStatus.slice(6)}`
+                : `${t('Receiving clipboard files')} ${clipboardStatus.slice(9)}%`}
+          <button
+            aria-label={t('Close')}
+            onClick={() => setClipboardStatus('')}
+            style={{ marginLeft: 8 }}
+          >
+            ×
+          </button>
+        </div>
+      )}
     </div>
   )
 }

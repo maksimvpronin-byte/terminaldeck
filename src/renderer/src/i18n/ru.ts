@@ -6,6 +6,11 @@
  * screen at a time without leaving machine names on any of them.
  */
 export const ru: Record<string, string> = {
+  'File copy cancelled': 'Копирование файлов отменено',
+  'Files ready to paste': 'Файлы готовы к вставке',
+  'File copy failed': 'Не удалось скопировать файлы',
+  'Receiving clipboard files': 'Получение файлов из буфера',
+
   Collections: 'Наборы',
   Workspaces: 'Рабочие области',
   'Tabs and panes': 'Вкладки и панели',

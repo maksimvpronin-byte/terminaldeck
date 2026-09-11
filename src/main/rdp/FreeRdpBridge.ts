@@ -7,6 +7,8 @@ import { askAboutCertificate } from './certificateVerifier'
 import { requireUnlocked } from '../vault/locked'
 import { createRecordReader, encodeCommand, readCursor, readFrame, RECORD } from './recordStream'
 import { complaintIn, failureText } from './clientLog'
+import { ClipboardDownload, cleanClipboardDownloads } from './ClipboardDownload'
+import { pathsToUris, readFileClipboard, writeClipboardFiles } from './clipboardFiles'
 
 /**
  * Drives td-rdp, which is what draws a desktop pane.
@@ -76,6 +78,10 @@ interface Session {
    * uncaught `ERR_STREAM_WRITE_AFTER_END`.
    */
   stopping?: boolean
+  ready?: boolean
+  clipboardSeeded?: boolean
+  download?: ClipboardDownload
+  clipboardManifestTimer?: NodeJS.Timeout
   /** The client's last complaint, which is usually the reason it stopped. */
   complaint?: string
 }
@@ -204,6 +210,8 @@ class FreeRdpBridge {
     })
 
     child.on('exit', (code) => {
+      clearTimeout(session.clipboardManifestTimer)
+      session.download?.cancel()
       this.sessions.delete(id)
       this.watchClipboard()
       this.say(session, id, {
@@ -213,6 +221,8 @@ class FreeRdpBridge {
       })
     })
     child.on('error', (err: Error) => {
+      clearTimeout(session.clipboardManifestTimer)
+      session.download?.cancel()
       this.sessions.delete(id)
       this.watchClipboard()
       this.say(session, id, {
@@ -262,6 +272,8 @@ class FreeRdpBridge {
   stop(id: string): void {
     const session = this.sessions.get(id)
     if (!session || session.stopping) return
+    clearTimeout(session.clipboardManifestTimer)
+    session.download?.cancel()
     this.write(id, { a: 'stop' })
     // Marked before the pipe is closed, not after: everything that writes goes
     // through one place and that place refuses a session in this state.
@@ -273,6 +285,7 @@ class FreeRdpBridge {
 
   stopAll(): void {
     for (const id of [...this.sessions.keys()]) this.stop(id)
+    cleanClipboardDownloads()
   }
 
   /**
@@ -284,66 +297,133 @@ class FreeRdpBridge {
   private lastClipboardText = ''
   /** The same, for the files beside it: copying a file changes neither text. */
   private lastClipboardFiles = ''
+  private lastClipboardVersion = ''
   private clipboardTimer: NodeJS.Timeout | undefined
 
-  /**
-   * The files on the clipboard, as a `text/uri-list`, or an empty string.
-   *
-   * macOS puts several of them on the pasteboard one item at a time, which
-   * Electron's clipboard cannot walk — it reads the first item and stops. The
-   * legacy `NSFilenamesPboardType` is one value holding all of them, written by
-   * Finder to this day for exactly the applications that cannot walk items, and
-   * is read here first for that reason. A single file is the fallback, and the
-   * common case.
-   */
-  private clipboardFiles(): string {
-    const paths: string[] = []
-    try {
-      const plist = clipboard.readBuffer('NSFilenamesPboardType').toString('utf8')
-      for (const match of plist.matchAll(/<string>([^<]*)<\/string>/g)) paths.push(match[1])
-    } catch {
-      // Not on the pasteboard, or not this platform. The single file below.
+  private clipboardEpoch = 0
+  private clipboardPolling = false
+  private clipboardPublishing = false
+  private nextFilesPoll = 0
+
+  private cancelClipboardDownloads(): void {
+    this.clipboardEpoch++
+    for (const [id, session] of this.sessions) {
+      if (session.download?.active)
+        this.say(session, id, { e: 'clipboard-transfer', state: 'cancelled' })
+      clearTimeout(session.clipboardManifestTimer)
+      session.download?.cancel()
     }
-    if (paths.length === 0) {
-      const one = clipboard.read('public.file-url')
-      if (one) paths.push(decodeURIComponent(one.replace(/^file:\/\//, '')))
-    }
-    if (paths.length === 0) return ''
-    // CRLF-separated `file://` URIs, which is what the client's file helper
-    // parses — see `cliprdr_local_stream_update`.
-    return paths
-      .map((path) => `file://${path.split('/').map(encodeURIComponent).join('/')}`)
-      .join('\r\n')
   }
 
-  /** Runs only while at least one open desktop shares a clipboard. */
   private watchClipboard(): void {
-    const wanted = [...this.sessions.values()].some((s) => s.clipboard)
+    const wanted = [...this.sessions.values()].some((s) => s.clipboard && !s.stopping)
     if (!wanted) {
       if (this.clipboardTimer) clearInterval(this.clipboardTimer)
       this.clipboardTimer = undefined
       return
     }
     if (this.clipboardTimer) return
+    this.nextFilesPoll = 0
+    this.clipboardTimer = setInterval(() => void this.pollClipboard(), CLIPBOARD_POLL_MS)
+    this.clipboardTimer.unref?.()
+  }
 
-    this.lastClipboardText = clipboard.readText()
-    this.lastClipboardFiles = this.clipboardFiles()
-    this.clipboardTimer = setInterval(() => {
+  private async pollClipboard(): Promise<void> {
+    if (this.clipboardPolling || this.clipboardPublishing) return
+    this.clipboardPolling = true
+    const epoch = this.clipboardEpoch
+    try {
       const text = clipboard.readText()
-      const files = this.clipboardFiles()
-      if (text === this.lastClipboardText && files === this.lastClipboardFiles) return
-      const textChanged = text !== this.lastClipboardText
-      const filesChanged = files !== this.lastClipboardFiles
+      let files = this.lastClipboardFiles
+      let version = this.lastClipboardVersion
+      if (Date.now() >= this.nextFilesPoll || text !== this.lastClipboardText) {
+        const snapshot = await readFileClipboard()
+        files = pathsToUris(snapshot.paths)
+        version = snapshot.version
+        this.nextFilesPoll = Date.now() + 1000
+      }
+      // A remote update or another local copy overtook the native read.
+      if (epoch !== this.clipboardEpoch || text !== clipboard.readText()) return
+      const changed =
+        text !== this.lastClipboardText ||
+        files !== this.lastClipboardFiles ||
+        (this.lastClipboardVersion !== '' && version !== this.lastClipboardVersion)
+      if (changed) this.cancelClipboardDownloads()
       this.lastClipboardText = text
       this.lastClipboardFiles = files
+      this.lastClipboardVersion = version
       for (const [id, session] of this.sessions) {
-        if (!session.clipboard) continue
-        if (textChanged) this.write(id, { a: 'clipboard', text })
-        if (filesChanged) this.write(id, { a: 'clipfiles', uris: files })
+        if (!session.clipboard || !session.ready || session.stopping) continue
+        if (changed || !session.clipboardSeeded) {
+          this.write(id, { a: 'clipset', text, uris: files })
+          session.clipboardSeeded = true
+        }
       }
-    }, CLIPBOARD_POLL_MS)
-    // Nothing here should hold the process open by itself.
-    this.clipboardTimer.unref?.()
+    } catch (error) {
+      // Native clipboard ownership can change while it is read. Retry on the next poll.
+      trace(`clipboard read failed: ${String(error)}`)
+    } finally {
+      this.clipboardPolling = false
+    }
+  }
+
+  private beginClipboardDownload(id: string, session: Session, manifest: Buffer): void {
+    this.cancelClipboardDownloads()
+    const epoch = this.clipboardEpoch
+    let lastReport = 0
+    session.download = new ClipboardDownload(
+      (fields) => this.write(id, fields),
+      (paths) => {
+        void (async () => {
+          if (epoch !== this.clipboardEpoch || session.stopping) return
+          this.clipboardPublishing = true
+          try {
+            // Do not overwrite a newer local copy with a transfer that took seconds.
+            const snapshot = await readFileClipboard()
+            const files = pathsToUris(snapshot.paths)
+            if (
+              epoch !== this.clipboardEpoch ||
+              session.stopping ||
+              clipboard.readText() !== this.lastClipboardText ||
+              files !== this.lastClipboardFiles ||
+              (this.lastClipboardVersion !== '' && snapshot.version !== this.lastClipboardVersion)
+            ) {
+              this.say(session, id, { e: 'clipboard-transfer', state: 'cancelled' })
+              return
+            }
+            const version = await writeClipboardFiles(paths, snapshot.version)
+            if (version === undefined) {
+              this.say(session, id, { e: 'clipboard-transfer', state: 'cancelled' })
+              return
+            }
+            this.lastClipboardVersion = version
+            this.lastClipboardFiles = pathsToUris(paths)
+            this.lastClipboardText = clipboard.readText()
+            this.say(session, id, { e: 'clipboard-transfer', state: 'ready' })
+          } catch (error) {
+            this.say(session, id, {
+              e: 'clipboard-transfer',
+              state: 'error',
+              detail: String(error)
+            })
+          } finally {
+            this.clipboardPublishing = false
+          }
+        })()
+      },
+      (received, total, error) => {
+        if (!error && received < total && Date.now() - lastReport < 100) return
+        lastReport = Date.now()
+        this.say(session, id, {
+          e: 'clipboard-transfer',
+          state: error ? 'error' : 'receiving',
+          received,
+          total,
+          detail: error
+        })
+      }
+    )
+    session.download.start(manifest)
   }
 
   private write(id: string, fields: Record<string, string | number | boolean | undefined>): void {
@@ -408,6 +488,36 @@ class FreeRdpBridge {
       return
     }
 
+    if (type === RECORD.clipboardReset) {
+      if (session.clipboard) {
+        this.cancelClipboardDownloads()
+        if (payload[0] === 1) {
+          this.say(session, id, {
+            e: 'clipboard-transfer',
+            state: 'receiving',
+            received: 0,
+            total: 0
+          })
+          session.clipboardManifestTimer = setTimeout(() => {
+            this.say(session, id, {
+              e: 'clipboard-transfer',
+              state: 'error',
+              detail: 'The RDP server did not send the file list'
+            })
+          }, 30000)
+        }
+      }
+      return
+    }
+    if (type === RECORD.clipboardFiles) {
+      if (session.clipboard && !session.stopping) this.beginClipboardDownload(id, session, payload)
+      return
+    }
+    if (type === RECORD.clipboardChunk) {
+      if (session.clipboard) session.download?.receive(payload)
+      return
+    }
+
     if (type === RECORD.clipboard) {
       if (!session.clipboard) return
       const text = payload.toString('utf8')
@@ -421,6 +531,9 @@ class FreeRdpBridge {
        */
       this.lastClipboardText = text
       clipboard.writeText(text)
+      this.lastClipboardFiles = ''
+      this.lastClipboardVersion = ''
+      this.nextFilesPoll = 0
       return
     }
 
@@ -433,6 +546,11 @@ class FreeRdpBridge {
       return
     }
 
+    if (event.e === 'connected') {
+      session.ready = true
+      this.nextFilesPoll = 0
+      void this.pollClipboard()
+    }
     if (event.e === 'certificate') {
       void this.decideCertificate(id, session, event)
       return

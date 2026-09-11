@@ -8,6 +8,24 @@ the other produces a version nobody can install, which is how 0.1.10 through
 
 ## 0.15.4
 
+### Added
+
+- Copy files out of a desktop as well as into one. RDP hands files over as a
+  list of descriptors and then in ranges on request, and FreeRDP's own answer to
+  presenting those locally is FUSE, which macOS does not have — so they are
+  fetched into a private temporary directory and the paths put on the clipboard
+  when the last byte lands. The pane says what is happening and says when it is
+  done: paste after **Files ready to paste**, not before. A newer copy cancels
+  an unfinished fetch rather than racing it, and the temporary copies go when
+  TerminalDeck quits, so paste what you need before closing it.
+- Read the files on the clipboard through the platform rather than around it. A
+  pasteboard holds several files as several items and Electron reads only the
+  first, so a copy of more than one file arrived as one file — the way out is
+  AppKit's own `NSURL` reader on macOS and the file drop list on Windows, asked
+  for in a short-lived helper. That helper also carries the clipboard's version
+  with it, so a transfer that took seconds cannot overwrite something copied
+  while it ran: the check happens inside the process doing the writing.
+
 ### Fixed
 
 - Stop the application dying when a desktop pane is closed. A session leaves the

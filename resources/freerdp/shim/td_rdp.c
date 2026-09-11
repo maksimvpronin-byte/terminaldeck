@@ -134,16 +134,8 @@ typedef struct
 	int clipboard;
 	CRITICAL_SECTION clip;
 	char* clip_local;
-	/**
-	 * Files, which are not data and are not carried like data.
-	 *
-	 * `clip_files` is FreeRDP's own helper, and it earns its place: asked for a
-	 * file's bytes it reads them off this disk in ranges, walking directories on
-	 * the way, so nothing is copied anywhere to be offered. `clip_system` is a
-	 * WinPR clipboard kept beside it for one job — turning the list of paths
-	 * into the array of descriptors the far end expects, which means stat'ing
-	 * every one of them, and which WinPR already knows how to do.
-	 */
+	/* FreeRDP owns channel bookkeeping; WinPR owns the single local file table
+	 * used for both descriptors and content, including recursive directories. */
 	CliprdrFileContext* clip_files;
 	wClipboard* clip_system;
 	/** What this side last copied, as a `text/uri-list`. */
@@ -151,6 +143,7 @@ typedef struct
 	/* Channel-thread state: responses carry no format id. Keep our outgoing
 	 * request separate from FreeRDP's lastRequestedFormatId (incoming requests). */
 	UINT32 clip_requested, clip_next;
+	int clip_requested_files, clip_next_files;
 	int clip_next_pending;
 
 	/** The size last asked of the server, so a repeat can be ignored. */
@@ -626,11 +619,10 @@ static UINT td_clip_monitor_ready(CliprdrClientContext* ctx, const CLIPRDR_MONIT
 	general.version = CB_CAPS_VERSION_2;
 	/* Long names only. Short ones are 32 bytes of UTF-16 and cannot carry the
 	 * names the formats we care about are registered under — `FileGroupDescriptorW`
-	 * is 20 characters before its terminator. The rest of the flags come from the
-	 * file helper: they say whether files may travel at all and in what shape, and
-	 * it is the half of this that knows. */
-	general.generalFlags =
-	    CB_USE_LONG_FORMAT_NAMES | cliprdr_file_context_current_flags(td->clip_files);
+	 * is 20 characters before its terminator. Advertise our capabilities directly:
+	 * the helper's current_flags describes a negotiated state, initially zero. */
+	general.generalFlags = CB_USE_LONG_FORMAT_NAMES | CB_STREAM_FILECLIP_ENABLED |
+	                       CB_FILECLIP_NO_FILE_PATHS | CB_HUGE_FILE_SUPPORT_ENABLED;
 
 	caps.common.msgType = CB_CLIP_CAPS;
 	caps.cCapabilitiesSets = 1;
@@ -642,7 +634,7 @@ static UINT td_clip_monitor_ready(CliprdrClientContext* ctx, const CLIPRDR_MONIT
 	return td_clip_offer(td);
 }
 
-static UINT td_clip_request(CliprdrClientContext* ctx, UINT32 format)
+static UINT td_clip_request(CliprdrClientContext* ctx, UINT32 format, int files)
 {
 	tdContext* td = td_of(ctx);
 	CLIPRDR_FORMAT_DATA_REQUEST request = { 0 };
@@ -652,6 +644,7 @@ static UINT td_clip_request(CliprdrClientContext* ctx, UINT32 format)
 	request.common.msgType = CB_FORMAT_DATA_REQUEST;
 	request.requestedFormatId = format;
 	td->clip_requested = format;
+	td->clip_requested_files = files;
 	rc = ctx->ClientFormatDataRequest(ctx, &request);
 	if (rc != CHANNEL_RC_OK)
 		td->clip_requested = 0;
@@ -670,7 +663,7 @@ static UINT td_clip_server_format_list(CliprdrClientContext* ctx, const CLIPRDR_
 {
 	CLIPRDR_FORMAT_LIST_RESPONSE response = { 0 };
 	tdContext* td = td_of(ctx);
-	UINT32 wanted = 0;
+	UINT32 wanted = 0, files = 0;
 	UINT rc;
 
 	response.common.msgType = CB_FORMAT_LIST_RESPONSE;
@@ -684,24 +677,28 @@ static UINT td_clip_server_format_list(CliprdrClientContext* ctx, const CLIPRDR_
 		WLog_INFO(TAG, "clipboard: the far end offers format %u (%s)",
 		          (unsigned)list->formats[i].formatId,
 		          list->formats[i].formatName ? list->formats[i].formatName : "standard");
+		if (list->formats[i].formatName && strcmp(list->formats[i].formatName, TD_FILE_LIST) == 0)
+			files = list->formats[i].formatId;
 		if (list->formats[i].formatId == CF_UNICODETEXT)
-		{
 			wanted = CF_UNICODETEXT;
-			break;
-		}
-		if (list->formats[i].formatId == CF_TEXT)
+		if (list->formats[i].formatId == CF_TEXT && !wanted)
 			wanted = CF_TEXT;
 	}
+	/* Cancel any transfer for the previous clipboard before publishing this one. */
+	const BYTE has_files = files != 0;
+	(void)td_write_record(TD_REC_CLIP_RESET, &has_files, 1);
+	if (files) wanted = files;
 	WLog_INFO(TAG, "clipboard: asking for format %u", (unsigned)wanted);
 	/* Only one request in flight: a response has no id with which to match it.
 	 * If the clipboard changes meanwhile, fetch the newest offer afterwards. */
 	if (td->clip_requested)
 	{
 		td->clip_next = wanted;
+		td->clip_next_files = files != 0;
 		td->clip_next_pending = 1;
 		return CHANNEL_RC_OK;
 	}
-	return td_clip_request(ctx, wanted);
+	return td_clip_request(ctx, wanted, files != 0);
 }
 
 /** What we asked for, arriving. */
@@ -710,6 +707,7 @@ static UINT td_clip_server_format_data_response(CliprdrClientContext* ctx,
 {
 	tdContext* td = td_of(ctx);
 	const UINT32 format = td->clip_requested;
+	const int files = td->clip_requested_files;
 	const BYTE* data = response->requestedFormatData;
 	const UINT32 length = response->common.dataLen;
 
@@ -721,15 +719,23 @@ static UINT td_clip_server_format_data_response(CliprdrClientContext* ctx,
 	if (td->clip_next_pending)
 	{
 		td->clip_next_pending = 0;
-		return td_clip_request(ctx, td->clip_next);
+		return td_clip_request(ctx, td->clip_next, td->clip_next_files);
 	}
 	if (!format)
 		return CHANNEL_RC_OK;
 	if ((response->common.msgFlags & CB_RESPONSE_FAIL) != 0)
+	{
+		if (files) (void)td_write_record(TD_REC_CLIP_FILES, NULL, 0);
 		return CHANNEL_RC_OK;
+	}
 	if (!data || length == 0)
 		return CHANNEL_RC_OK;
 
+	if (files)
+	{
+		(void)td_write_record(TD_REC_CLIP_FILES, data, length);
+		return CHANNEL_RC_OK;
+	}
 	if (format == CF_UNICODETEXT)
 	{
 		size_t utf8_len = 0;
@@ -754,17 +760,7 @@ static UINT td_clip_server_format_data_response(CliprdrClientContext* ctx,
 	return CHANNEL_RC_OK;
 }
 
-/**
- * The far end is pasting files, and wants to know what it is getting.
- *
- * Three steps, and none of them moves a byte of content. The helper is told
- * which local paths back this clipboard, so it can serve their contents later
- * and walk into directories on the way. WinPR is handed the same list and asked
- * for it back as an array of descriptors — that is where the names, sizes and
- * timestamps come from, and it means stat'ing every file, which is why it is
- * done here and not when the clipboard changed. Then the array is serialised
- * into the shape the wire wants.
- */
+/** Build and retain WinPR's file table when the server requests descriptors. */
 static UINT td_clip_answer_files(CliprdrClientContext* ctx, tdContext* td)
 {
 	CLIPRDR_FORMAT_DATA_RESPONSE response = { 0 };
@@ -785,8 +781,7 @@ static UINT td_clip_answer_files(CliprdrClientContext* ctx, tdContext* td)
 	{
 		const size_t length = strlen(uris);
 		ClipboardLock(td->clip_system);
-		if (cliprdr_file_context_update_client_data(td->clip_files, uris, length) &&
-		    ClipboardSetData(td->clip_system, uriFormat, uris, (UINT32)length))
+		if (ClipboardSetData(td->clip_system, uriFormat, uris, (UINT32)length))
 		{
 			UINT32 count = 0;
 			const FILEDESCRIPTORW* descriptors =
@@ -866,6 +861,123 @@ static UINT td_clip_server_format_data_request(CliprdrClientContext* ctx,
 	return rc;
 }
 
+/* Serve bytes from the same WinPR file table that produced the descriptors.
+ * A second walk can assign different indices; the generic file helper also
+ * decodes percent escapes twice and mishandles Windows drive-letter URIs. */
+static UINT td_clip_local_reply(tdContext* td, UINT32 stream, const BYTE* data, UINT32 length, UINT16 flags)
+{
+	CLIPRDR_FILE_CONTENTS_RESPONSE response = { 0 };
+	response.common.msgType = CB_FILECONTENTS_RESPONSE;
+	response.common.msgFlags = flags;
+	response.streamId = stream;
+	response.cbRequested = length;
+	response.requestedData = data;
+	return td->cliprdr->ClientFileContentsResponse(td->cliprdr, &response);
+}
+static UINT td_clip_size_ok(wClipboardDelegate* delegate, const wClipboardFileSizeRequest* request, UINT64 size)
+{
+	BYTE data[8];
+	for (size_t i = 0; i < 8; i++) data[i] = (BYTE)(size >> (i * 8));
+	return td_clip_local_reply(delegate->custom, request->streamId, data, 8, CB_RESPONSE_OK);
+}
+static UINT td_clip_size_fail(wClipboardDelegate* delegate, const wClipboardFileSizeRequest* request, UINT error)
+{
+	(void)error;
+	return td_clip_local_reply(delegate->custom, request->streamId, NULL, 0, CB_RESPONSE_FAIL);
+}
+static UINT td_clip_range_ok(wClipboardDelegate* delegate, const wClipboardFileRangeRequest* request, const BYTE* data, UINT32 size)
+{
+	return td_clip_local_reply(delegate->custom, request->streamId, data, size, CB_RESPONSE_OK);
+}
+static UINT td_clip_range_fail(wClipboardDelegate* delegate, const wClipboardFileRangeRequest* request, UINT error)
+{
+	(void)error;
+	return td_clip_local_reply(delegate->custom, request->streamId, NULL, 0, CB_RESPONSE_FAIL);
+}
+static UINT td_clip_local_request(CliprdrClientContext* ctx, const CLIPRDR_FILE_CONTENTS_REQUEST* request)
+{
+	tdContext* td = td_of(ctx);
+	wClipboardDelegate* delegate = ClipboardGetDelegate(td->clip_system);
+	UINT rc = ERROR_INVALID_DATA;
+	ClipboardLock(td->clip_system);
+	delegate->custom = td;
+	delegate->ClipboardFileSizeSuccess = td_clip_size_ok;
+	delegate->ClipboardFileSizeFailure = td_clip_size_fail;
+	delegate->ClipboardFileRangeSuccess = td_clip_range_ok;
+	delegate->ClipboardFileRangeFailure = td_clip_range_fail;
+	if (request->dwFlags == FILECONTENTS_SIZE)
+	{
+		wClipboardFileSizeRequest size = { request->streamId, request->listIndex };
+		rc = delegate->ClientRequestFileSize(delegate, &size);
+	}
+	else if (request->dwFlags == FILECONTENTS_RANGE && request->cbRequested <= 4 * 1024 * 1024)
+	{
+		wClipboardFileRangeRequest range = { request->streamId, request->listIndex,
+		    request->nPositionLow, request->nPositionHigh, request->cbRequested };
+		rc = delegate->ClientRequestFileRange(delegate, &range);
+	}
+	ClipboardUnlock(td->clip_system);
+	if (rc != CHANNEL_RC_OK) return td_clip_local_reply(td, request->streamId, NULL, 0, CB_RESPONSE_FAIL);
+	return CHANNEL_RC_OK;
+}
+
+/* File payloads stay binary across the pipe; Node owns staging and path validation. */
+static UINT td_clip_file_response(CliprdrClientContext* ctx,
+                                  const CLIPRDR_FILE_CONTENTS_RESPONSE* response)
+{
+	(void)ctx;
+	UINT32 length = response->cbRequested;
+	if (length > 65536 || (length && !response->requestedData)) length = 0;
+	BYTE* packet = calloc(1, (size_t)length + 8);
+	if (!packet) return ERROR_NOT_ENOUGH_MEMORY;
+	UINT32 fields[2] = { response->streamId, response->common.msgFlags };
+	for (size_t f = 0; f < 2; f++)
+		for (size_t b = 0; b < 4; b++) packet[f * 4 + b] = (BYTE)(fields[f] >> (b * 8));
+	if (length) memcpy(packet + 8, response->requestedData, length);
+	(void)td_write_record(TD_REC_CLIP_CHUNK, packet, (size_t)length + 8);
+	free(packet);
+	return CHANNEL_RC_OK;
+}
+
+static UINT td_clip_caps(CliprdrClientContext* ctx, const CLIPRDR_CAPABILITIES* caps)
+{
+	tdContext* td = td_of(ctx);
+	const BYTE* p = (const BYTE*)caps->capabilitySets;
+	for (UINT32 i = 0; i < caps->cCapabilitiesSets; i++)
+	{
+		const CLIPRDR_CAPABILITY_SET* set = (const CLIPRDR_CAPABILITY_SET*)p;
+		if (set->capabilitySetLength < sizeof(*set)) return ERROR_INVALID_DATA;
+		if (set->capabilitySetType == CB_CAPSTYPE_GENERAL &&
+		    set->capabilitySetLength >= CB_CAPSTYPE_GENERAL_LEN)
+			(void)cliprdr_file_context_remote_set_flags(td->clip_files,
+			    ((const CLIPRDR_GENERAL_CAPABILITY_SET*)p)->generalFlags);
+		p += set->capabilitySetLength;
+	}
+	return CHANNEL_RC_OK;
+}
+
+static void td_clip_get_chunk(tdContext* td, const td_cmd* cmd)
+{
+	if (!td->cliprdr || !td->clipboard) return;
+	CLIPRDR_FILE_CONTENTS_REQUEST request = { 0 };
+	request.common.msgType = CB_FILECONTENTS_REQUEST;
+	request.streamId = (UINT32)td_cmd_int(cmd, "stream", 0);
+	request.listIndex = (UINT32)td_cmd_int(cmd, "index", 0);
+	request.dwFlags = FILECONTENTS_RANGE;
+	UINT64 offset = strtoull(td_cmd_str(cmd, "offset", "0"), NULL, 10);
+	request.nPositionLow = (UINT32)offset;
+	request.nPositionHigh = (UINT32)(offset >> 32);
+	request.cbRequested = (UINT32)td_cmd_int(cmd, "length", 65536);
+	if (request.cbRequested > 65536) request.cbRequested = 65536;
+	if (td->cliprdr->ClientFileContentsRequest(td->cliprdr, &request) != CHANNEL_RC_OK)
+	{
+		CLIPRDR_FILE_CONTENTS_RESPONSE failure = { 0 };
+		failure.streamId = request.streamId;
+		failure.common.msgFlags = CB_RESPONSE_FAIL;
+		(void)td_clip_file_response(td->cliprdr, &failure);
+	}
+}
+
 /* -------------------------------------------------------------- the channels */
 
 static void on_channel_connected(void* context, const ChannelConnectedEventArgs* e)
@@ -905,19 +1017,17 @@ static void on_channel_connected(void* context, const ChannelConnectedEventArgs*
 		}
 		td->cliprdr = clip;
 		td->cliprdr->MonitorReady = td_clip_monitor_ready;
+		td->cliprdr->ServerCapabilities = td_clip_caps;
+		(void)cliprdr_file_context_set_locally_available(td->clip_files, TRUE);
 		td->cliprdr->ServerFormatList = td_clip_server_format_list;
 		td->cliprdr->ServerFormatDataRequest = td_clip_server_format_data_request;
 		td->cliprdr->ServerFormatDataResponse = td_clip_server_format_data_response;
-		/*
-		 * Last, and it overwrites `custom` with itself — which is why everything
-		 * above reaches us through `td_of`. It also claims
-		 * `ServerFileContentsRequest`, which is the whole of the outgoing
-		 * direction: asked for a file's bytes it reads them off this disk in
-		 * ranges. `ServerFileContentsResponse` it only claims when built with
-		 * FUSE, which this is not, so the incoming direction stays ours.
-		 */
+		/* Init replaces custom. Override both file callbacks afterwards: content
+		 * comes from WinPR's descriptor table; incoming ranges go to Node. */
 		if (!cliprdr_file_context_init(td->clip_files, td->cliprdr))
 			WLog_ERR(TAG, "clipboard: the file helper refused to start");
+		td->cliprdr->ServerFileContentsResponse = td_clip_file_response;
+		td->cliprdr->ServerFileContentsRequest = td_clip_local_request;
 		return;
 	}
 
@@ -1125,7 +1235,25 @@ static void apply_command(tdContext* td, const td_cmd* cmd)
 	rdpInput* input = context->input;
 	const char* action = td_cmd_str(cmd, "a", "");
 
-	if (strcmp(action, "clipboard") == 0)
+	if (strcmp(action, "clipset") == 0)
+	{
+		if (td->clipboard)
+		{
+			EnterCriticalSection(&td->clip);
+			free(td->clip_local);
+			free(td->clip_uris);
+			td->clip_local = _strdup(td_cmd_str(cmd, "text", ""));
+			const char* uris = td_cmd_str(cmd, "uris", "");
+			td->clip_uris = *uris ? _strdup(uris) : NULL;
+			LeaveCriticalSection(&td->clip);
+			(void)td_clip_offer(td);
+		}
+	}
+	else if (strcmp(action, "clipget") == 0)
+	{
+		td_clip_get_chunk(td, cmd);
+	}
+	else if (strcmp(action, "clipboard") == 0)
 	{
 		if (td->clipboard)
 			td_clip_set_local(td, td_cmd_str(cmd, "text", ""));
