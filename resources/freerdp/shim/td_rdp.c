@@ -34,6 +34,8 @@
 #include <freerdp/client/cmdline.h>
 #include <freerdp/client/disp.h>
 #include <freerdp/channels/channels.h>
+#include <freerdp/channels/cliprdr.h>
+#include <freerdp/client/cliprdr.h>
 #include <freerdp/channels/disp.h>
 #include <freerdp/channels/rdpsnd.h>
 
@@ -110,6 +112,23 @@ typedef struct
 
 	DispClientContext* disp;
 	int disp_ready;
+
+	/**
+	 * The clipboard, when the host asked for one.
+	 *
+	 * `clip_local` is what this side last copied, held as UTF-8 because that is
+	 * what arrives down the pipe and what goes back up it; the conversion to
+	 * UTF-16 happens at the moment the server asks, not before, since most of
+	 * what is copied here is never pasted there.
+	 *
+	 * Guarded on its own: a command setting it arrives on the main loop while a
+	 * request for it arrives on the channel thread, and the two meet over this
+	 * one pointer.
+	 */
+	CliprdrClientContext* cliprdr;
+	int clipboard;
+	CRITICAL_SECTION clip;
+	char* clip_local;
 
 	/** The size last asked of the server, so a repeat can be ignored. */
 	UINT32 want_width, want_height, want_scale;
@@ -500,6 +519,177 @@ static void send_size(tdContext* td, UINT32 width, UINT32 height, UINT32 scale)
 	(void)td->disp->SendMonitorLayout(td->disp, 1, &layout);
 }
 
+/* ------------------------------------------------------------- the clipboard */
+
+/**
+ * Announcing what this side holds.
+ *
+ * An empty list is a real answer and the one to send when nothing has been
+ * copied here yet: it says "I have a clipboard and it is empty", which is not
+ * the same as never speaking, and a server that hears nothing goes on offering
+ * its own formats to a client it believes is not listening.
+ */
+static UINT td_clip_offer(tdContext* td)
+{
+	CliprdrClientContext* ctx = td->cliprdr;
+	CLIPRDR_FORMAT_LIST list = { 0 };
+	CLIPRDR_FORMAT format = { 0 };
+	int have;
+
+	if (!ctx)
+		return CHANNEL_RC_OK;
+
+	EnterCriticalSection(&td->clip);
+	have = td->clip_local != NULL;
+	LeaveCriticalSection(&td->clip);
+
+	format.formatId = CF_UNICODETEXT;
+	format.formatName = NULL;
+
+	list.common.msgType = CB_FORMAT_LIST;
+	list.numFormats = have ? 1 : 0;
+	list.formats = have ? &format : NULL;
+	return ctx->ClientFormatList(ctx, &list);
+}
+
+/* The server speaks first; this is the whole of our half of the handshake. */
+static UINT td_clip_monitor_ready(CliprdrClientContext* ctx, const CLIPRDR_MONITOR_READY* ready)
+{
+	tdContext* td = (tdContext*)ctx->custom;
+	CLIPRDR_CAPABILITIES caps = { 0 };
+	CLIPRDR_GENERAL_CAPABILITY_SET general = { 0 };
+	UINT rc;
+
+	(void)ready;
+
+	general.capabilitySetType = CB_CAPSTYPE_GENERAL;
+	general.capabilitySetLength = CB_CAPSTYPE_GENERAL_LEN;
+	general.version = CB_CAPS_VERSION_2;
+	/* Long names only. Short ones are 32 bytes of UTF-16 and cannot carry the
+	 * names the formats we care about are registered under. */
+	general.generalFlags = CB_USE_LONG_FORMAT_NAMES;
+
+	caps.common.msgType = CB_CLIP_CAPS;
+	caps.cCapabilitiesSets = 1;
+	caps.capabilitySets = (CLIPRDR_CAPABILITY_SET*)&general;
+
+	rc = ctx->ClientCapabilities(ctx, &caps);
+	if (rc != CHANNEL_RC_OK)
+		return rc;
+	return td_clip_offer(td);
+}
+
+/**
+ * The far end copied something.
+ *
+ * Answered before it is acted on: the response is what lets the server go on
+ * talking, and asking for the data is a separate message it is free to answer
+ * slowly. Unicode is preferred and plain text accepted, because a server that
+ * offers only `CF_TEXT` is usually an old one with something worth pasting.
+ */
+static UINT td_clip_server_format_list(CliprdrClientContext* ctx, const CLIPRDR_FORMAT_LIST* list)
+{
+	CLIPRDR_FORMAT_LIST_RESPONSE response = { 0 };
+	CLIPRDR_FORMAT_DATA_REQUEST request = { 0 };
+	UINT32 wanted = 0;
+	UINT rc;
+
+	response.common.msgType = CB_FORMAT_LIST_RESPONSE;
+	response.common.msgFlags = CB_RESPONSE_OK;
+	rc = ctx->ClientFormatListResponse(ctx, &response);
+	if (rc != CHANNEL_RC_OK)
+		return rc;
+
+	for (UINT32 i = 0; i < list->numFormats; i++)
+	{
+		if (list->formats[i].formatId == CF_UNICODETEXT)
+		{
+			wanted = CF_UNICODETEXT;
+			break;
+		}
+		if (list->formats[i].formatId == CF_TEXT)
+			wanted = CF_TEXT;
+	}
+	if (!wanted)
+		return CHANNEL_RC_OK;
+
+	request.common.msgType = CB_FORMAT_DATA_REQUEST;
+	request.requestedFormatId = wanted;
+	return ctx->ClientFormatDataRequest(ctx, &request);
+}
+
+/** What we asked for, arriving. */
+static UINT td_clip_server_format_data_response(CliprdrClientContext* ctx,
+                                                const CLIPRDR_FORMAT_DATA_RESPONSE* response)
+{
+	const BYTE* data = response->requestedFormatData;
+	const UINT32 length = response->common.dataLen;
+
+	if ((response->common.msgFlags & CB_RESPONSE_FAIL) != 0)
+		return CHANNEL_RC_OK;
+	if (!data || length == 0)
+		return CHANNEL_RC_OK;
+
+	if (ctx->lastRequestedFormatId == CF_UNICODETEXT)
+	{
+		size_t utf8_len = 0;
+		char* utf8 = ConvertWCharNToUtf8Alloc((const WCHAR*)data, length / sizeof(WCHAR),
+		                                      &utf8_len);
+		if (!utf8)
+			return CHANNEL_RC_OK;
+		/* Windows terminates what it sends; the terminator is not the text. */
+		while (utf8_len > 0 && utf8[utf8_len - 1] == '\0')
+			utf8_len--;
+		(void)td_write_record(TD_REC_CLIPBOARD, utf8, utf8_len);
+		free(utf8);
+		return CHANNEL_RC_OK;
+	}
+
+	{
+		size_t len = length;
+		while (len > 0 && data[len - 1] == '\0')
+			len--;
+		(void)td_write_record(TD_REC_CLIPBOARD, data, len);
+	}
+	return CHANNEL_RC_OK;
+}
+
+/** The far end is pasting, and wants what this side copied. */
+static UINT td_clip_server_format_data_request(CliprdrClientContext* ctx,
+                                               const CLIPRDR_FORMAT_DATA_REQUEST* request)
+{
+	tdContext* td = (tdContext*)ctx->custom;
+	CLIPRDR_FORMAT_DATA_RESPONSE response = { 0 };
+	WCHAR* wide = NULL;
+	size_t chars = 0;
+	UINT rc;
+
+	if (request->requestedFormatId == CF_UNICODETEXT)
+	{
+		EnterCriticalSection(&td->clip);
+		if (td->clip_local)
+			wide = ConvertUtf8ToWCharAlloc(td->clip_local, &chars);
+		LeaveCriticalSection(&td->clip);
+	}
+
+	response.common.msgType = CB_FORMAT_DATA_RESPONSE;
+	if (!wide)
+	{
+		/* A refusal is a complete answer. Saying nothing leaves the far end's
+		 * paste waiting on a message that is never coming. */
+		response.common.msgFlags = CB_RESPONSE_FAIL;
+		return ctx->ClientFormatDataResponse(ctx, &response);
+	}
+
+	response.common.msgFlags = CB_RESPONSE_OK;
+	/* With its terminator, which is what Windows expects of this format. */
+	response.common.dataLen = (UINT32)((chars + 1) * sizeof(WCHAR));
+	response.requestedFormatData = (const BYTE*)wide;
+	rc = ctx->ClientFormatDataResponse(ctx, &response);
+	free(wide);
+	return rc;
+}
+
 /* -------------------------------------------------------------- the channels */
 
 static void on_channel_connected(void* context, const ChannelConnectedEventArgs* e)
@@ -511,6 +701,17 @@ static void on_channel_connected(void* context, const ChannelConnectedEventArgs*
 		td->disp = (DispClientContext*)e->pInterface;
 		td->disp->custom = td;
 		td->disp->DisplayControlCaps = td_display_caps;
+		return;
+	}
+
+	if (strcmp(e->name, CLIPRDR_SVC_CHANNEL_NAME) == 0)
+	{
+		td->cliprdr = (CliprdrClientContext*)e->pInterface;
+		td->cliprdr->custom = td;
+		td->cliprdr->MonitorReady = td_clip_monitor_ready;
+		td->cliprdr->ServerFormatList = td_clip_server_format_list;
+		td->cliprdr->ServerFormatDataRequest = td_clip_server_format_data_request;
+		td->cliprdr->ServerFormatDataResponse = td_clip_server_format_data_response;
 		return;
 	}
 
@@ -527,6 +728,12 @@ static void on_channel_disconnected(void* context, const ChannelDisconnectedEven
 	{
 		td->disp = NULL;
 		td->disp_ready = 0;
+		return;
+	}
+
+	if (strcmp(e->name, CLIPRDR_SVC_CHANNEL_NAME) == 0)
+	{
+		td->cliprdr = NULL;
 		return;
 	}
 	freerdp_client_OnChannelDisconnectedEventHandler(&td->common, e);
@@ -660,13 +867,33 @@ static int td_logon_error(freerdp* instance, UINT32 data, UINT32 type)
 
 /* ---------------------------------------------------------------- the input */
 
+/** What this side copied, arriving from the process that drives us. */
+static void td_clip_set_local(tdContext* td, const char* text)
+{
+	char* copy = text ? _strdup(text) : NULL;
+
+	EnterCriticalSection(&td->clip);
+	free(td->clip_local);
+	td->clip_local = copy;
+	LeaveCriticalSection(&td->clip);
+
+	/* Announced, not sent: the far end asks for the data if and when somebody
+	 * pastes, and most of what is copied here never is. */
+	(void)td_clip_offer(td);
+}
+
 static void apply_command(tdContext* td, const td_cmd* cmd)
 {
 	rdpContext* context = &td->common.context;
 	rdpInput* input = context->input;
 	const char* action = td_cmd_str(cmd, "a", "");
 
-	if (strcmp(action, "mouse") == 0)
+	if (strcmp(action, "clipboard") == 0)
+	{
+		if (td->clipboard)
+			td_clip_set_local(td, td_cmd_str(cmd, "text", ""));
+	}
+	else if (strcmp(action, "mouse") == 0)
 	{
 		(void)freerdp_input_send_mouse_event(input, (UINT16)td_cmd_int(cmd, "flags", 0),
 		                                     (UINT16)td_cmd_int(cmd, "x", 0),
@@ -909,6 +1136,17 @@ static BOOL configure(tdContext* td, const td_cmd* start)
 			return FALSE;
 	}
 
+	if (td_cmd_bool(start, "clipboard", 0))
+	{
+		const char* const channel[] = { CLIPRDR_SVC_CHANNEL_NAME };
+		td->clipboard = 1;
+		/* The channel itself and nothing else: `FreeRDP_RedirectClipboard` is
+		 * deprecated in FreeRDP 3, and adding the channel is what actually
+		 * turns this on. */
+		if (!freerdp_client_add_static_channel(s, 1, channel))
+			return FALSE;
+	}
+
 	/* What the far end may spend effort on. Off by default in RDP and worth
 	 * having on a link that can carry it; the caller decides. */
 	SET_BOOL(FreeRDP_AllowFontSmoothing, td_cmd_bool(start, "fontSmoothing", 1));
@@ -1023,6 +1261,7 @@ static BOOL client_new(freerdp* instance, rdpContext* context)
 
 	InitializeCriticalSection(&td->lock);
 	InitializeCriticalSection(&td->paint);
+	InitializeCriticalSection(&td->clip);
 	td->arrived = CreateEvent(NULL, TRUE, FALSE, NULL);
 	td->answered = CreateEvent(NULL, TRUE, FALSE, NULL);
 	return td->arrived != NULL && td->answered != NULL;
@@ -1045,8 +1284,11 @@ static void client_free(freerdp* instance, rdpContext* context)
 		(void)CloseHandle(td->arrived);
 	if (td->answered)
 		(void)CloseHandle(td->answered);
+	free(td->clip_local);
+	td->clip_local = NULL;
 	DeleteCriticalSection(&td->lock);
 	DeleteCriticalSection(&td->paint);
+	DeleteCriticalSection(&td->clip);
 	free(td->scratch);
 }
 

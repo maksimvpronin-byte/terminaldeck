@@ -22,6 +22,9 @@ export const RDP_FALLBACK: ResolvedRdp = {
   // played by the desktop client's process, so nothing about it crosses into
   // the window.
   sound: true,
+  // Off until somebody says otherwise: sharing a clipboard sends what you
+  // copied here to a machine that is not yours, and that is a decision.
+  clipboard: false,
   resolution: 'fit',
   desktopWidth: 1920,
   desktopHeight: 1080,
@@ -93,6 +96,7 @@ export function resolveRdp(
     magnification: pick(chain, 'magnification') ?? RDP_FALLBACK.magnification,
     // Booleans can be legitimately false, so they take the first explicit value.
     sound: firstDefined(chain, 'sound') ?? RDP_FALLBACK.sound,
+    clipboard: firstDefined(chain, 'clipboard') ?? RDP_FALLBACK.clipboard,
     sendDensity: firstDefined(chain, 'sendDensity') ?? RDP_FALLBACK.sendDensity,
     commandAsControl: firstDefined(chain, 'commandAsControl') ?? RDP_FALLBACK.commandAsControl
   }

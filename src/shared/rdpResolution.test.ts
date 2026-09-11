@@ -116,3 +116,24 @@ describe('rdpInheritedFrom', () => {
     ).toBeUndefined()
   })
 })
+
+describe('sharing the clipboard', () => {
+  /**
+   * The one setting under Desktop that moves data rather than pixels. Every
+   * other default here answers "how should this be drawn"; this one answers
+   * "may what you copied leave this machine", and the answer is no until asked.
+   */
+  it('is off unless something in the chain asks for it', () => {
+    expect(resolveRdp({}, null, []).clipboard).toBe(false)
+  })
+
+  it('is inherited from a group like the rest of the desktop settings', () => {
+    const group = { id: 'g', name: 'win', parentId: null, clipboard: true }
+    expect(resolveRdp({ groupId: 'g' } as never, 'g', [group]).clipboard).toBe(true)
+  })
+
+  it('lets a host refuse what its group allows', () => {
+    const group = { id: 'g', name: 'win', parentId: null, clipboard: true }
+    expect(resolveRdp({ clipboard: false }, 'g', [group]).clipboard).toBe(false)
+  })
+})

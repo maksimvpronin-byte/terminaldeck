@@ -126,6 +126,8 @@ const SECTIONS: Section[] = [
       { what: 'A certificate the machine cannot verify is asked about once, then remembered' },
       { what: 'Settings → Security lists what was trusted by hand, and forgets it on request' },
       { what: 'The far end’s sound plays here, and can be turned off per host or group' },
+      { what: 'The clipboard can be shared with a host — text both ways, off unless asked' },
+      { what: 'What you copy leaves this machine when it is on, so it is a per-host decision' },
       { what: 'The picture is decoded by a client of its own, so H.264 hosts are drawn as such' },
       { what: 'A desktop in a tab you are not looking at stops being sent its picture' },
       { what: 'Returning draws the whole screen again, without reconnecting' },

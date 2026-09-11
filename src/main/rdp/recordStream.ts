@@ -17,7 +17,9 @@ export const RECORD = {
   event: 1,
   frame: 2,
   cursor: 3,
-  cursorState: 4
+  cursorState: 4,
+  /** What the far end put on its clipboard, UTF-8, no header of its own. */
+  clipboard: 5
 } as const
 
 const HEADER = 5

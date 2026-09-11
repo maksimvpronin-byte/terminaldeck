@@ -136,6 +136,14 @@ export interface RdpDefaults {
    */
   sound?: boolean
   /**
+   * Whether the clipboard is shared with the far end.
+   *
+   * Off unless asked for. Everything else under Desktop changes how a picture
+   * is drawn; this one moves what you copied onto somebody else's machine, and
+   * a default that does that quietly is the wrong default.
+   */
+  clipboard?: boolean
+  /**
    * `fit` follows the pane and resizes the far end with it, which is what the
    * app has always done. `fixed` pins the desktop to a stated size and scales
    * the picture into the pane, for a host that resizes badly or a session that
@@ -228,6 +236,8 @@ export interface ResolvedRdp {
   gatewayBypassLocal: boolean
   /** Whether the far end's sound is played on this machine. */
   sound: boolean
+  /** Whether what is copied on either side reaches the other. */
+  clipboard: boolean
   resolution: RdpResolution
   desktopWidth: number
   desktopHeight: number

@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from 'child_process'
 import { join } from 'path'
 import { X509Certificate } from 'crypto'
-import { app, type BrowserWindow } from 'electron'
+import { app, clipboard, type BrowserWindow } from 'electron'
 import { IPC } from '../../shared/ipc-channels'
 import { askAboutCertificate } from './certificateVerifier'
 import { requireUnlocked } from '../vault/locked'
@@ -33,6 +33,8 @@ export interface DesktopRequest {
   /** 100–500, or nothing to leave the field at zero and be ignored. */
   scale?: number
   sound?: boolean
+  /** Whether this desktop shares its clipboard with this machine. */
+  clipboard?: boolean
   fontSmoothing?: boolean
   composition?: boolean
   noWallpaper?: boolean
@@ -61,9 +63,21 @@ interface Session {
   window: BrowserWindow
   host: string
   port: number
+  /** Whether this desktop shares a clipboard. Off unless the host asked. */
+  clipboard: boolean
   /** The client's last complaint, which is usually the reason it stopped. */
   complaint?: string
 }
+
+/**
+ * How often the local clipboard is read while a sharing desktop is open.
+ *
+ * There is no event for it — neither Electron nor any platform underneath
+ * offers one — so it is a poll or it is nothing. Four times a second is under
+ * the threshold where a paste feels like it waited, and reading a string
+ * somebody may not have changed costs nothing worth measuring.
+ */
+const CLIPBOARD_POLL_MS = 250
 
 /**
  * A line in the terminal running the app, on the same switch the rest of the
@@ -129,8 +143,15 @@ class FreeRdpBridge {
       }
     })
 
-    const session: Session = { child, window, host: request.host, port }
+    const session: Session = {
+      child,
+      window,
+      host: request.host,
+      port,
+      clipboard: Boolean(request.clipboard)
+    }
     this.sessions.set(id, session)
+    this.watchClipboard()
 
     const reader = createRecordReader(
       (type, payload) => this.receive(id, session, type, payload),
@@ -173,6 +194,7 @@ class FreeRdpBridge {
 
     child.on('exit', (code) => {
       this.sessions.delete(id)
+      this.watchClipboard()
       this.say(session, id, {
         e: 'closed',
         detail:
@@ -181,6 +203,7 @@ class FreeRdpBridge {
     })
     child.on('error', (err: Error) => {
       this.sessions.delete(id)
+      this.watchClipboard()
       this.say(session, id, {
         e: 'failed',
         // The common case by far, and worth naming: a checkout without the
@@ -202,6 +225,7 @@ class FreeRdpBridge {
       height: request.height,
       scale: request.scale,
       sound: request.sound,
+      clipboard: request.clipboard,
       fontSmoothing: request.fontSmoothing,
       composition: request.composition,
       noWallpaper: request.noWallpaper,
@@ -235,6 +259,38 @@ class FreeRdpBridge {
 
   stopAll(): void {
     for (const id of [...this.sessions.keys()]) this.stop(id)
+  }
+
+  /**
+   * What was last on the clipboard, whichever side put it there.
+   *
+   * One value for every session rather than one each: the local clipboard is
+   * one thing, and two desktops sharing it should agree about what is on it.
+   */
+  private lastClipboardText = ''
+  private clipboardTimer: NodeJS.Timeout | undefined
+
+  /** Runs only while at least one open desktop shares a clipboard. */
+  private watchClipboard(): void {
+    const wanted = [...this.sessions.values()].some((s) => s.clipboard)
+    if (!wanted) {
+      if (this.clipboardTimer) clearInterval(this.clipboardTimer)
+      this.clipboardTimer = undefined
+      return
+    }
+    if (this.clipboardTimer) return
+
+    this.lastClipboardText = clipboard.readText()
+    this.clipboardTimer = setInterval(() => {
+      const text = clipboard.readText()
+      if (text === this.lastClipboardText) return
+      this.lastClipboardText = text
+      for (const [id, session] of this.sessions) {
+        if (session.clipboard) this.write(id, { a: 'clipboard', text })
+      }
+    }, CLIPBOARD_POLL_MS)
+    // Nothing here should hold the process open by itself.
+    this.clipboardTimer.unref?.()
   }
 
   private write(id: string, fields: Record<string, string | number | boolean | undefined>): void {
@@ -284,6 +340,22 @@ class FreeRdpBridge {
       if (!session.window.isDestroyed()) {
         session.window.webContents.send(`${IPC.desktopCursor}:${id}`, { kind })
       }
+      return
+    }
+
+    if (type === RECORD.clipboard) {
+      if (!session.clipboard) return
+      const text = payload.toString('utf8')
+      /*
+       * Remembered before it is written, and that order is the whole trick:
+       * writing it fires nothing, but the poll below would read it back a
+       * quarter of a second later, see something new, and send it to the
+       * machine it just came from — which answers with a format list, and the
+       * two sides pass one string back and forth for as long as the session
+       * lasts.
+       */
+      this.lastClipboardText = text
+      clipboard.writeText(text)
       return
     }
 

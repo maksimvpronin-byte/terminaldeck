@@ -290,6 +290,18 @@ export default function RdpFields({
       <label className="checkbox-row" style={{ flexDirection: 'row' }}>
         <input
           type="checkbox"
+          checked={effective.clipboard}
+          onChange={(e) => set('clipboard', e.target.checked)}
+        />
+        <Hint label={t('Share the clipboard with this host')}>
+          {t(
+            'What you copy here can be pasted there and back again. Off unless asked for: it puts what you copied onto a machine that is not yours, and anything running on it can read the clipboard.'
+          )}
+        </Hint>
+      </label>
+      <label className="checkbox-row" style={{ flexDirection: 'row' }}>
+        <input
+          type="checkbox"
           checked={effective.commandAsControl}
           onChange={(e) => set('commandAsControl', e.target.checked)}
         />

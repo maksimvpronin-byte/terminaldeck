@@ -461,11 +461,14 @@ paths have only ever been exercised by unit tests or by hand on a local stand-in
   trade: the client that asked nothing of the build also had no graphics pipeline, and the
   picture was the thing being paid for. There is now a compiled client, built per platform and
   shipped in the application. See **Desktops** above.
-- **Clipboard and file transfer, for now.** Both rode on the previous client's own extensions
-  and neither survived the change. FreeRDP speaks the channels — `cliprdr` for both — and they
-  are the next piece of work rather than a decision against them. Said plainly here because it
-  is a step backwards, and a real one: text copied in a desktop session does not paste out of
-  it today.
+- **Everything on a clipboard except text, for now.** Text crosses in both directions once a
+  host has **Share the clipboard** ticked — off by default, since it puts what you copied onto a
+  machine that is not yours. Images, HTML and RTF are the next piece: they are more entries in
+  the same format table the text goes through, not a second mechanism. Files are a third thing
+  and the one genuinely hard on this side — RDP hands them over as a descriptor plus
+  `FileContentsRequest` in pieces, while macOS wants a path to a file that already exists, so
+  copying on the far end would mean downloading the whole thing before knowing whether anyone
+  will paste it. That decision is not made yet.
 - **Joining a session somebody else is already working in.** It was offered until 0.13.2 and has
   been removed. The mechanism goes over RPC and SMB rather than RDP, so no client this app can
   embed speaks it: the picture came from `mstsc` in a window of its own, which this app could

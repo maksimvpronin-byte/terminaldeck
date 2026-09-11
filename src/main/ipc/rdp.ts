@@ -144,7 +144,8 @@ export function registerRdpHandlers(): void {
         width: request.width,
         height: request.height,
         scale: rdp.sendDensity ? request.scale : undefined,
-        sound: rdp.sound
+        sound: rdp.sound,
+        clipboard: rdp.clipboard
       }
 
       return freeRdpBridge.start(
