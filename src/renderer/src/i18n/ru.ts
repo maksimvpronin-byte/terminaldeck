@@ -318,7 +318,6 @@ export const ru: Record<string, string> = {
   'Each in its own tab, in the current workspace':
     'Каждый в своей вкладке, в текущей рабочей области',
   'Import from ~/.ssh/config': 'Импорт из ~/.ssh/config',
-  'New subgroup': 'Новая подгруппа',
   'Save these hosts as a collection you can reopen later':
     'Сохранить эти хосты набором, чтобы открыть их позже',
   'Close pane (⌘W)': 'Закрыть панель (⌘W)',

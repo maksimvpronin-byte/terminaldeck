@@ -63,6 +63,32 @@ describe('what a host row shows', () => {
   })
 
   /**
+   * The width the row gives its name back.
+   *
+   * An Edit button stood at the right end of every row, hidden until hover and
+   * laid out regardless — `visibility: hidden` reserves the space it hides — so
+   * a name ended in an ellipsis with visible emptiness after it. Nothing may
+   * take width on the right of a row again: the context menu is where editing
+   * lives, and it always was.
+   */
+  it('keeps nothing on the right of a row that would shorten the name', () => {
+    useStore.setState({
+      sessions: [host({ id: 'h1', name: 'k8s2-mstr-001.test.local' })],
+      groups: [],
+      inventoryTrees: [],
+      gitFolderTrees: [],
+      gitFolderOverrides: [],
+      inventoryOverrides: []
+    })
+
+    render(<Sidebar onOpenSnippets={() => {}} onOpenHelp={() => {}} />)
+
+    const row = rowFor('k8s2-mstr-001.test.local')
+    expect(row.querySelector('.actions')).toBeNull()
+    expect(row.querySelector('button')).toBeNull()
+  })
+
+  /**
    * The dot this replaced sat after the name, inside the span that ellipsises,
    * so it disappeared in exactly the rows whose names were too long. Nothing
    * about the mark may depend on the name fitting, which is why it is asserted

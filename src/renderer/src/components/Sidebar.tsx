@@ -682,20 +682,15 @@ export default function Sidebar({
             </span>
           )}
         </span>
-        {/* No delete button here on purpose: one stray click must not be able
-            to destroy a host. Deleting is in the context menu, behind a prompt. */}
-        <div className="actions">
-          <button
-            title={mirrored ? t('Settings kept here, over what the repository says') : undefined}
-            onClick={(e) => {
-              e.stopPropagation()
-              if (mirrored) setOverriding(s)
-              else setEditingSession(s)
-            }}
-          >
-            Edit
-          </button>
-        </div>
+        {/* Nothing on the right, and that is the point.
+         *
+         * An Edit button stood here, hidden until the row was hovered and laid
+         * out regardless — which is how `visibility: hidden` works, and which
+         * cost every row some forty pixels of width for a control shown one
+         * second in a thousand. Names ended in an ellipsis with visible empty
+         * space after it, and in a folder three levels deep that was most of
+         * the name. The context menu already had Edit, and Local settings for a
+         * host from a repository; deleting was only ever there. */}
       </div>
     )
   }
@@ -759,31 +754,16 @@ export default function Sidebar({
                   {isCollapsed && childCount > 0 && (
                     <span className="child-count">{childCount}</span>
                   )}
+                  {/* The one thing the button that stood here carried by
+                      itself: it turned into an ellipsis while a sync ran, and
+                      nothing else on screen said a folder was busy. */}
+                  {isSyncing && <span className="settings-note"> …</span>}
                 </span>
-                <div className="actions">
-                  {g.git && (
-                    <button
-                      title={t('Sync with git…')}
-                      disabled={isSyncing}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        startSync(g)
-                      }}
-                    >
-                      {isSyncing ? '…' : '⟳'}
-                    </button>
-                  )}
-                  <button
-                    title={t('New subgroup')}
-                    disabled={isGitNode(g.id)}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setGroupDialog({ parentId: g.id })
-                    }}
-                  >
-                    +
-                  </button>
-                </div>
+                {/* The same two buttons went for the same reason: reserved
+                    width on every folder row, sixty pixels of it, for Sync with
+                    git and New subgroup — both of which the context menu has
+                    had all along. A sync in progress says so in the line under
+                    the folder, which is where the branch and revision are. */}
               </div>
               {/* Only when a sync went wrong. That is not a caption to read past:
                 the folder goes on showing what it already had, and without this
