@@ -131,16 +131,30 @@ if (-not (Test-Path $src)) {
   Write-Host "already at $src"
 }
 
-# WinPR 3.31 opens clipboard files exclusively. A file already open for reading
-# (for example by Explorer preview) then fails after its descriptor was sent.
-# Keep writers excluded, but permit concurrent readers. Check the exact source
-# so a FreeRDP upgrade cannot silently omit this fix.
+# WinPR 3.31 opens clipboard files exclusively, and reopens the file for every
+# chunk the far end asks for — so any other handle on it, at any point during
+# the paste, fails the transfer after its descriptor was already sent.
+#
+# Shared the way Explorer shares a file it is copying: readers, writers and
+# deleters all allowed. The first version of this kept writers out, and that
+# is precisely the case that matters: Office holds every open document with
+# write access, so a workbook open in Excel — the thing most often copied —
+# failed with a sharing violation (error 32) on a paste Explorer makes without
+# a word. What reading beside a writer risks is a file caught mid-save, which
+# is the risk every Windows copy already takes.
+#
+# Three states of the source, all checked by their exact text so a FreeRDP
+# upgrade cannot silently drop the fix: as released, as the first version of
+# this patch left it (a tree fetched before this change), and patched.
 $clipboardSource = Join-Path $src 'winpr\libwinpr\clipboard\synthetic_file.c'
 $clipboardCode = [System.IO.File]::ReadAllText($clipboardSource)
-$exclusiveRead = 'CreateFileW(file->local_name, GENERIC_READ, 0, nullptr, OPEN_EXISTING,'
-$sharedRead = 'CreateFileW(file->local_name, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,'
-if ($clipboardCode.Contains($exclusiveRead)) {
-  [System.IO.File]::WriteAllText($clipboardSource, $clipboardCode.Replace($exclusiveRead, $sharedRead), [System.Text.UTF8Encoding]::new($false))
+$readerOpen = 'CreateFileW(file->local_name, GENERIC_READ, {0}, nullptr, OPEN_EXISTING,'
+$exclusiveRead = $readerOpen -f '0'
+$readersOnly = $readerOpen -f 'FILE_SHARE_READ'
+$sharedRead = $readerOpen -f 'FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE'
+$unpatched = @($exclusiveRead, $readersOnly) | Where-Object { $clipboardCode.Contains($_) } | Select-Object -First 1
+if ($unpatched) {
+  [System.IO.File]::WriteAllText($clipboardSource, $clipboardCode.Replace($unpatched, $sharedRead), [System.Text.UTF8Encoding]::new($false))
   # The installed WinPR DLL also needs rebuilding, even for a shim-only request.
   $ShimOnly = $false
 } elseif (-not $clipboardCode.Contains($sharedRead)) {

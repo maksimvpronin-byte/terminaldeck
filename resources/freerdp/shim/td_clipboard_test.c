@@ -162,10 +162,20 @@ static void file_transfers(tdContext* td, CliprdrClientContext* ctx)
 	assert(wide_path);
 	HANDLE reader = CreateFileW(wide_path, GENERIC_READ, FILE_SHARE_READ, NULL,
 	                            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	free(wide_path);
 	assert(reader != INVALID_HANDLE_VALUE);
 	assert(td_clip_local_request(ctx, &request) == CHANNEL_RC_OK);
 	assert(CloseHandle(reader));
+	/* And a writer, which is how Office holds every document it has open: read
+	 * and write access, sharing reads only. Explorer copies such a file without
+	 * a word, so a paste must too. Sharing with readers alone refused it with
+	 * error 32 on the far side of the paste — a workbook open in Excel, which
+	 * is how this was found. */
+	HANDLE writer = CreateFileW(wide_path, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL,
+	                            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	free(wide_path);
+	assert(writer != INVALID_HANDLE_VALUE);
+	assert(td_clip_local_request(ctx, &request) == CHANNEL_RC_OK);
+	assert(CloseHandle(writer));
 #endif
 	/*
 	 * A file list must still go out when the capability exchange left no trace

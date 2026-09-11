@@ -6,6 +6,19 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.15.9
+
+### Fixed
+
+- Copy a file into a desktop while another program has it open — a workbook in
+  Excel, a document in Word. The list of files now reached the far end, and the
+  paste then failed on the first read with a sharing violation (error 32): the
+  Windows build shared the file with other readers but kept writers out, and
+  Office holds every open document with write access. Files are now shared the
+  way Explorer shares a file it is copying, which also copies open documents; a
+  file caught mid-save is the risk every Windows copy already takes. The shim's
+  test holds the file the way Office does and then asks for it.
+
 ## 0.15.8
 
 Everything 0.15.7 was, which never reached anybody: its Windows build failed on
