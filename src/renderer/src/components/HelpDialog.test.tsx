@@ -26,6 +26,12 @@ describe('the examples in the help', () => {
     expect(shown).toContain('terminaldeck_port: 33890')
   })
 
+  it('says which build this is, at the top where a bug report starts', () => {
+    inLanguage('en')
+    render(<HelpDialog onClose={() => {}} />)
+    expect(screen.getByText('0.0.0-test')).toBeInTheDocument()
+  })
+
   it('leaves them alone in Russian, where the prose around them is translated', () => {
     inLanguage('ru')
     render(<HelpDialog onClose={() => {}} />)

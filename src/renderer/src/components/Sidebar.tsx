@@ -11,6 +11,7 @@ import { applyOverride } from '../../../shared/overrides'
 import { isGitNode, gitFolderLayout } from '../../../shared/gitFolders'
 import { protocolOf } from '../../../shared/protocols'
 import { DesktopIcon, TerminalIcon } from './icons'
+import { groupIndent, hostIndent } from './treeIndent'
 import {
   useStore,
   collectConnectedSessionIds,
@@ -714,7 +715,7 @@ export default function Sidebar({
                 className={`tree-item ${dropTarget === g.id ? 'drop-target' : ''}${
                   dropEdge?.id === g.id ? ` drop-${dropEdge.place}` : ''
                 }`}
-                style={{ paddingLeft: 8 + depth * 12 }}
+                style={{ paddingLeft: groupIndent(depth) }}
                 draggable={!isGitNode(g.id)}
                 onDragStart={(e) => startDrag(e, { kind: 'group', id: g.id }, g.name)}
                 onDragEnd={endDrag}
@@ -783,13 +784,13 @@ export default function Sidebar({
                 the folder goes on showing what it already had, and without this
                 a failed sync looks exactly like one that changed nothing. */}
               {g.git && !isSyncing && (gitErrors[g.id] ?? g.git.lastError) && (
-                <div className="inventory-error" style={{ paddingLeft: 20 + depth * 12 }}>
+                <div className="inventory-error" style={{ paddingLeft: hostIndent(depth) }}>
                   {gitErrors[g.id] ?? g.git.lastError}
                 </div>
               )}
               {!isCollapsed && (
                 <>
-                  {hostsIn(g.id, visible).map((s) => renderSession(s, 20 + depth * 12))}
+                  {hostsIn(g.id, visible).map((s) => renderSession(s, hostIndent(depth)))}
                   {renderGroups(g.id, depth + 1)}
                 </>
               )}
@@ -876,7 +877,7 @@ export default function Sidebar({
             {rootSessions.length > 0 && (
               <div className="tree-group">
                 <div className="tree-group-title">{t('Sessions')}</div>
-                {rootSessions.map((s) => renderSession(s, 8))}
+                {rootSessions.map((s) => renderSession(s, groupIndent(0)))}
               </div>
             )}
 

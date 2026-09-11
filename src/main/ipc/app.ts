@@ -20,6 +20,10 @@ export function registerAppHandlers(): void {
   ipcMain.on(IPC.appLocalUsername, (event) => {
     event.returnValue = userInfo().username
   })
+  // Constant for the life of the process, so it travels the same way.
+  ipcMain.on(IPC.appVersion, (event) => {
+    event.returnValue = app.getVersion()
+  })
   ipcMain.on(IPC.clipboardRead, (event) => {
     event.returnValue = clipboard.readText()
   })

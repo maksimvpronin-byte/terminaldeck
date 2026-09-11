@@ -36,6 +36,7 @@ if (typeof window !== 'undefined') {
     configurable: true,
     value: {
       localUsername: 'tester',
+      appVersion: '0.0.0-test',
       store: stub({
         load: () => Promise.resolve({ version: 1, groups: [], sessions: [] }),
         reorderSessions: () => Promise.resolve(),

@@ -20,6 +20,7 @@ import { paneTitle } from '../state/connect'
 import { useT } from '../i18n'
 import { ago } from '../state/syncStatus'
 import { DesktopIcon, RefreshIcon, TerminalIcon } from './icons'
+import { groupIndent, hostIndent } from './treeIndent'
 import Hint from './Hint'
 
 const COLLAPSED_KEY = 'terminaldeck.collapsedInventory'
@@ -302,7 +303,7 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
           <div className="tree-group" key={g.id}>
             <div
               className="tree-item"
-              style={{ paddingLeft: 8 + depth * 12 }}
+              style={{ paddingLeft: groupIndent(depth) }}
               onClick={() => toggleCollapsed(g.id)}
               onContextMenu={(e) => {
                 e.preventDefault()
@@ -321,7 +322,7 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
             </div>
             {!isCollapsed && (
               <>
-                {hostsOf(g.id).map((h) => renderHost(h, 20 + depth * 12, colour))}
+                {hostsOf(g.id).map((h) => renderHost(h, hostIndent(depth), colour))}
                 {renderGroups(g.id, depth + 1, colour)}
               </>
             )}
@@ -510,19 +511,19 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
                   worth interrupting the list for: everything else about a
                   repository is under the mark beside its name. */}
               {busy && (
-                <div className="inventory-meta" style={{ paddingLeft: 26 }}>
+                <div className="inventory-meta" style={{ paddingLeft: hostIndent(0) }}>
                   {t('syncing…')}
                 </div>
               )}
               {(source.lastError || syncErrors[source.id]) && (
-                <div className="inventory-error" style={{ paddingLeft: 26 }}>
+                <div className="inventory-error" style={{ paddingLeft: hostIndent(0) }}>
                   {source.lastError ?? syncErrors[source.id]}
                 </div>
               )}
 
               {!isCollapsed && (
                 <>
-                  {hostsOf(rootId).map((h) => renderHost(h, 20, source.color))}
+                  {hostsOf(rootId).map((h) => renderHost(h, hostIndent(0), source.color))}
                   {renderGroups(rootId, 1, source.color)}
                 </>
               )}

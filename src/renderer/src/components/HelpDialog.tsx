@@ -349,7 +349,13 @@ export default function HelpDialog({ onClose }: { onClose: () => void }): JSX.El
   return (
     <ModalBackdrop onClose={onClose}>
       <div className="modal-card help-card">
-        <h2>{t('Shortcuts and features')}</h2>
+        <h2 className="help-title">
+          {t('Shortcuts and features')}
+          {/* Which build this is, where somebody reporting a problem will look
+              for it. Read once as the bridge is built, so it is a value here
+              rather than something to wait for. */}
+          <span className="help-version">{window.td.appVersion}</span>
+        </h2>
         <p className="settings-note">
           {t('On Windows and Linux read ⌘ as Ctrl+Shift — plain Ctrl belongs to the shell.')}
         </p>

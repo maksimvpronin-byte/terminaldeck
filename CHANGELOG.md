@@ -20,6 +20,18 @@ the other produces a version nobody can install, which is how 0.1.10 through
   monitor for RDP, drawn rather than typed. It is the first thing worth knowing
   about a Windows machine in a list of Linux ones, and until now the tree did not
   say it anywhere. Both trees, Sessions and Inventory.
+- Tighten the tree's indentation, which compounded faster than it looked: a base
+  of 8, a step of 12 and a whole extra step for a host put a name 58px into a
+  260px panel three levels down, with nothing left to read it in. The base is 4,
+  the step 10, and a host is nudged 8 inside its group rather than given a level
+  — it has no chevron to make room for, and the icon landing under the folder
+  above it already says "inside". The geometry is written down once now, in
+  `treeIndent.ts`, because both trees draw it and they have to agree.
+
+### Added
+
+- The help says which build it belongs to, at the top right, where somebody
+  writing a bug report will look for it.
 
 ### Fixed
 

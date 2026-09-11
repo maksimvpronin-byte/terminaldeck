@@ -45,7 +45,7 @@ describe('what a host row shows', () => {
       inventoryOverrides: []
     })
 
-    render(<Sidebar />)
+    render(<Sidebar onOpenSnippets={() => {}} onOpenHelp={() => {}} />)
 
     expect(rowFor('linux-box').querySelector('.session-kind')?.getAttribute('title')).toBe(
       'Opens a terminal'

@@ -197,6 +197,8 @@ export const IPC = {
    * keystroke is cheaper than reshaping every caller around a promise.
    */
   appLocalUsername: 'app:localUsername',
+  /** What this build calls itself, for the help to say out loud. */
+  appVersion: 'app:version',
   clipboardRead: 'clipboard:read',
   clipboardWrite: 'clipboard:write',
 

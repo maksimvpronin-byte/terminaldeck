@@ -470,6 +470,7 @@ const api = {
    * instead of demanding that it be typed.
    */
   localUsername: ipcRenderer.sendSync(IPC.appLocalUsername) as string,
+  appVersion: ipcRenderer.sendSync(IPC.appVersion) as string,
   clipboard: {
     // Electron's own clipboard rather than navigator.clipboard: the packaged app
     // is served from file://, which is not a secure context, so the web API fails.
