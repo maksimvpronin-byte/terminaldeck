@@ -989,7 +989,7 @@ export default function RemoteScreen({
             : clipboardStatus === 'ready'
               ? t('Files ready to paste')
               : clipboardStatus.startsWith('error:')
-                ? `${t('File copy failed')}: ${clipboardStatus.slice(6)}`
+                ? `${t('File copy failed')}: ${t(clipboardStatus.slice(6))}`
                 : `${t('Receiving clipboard files')} ${clipboardStatus.slice(9)}%`}
           <button
             aria-label={t('Close')}

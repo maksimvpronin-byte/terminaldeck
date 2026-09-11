@@ -167,6 +167,19 @@ static void file_transfers(tdContext* td, CliprdrClientContext* ctx)
 	assert(td_clip_local_request(ctx, &request) == CHANNEL_RC_OK);
 	assert(CloseHandle(reader));
 #endif
+	/*
+	 * A file list must still go out when the capability exchange left no trace
+	 * here. The far end is asking for a format offered only when files are
+	 * waiting, so it does support them; WinPR, told otherwise, serialises
+	 * nothing at all and the paste fails with the far end none the wiser.
+	 */
+	assert(cliprdr_file_context_remote_set_flags(td->clip_files, 0));
+	assert(td_clip_answer_files(ctx, td) == CHANNEL_RC_OK);
+	assert(td_clip_send_flags(td) & CB_STREAM_FILECLIP_ENABLED);
+	assert(cliprdr_file_context_remote_set_flags(td->clip_files,
+	                                             CB_STREAM_FILECLIP_ENABLED |
+	                                                 CB_FILECLIP_NO_FILE_PATHS));
+
 	free(td->clip_uris);
 	td->clip_uris = NULL;
 	assert(remove(path) == 0);

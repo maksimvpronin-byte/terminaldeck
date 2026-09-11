@@ -3,8 +3,10 @@ import { readdirSync, readFileSync, statSync } from 'fs'
 import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
 import { ru } from './ru'
+import { EXTERNAL_PHRASES, EXTERNAL_PHRASE_SOURCES } from './external'
 
 const RENDERER = join(dirname(fileURLToPath(import.meta.url)), '..')
+const ROOT = join(RENDERER, '..', '..', '..')
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -72,6 +74,13 @@ function keysAskedFor(): Map<string, string[]> {
       }
     }
   }
+  /*
+   * And the sentences that are never written in the renderer at all: a failed
+   * file copy is explained by the RDP client or by the transfer, and arrives
+   * here as a value. `external.ts` says which they are; the test below holds
+   * that list to what those two files actually say.
+   */
+  for (const phrase of EXTERNAL_PHRASES) add(phrase, join(RENDERER, 'i18n/external.ts'))
   return found
 }
 
@@ -105,6 +114,20 @@ describe('the Russian phrase book', () => {
     const stale = Object.keys(ru).filter((key) => !asked.has(key))
 
     expect(stale).toEqual([])
+  })
+
+  /**
+   * The half of `external.ts` that can rot: a phrase reworded where it is
+   * produced leaves an entry here that nothing will ever look up again, and
+   * the new wording reaches the screen in English with nothing to say so.
+   */
+  it('lists only phrases the client and the transfer really produce', () => {
+    const sources = EXTERNAL_PHRASE_SOURCES.map((file) => readFileSync(join(ROOT, file), 'utf8'))
+    const unclaimed = EXTERNAL_PHRASES.filter(
+      (phrase) => !sources.some((text) => text.includes(phrase))
+    )
+
+    expect(unclaimed).toEqual([])
   })
 
   it('carries the same placeholders across into the translation', () => {

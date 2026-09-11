@@ -10,6 +10,29 @@ export const ru: Record<string, string> = {
   'Files ready to paste': 'Файлы готовы к вставке',
   'File copy failed': 'Не удалось скопировать файлы',
   'Receiving clipboard files': 'Получение файлов из буфера',
+  // Why a copy failed. The text arrives from the RDP client and the transfer
+  // itself, so these are keyed by the English the one and the other produce.
+  'Nothing is copied on this computer': 'На этом компьютере ничего не скопировано',
+  'This build cannot read local files into the clipboard':
+    'Эта сборка не умеет забирать локальные файлы в буфер обмена',
+  'Windows would not accept the copied paths': 'Windows не принял пути скопированных файлов',
+  'Cannot open the copied files on this computer':
+    'Не удалось открыть скопированные файлы на этом компьютере',
+  'This session cannot carry a file of 2 GB or more':
+    'Эта сессия не перенесёт файл размером 2 ГБ и больше',
+  'The server did not supply a file list': 'Сервер не прислал список файлов',
+  'Invalid RDP file list': 'Список файлов от сервера испорчен',
+  'Unterminated RDP file name': 'Имя файла от сервера не завершено',
+  'Unsafe RDP file name': 'Небезопасное имя файла от сервера',
+  'RDP links are not supported': 'Ссылки через буфер обмена не поддерживаются',
+  'The server did not supply the file size': 'Сервер не сообщил размер файла',
+  'Clipboard transfer exceeds 20 GB': 'Передача больше 20 ГБ',
+  'Duplicate RDP file name': 'Сервер прислал два файла с одним именем',
+  'A file is used as a directory': 'Сервер выдал файл за папку',
+  'RDP file transfer timed out': 'Сервер перестал отвечать',
+  'The RDP server refused or truncated the file transfer':
+    'Сервер отказал в передаче файла или оборвал её',
+  'Could not write the received file': 'Не удалось записать полученный файл',
 
   Collections: 'Наборы',
   Workspaces: 'Рабочие области',

@@ -760,7 +760,40 @@ static UINT td_clip_server_format_data_response(CliprdrClientContext* ctx,
 	return CHANNEL_RC_OK;
 }
 
-/** Build and retain WinPR's file table when the server requests descriptors. */
+/**
+ * The flags the outgoing descriptor list is built under.
+ *
+ * The far end's own, as it announced them — with one addition. WinPR refuses
+ * to serialise any list at all unless CB_STREAM_FILECLIP_ENABLED is among
+ * them, and a request for the file list is itself proof that the far end does
+ * file clipboards: it is answering a format we only offer when files are
+ * waiting. A capability exchange that never reached this context would
+ * otherwise turn every paste into a refusal the far end cannot explain.
+ *
+ * What is not assumed is CB_HUGE_FILE_SUPPORT_ENABLED: without it WinPR keeps
+ * files of 2 GB and over off the wire, which is the safe half of the guess.
+ */
+static UINT32 td_clip_send_flags(tdContext* td)
+{
+	const UINT32 flags = cliprdr_file_context_remote_get_flags(td->clip_files);
+
+	if (flags & CB_STREAM_FILECLIP_ENABLED)
+		return flags;
+
+	WLog_WARN(TAG, "clipboard: the far end asked for files it never announced (flags 0x%08x)",
+	          (unsigned)flags);
+	return flags | CB_STREAM_FILECLIP_ENABLED;
+}
+
+/**
+ * Build and retain WinPR's file table when the server requests descriptors.
+ *
+ * Every step between the paths this side copied and the descriptors the far
+ * end asked for says which one it was. They used to share a single sentence,
+ * and a failure here is reported from a machine that is not this one, by
+ * somebody reading a notification: "could not prepare the files" narrows it to
+ * four unrelated causes, which is no better than silence.
+ */
 static UINT td_clip_answer_files(CliprdrClientContext* ctx, tdContext* td)
 {
 	CLIPRDR_FORMAT_DATA_RESPONSE response = { 0 };
@@ -769,6 +802,7 @@ static UINT td_clip_answer_files(CliprdrClientContext* ctx, tdContext* td)
 	BYTE* wire = NULL;
 	UINT32 wire_size = 0;
 	char* uris = NULL;
+	char why[192] = "Nothing is copied on this computer";
 	UINT rc;
 
 	EnterCriticalSection(&td->clip);
@@ -777,21 +811,38 @@ static UINT td_clip_answer_files(CliprdrClientContext* ctx, tdContext* td)
 	LeaveCriticalSection(&td->clip);
 
 	response.common.msgType = CB_FORMAT_DATA_RESPONSE;
-	if (uris && uriFormat && listFormat)
+	if (!uriFormat || !listFormat)
+		(void)snprintf(why, sizeof(why), "This build cannot read local files into the clipboard");
+	else if (uris)
 	{
 		const size_t length = strlen(uris);
+		/* The list itself, because every remaining cause is a property of one
+		 * of these paths and none of them is guessable from the outside. */
+		WLog_INFO(TAG, "clipboard: preparing %s", uris);
 		ClipboardLock(td->clip_system);
-		if (ClipboardSetData(td->clip_system, uriFormat, uris, (UINT32)length))
+		if (!ClipboardSetData(td->clip_system, uriFormat, uris, (UINT32)length))
+			(void)snprintf(why, sizeof(why), "Windows would not accept the copied paths");
+		else
 		{
 			UINT32 count = 0;
 			const FILEDESCRIPTORW* descriptors =
 			    (const FILEDESCRIPTORW*)ClipboardGetData(td->clip_system, listFormat, &count);
-			if (descriptors)
+			if (!descriptors)
+				(void)snprintf(why, sizeof(why), "Cannot open the copied files on this computer");
+			else
 			{
-				const UINT32 flags = cliprdr_file_context_remote_get_flags(td->clip_files);
-				if (cliprdr_serialize_file_list_ex(flags, descriptors,
-				                                   count / sizeof(FILEDESCRIPTORW), &wire,
-				                                   &wire_size) != CHANNEL_RC_OK)
+				const UINT32 flags = td_clip_send_flags(td);
+				const UINT error = cliprdr_serialize_file_list_ex(
+				    flags, descriptors, count / sizeof(FILEDESCRIPTORW), &wire, &wire_size);
+
+				if (error == ERROR_FILE_TOO_LARGE)
+					(void)snprintf(why, sizeof(why),
+					               "This session cannot carry a file of 2 GB or more");
+				else if (error != CHANNEL_RC_OK)
+					(void)snprintf(why, sizeof(why),
+					               "Cannot describe the copied files (error %u, flags 0x%08x)",
+					               (unsigned)error, (unsigned)flags);
+				if (error != CHANNEL_RC_OK)
 					wire = NULL;
 				free((void*)descriptors);
 			}
@@ -804,7 +855,11 @@ static UINT td_clip_answer_files(CliprdrClientContext* ctx, tdContext* td)
 
 	if (!wire)
 	{
-		td_event("{\"e\":\"clipboard-transfer\",\"state\":\"error\",\"detail\":\"Cannot prepare local files for RDP clipboard\"}");
+		char escaped[512];
+
+		WLog_ERR(TAG, "clipboard: %s", why);
+		td_event("{\"e\":\"clipboard-transfer\",\"state\":\"error\",\"detail\":\"%s\"}",
+		         td_json_escape(escaped, sizeof(escaped), why));
 		response.common.msgFlags = CB_RESPONSE_FAIL;
 		return ctx->ClientFormatDataResponse(ctx, &response);
 	}

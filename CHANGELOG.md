@@ -6,6 +6,26 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.15.6
+
+### Fixed
+
+- Copy files *into* a desktop when the far end never said it could take them.
+  A Windows host that asks for the file list has, by asking, proved it does file
+  clipboards — it is answering a format offered only when files are waiting — but
+  the client refused to build the list unless the capability had also been
+  recorded from the handshake, and a handshake that did not reach it turned every
+  paste into a refusal the host could not explain.
+
+### Changed
+
+- A file copy that fails now says which step failed. One sentence covered four
+  unrelated causes — nothing copied here, Windows refusing the paths, a file that
+  cannot be opened, a list the session will not carry — and all of them arrived as
+  "could not prepare the files", which is no more use than silence to somebody
+  reading a notification on another machine. Every reason a copy can fail, on
+  either side of the transfer, is now also translated.
+
 ## 0.15.5
 
 ### Fixed
