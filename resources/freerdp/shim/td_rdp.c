@@ -34,6 +34,7 @@
 #include <freerdp/client/cmdline.h>
 #include <freerdp/client/disp.h>
 #include <freerdp/channels/channels.h>
+#include <freerdp/log.h>
 #include <freerdp/channels/cliprdr.h>
 #include <freerdp/client/cliprdr.h>
 #include <freerdp/channels/disp.h>
@@ -129,6 +130,10 @@ typedef struct
 	int clipboard;
 	CRITICAL_SECTION clip;
 	char* clip_local;
+	/* Channel-thread state: responses carry no format id. Keep our outgoing
+	 * request separate from FreeRDP's lastRequestedFormatId (incoming requests). */
+	UINT32 clip_requested, clip_next;
+	int clip_next_pending;
 
 	/** The size last asked of the server, so a repeat can be ignored. */
 	UINT32 want_width, want_height, want_scale;
@@ -549,6 +554,12 @@ static UINT td_clip_offer(tdContext* td)
 	list.common.msgType = CB_FORMAT_LIST;
 	list.numFormats = have ? 1 : 0;
 	list.formats = have ? &format : NULL;
+	/* At INFO, which the driving process only lets through when it is tracing:
+	 * the clipboard is the one part of this whose failures all look identical
+	 * from the outside — nothing pasted, or something pasted wrong — and which
+	 * of the four messages went astray is not guessable from either. */
+	WLog_INFO(TAG, "clipboard: announcing %u format(s), CF_UNICODETEXT=%u", list.numFormats,
+	          (unsigned)CF_UNICODETEXT);
 	return ctx->ClientFormatList(ctx, &list);
 }
 
@@ -579,6 +590,22 @@ static UINT td_clip_monitor_ready(CliprdrClientContext* ctx, const CLIPRDR_MONIT
 	return td_clip_offer(td);
 }
 
+static UINT td_clip_request(CliprdrClientContext* ctx, UINT32 format)
+{
+	tdContext* td = (tdContext*)ctx->custom;
+	CLIPRDR_FORMAT_DATA_REQUEST request = { 0 };
+	UINT rc;
+	if (!format)
+		return CHANNEL_RC_OK;
+	request.common.msgType = CB_FORMAT_DATA_REQUEST;
+	request.requestedFormatId = format;
+	td->clip_requested = format;
+	rc = ctx->ClientFormatDataRequest(ctx, &request);
+	if (rc != CHANNEL_RC_OK)
+		td->clip_requested = 0;
+	return rc;
+}
+
 /**
  * The far end copied something.
  *
@@ -590,7 +617,7 @@ static UINT td_clip_monitor_ready(CliprdrClientContext* ctx, const CLIPRDR_MONIT
 static UINT td_clip_server_format_list(CliprdrClientContext* ctx, const CLIPRDR_FORMAT_LIST* list)
 {
 	CLIPRDR_FORMAT_LIST_RESPONSE response = { 0 };
-	CLIPRDR_FORMAT_DATA_REQUEST request = { 0 };
+	tdContext* td = (tdContext*)ctx->custom;
 	UINT32 wanted = 0;
 	UINT rc;
 
@@ -602,6 +629,9 @@ static UINT td_clip_server_format_list(CliprdrClientContext* ctx, const CLIPRDR_
 
 	for (UINT32 i = 0; i < list->numFormats; i++)
 	{
+		WLog_INFO(TAG, "clipboard: the far end offers format %u (%s)",
+		          (unsigned)list->formats[i].formatId,
+		          list->formats[i].formatName ? list->formats[i].formatName : "standard");
 		if (list->formats[i].formatId == CF_UNICODETEXT)
 		{
 			wanted = CF_UNICODETEXT;
@@ -610,27 +640,45 @@ static UINT td_clip_server_format_list(CliprdrClientContext* ctx, const CLIPRDR_
 		if (list->formats[i].formatId == CF_TEXT)
 			wanted = CF_TEXT;
 	}
-	if (!wanted)
+	WLog_INFO(TAG, "clipboard: asking for format %u", (unsigned)wanted);
+	/* Only one request in flight: a response has no id with which to match it.
+	 * If the clipboard changes meanwhile, fetch the newest offer afterwards. */
+	if (td->clip_requested)
+	{
+		td->clip_next = wanted;
+		td->clip_next_pending = 1;
 		return CHANNEL_RC_OK;
-
-	request.common.msgType = CB_FORMAT_DATA_REQUEST;
-	request.requestedFormatId = wanted;
-	return ctx->ClientFormatDataRequest(ctx, &request);
+	}
+	return td_clip_request(ctx, wanted);
 }
 
 /** What we asked for, arriving. */
 static UINT td_clip_server_format_data_response(CliprdrClientContext* ctx,
                                                 const CLIPRDR_FORMAT_DATA_RESPONSE* response)
 {
+	tdContext* td = (tdContext*)ctx->custom;
+	const UINT32 format = td->clip_requested;
 	const BYTE* data = response->requestedFormatData;
 	const UINT32 length = response->common.dataLen;
 
+	WLog_INFO(TAG, "clipboard: format %u came back, %u byte(s), flags 0x%04x",
+	          (unsigned)format, (unsigned)length,
+	          (unsigned)response->common.msgFlags);
+
+	td->clip_requested = 0;
+	if (td->clip_next_pending)
+	{
+		td->clip_next_pending = 0;
+		return td_clip_request(ctx, td->clip_next);
+	}
+	if (!format)
+		return CHANNEL_RC_OK;
 	if ((response->common.msgFlags & CB_RESPONSE_FAIL) != 0)
 		return CHANNEL_RC_OK;
 	if (!data || length == 0)
 		return CHANNEL_RC_OK;
 
-	if (ctx->lastRequestedFormatId == CF_UNICODETEXT)
+	if (format == CF_UNICODETEXT)
 	{
 		size_t utf8_len = 0;
 		char* utf8 = ConvertWCharNToUtf8Alloc((const WCHAR*)data, length / sizeof(WCHAR),
@@ -672,6 +720,9 @@ static UINT td_clip_server_format_data_request(CliprdrClientContext* ctx,
 		LeaveCriticalSection(&td->clip);
 	}
 
+	WLog_INFO(TAG, "clipboard: the far end wants format %u, we have %s",
+	          (unsigned)request->requestedFormatId, wide ? "it" : "nothing for it");
+
 	response.common.msgType = CB_FORMAT_DATA_RESPONSE;
 	if (!wide)
 	{
@@ -682,8 +733,12 @@ static UINT td_clip_server_format_data_request(CliprdrClientContext* ctx,
 	}
 
 	response.common.msgFlags = CB_RESPONSE_OK;
-	/* With its terminator, which is what Windows expects of this format. */
+	/* With its terminator, which is what Windows expects of this format.
+	 * `chars` is a wcslen — characters, not bytes — so this is the text plus
+	 * one more UTF-16 unit for the NUL. */
 	response.common.dataLen = (UINT32)((chars + 1) * sizeof(WCHAR));
+	WLog_INFO(TAG, "clipboard: answering with %u byte(s) of UTF-16",
+	          (unsigned)response.common.dataLen);
 	response.requestedFormatData = (const BYTE*)wide;
 	rc = ctx->ClientFormatDataResponse(ctx, &response);
 	free(wide);
@@ -734,6 +789,8 @@ static void on_channel_disconnected(void* context, const ChannelDisconnectedEven
 	if (strcmp(e->name, CLIPRDR_SVC_CHANNEL_NAME) == 0)
 	{
 		td->cliprdr = NULL;
+		td->clip_requested = 0;
+		td->clip_next_pending = 0;
 		return;
 	}
 	freerdp_client_OnChannelDisconnectedEventHandler(&td->common, e);
