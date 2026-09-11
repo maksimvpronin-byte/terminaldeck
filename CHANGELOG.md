@@ -6,6 +6,23 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.15.3
+
+### Added
+
+- Copy files into a desktop. A desktop pane has no SFTP — RDP has no shell to
+  hang one off — so until now there was no way at all to put a file on a Windows
+  machine from here; the clipboard is that way. Copy in Finder, paste in the
+  session: single files, several at once, and directories, which are walked on
+  the far end's behalf. Nothing is copied anywhere to be offered, so the size of
+  what you copy does not matter: FreeRDP's file helper reads the bytes off this
+  disk in ranges when the far end asks for them, and it only asks when somebody
+  pastes. The list of paths turns into the descriptors the far end expects at
+  that moment too, since building them means stat'ing every file.
+
+  Copying files *out* of a session is not here yet. FreeRDP answers that with
+  FUSE, which macOS does not have, so it has to be written rather than wired up.
+
 ## 0.15.2
 
 ### Fixed

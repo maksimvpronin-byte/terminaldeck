@@ -496,6 +496,12 @@ export const ru: Record<string, string> = {
     'Буфер обмена делится с рабочим столом — текст в обе стороны, как в клиентах Windows',
   'Turn it off per host or group for a machine you would rather not hand it to':
     'Выключается для хоста или группы, если машине не стоит его отдавать',
+  'Files go the same way: copy in Finder, paste in the session, directories and all':
+    'Файлы едут так же: скопировали в Finder, вставили в сессии, вместе с каталогами',
+  'Nothing is copied first — the far end reads them off this disk as it pastes':
+    'Ничего заранее не копируется — та сторона читает файлы с этого диска в момент вставки',
+  'The other direction, copying files out of a session, is not here yet':
+    'Обратного направления, из сессии сюда, пока нет',
   'The far end’s sound plays here, and can be turned off per host or group':
     'Звук той стороны слышен здесь; выключается для хоста или для всей группы',
   'The picture is decoded by a client of its own, so H.264 hosts are drawn as such':
