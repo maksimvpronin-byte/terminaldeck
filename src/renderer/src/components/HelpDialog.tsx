@@ -149,6 +149,9 @@ const SECTIONS: Section[] = [
     title: 'Sessions',
     rows: [
       { what: 'Double-click a host to connect; a single click only selects it' },
+      { what: 'The mark in front of a name says what it opens: a terminal or a desktop' },
+      { what: 'A host given a colour wears it as its own background and a coloured edge' },
+      { what: 'The edge stays while the row is selected, so the colour survives the click' },
       { what: 'Right-click for connect, split, duplicate, edit and delete' },
       { what: 'Deleting lives in that menu alone, behind a prompt — no button to misclick' },
       { keys: '⌘ click', what: 'Tick a host as well, to open several at once' },

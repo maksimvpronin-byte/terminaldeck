@@ -130,6 +130,12 @@ export const ru: Record<string, string> = {
     'Оформление и учётные данные отключаются от наследования независимо',
   'A host theme recolours its terminal only — the app keeps the Settings theme':
     'Тема хоста перекрашивает только его терминал — приложение сохраняет свою',
+  'The mark in front of a name says what it opens: a terminal or a desktop':
+    'Значок перед именем говорит, что откроется: терминал или рабочий стол',
+  'A host given a colour wears it as its own background and a coloured edge':
+    'Хост, которому задан цвет, носит его как собственный фон и цветную полосу слева',
+  'The edge stays while the row is selected, so the colour survives the click':
+    'Полоса остаётся и на выделенной строке, поэтому цвет не пропадает при клике',
   'Double-click a host to connect; a single click only selects it':
     'Двойной клик по хосту подключается; одиночный только выделяет',
   'Right-click for connect, split, duplicate, edit and delete':
@@ -714,6 +720,8 @@ export const ru: Record<string, string> = {
   'Has local settings': 'Есть локальные настройки',
   'Has a local override': 'Есть локальное переопределение',
   'Copy {address}': 'Скопировать {address}',
+  'Opens a terminal': 'Открывает терминал',
+  'Opens a desktop': 'Открывает рабочий стол',
   'Double-click to connect': 'Двойной щелчок — подключиться',
   'In {count} groups — the same host, shown under each. Its connection settings come from {group}.':
     'В {count} группах — это один и тот же хост, показанный под каждой. Настройки подключения берутся из {group}.',

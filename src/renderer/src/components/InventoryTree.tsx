@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import type { MouseEvent as ReactMouseEvent } from 'react'
+import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react'
 import type { InventorySource, SessionGroup, SessionProfile } from '../../../shared/types'
 import { resolveAuth } from '../../../shared/authResolution'
 import { applyOverride } from '../../../shared/overrides'
+import { protocolOf } from '../../../shared/protocols'
 import {
   useStore,
   collectConnectedSessionIds,
@@ -18,7 +19,7 @@ import { connectMenuItems } from './connectMenu'
 import { paneTitle } from '../state/connect'
 import { useT } from '../i18n'
 import { ago } from '../state/syncStatus'
-import { RefreshIcon } from './icons'
+import { DesktopIcon, RefreshIcon, TerminalIcon } from './icons'
 import Hint from './Hint'
 
 const COLLAPSED_KEY = 'terminaldeck.collapsedInventory'
@@ -357,14 +358,19 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
   }
 
   function renderHost(host: SessionProfile, paddingLeft: number, colour?: string): JSX.Element {
-    const dotColour = host.color ?? colour
+    const rowColour = host.color ?? colour
+    const Kind = protocolOf(host) === 'rdp' ? DesktopIcon : TerminalIcon
     return (
       <div
-        className={`tree-item ${selectedHostIds.includes(host.id) ? 'selected' : ''}`}
+        className={`tree-item ${rowColour ? 'tinted' : ''} ${
+          selectedHostIds.includes(host.id) ? 'selected' : ''
+        }`}
         key={host.id}
-        style={{ paddingLeft }}
+        style={
+          { paddingLeft, ...(rowColour ? { '--host-colour': rowColour } : {}) } as CSSProperties
+        }
         onClick={(e) => onHostClick(e, host)}
-        onDoubleClick={() => connect(host, dotColour)}
+        onDoubleClick={() => connect(host, rowColour)}
         title={t('Double-click to connect')}
         onContextMenu={(e) => {
           e.preventDefault()
@@ -372,16 +378,17 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
           setMenu({
             x: e.clientX,
             y: e.clientY,
-            items: hostMenu(host, e.clientX, e.clientY, dotColour)
+            items: hostMenu(host, e.clientX, e.clientY, rowColour)
           })
         }}
       >
         <span className="name">
           <span
-            className="session-dot"
-            style={dotColour ? { background: dotColour } : undefined}
-            aria-hidden="true"
-          />
+            className="session-kind"
+            title={protocolOf(host) === 'rdp' ? t('Opens a desktop') : t('Opens a terminal')}
+          >
+            <Kind />
+          </span>
           {host.name}
           {connected.has(host.id) && <span className="live-dot" title={t('Connected')} />}
           {membershipCount(host.id) > 1 && (

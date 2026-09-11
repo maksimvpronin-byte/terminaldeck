@@ -3,7 +3,8 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import Pane from './Pane'
 import { useStore } from '../state/store'
-import type { GitFolderTree, PaneNode, SessionProfile } from '../../../shared/types'
+import type { GitFolderTree, SessionProfile } from '../../../shared/types'
+import type { PaneNode } from '../state/store'
 
 const windowsHost: SessionProfile = {
   id: 'git:dc1',

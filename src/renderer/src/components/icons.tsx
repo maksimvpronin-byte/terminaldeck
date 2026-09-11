@@ -94,3 +94,66 @@ export function CloseIcon(): JSX.Element {
     </svg>
   )
 }
+
+/**
+ * What a host is, where its colour used to be.
+ *
+ * The tree had a coloured dot in this slot and nothing that said whether a row
+ * would open a shell or a desktop — which is the first thing you want to know
+ * about a Windows machine in a list of Linux ones. The colour moved to the
+ * ground the row stands on, and these took the space it left.
+ *
+ * Drawn rather than typed: ⌨ and 🖥 are emoji on every platform that has them,
+ * and a coloured pictogram beside a name is louder than the name.
+ */
+export function TerminalIcon(): JSX.Element {
+  return (
+    <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" focusable="false">
+      <rect {...frame} rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.2" />
+      <polyline
+        points="4.3,6 6.6,8 4.3,10"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <line
+        x1="8.3"
+        y1="10.4"
+        x2="11.7"
+        y2="10.4"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+export function DesktopIcon(): JSX.Element {
+  return (
+    <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" focusable="false">
+      <rect
+        x="1.5"
+        y="2.5"
+        width="13"
+        height="9"
+        rx="1.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.2"
+      />
+      <line x1="8" y1="11.5" x2="8" y2="13" stroke="currentColor" strokeWidth="1.2" />
+      <line
+        x1="5.5"
+        y1="13.4"
+        x2="10.5"
+        y2="13.4"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}

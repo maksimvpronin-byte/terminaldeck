@@ -1,10 +1,16 @@
 import { useEffect, useState } from 'react'
 import { nanoid } from 'nanoid'
-import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from 'react'
+import type {
+  CSSProperties,
+  DragEvent as ReactDragEvent,
+  MouseEvent as ReactMouseEvent
+} from 'react'
 import type { GitFolderPreview, SessionGroup, SessionProfile } from '../../../shared/types'
 import { resolveAuth } from '../../../shared/authResolution'
 import { applyOverride } from '../../../shared/overrides'
 import { isGitNode, gitFolderLayout } from '../../../shared/gitFolders'
+import { protocolOf } from '../../../shared/protocols'
+import { DesktopIcon, TerminalIcon } from './icons'
 import {
   useStore,
   collectConnectedSessionIds,
@@ -628,16 +634,19 @@ export default function Sidebar({
   function renderSession(s: SessionProfile, paddingLeft: number): JSX.Element {
     const edge = dropEdge?.id === s.id ? ` drop-${dropEdge.place}` : ''
     const mirrored = isGitNode(s.id)
+    const Kind = protocolOf(s) === 'rdp' ? DesktopIcon : TerminalIcon
     return (
       <div
-        className={`tree-item ${selectedHostIds.includes(s.id) ? 'selected' : ''}${edge}`}
+        className={`tree-item ${s.color ? 'tinted' : ''} ${
+          selectedHostIds.includes(s.id) ? 'selected' : ''
+        }${edge}`}
         onContextMenu={(e) => {
           e.preventDefault()
           e.stopPropagation()
           setMenu({ x: e.clientX, y: e.clientY, items: sessionMenu(s, e.clientX, e.clientY) })
         }}
         key={s.id}
-        style={{ paddingLeft }}
+        style={{ paddingLeft, ...(s.color ? { '--host-colour': s.color } : {}) } as CSSProperties}
         draggable={!mirrored}
         onDragStart={(e) => startDrag(e, { kind: 'session', id: s.id }, s.name)}
         onDragEnd={endDrag}
@@ -654,10 +663,11 @@ export default function Sidebar({
       >
         <span className="name">
           <span
-            className="session-dot"
-            style={s.color ? { background: s.color } : undefined}
-            aria-hidden="true"
-          />
+            className="session-kind"
+            title={protocolOf(s) === 'rdp' ? t('Opens a desktop') : t('Opens a terminal')}
+          >
+            <Kind />
+          </span>
           {s.name}
           {connected.has(s.id) && <span className="live-dot" title={t('Connected')} />}
           {s.groupId && s.inheritAuth === false && (

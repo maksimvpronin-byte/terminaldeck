@@ -327,6 +327,37 @@ label {
 .tree-item.selected {
   background: var(--accent-dim);
 }
+/* A host's colour, as the ground it stands on rather than a dot beside it.
+ *
+ * The dot had to go: the slot in front of a name is where you look to learn
+ * what a row *is*, and a protocol icon answers that where a colour never did.
+ * So the colour takes the row — but faintly. At full strength a tree with half
+ * its hosts coloured reads as a striped blanket and the selected row stops
+ * standing out, which is the one row that must. The 3px edge carries the
+ * colour where the wash is too quiet to see, and survives selection, which
+ * paints over the wash: the row you just clicked is the one you were hunting
+ * for by colour, and it must not lose it at the moment of being found. */
+.tree-item.tinted {
+  background: color-mix(in srgb, var(--host-colour) 10%, transparent);
+  box-shadow: inset 3px 0 0 var(--host-colour);
+}
+.tree-item.tinted:hover {
+  background: color-mix(in srgb, var(--host-colour) 16%, var(--bg-2));
+}
+.tree-item.tinted.selected {
+  background: var(--accent-dim);
+}
+/* Sits where the dot sat, and inherits the row's colour rather than the host's:
+   it says what the row opens, not which environment it belongs to. */
+.session-kind {
+  display: inline-block;
+  margin-right: 7px;
+  vertical-align: -2px;
+  color: var(--text-dim);
+}
+.tree-item.selected .session-kind {
+  color: var(--text);
+}
 .selection-bar {
   display: flex;
   /* Five controls do not fit across a sidebar this narrow. Without the wrap they
