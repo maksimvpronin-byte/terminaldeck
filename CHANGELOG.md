@@ -6,6 +6,26 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.17.0
+
+### Added
+
+- A host opens out of its row. Double-clicking one in Sessions or Inventory
+  grows a window from the row to the pane it opens in, and closing that window —
+  by its tab, its pane or Ctrl+W — folds it back into the row, which lights for
+  a moment. What moves is a stand-in drawn over everything, so the terminal or
+  desktop underneath is never resized along the way. With no row in sight to
+  land on, the window shrinks a little and fades where it stood.
+
+### Changed
+
+- The interface eases instead of cutting. Hover and selection fade across the
+  tree, the tab and workspace strips, menus and the file panel; a context menu
+  grows out of where it was opened, dialogs and the palette rise in, a folder's
+  arrow turns, and a tab or workspace brought forward fades up. Everything is
+  120–160ms, only on the way in, and switched off for anybody whose system asks
+  for less motion.
+
 ## 0.16.0
 
 ### Added
