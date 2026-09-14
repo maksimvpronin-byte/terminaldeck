@@ -148,11 +148,17 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
    * an inventory host is read from a repository and nothing about this is
    * written back, to the repo or to the local override.
    */
-  function connect(host: SessionProfile, colour?: string, credentialId?: string): void {
+  function connect(
+    host: SessionProfile,
+    colour?: string,
+    credentialId?: string,
+    admin?: boolean
+  ): void {
     const credential = credentials.find((c) => c.id === credentialId)
+    const title = paneTitle(host.name, credential)
     openTab(
-      paneTitle(host.name, credential),
-      { kind: 'session', sessionId: host.id, credentialId },
+      admin ? `${title} · ${t('console')}` : title,
+      { kind: 'session', sessionId: host.id, credentialId, admin },
       colour
     )
   }
@@ -185,7 +191,9 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
         connectAs: (credentialId) => connect(host, colour, credentialId),
         showMenu: (items) => setMenu({ x: atX, y: atY, items }),
         manageAccounts: () => setSettingsTab('accounts'),
-        openMultiConnect: () => setMultiConnecting({ id: host.id, name: host.name, color: colour })
+        openMultiConnect: () => setMultiConnecting({ id: host.id, name: host.name, color: colour }),
+        connectConsole:
+          protocolOf(host) === 'rdp' ? () => connect(host, colour, undefined, true) : undefined
       }),
       {
         label: t('Copy {address}', {

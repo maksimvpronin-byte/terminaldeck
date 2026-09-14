@@ -40,6 +40,8 @@ export interface DesktopRequest {
   fontSmoothing?: boolean
   composition?: boolean
   noWallpaper?: boolean
+  /** The administrative session rather than an ordinary one (`/admin`). */
+  admin?: boolean
 }
 
 /** Who to be. Never sent to the renderer, and never in an argument list. */
@@ -250,6 +252,7 @@ class FreeRdpBridge {
       fontSmoothing: request.fontSmoothing,
       composition: request.composition,
       noWallpaper: request.noWallpaper,
+      admin: request.admin,
       gatewayHost: gateway?.host,
       gatewayPort: gateway?.port,
       // Stated rather than inferred: on most deployments the gateway takes the

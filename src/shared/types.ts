@@ -145,6 +145,17 @@ export interface RdpDefaults {
    */
   clipboard?: boolean
   /**
+   * Whether to sign in to the administrative session — `mstsc /admin`, which
+   * was `/console` before Windows Server 2008.
+   *
+   * On a Session Host that session takes no client access licence, so it still
+   * lets somebody in once licensing has run out, and it is not redirected by a
+   * Connection Broker, so it lands on the server that was named. Off by
+   * default, as in every Windows client; the host menu offers it for one
+   * connection without saving it here.
+   */
+  consoleSession?: boolean
+  /**
    * `fit` follows the pane and resizes the far end with it, which is what the
    * app has always done. `fixed` pins the desktop to a stated size and scales
    * the picture into the pane, for a host that resizes badly or a session that
@@ -239,6 +250,8 @@ export interface ResolvedRdp {
   sound: boolean
   /** Whether what is copied on either side reaches the other. */
   clipboard: boolean
+  /** Whether the administrative session is asked for (`/admin`). */
+  consoleSession: boolean
   resolution: RdpResolution
   desktopWidth: number
   desktopHeight: number

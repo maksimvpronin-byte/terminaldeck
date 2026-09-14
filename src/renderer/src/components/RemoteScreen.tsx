@@ -46,6 +46,8 @@ interface Props {
    * resolved: the password stays in the main process either way.
    */
   credentialId?: string
+  /** The administrative session for this connection, whatever the host says. */
+  admin?: boolean
   look: RdpView | null
   /** Typed in the pane, for a host with nothing saved. */
   password?: string
@@ -112,6 +114,7 @@ export default function RemoteScreen({
   visible,
   sessionId,
   credentialId,
+  admin,
   look,
   password,
   onPhase,
@@ -455,7 +458,8 @@ export default function RemoteScreen({
           height: size?.height ?? 800,
           scale: size ? Math.min(500, Math.max(100, Math.round(size.factor * 100))) : undefined,
           password,
-          credentialId
+          credentialId,
+          admin
         })
         if (!alive) {
           void window.td.rdp.desktopStop(id)

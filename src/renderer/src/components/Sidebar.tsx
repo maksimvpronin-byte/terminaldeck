@@ -215,11 +215,12 @@ export default function Sidebar({
    * it travels on the pane, so a reconnect keeps it, and the saved host is not
    * touched by any of it.
    */
-  function connect(session: SessionProfile, credentialId?: string): void {
+  function connect(session: SessionProfile, credentialId?: string, admin?: boolean): void {
     const credential = credentials.find((c) => c.id === credentialId)
+    const title = paneTitle(session.name, credential)
     openTab(
-      paneTitle(session.name, credential),
-      { kind: 'session', sessionId: session.id, credentialId },
+      admin ? `${title} · ${t('console')}` : title,
+      { kind: 'session', sessionId: session.id, credentialId, admin },
       session.color
     )
   }
@@ -472,7 +473,8 @@ export default function Sidebar({
         connectAs: (credentialId) => connect(s, credentialId),
         showMenu: (items) => setMenu({ x: atX, y: atY, items }),
         manageAccounts: () => setSettingsTab('accounts'),
-        openMultiConnect: () => setMultiConnecting(s)
+        openMultiConnect: () => setMultiConnecting(s),
+        connectConsole: protocolOf(s) === 'rdp' ? () => connect(s, undefined, true) : undefined
       }),
       ...(mirrored
         ? [

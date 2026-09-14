@@ -28,6 +28,11 @@ export interface ConnectMenuOptions {
   manageAccounts: () => void
   /** The dialog that asks how many windows, and as whom. */
   openMultiConnect: () => void
+  /**
+   * Opens the host once in console mode — the administrative session. Given
+   * only for a Windows desktop; an SSH host has no such thing to offer.
+   */
+  connectConsole?: () => void
 }
 
 /** How an account reads in a menu: what it is called, and who it signs in as. */
@@ -41,7 +46,7 @@ export function accountItems({
   credentials,
   connectAs,
   manageAccounts
-}: Omit<ConnectMenuOptions, 'showMenu' | 'openMultiConnect'>): MenuItem[] {
+}: Omit<ConnectMenuOptions, 'showMenu' | 'openMultiConnect' | 'connectConsole'>): MenuItem[] {
   return [
     // First, and always present: the ordinary connection, so opening this menu
     // by mistake has an obvious way back out that is not the Escape key.
@@ -58,8 +63,11 @@ export function accountItems({
 }
 
 export function connectMenuItems(options: ConnectMenuOptions): MenuItem[] {
-  const { t, showMenu, openMultiConnect } = options
+  const { t, showMenu, openMultiConnect, connectConsole } = options
   return [
+    // Beside the plain connect rather than below the line: like it, and unlike
+    // the two that follow, it connects straight away without asking anything.
+    ...(connectConsole ? [{ label: t('Connect in console mode'), onSelect: connectConsole }] : []),
     {
       label: t('Connect as…'),
       // Below the plain connect and its split, and marked off from them: these

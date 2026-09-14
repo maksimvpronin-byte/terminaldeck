@@ -124,6 +124,8 @@ export function registerRdpHandlers(): void {
         password?: string
         /** A stored account to sign in as instead, for this session alone. */
         credentialId?: string
+        /** The administrative session for this one connection, whatever the host says. */
+        admin?: boolean
       }
     ) => {
       const win = focusedWin()
@@ -145,7 +147,10 @@ export function registerRdpHandlers(): void {
         height: request.height,
         scale: rdp.sendDensity ? request.scale : undefined,
         sound: rdp.sound,
-        clipboard: rdp.clipboard
+        clipboard: rdp.clipboard,
+        // Asked for from the host menu it holds for that pane alone; otherwise
+        // the host's own setting decides.
+        admin: request.admin || rdp.consoleSession
       }
 
       return freeRdpBridge.start(

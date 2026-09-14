@@ -271,6 +271,8 @@ const api = {
       password?: string
       /** A stored account to sign in as instead of the host's own. */
       credentialId?: string
+      /** The administrative session (`/admin`) for this connection. */
+      admin?: boolean
     }): Promise<string> => ipcRenderer.invoke(IPC.desktopStart, request),
     /**
      * Anything the pane has to say to a running desktop: a key, the mouse, a

@@ -9,8 +9,11 @@ export type PaneTarget =
    * untouched and every other pane opens as whoever it was saved as.
    *
    * It is an id and no secret, so it is safe in a restored layout.
+   *
+   * `admin` is the same kind of choice: a desktop opened in console mode from
+   * the host menu reconnects in console mode, and the host is not changed.
    */
-  | { kind: 'session'; sessionId: string; credentialId?: string }
+  | { kind: 'session'; sessionId: string; credentialId?: string; admin?: boolean }
   | { kind: 'quick'; params: QuickConnectParams }
 
 export type PaneNode =

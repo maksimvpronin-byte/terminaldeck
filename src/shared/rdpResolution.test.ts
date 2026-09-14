@@ -117,6 +117,20 @@ describe('rdpInheritedFrom', () => {
   })
 })
 
+describe('console mode', () => {
+  const group = { id: 'g', name: 'servers', parentId: null, consoleSession: true }
+
+  it('is off unless something in the chain asks for it', () => {
+    expect(resolveRdp({}, null, []).consoleSession).toBe(false)
+    expect(resolveRdp({ consoleSession: true }, null, []).consoleSession).toBe(true)
+  })
+
+  it('is inherited from a group, and a host can decline what its group asked for', () => {
+    expect(resolveRdp({ groupId: 'g' } as never, 'g', [group]).consoleSession).toBe(true)
+    expect(resolveRdp({ consoleSession: false }, 'g', [group]).consoleSession).toBe(false)
+  })
+})
+
 describe('sharing the clipboard', () => {
   /**
    * On by default, as every Windows client has it — a desktop you cannot paste

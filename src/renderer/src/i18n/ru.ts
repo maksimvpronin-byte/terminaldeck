@@ -518,6 +518,9 @@ export const ru: Record<string, string> = {
     'Попросить ту сторону — единственный способ получить нужный размер при полной резкости; Windows 8.1 и новее это учитывают, старее игнорируют, и рабочий стол остаётся как был. Растягивание здесь работает всегда и стоит резкости.',
   'Played by the desktop client itself, so it costs this side nothing and the link something.':
     'Проигрывает сам клиент рабочего стола: этой стороне бесплатно, каналу — нет.',
+  'Connect in console mode (/admin)': 'Подключаться в режиме консоли (/admin)',
+  'The administrative session. On a Session Host it takes no client access licence, so it still lets you in once licensing has run out, and a Connection Broker does not send it to another server. To use it once without saving it, right-click the host.':
+    'Административная сессия. На сервере узла сеансов она не занимает клиентскую лицензию — пустит, даже когда лицензии закончились, — и посредник подключений не перенаправит её на другой сервер. Чтобы подключиться так один раз, не меняя хост, нажмите на него правой кнопкой.',
   'Share the clipboard with this host': 'Делить буфер обмена с этим хостом',
   'What you copy here can be pasted there and back again, as every Windows client does it. Turn it off for a host you would rather not hand what you copied: anything running over there can read the clipboard, not only what you paste into.':
     'Скопированное здесь можно вставить там и наоборот — так же, как в любом клиенте Windows. Выключите для хоста, которому не хотите отдавать скопированное: прочитать буфер может всё, что на той машине работает, а не только то, куда вы вставляете.',
@@ -972,6 +975,10 @@ export const ru: Record<string, string> = {
   'Manage accounts…': 'Управление учётными записями…',
   'Connect as…': 'Подключиться с помощью другой учётной записи…',
   'Connect several times…': 'Подключиться несколько раз…',
+  'Connect in console mode': 'Подключиться в режиме консоли',
+  console: 'консоль',
+  'Right-click a Windows host and choose “Connect in console mode” for the /admin session':
+    'Правый клик по Windows-хосту → «Подключиться в режиме консоли» открывает сессию /admin',
   Accounts: 'Учётные записи',
   'Saved accounts': 'Сохранённые учётные записи',
   'Logins kept on their own, so a host can be reached as somebody else without being edited. Right-click a host and choose “Connect as…” to use one; nothing here changes what a host connects as by default.':

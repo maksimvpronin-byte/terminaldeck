@@ -57,6 +57,8 @@ function Pane({
   const sessionId = node.target.kind === 'session' ? node.target.sessionId : null
   /** A stored account chosen for this pane, in place of the host's own login. */
   const credentialId = node.target.kind === 'session' ? node.target.credentialId : undefined
+  /** Console mode chosen for this pane from the host menu. */
+  const admin = node.target.kind === 'session' && node.target.admin === true
   /*
    * Through `findHost`, which is the only lookup that knows about the hosts
    * this app did not save itself.
@@ -264,6 +266,7 @@ function Pane({
             port={port}
             sessionId={sessionId ?? undefined}
             credentialId={credentialId}
+            admin={admin}
             onMeasured={setMeasured}
             onSession={(desktopId) => setPaneDesktop(tabId, node.id, desktopId)}
             paneVisible={visible}

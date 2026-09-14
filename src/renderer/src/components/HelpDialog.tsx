@@ -127,6 +127,9 @@ const SECTIONS: Section[] = [
       { what: 'A certificate the machine cannot verify is asked about once, then remembered' },
       { what: 'Settings → Security lists what was trusted by hand, and forgets it on request' },
       { what: 'The far end’s sound plays here, and can be turned off per host or group' },
+      {
+        what: 'Right-click a Windows host and choose “Connect in console mode” for the /admin session'
+      },
       { what: 'The clipboard is shared with a desktop — text both ways, as Windows clients do' },
       { what: 'Turn it off per host or group for a machine you would rather not hand it to' },
       { what: 'Files go the same way: copy in Finder, paste in the session, directories and all' },

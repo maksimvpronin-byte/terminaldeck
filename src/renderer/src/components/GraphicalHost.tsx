@@ -27,6 +27,7 @@ export default function GraphicalHost({
   port,
   sessionId,
   credentialId,
+  admin,
   onMeasured,
   onSession,
   paneVisible
@@ -41,6 +42,8 @@ export default function GraphicalHost({
    * password reaches this component whichever login is used.
    */
   credentialId?: string
+  /** Console mode (`/admin`) for this pane, chosen from the host menu. */
+  admin?: boolean
   /**
    * What size was asked for and what came back, handed to the pane to show.
    *
@@ -228,6 +231,7 @@ export default function GraphicalHost({
           key={attempt}
           sessionId={sessionId}
           credentialId={credentialId}
+          admin={admin}
           look={look}
           password={lastTyped.current}
           onPhase={setPhase}

@@ -184,6 +184,7 @@ function validateDefaults(record: UnknownRecord, path: string): void {
     'inheritRdp',
     'gatewayBypassLocal',
     'sound',
+    'consoleSession',
     'sendDensity',
     'commandAsControl',
     'inheritAppearance',

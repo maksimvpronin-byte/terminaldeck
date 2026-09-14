@@ -302,6 +302,18 @@ export default function RdpFields({
       <label className="checkbox-row" style={{ flexDirection: 'row' }}>
         <input
           type="checkbox"
+          checked={effective.consoleSession}
+          onChange={(e) => set('consoleSession', e.target.checked)}
+        />
+        <Hint label={t('Connect in console mode (/admin)')}>
+          {t(
+            'The administrative session. On a Session Host it takes no client access licence, so it still lets you in once licensing has run out, and a Connection Broker does not send it to another server. To use it once without saving it, right-click the host.'
+          )}
+        </Hint>
+      </label>
+      <label className="checkbox-row" style={{ flexDirection: 'row' }}>
+        <input
+          type="checkbox"
           checked={effective.commandAsControl}
           onChange={(e) => set('commandAsControl', e.target.checked)}
         />

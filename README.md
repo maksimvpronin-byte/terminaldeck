@@ -310,6 +310,12 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
 - **Sound**, played by the client itself through the platform's own audio, and switchable per
   host or group. It travels on its own channel, so it costs this side nothing and the link
   something — worth turning off where the line should be spent on the picture
+- **Console mode** — the administrative session, `mstsc /admin` (`/console` before Windows
+  Server 2008). On a Session Host it takes no client access licence, so it still lets somebody
+  in once licensing has run out, and no Connection Broker redirects it to another server.
+  Right-click a Windows host and choose **Connect in console mode** to open it once, the way
+  mRemoteNG's *Connect to console session* does — the pane keeps it across reconnects and the
+  host is not changed. To make it the default, tick it under Desktop for a host or a group
 - Panels that ride on an SSH connection — the file browser, port forwarding, monitoring,
   broadcast — are hidden for a desktop rather than greyed out, since none of them is coming
 - Opening a host asks what you want: a **new session** in the pane, or one of the sessions
@@ -476,10 +482,6 @@ paths have only ever been exercised by unit tests or by hand on a local stand-in
   application — so nearly every feature of a desktop pane had an exception written for it. Doing
   it properly means implementing Remote Desktop Services shadowing from scratch, which is not
   planned. See [the channel notes](docs/ironrdp-channel-gap.md) for what that would take.
-- The console session (`/admin`). FreeRDP carries the flag and nothing but a setting stands in
-  the way now, so this is a small piece of work rather than an impossibility — it is simply not
-  done. Connecting as the same user already reconnects to that user's existing session, which
-  is most of what it is wanted for.
 - PuTTY session import — Windows-only value, deferred since the MVP.
 - Code signing and notarization. Configured and documented below, but no certificate is in use.
   On macOS that also rules out updating in place, so the application now says as much instead of

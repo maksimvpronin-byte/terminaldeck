@@ -1513,6 +1513,10 @@ static BOOL configure(tdContext* td, const td_cmd* start)
 	SET_STR(FreeRDP_Username, td_cmd_str(start, "user", ""));
 	SET_STR(FreeRDP_Domain, td_cmd_str(start, "domain", ""));
 	SET_STR(FreeRDP_Password, td_cmd_str(start, "password", ""));
+	/* The administrative session, as `mstsc /admin` asks for it: the cluster
+	 * data says the session id field is valid, and the id is zero. No licence
+	 * is taken on a Session Host and no broker redirects it elsewhere. */
+	SET_BOOL(FreeRDP_ConsoleSession, td_cmd_bool(start, "admin", 0));
 
 	SET_U32(FreeRDP_DesktopWidth, td_cmd_int(start, "width", 1280) & ~1);
 	SET_U32(FreeRDP_DesktopHeight, td_cmd_int(start, "height", 800) & ~1);

@@ -49,6 +49,25 @@ beforeEach(() => {
   window.td.ui.onForwardKey = () => () => undefined
 })
 
+describe('console mode', () => {
+  it('asks the main process for the administrative session when the pane was opened in it', async () => {
+    const props = {
+      sessionId: 'host',
+      look: null,
+      onPhase: vi.fn(),
+      onNotice: vi.fn(),
+      onMeasured: vi.fn()
+    }
+    const view = render(<RemoteScreen {...props} admin visible />)
+    await act(async () => {})
+    expect(window.td.rdp.desktopStart).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: 'host', admin: true })
+    )
+    view.unmount()
+    vi.unstubAllGlobals()
+  })
+})
+
 describe('background desktops', () => {
   it('pauses and resumes without reconnecting, and acknowledges a hidden frame without drawing', async () => {
     const props = {

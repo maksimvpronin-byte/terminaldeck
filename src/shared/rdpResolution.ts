@@ -28,6 +28,8 @@ export const RDP_FALLBACK: ResolvedRdp = {
   // worth turning off per host — a machine you do not trust with what you
   // copied should not be given it.
   clipboard: true,
+  // The ordinary session, as every Windows client connects unless told /admin.
+  consoleSession: false,
   resolution: 'fit',
   desktopWidth: 1920,
   desktopHeight: 1080,
@@ -100,6 +102,7 @@ export function resolveRdp(
     // Booleans can be legitimately false, so they take the first explicit value.
     sound: firstDefined(chain, 'sound') ?? RDP_FALLBACK.sound,
     clipboard: firstDefined(chain, 'clipboard') ?? RDP_FALLBACK.clipboard,
+    consoleSession: firstDefined(chain, 'consoleSession') ?? RDP_FALLBACK.consoleSession,
     sendDensity: firstDefined(chain, 'sendDensity') ?? RDP_FALLBACK.sendDensity,
     commandAsControl: firstDefined(chain, 'commandAsControl') ?? RDP_FALLBACK.commandAsControl
   }
