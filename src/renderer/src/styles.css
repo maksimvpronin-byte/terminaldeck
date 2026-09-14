@@ -2264,3 +2264,41 @@ button,
     transition-duration: 1ms !important;
   }
 }
+
+/* The stand-in that flies between a host's row and its window — see
+   components/hostMorph.ts. A window in outline: a title bar the height of a
+   row, so it reads as the row at one end and as a pane at the other. */
+.host-morph {
+  position: fixed;
+  z-index: 400;
+  pointer-events: none;
+  overflow: hidden;
+  background: var(--bg-0);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+.host-morph-bar {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  max-height: 100%;
+  padding: 0 10px;
+  background: var(--bg-2);
+  border-left: 3px solid var(--host-colour, var(--accent));
+  color: var(--text);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* On the row it becomes a highlight over it, not a second copy of its name:
+   the two never line up exactly, and a name printed twice reads as a glitch. */
+.host-morph.landing .host-morph-bar {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+  color: transparent;
+}
+.host-morph.landing {
+  background: transparent;
+  box-shadow: none;
+}

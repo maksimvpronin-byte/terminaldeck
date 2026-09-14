@@ -3,6 +3,7 @@ import { useStore, activeTab, activeWorkspace, type PaneNode } from '../state/st
 import { findHost, type FoundHost } from '../state/hosts'
 import { DEFAULT_SETTINGS } from '../state/settings'
 import { IS_MAC } from '../state/keys'
+import { hostOfLeaf, hostOfTab, morphClose, tabElement } from '../components/hostMorph'
 
 function clampFontSize(size: number): number {
   return Math.min(32, Math.max(8, size))
@@ -189,8 +190,16 @@ export function useShortcuts(actions: {
           e.preventDefault()
           e.stopPropagation()
           // Close just the focused pane while the tab is split; otherwise the tab.
-          if (current.root.type === 'split') state.closePane(current.id, current.activePaneId)
-          else state.closeTab(current.id)
+          if (current.root.type === 'split') {
+            morphClose(
+              document.querySelector(`.pane[data-pane-id="${CSS.escape(current.activePaneId)}"]`),
+              hostOfLeaf(findLeaf(current.root, current.activePaneId))
+            )
+            state.closePane(current.id, current.activePaneId)
+          } else {
+            morphClose(tabElement(current.id), hostOfTab(current))
+            state.closeTab(current.id)
+          }
           break
         }
         /*

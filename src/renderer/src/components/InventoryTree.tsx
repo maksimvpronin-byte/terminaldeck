@@ -16,6 +16,7 @@ import ContextMenu, { type MenuItem } from './ContextMenu'
 import SettingsDialog, { type SettingsTab } from './SettingsDialog'
 import MultiConnectDialog from './MultiConnectDialog'
 import { connectMenuItems } from './connectMenu'
+import { morphOpen } from './hostMorph'
 import { paneTitle } from '../state/connect'
 import { useT } from '../i18n'
 import { ago } from '../state/syncStatus'
@@ -375,11 +376,19 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
           selectedHostIds.includes(host.id) ? 'selected' : ''
         }`}
         key={host.id}
+        data-host-id={host.id}
         style={
           { paddingLeft, ...(rowColour ? { '--host-colour': rowColour } : {}) } as CSSProperties
         }
         onClick={(e) => onHostClick(e, host)}
-        onDoubleClick={() => connect(host, rowColour)}
+        onDoubleClick={(e) => {
+          const row = e.currentTarget
+          connect(host, rowColour)
+          morphOpen(row, currentTab(useStore.getState())?.id, {
+            title: host.name,
+            colour: rowColour
+          })
+        }}
         title={t('Double-click to connect')}
         onContextMenu={(e) => {
           e.preventDefault()

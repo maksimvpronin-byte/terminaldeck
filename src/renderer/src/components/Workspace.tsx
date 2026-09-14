@@ -13,6 +13,7 @@ import { dropSide } from '../state/dropZone'
 import SplitContainer from './SplitContainer'
 import ContextMenu, { type MenuItem } from './ContextMenu'
 import CollectionDialog from './CollectionDialog'
+import { hostOfTab, morphClose, tabElement } from './hostMorph'
 import { CloseIcon } from './icons'
 import { useT } from '../i18n'
 
@@ -221,6 +222,7 @@ export default function Workspace(): JSX.Element {
           {current.tabs.map((tab) => (
             <div
               key={tab.id}
+              data-tab-id={tab.id}
               className={`tab ${tab.id === current.activeTabId ? 'active' : ''} ${
                 tabGap?.id === tab.id ? `drop-${tabGap.place}` : ''
               } ${draggingTab === tab.id ? 'dragging' : ''}`}
@@ -259,6 +261,7 @@ export default function Workspace(): JSX.Element {
                 className="close"
                 onClick={(e) => {
                   e.stopPropagation()
+                  morphClose(tabElement(tab.id), hostOfTab(tab))
                   closeTab(tab.id)
                 }}
               >
@@ -302,6 +305,7 @@ export default function Workspace(): JSX.Element {
       {everyTab.map((tab) => (
         <div
           key={tab.id}
+          data-tab-id={tab.id}
           className="tab-panel"
           style={{ display: current?.activeTabId === tab.id ? 'flex' : 'none' }}
         >

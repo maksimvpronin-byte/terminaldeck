@@ -33,6 +33,7 @@ import SettingsDialog, { type SettingsTab } from './SettingsDialog'
 import MultiConnectDialog from './MultiConnectDialog'
 import ContextMenu, { type MenuItem } from './ContextMenu'
 import { connectMenuItems } from './connectMenu'
+import { morphOpen } from './hostMorph'
 import { paneTitle } from '../state/connect'
 import { keyHint } from '../state/keys'
 import { ago } from '../state/syncStatus'
@@ -649,6 +650,7 @@ export default function Sidebar({
           setMenu({ x: e.clientX, y: e.clientY, items: sessionMenu(s, e.clientX, e.clientY) })
         }}
         key={s.id}
+        data-host-id={s.id}
         style={{ paddingLeft, ...(s.color ? { '--host-colour': s.color } : {}) } as CSSProperties}
         draggable={!mirrored}
         onDragStart={(e) => startDrag(e, { kind: 'session', id: s.id }, s.name)}
@@ -657,7 +659,11 @@ export default function Sidebar({
         onDragLeave={() => setDropEdge((cur) => (cur?.id === s.id ? null : cur))}
         onDrop={(e) => handleReorderDrop(e, s)}
         onClick={(e) => onSessionClick(e, s)}
-        onDoubleClick={() => connect(s)}
+        onDoubleClick={(e) => {
+          const row = e.currentTarget
+          connect(s)
+          morphOpen(row, currentTab(useStore.getState())?.id, { title: s.name, colour: s.color })
+        }}
         title={
           mirrored
             ? t('From the repository this folder mirrors · double-click to connect')

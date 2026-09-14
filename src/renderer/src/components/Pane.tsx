@@ -20,6 +20,7 @@ import MonitorBar from './MonitorBar'
 import { protocolOf, traitsOf } from '../../../shared/protocols'
 import { SplitRightIcon, SplitDownIcon, CloseIcon, DetachIcon } from './icons'
 import Hint from './Hint'
+import { hostOfLeaf, morphClose } from './hostMorph'
 import { keyHint } from '../state/keys'
 import { useT } from '../i18n'
 
@@ -139,6 +140,7 @@ function Pane({
   return (
     <div
       className={`pane ${isActive ? 'active' : ''}`}
+      data-pane-id={node.id}
       ref={rootRef}
       onDragOver={onDragOver}
       onDragLeave={() => setDropEdge(null)}
@@ -234,7 +236,10 @@ function Pane({
           <button
             className="icon-button"
             title={keyHint(t('Close pane (⌘W)'))}
-            onClick={() => closePane(tabId, node.id)}
+            onClick={() => {
+              morphClose(rootRef.current, hostOfLeaf(node))
+              closePane(tabId, node.id)
+            }}
           >
             <CloseIcon />
           </button>
