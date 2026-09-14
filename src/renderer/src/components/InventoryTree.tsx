@@ -320,7 +320,7 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
               }}
             >
               <span className="tree-group-title name">
-                <span className="chevron">{isCollapsed ? '▸' : '▾'}</span> 📁 {g.name}
+                <span className={`chevron ${isCollapsed ? '' : 'open'}`}>▸</span> 📁 {g.name}
                 {overrides.some((o) => o.nodeId === g.id) && (
                   <span className="no-inherit" title={t('Has local settings')}>
                     ✎
@@ -477,7 +477,7 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
                 }}
               >
                 <span className="tree-group-title name">
-                  <span className="chevron">{isCollapsed ? '▸' : '▾'}</span>
+                  <span className={`chevron ${isCollapsed ? '' : 'open'}`}>▸</span>
                   <span
                     className="session-dot"
                     style={source.color ? { background: source.color } : undefined}

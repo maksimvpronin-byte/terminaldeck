@@ -15,6 +15,12 @@
   --file-dir: #5b9dff;
   --file-link: #4dd0d8;
   --file-exec: #e5534b;
+  /* Motion, kept short: this is a tool people drive from the keyboard, and an
+     animation that is still running when the next key lands is in the way.
+     A state change eases out; something appearing takes a little longer. */
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --motion-fast: 120ms;
+  --motion-enter: 160ms;
 }
 
 * {
@@ -2133,4 +2139,128 @@ kbd {
   color: var(--text-dim);
   background: var(--bg-1);
   font-size: 10px;
+}
+
+/* --- motion ---
+ *
+ * Held in one place, after everything it animates, so the rules above describe
+ * what a thing looks like and this section alone describes how it gets there.
+ *
+ * Only colour, opacity, shadow and transform move. Nothing animates a size or a
+ * position that layout depends on: a terminal measures its pane to decide how
+ * many columns it has, and a desktop asks the far end for a new resolution when
+ * its pane changes, so a pane that grew over 160ms would be measured mid-way
+ * and resized twice. */
+
+/* State changes: hover, selection, the gap a drag will drop into. */
+button,
+.tree-item,
+.workspace-chip,
+.tab,
+.tab .close,
+.workspace-chip .close,
+.sidebar-tabs button,
+.context-menu button,
+.palette-row,
+.sftp-tree-row,
+.sftp-crumbs .crumb,
+.hint-mark,
+.swatch,
+.sidebar-resize,
+.sftp-resize,
+.sftp-split,
+.split-divider-abs {
+  transition-property: background-color, border-color, color, opacity, box-shadow;
+  transition-duration: var(--motion-fast);
+  transition-timing-function: var(--ease-out);
+}
+/* A file list can hold thousands of rows and a select-all changes every one;
+   the hover alone is worth easing, and quicker, so a sweep of the pointer down
+   the list does not leave a trail behind it. */
+.sftp-row {
+  transition: background-color 80ms var(--ease-out);
+}
+
+/* A folder's arrow turns rather than being swapped for another character. */
+.chevron {
+  text-align: center;
+  transition: transform var(--motion-fast) var(--ease-out);
+}
+.chevron.open {
+  transform: rotate(90deg);
+}
+
+@keyframes td-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes td-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+@keyframes td-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+}
+@keyframes td-dot-in {
+  from {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+}
+
+/* Things that appear. Enter only: a menu or a dialog that lingered on the way
+   out would still be on screen when the next click meant to reach what is
+   under it. */
+.context-menu {
+  transform-origin: top left;
+  animation: td-pop-in var(--motion-fast) var(--ease-out);
+}
+.hint-bubble {
+  animation: td-fade-in var(--motion-fast) var(--ease-out);
+}
+.modal-backdrop {
+  animation: td-fade-in var(--motion-enter) var(--ease-out);
+}
+.modal-card,
+.palette {
+  animation: td-rise-in var(--motion-enter) var(--ease-out);
+}
+.graphical-overlay {
+  animation: td-fade-in var(--motion-enter) var(--ease-out);
+}
+.update-banner,
+.broadcast-banner {
+  animation: td-fade-in var(--motion-enter) var(--ease-out);
+}
+.activity-dot {
+  animation: td-dot-in 200ms var(--ease-out);
+}
+/* A tab brought forward. The panels are shown with `display`, and an animation
+   restarts whenever an element starts being displayed, so this plays on every
+   switch of tab or workspace — from most of the way there, because the point
+   is to soften the cut, not to make anybody wait for their terminal. */
+.tab-panel {
+  animation: td-panel-in var(--motion-fast) var(--ease-out);
+}
+@keyframes td-panel-in {
+  from {
+    opacity: 0.55;
+  }
+}
+
+/* Whoever has asked their system for less motion gets none of it. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
 }

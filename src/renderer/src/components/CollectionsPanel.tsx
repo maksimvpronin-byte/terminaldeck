@@ -187,7 +187,7 @@ export default function CollectionsPanel({ query }: { query: string }): JSX.Elem
                 title={t('Double-click to open the whole set in a new workspace')}
               >
                 <span className="tree-group-title name">
-                  <span className="chevron">{isCollapsed ? '▸' : '▾'}</span>
+                  <span className={`chevron ${isCollapsed ? '' : 'open'}`}>▸</span>
                   <span
                     className="session-dot"
                     style={collection.color ? { background: collection.color } : undefined}

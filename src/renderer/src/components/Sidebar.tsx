@@ -751,7 +751,7 @@ export default function Sidebar({
                 }
               >
                 <span className="tree-group-title name">
-                  <span className="chevron">{isCollapsed ? '▸' : '▾'}</span> 📁
+                  <span className={`chevron ${isCollapsed ? '' : 'open'}`}>▸</span> 📁
                   {g.git && <span className="git-mark">🔗</span>} {g.name}
                   {isCollapsed && childCount > 0 && (
                     <span className="child-count">{childCount}</span>
