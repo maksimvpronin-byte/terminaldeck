@@ -49,6 +49,7 @@ const SECTIONS: Section[] = [
       { what: '“+” makes an empty one — double-click a workspace to rename it' },
       { what: 'Right-click a group or a repository to open everything in a new workspace' },
       { what: 'Drag a tab onto a workspace to move it there; its terminal stays connected' },
+      { what: 'Drag a tab beside another to change their order' },
       { keys: '⌘⇧1 … ⌘⇧9', what: 'Jump to that workspace' },
       { what: 'Closing a workspace closes every terminal in it' },
       { what: 'A dot on a workspace means new output arrived in one of its tabs' }

@@ -688,6 +688,17 @@ label {
   color: var(--text);
   background: var(--bg-0);
 }
+/* Reordering tabs: the line marks the gap the tab will drop into, drawn inside
+   the tab so the strip does not shift mid-drag. */
+.tab.drop-before {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.tab.drop-after {
+  box-shadow: inset -2px 0 0 var(--accent);
+}
+.tab.dragging {
+  opacity: 0.5;
+}
 .tab .close {
   opacity: 0.6;
 }

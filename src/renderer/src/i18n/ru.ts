@@ -80,6 +80,8 @@ export const ru: Record<string, string> = {
     'Правый клик по группе или репозиторию открывает всё в новой рабочей области',
   'Drag a tab onto a workspace to move it there; its terminal stays connected':
     'Перетащите вкладку на другую область — терминал не разорвёт соединение',
+  'Drag a tab beside another to change their order':
+    'Перетащите вкладку к соседней, чтобы поменять их местами',
   'Jump to that workspace': 'Перейти к этой рабочей области',
   'Closing a workspace closes every terminal in it':
     'Закрытие области закрывает все терминалы в ней',
@@ -373,8 +375,8 @@ export const ru: Record<string, string> = {
   'Close this workspace and everything in it': 'Закрыть эту рабочую область и всё в ней',
   'Double-click to rename; right-click to save it; drop a tab here to move it':
     'Двойной клик — переименовать, правый — сохранить, бросьте вкладку сюда, чтобы перенести',
-  'Drag onto a pane to view side by side, or onto a workspace to move it':
-    'Перетащите на панель, чтобы поставить рядом, или на область, чтобы перенести',
+  'Drag beside another tab to reorder, onto a pane to view side by side, or onto a workspace to move it':
+    'Перетащите к другой вкладке, чтобы поменять порядок, на панель — чтобы поставить рядом, на область — чтобы перенести',
   'Mirror typing to every open pane, in every workspace':
     'Повторять ввод во всех открытых панелях, во всех рабочих областях',
   'New output in this workspace': 'Новый вывод в этой рабочей области',

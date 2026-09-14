@@ -173,6 +173,24 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
     })
   },
 
+  reorderTab: (tabId, targetId, place) => {
+    set((s) => {
+      if (tabId === targetId) return {}
+      const owner = workspaceOfTab(s, tabId)
+      const tab = owner?.tabs.find((t) => t.id === tabId)
+      // Only within one strip: a tab goes to another workspace by its header.
+      if (!owner || !tab || !owner.tabs.some((t) => t.id === targetId)) return {}
+      const rest = owner.tabs.filter((t) => t.id !== tabId)
+      const at = rest.findIndex((t) => t.id === targetId) + (place === 'after' ? 1 : 0)
+      const tabs = [...rest.slice(0, at), tab, ...rest.slice(at)]
+      if (tabs.every((t, i) => t === owner.tabs[i])) return {}
+      // Same tab objects, same keys — the panels stay mounted and connected.
+      return {
+        workspaces: s.workspaces.map((w) => (w.id === owner.id ? { ...w, tabs } : w))
+      }
+    })
+  },
+
   // --- tabs ---
 
   openTab: (title, target, color, viaCollectionId) => {

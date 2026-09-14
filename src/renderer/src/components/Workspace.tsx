@@ -9,6 +9,7 @@ import {
 } from '../state/store'
 import { sessionIdsOf } from '../state/workspaces'
 import { DRAG_MIME, type DragItem } from '../state/dnd'
+import { dropSide } from '../state/dropZone'
 import SplitContainer from './SplitContainer'
 import ContextMenu, { type MenuItem } from './ContextMenu'
 import CollectionDialog from './CollectionDialog'
@@ -24,6 +25,7 @@ export default function Workspace(): JSX.Element {
   const closeWorkspace = useStore((s) => s.closeWorkspace)
   const renameWorkspace = useStore((s) => s.renameWorkspace)
   const moveTabToWorkspace = useStore((s) => s.moveTabToWorkspace)
+  const reorderTab = useStore((s) => s.reorderTab)
   const setActiveTab = useStore((s) => s.setActiveTab)
   const closeTab = useStore((s) => s.closeTab)
   const toggleBroadcast = useStore((s) => s.toggleBroadcast)
@@ -34,6 +36,10 @@ export default function Workspace(): JSX.Element {
   const [draftTitle, setDraftTitle] = useState('')
   /** Workspace being hovered by a dragged tab, for the drop outline. */
   const [dropTarget, setDropTarget] = useState<string | null>(null)
+  /** The tab being dragged — dragover cannot read the payload, only its type. */
+  const [draggingTab, setDraggingTab] = useState<string | null>(null)
+  /** The gap beside a tab that the dragged tab would drop into. */
+  const [tabGap, setTabGap] = useState<{ id: string; place: 'before' | 'after' } | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null)
   /** Workspace being saved as a collection, so it can be reopened after closing. */
   const [saving, setSaving] = useState<string | null>(null)
@@ -79,6 +85,35 @@ export default function Workspace(): JSX.Element {
     if (!raw) return
     const item = JSON.parse(raw) as DragItem
     if (item.kind === 'tab') moveTabToWorkspace(item.id, workspaceId)
+  }
+
+  /** Which half of a tab the pointer is over: the gap to its left or right. */
+  function tabPlace(e: ReactDragEvent): 'before' | 'after' {
+    const rect = e.currentTarget.getBoundingClientRect()
+    return dropSide({ top: rect.left, height: rect.width }, e.clientX)
+  }
+
+  function allowTabReorder(e: ReactDragEvent, targetId: string): void {
+    if (!draggingTab || draggingTab === targetId) return
+    if (!e.dataTransfer.types.includes(DRAG_MIME)) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    // dragover fires continuously; keep the same object while the gap holds.
+    const place = tabPlace(e)
+    setTabGap((cur) =>
+      cur?.id === targetId && cur.place === place ? cur : { id: targetId, place }
+    )
+  }
+
+  function onTabDrop(e: ReactDragEvent, targetId: string): void {
+    e.preventDefault()
+    e.stopPropagation()
+    const place = tabPlace(e)
+    setTabGap(null)
+    const raw = e.dataTransfer.getData(DRAG_MIME)
+    if (!raw) return
+    const item = JSON.parse(raw) as DragItem
+    if (item.kind === 'tab') reorderTab(item.id, targetId, place)
   }
 
   return (
@@ -186,13 +221,25 @@ export default function Workspace(): JSX.Element {
           {current.tabs.map((tab) => (
             <div
               key={tab.id}
-              className={`tab ${tab.id === current.activeTabId ? 'active' : ''}`}
+              className={`tab ${tab.id === current.activeTabId ? 'active' : ''} ${
+                tabGap?.id === tab.id ? `drop-${tabGap.place}` : ''
+              } ${draggingTab === tab.id ? 'dragging' : ''}`}
               draggable
-              title={t('Drag onto a pane to view side by side, or onto a workspace to move it')}
+              title={t(
+                'Drag beside another tab to reorder, onto a pane to view side by side, or onto a workspace to move it'
+              )}
               onDragStart={(e) => {
                 e.dataTransfer.setData(DRAG_MIME, JSON.stringify({ kind: 'tab', id: tab.id }))
                 e.dataTransfer.effectAllowed = 'copyMove'
+                setDraggingTab(tab.id)
               }}
+              onDragEnd={() => {
+                setDraggingTab(null)
+                setTabGap(null)
+              }}
+              onDragOver={(e) => allowTabReorder(e, tab.id)}
+              onDragLeave={() => setTabGap((cur) => (cur?.id === tab.id ? null : cur))}
+              onDrop={(e) => onTabDrop(e, tab.id)}
               onClick={() => setActiveTab(tab.id)}
             >
               {(() => {

@@ -215,6 +215,8 @@ export interface WorkspaceSlice {
   renameWorkspace: (workspaceId: string, title: string) => void
   /** Drag a tab onto another workspace's header to move it there. */
   moveTabToWorkspace: (tabId: string, workspaceId: string) => void
+  /** Drag a tab into the gap beside another tab of the same workspace. */
+  reorderTab: (tabId: string, targetId: string, place: 'before' | 'after') => void
 
   /** Opens a tab in the current workspace, creating one if there is none. */
   openTab: (title: string, target: PaneTarget, color?: string, viaCollectionId?: string) => string
