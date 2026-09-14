@@ -6,6 +6,28 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.16.0
+
+### Added
+
+- Connect to a Windows host in console mode — the administrative session,
+  `mstsc /admin`, and mRemoteNG's "Connect to console session". On a Session
+  Host it takes no client access licence, so it still lets somebody in once
+  licensing has run out, and no Connection Broker sends it to another server.
+  Right-click a Windows host, saved or from an inventory, and choose "Connect in
+  console mode" to open it once: the pane keeps it across reconnects and the
+  host is not changed. To make it the default, tick it under Desktop for a host
+  or a whole group.
+- Reorder tabs by dragging one beside another. A line marks the gap it will drop
+  into; the terminal or desktop in it stays connected, and the order is kept
+  with the rest of the layout.
+
+### Changed
+
+- Building the desktop client on Windows finds the CMake that Visual Studio
+  installed when there is none on `PATH`, so Build Tools alone is enough. One on
+  `PATH` is still preferred.
+
 ## 0.15.9
 
 ### Fixed
