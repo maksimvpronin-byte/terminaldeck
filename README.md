@@ -532,7 +532,8 @@ it touched — an unsigned Mach-O with a stale signature is refused outright on 
 the symptom is a build that works only on the machine that made it.
 
 On Windows, with Visual Studio and its C++ workload — 2017 or newer, whichever is installed —
-plus CMake and Git on the path:
+plus Git on the path. CMake on the path is used if there is one; otherwise the copy the C++
+workload installs is found by itself, so Build Tools alone is enough:
 
 ```
 npm run build:freerdp:win
@@ -645,7 +646,8 @@ real host with the same code and no application around it. Packaging never inclu
 `npm run build:freerdp:mac` on its own that wants them.
 
 **Windows** — produces an NSIS installer and a portable `.exe` for x64. Needs Visual Studio with
-the C++ workload — 2017 or newer, whichever is installed — plus CMake and Git on `PATH`:
+the C++ workload — 2017 or newer, whichever is installed — plus Git on `PATH`. CMake on `PATH` is
+used if there is one, otherwise the copy the C++ workload installs:
 
 ```
 npm install

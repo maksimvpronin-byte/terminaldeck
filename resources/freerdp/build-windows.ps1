@@ -15,8 +15,9 @@ last step copies them there instead of rewriting install names.
     npm run build:freerdp:win        the lot, an hour the first time
     npm run build:freerdp:win:shim   only td-rdp, seconds
 
-Requires: Visual Studio 2022 with the C++ workload, CMake and Git. Set
-VCPKG_ROOT to an existing vcpkg, or one is fetched into resources\freerdp\vcpkg.
+Requires: Visual Studio 2017 or newer with the C++ workload, and Git. CMake is
+taken from PATH, or else the one that workload installs. Set VCPKG_ROOT to an
+existing vcpkg, or one is fetched into resources\freerdp\vcpkg.
 #>
 # This file, and every .ps1 beside it, begins with a UTF-8 byte order mark, and
 # that is not decoration. `npm run build:freerdp:win` invokes `powershell`, which
@@ -68,11 +69,6 @@ function Ran([string]$what) {
 # Checked together and up front: a build that dies twenty minutes in for a
 # missing tool wastes twenty minutes.
 Step 'Checking what is needed'
-$missing = @()
-foreach ($tool in 'cmake', 'git') {
-  if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) { $missing += $tool }
-}
-if ($missing) { Die "missing: $($missing -join ', ') — install them, or add them to PATH" }
 
 # The compiler comes from Visual Studio, and only inside its environment: cl.exe
 # needs a dozen variables set that the installer does not put in PATH. vswhere
@@ -81,6 +77,24 @@ $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer
 if (-not (Test-Path $vswhere)) { Die 'Visual Studio is not installed, or is older than 2017' }
 $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
 if (-not $vs) { Die 'Visual Studio is installed without the C++ workload' }
+
+# The C++ workload installs a CMake of its own, and leaves it out of PATH just
+# as it does cl.exe — so a machine with nothing but Build Tools has CMake and
+# still reports it missing. One on PATH wins; otherwise take the one that came
+# with the compiler, which is also the one that knows that compiler's generator.
+if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
+  $vsCmake = Join-Path $vs 'Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin'
+  if (Test-Path (Join-Path $vsCmake 'cmake.exe')) {
+    $env:PATH = "$vsCmake;$env:PATH"
+    Write-Host "  CMake from Visual Studio: $vsCmake"
+  }
+}
+
+$missing = @()
+foreach ($tool in 'cmake', 'git') {
+  if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) { $missing += $tool }
+}
+if ($missing) { Die "missing: $($missing -join ', ') — install them, or add them to PATH" }
 
 # The year in "Visual Studio 17 2022" is the version that is installed, and it
 # cannot be written down here: the runner moved to Visual Studio 18, and CMake,
