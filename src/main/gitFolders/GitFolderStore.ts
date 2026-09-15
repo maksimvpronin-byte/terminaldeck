@@ -321,6 +321,7 @@ class GitFolderStore {
     const tree = pruneTree(folderId, repo.tree, included)
 
     let orphaned: InventoryOverride[] = []
+    const before = this.doc.snapshot()
     this.doc.change((d) => {
       d.trees = [...d.trees.filter((t) => t.groupId !== folderId), tree]
       orphaned = this.orphanedOverrides(d, folderId)
@@ -329,18 +330,24 @@ class GitFolderStore {
       // next folder is a repository that has actually been read.
       this.rememberRepo(d, found.link.repoUrl, found.link.branch)
     })
+    try {
+      this.saveLink(found.folder, {
+        includedGroups: included,
+        showGroupFolders: showGroupFolders ?? found.link.showGroupFolders ?? false,
+        knownGroups: repo.paths,
+        lastSyncedAt: Date.now(),
+        lastRevision: repo.revision,
+        lastFiles: repo.files,
+        lastError: repo.warning
+      })
+    } catch (err) {
+      // The tree and the folder's link describe one sync; one saved without the
+      // other is a folder showing groups its link does not say were chosen.
+      this.doc.restore(before)
+      throw err
+    }
     // Forgotten only once nothing saved points at them any more.
     for (const override of orphaned) forgetSecret(override)
-
-    this.saveLink(found.folder, {
-      includedGroups: included,
-      showGroupFolders: showGroupFolders ?? found.link.showGroupFolders ?? false,
-      knownGroups: repo.paths,
-      lastSyncedAt: Date.now(),
-      lastRevision: repo.revision,
-      lastFiles: repo.files,
-      lastError: repo.warning
-    })
     this.pending.delete(folderId)
     return tree
   }
@@ -368,8 +375,12 @@ class GitFolderStore {
    * Everything a folder holds, so deleting it can take the lot: its cached tree
    * and every local setting addressed to a node of it.
    */
-  forget(folderId: string, forgetSecret: (override: InventoryOverride) => void): void {
-    this.dropCheckout(folderId)
+  forget(
+    folderId: string,
+    forgetSecret: (override: InventoryOverride) => void,
+    /** The link the folder had, for when the folder is already gone or untied. */
+    link: GitFolderLink | undefined = this.linkOf(folderId)?.link
+  ): void {
     const prefix = gitNodePrefix(folderId)
     const forgotten = this.data.overrides.filter((o) => o.nodeId.startsWith(prefix))
     this.doc.change((d) => {
@@ -377,6 +388,9 @@ class GitFolderStore {
       d.trees = d.trees.filter((t) => t.groupId !== folderId)
     })
     this.pending.delete(folderId)
+    // The checkout and the passwords only once nothing saved points at them:
+    // neither can be brought back if the change above had failed.
+    this.dropCheckout(folderId, link)
     for (const override of forgotten) forgetSecret(override)
   }
 
@@ -388,8 +402,7 @@ class GitFolderStore {
    * its neighbour. The saved repository itself stays in the list: it is there
    * to be picked again, and re-cloning is what picking it means.
    */
-  private dropCheckout(folderId: string): void {
-    const link = this.linkOf(folderId)?.link
+  private dropCheckout(folderId: string, link: GitFolderLink | undefined): void {
     if (!link) return
     const shared = sessionStore
       .getAll()

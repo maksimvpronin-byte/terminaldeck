@@ -13,7 +13,7 @@ import { credentialStore } from '../store/CredentialStore'
 import { sessionStore } from '../store/SessionStore'
 import { snippetStore } from '../store/SnippetStore'
 import { forgetGitFolder } from './gitFolders'
-import { applySecret, forgetSecret, forgetSecretAt } from './secrets'
+import { forgetSecret, forgetSecretAt, saveWithSecrets } from './secrets'
 import { focusedWin } from './win'
 
 /**
@@ -26,11 +26,15 @@ export function registerStoreHandlers(): void {
   ipcMain.handle(IPC.storeLoad, () => sessionStore.getAll())
   ipcMain.handle(
     IPC.storeSaveSession,
-    (_e, session: SessionProfile, secret?: string | null, gatewaySecret?: string | null) => {
-      applySecret(session, 'secretRef', secret)
-      applySecret(session, 'gatewaySecretRef', gatewaySecret)
-      return sessionStore.saveSession(session)
-    }
+    (_e, session: SessionProfile, secret?: string | null, gatewaySecret?: string | null) =>
+      saveWithSecrets(
+        session,
+        [
+          ['secretRef', secret],
+          ['gatewaySecretRef', gatewaySecret]
+        ],
+        (s) => sessionStore.saveSession(s)
+      )
   )
   ipcMain.handle(IPC.storeDeleteSession, (_e, id: string) => {
     // The credential goes with the host. Left behind it would sit in the vault
@@ -50,14 +54,21 @@ export function registerStoreHandlers(): void {
   ipcMain.handle(
     IPC.storeSaveGroup,
     (_e, group: SessionGroup, secret?: string | null, gatewaySecret?: string | null) => {
-      applySecret(group, 'secretRef', secret)
-      applySecret(group, 'gatewaySecretRef', gatewaySecret)
+      const had = sessionStore.getAll().groups.find((g) => g.id === group.id)?.git
+      const saved = saveWithSecrets(
+        group,
+        [
+          ['secretRef', secret],
+          ['gatewaySecretRef', gatewaySecret]
+        ],
+        (g) => sessionStore.saveGroup(g)
+      )
       // Untying a folder from its repository empties it: the hosts it showed
       // were the repository's, and the settings kept for them addressed nodes
-      // that no longer exist.
-      const had = sessionStore.getAll().groups.find((g) => g.id === group.id)?.git
-      if (had && !group.git) forgetGitFolder(group.id)
-      return sessionStore.saveGroup(group)
+      // that no longer exist. After the save, not before: a save that fails
+      // leaves the folder tied, and it must still have what it mirrors.
+      if (had && !group.git) forgetGitFolder(group.id, had)
+      return saved
     }
   )
   ipcMain.handle(IPC.storeReorderGroups, (_e, orderedIds: string[]) => {
@@ -67,11 +78,11 @@ export function registerStoreHandlers(): void {
     // Only the group's own credential: hosts and subgroups are re-parented, not
     // deleted, and keep whatever they hold themselves.
     const group = sessionStore.getAll().groups.find((g) => g.id === id)
+    sessionStore.deleteGroup(id)
     // A folder tied to git takes its mirrored tree with it, and the local
     // settings and passwords kept for the hosts in it: nothing else can address
     // those nodes once the folder is gone.
-    if (group?.git) forgetGitFolder(id)
-    sessionStore.deleteGroup(id)
+    if (group?.git) forgetGitFolder(id, group.git)
     if (group) {
       forgetSecret({ ...group })
       forgetSecretAt({ ...group }, 'gatewaySecretRef')
@@ -102,10 +113,13 @@ export function registerStoreHandlers(): void {
    * A method that cannot carry one drops it, so a password left in the box
    * after switching to the agent is not kept where nothing will ever use it.
    */
-  ipcMain.handle(IPC.credentialsSave, (_e, credential: Credential, secret?: string | null) => {
-    applySecret(credential, 'secretRef', credential.authMethod === 'agent' ? null : secret)
-    return credentialStore.save(credential)
-  })
+  ipcMain.handle(IPC.credentialsSave, (_e, credential: Credential, secret?: string | null) =>
+    saveWithSecrets(
+      credential,
+      [['secretRef', credential.authMethod === 'agent' ? null : secret]],
+      (c) => credentialStore.save(c)
+    )
+  )
   ipcMain.handle(IPC.credentialsDelete, (_e, id: string) => {
     // The secret goes with the account. Left behind it would sit in the vault
     // for good, with nothing left pointing at it.

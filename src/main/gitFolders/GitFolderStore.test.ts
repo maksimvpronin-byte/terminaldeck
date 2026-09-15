@@ -263,4 +263,30 @@ describe('a Sessions folder mirroring a repository', () => {
     gitFolderStore.forget('folder-3', forget)
     sessionStore.deleteGroup('folder-3')
   })
+
+  /**
+   * The tree is saved, and then the folder's link. When the second write fails
+   * the first is taken back, and no password is forgotten for a host that the
+   * saved tree still shows.
+   */
+  it('takes the tree back when the folder link fails to save', async () => {
+    const folder: SessionGroup = {
+      id: 'folder-4',
+      name: 'Half',
+      parentId: null,
+      git: { repoUrl: repo, paths: ['hosts.yml'], includedGroups: [] }
+    }
+    sessionStore.saveGroup(folder)
+    await gitFolderStore.preview('folder-4')
+    const forgottenBefore = forgotten.length
+    vi.spyOn(sessionStore, 'saveGroup').mockImplementationOnce(() => {
+      throw new Error('EBUSY: resource busy or locked')
+    })
+
+    expect(() => gitFolderStore.apply('folder-4', ['all'], forget)).toThrow(/EBUSY/)
+
+    expect(gitFolderStore.treeOf('folder-4')).toBeUndefined()
+    expect(forgotten).toHaveLength(forgottenBefore)
+    sessionStore.deleteGroup('folder-4')
+  })
 })

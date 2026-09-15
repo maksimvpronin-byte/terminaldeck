@@ -1,8 +1,8 @@
 import { ipcMain } from 'electron'
 import { IPC } from '../../shared/ipc-channels'
-import type { InventoryOverride } from '../../shared/types'
+import type { GitFolderLink, InventoryOverride } from '../../shared/types'
 import { gitFolderStore } from '../gitFolders/GitFolderStore'
-import { applySecret, forgetSecret, forgetSecretAt } from './secrets'
+import { forgetSecret, forgetSecretAt, saveWithSecrets } from './secrets'
 
 /**
  * Sessions folders backed by git: what they hold, pulling a repository, taking
@@ -39,9 +39,14 @@ export function registerGitFolderHandlers(): void {
   ipcMain.handle(
     IPC.gitFolderSaveOverride,
     (_e, override: InventoryOverride, secret?: string | null, gatewaySecret?: string | null) => {
-      applySecret(override, 'secretRef', secret)
-      applySecret(override, 'gatewaySecretRef', gatewaySecret)
-      return gitFolderStore.saveOverride(override)
+      saveWithSecrets(
+        override,
+        [
+          ['secretRef', secret],
+          ['gatewaySecretRef', gatewaySecret]
+        ],
+        (o) => gitFolderStore.saveOverride(o)
+      )
     }
   )
 
@@ -57,6 +62,6 @@ export function registerGitFolderHandlers(): void {
  * link — is taken away. Exported rather than registered: the session store owns
  * both of those moments.
  */
-export function forgetGitFolder(groupId: string): void {
-  gitFolderStore.forget(groupId, forgetBoth)
+export function forgetGitFolder(groupId: string, link?: GitFolderLink): void {
+  gitFolderStore.forget(groupId, forgetBoth, link)
 }

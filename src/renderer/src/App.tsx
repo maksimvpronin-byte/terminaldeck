@@ -9,9 +9,11 @@ function CreateVaultScreen({ onCreated }: { onCreated: () => void }): JSX.Elemen
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
   const t = useT()
 
   async function submit(): Promise<void> {
+    if (busy) return
     if (password.length < MIN_MASTER_PASSWORD_LENGTH) {
       setError(t('Master password must be at least 8 characters'))
       return
@@ -20,11 +22,14 @@ function CreateVaultScreen({ onCreated }: { onCreated: () => void }): JSX.Elemen
       setError(t('Passwords do not match'))
       return
     }
+    setBusy(true)
     try {
       await window.td.vault.create(password)
       onCreated()
     } catch (err) {
       setError((err as Error).message)
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -51,7 +56,7 @@ function CreateVaultScreen({ onCreated }: { onCreated: () => void }): JSX.Elemen
           <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
         </label>
         {error && <span className="error-text">{error}</span>}
-        <button className="primary" onClick={submit}>
+        <button className="primary" onClick={submit} disabled={busy}>
           {t('Create vault')}
         </button>
       </div>
@@ -62,9 +67,17 @@ function CreateVaultScreen({ onCreated }: { onCreated: () => void }): JSX.Elemen
 function UnlockScreen({ onUnlocked }: { onUnlocked: () => void }): JSX.Element {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+  /*
+   * Deriving the key takes a noticeable moment, and Enter pressed again in it
+   * queued another unlock behind the first. The main process now copes with
+   * that; this keeps it from being asked.
+   */
+  const [busy, setBusy] = useState(false)
   const t = useT()
 
   async function submit(): Promise<void> {
+    if (busy) return
+    setBusy(true)
     try {
       const res = await window.td.vault.unlock(password)
       if (!res.ok) {
@@ -74,6 +87,8 @@ function UnlockScreen({ onUnlocked }: { onUnlocked: () => void }): JSX.Element {
       onUnlocked()
     } catch (err) {
       setError((err as Error).message)
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -93,7 +108,7 @@ function UnlockScreen({ onUnlocked }: { onUnlocked: () => void }): JSX.Element {
           />
         </label>
         {error && <span className="error-text">{error}</span>}
-        <button className="primary" onClick={submit}>
+        <button className="primary" onClick={submit} disabled={busy}>
           {t('Unlock')}
         </button>
       </div>

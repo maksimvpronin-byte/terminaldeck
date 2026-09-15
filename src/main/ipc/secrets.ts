@@ -37,19 +37,58 @@ export function forgetSecretAt<K extends string>(
 }
 
 /**
- * Stores a typed secret, mints a reference for it if there is none, or drops
- * the stored one when the caller passes null. Undefined leaves it as it was,
- * which is what saving a dialog nobody typed a password into means.
+ * Saves an item together with the secrets typed for it, as one change.
+ *
+ * For each named reference: a string stores it (minting a reference if there is
+ * none), null drops the stored one, undefined leaves it as it was — which is
+ * what saving a dialog nobody typed a password into means.
+ *
+ * The secrets used to be changed first and the item saved after, each on its
+ * own. A save that then failed — a full disk, a file held by a scanner — left
+ * the host as it was, pointing at a password that had just been replaced, or at
+ * one that had just been deleted, while the dialog reported the failure as if
+ * nothing had happened. Now the vault is written once, the item is saved, and if
+ * that save fails the vault is put back as it was before either.
  */
-export function applySecret<K extends string>(
-  item: Partial<Record<K, string | undefined>>,
-  field: K,
-  secret: string | null | undefined
-): void {
-  if (secret === null) forgetSecretAt(item, field)
-  else if (secret !== undefined) {
-    const ref = item[field] ?? randomUUID()
-    item[field] = ref
-    vault.setSecret(ref, secret)
+export function saveWithSecrets<T extends object, R>(
+  item: T,
+  secrets: Array<[field: string, secret: string | null | undefined]>,
+  save: (item: T) => R
+): R {
+  const refs = item as Record<string, string | undefined>
+  const set: Record<string, string> = {}
+  const remove: string[] = []
+  for (const [field, secret] of secrets) {
+    if (secret === undefined) continue
+    if (secret === null) {
+      const ref = refs[field]
+      if (ref) remove.push(ref)
+      refs[field] = undefined
+      continue
+    }
+    const ref = refs[field] ?? randomUUID()
+    refs[field] = ref
+    set[ref] = secret
+  }
+
+  const touchesVault = Object.keys(set).length > 0 || remove.length > 0
+  // Forgetting while locked drops the reference and leaves the ciphertext: an
+  // unreferenced secret is unreachable. Storing one while locked is refused by
+  // the vault itself, before anything is saved.
+  if (!touchesVault || (!vault.isUnlocked() && Object.keys(set).length === 0)) return save(item)
+
+  const before = vault.snapshotSecrets()
+  vault.changeSecrets(set, remove)
+  try {
+    return save(item)
+  } catch (err) {
+    try {
+      vault.restoreSecrets(before)
+    } catch (restoreErr) {
+      throw new Error(
+        `${(err as Error).message} — and the passwords changed with it could not be put back (${(restoreErr as Error).message})`
+      )
+    }
+    throw err
   }
 }

@@ -119,6 +119,19 @@ class Vault {
         wipe(key)
         throw new WrongPasswordError()
       }
+      /*
+       * Already open — a second press of Unlock, or a second window — and the
+       * password has been checked, so there is nothing left to do.
+       *
+       * Adopting what was read would be worse than nothing: it was read before
+       * the derivation, and a secret saved during that wait is in the open vault
+       * and not in that copy. Adopting it dropped the secret from memory, and the
+       * next save of anything wrote the older set over the file for good.
+       */
+      if (this.key) {
+        wipe(key)
+        return
+      }
       this.adopt(file, key)
     })
   }
@@ -264,9 +277,15 @@ class Vault {
 
   /** Several at once, in one write, for an import. */
   setSecrets(values: Record<string, string>): void {
+    this.changeSecrets(values, [])
+  }
+
+  /** Stores some secrets and forgets others, in one write. */
+  changeSecrets(set: Record<string, string>, remove: string[]): void {
     const { key, file } = this.requireUnlocked()
     const secrets = { ...file.secrets }
-    for (const [ref, plaintext] of Object.entries(values)) secrets[ref] = encrypt(key, plaintext)
+    for (const ref of remove) delete secrets[ref]
+    for (const [ref, plaintext] of Object.entries(set)) secrets[ref] = encrypt(key, plaintext)
     this.replaceFile({ ...file, secrets })
   }
 

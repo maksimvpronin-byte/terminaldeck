@@ -282,6 +282,30 @@ describe('vault', () => {
   })
 
   /**
+   * A second unlock of a vault that is already open — a double press of Enter.
+   * It adopted the file it read before deriving its key, so a secret saved in
+   * the meantime vanished from memory and the next save wrote it off the disk.
+   */
+  it('keeps a secret saved while a second unlock was deriving its key', async () => {
+    await vault.create(OLD)
+    vault.setSecret('host-0', 'before')
+
+    const again = vault.unlock(OLD)
+    vault.setSecret('host-1', 'during')
+    await again
+    vault.setSecret('host-2', 'after')
+
+    expect(vault.getSecret('host-1')).toBe('during')
+    vault.lock()
+    await vault.unlock(OLD)
+    expect(vault.allSecrets()).toEqual({
+      'host-0': 'before',
+      'host-1': 'during',
+      'host-2': 'after'
+    })
+  })
+
+  /**
    * The point of the asynchronous derivation. Were scrypt run synchronously the
    * timer below could not fire until it finished, because nothing else runs at
    * all — which in the app means no terminal draws and no keystroke is

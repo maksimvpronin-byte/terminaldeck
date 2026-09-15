@@ -3,7 +3,7 @@ import { IPC } from '../../shared/ipc-channels'
 import type { InventoryOverride, InventorySource } from '../../shared/types'
 import { isGitAvailable } from '../inventory/GitRepo'
 import { inventoryStore } from '../inventory/InventoryStore'
-import { applySecret, forgetSecret, forgetSecretAt } from './secrets'
+import { forgetSecret, forgetSecretAt, saveWithSecrets } from './secrets'
 
 /** Inventory repositories, their syncs, and the local overrides on top of them. */
 
@@ -34,9 +34,14 @@ export function registerInventoryHandlers(): void {
   ipcMain.handle(
     IPC.inventorySaveOverride,
     (_e, override: InventoryOverride, secret?: string | null, gatewaySecret?: string | null) => {
-      applySecret(override, 'secretRef', secret)
-      applySecret(override, 'gatewaySecretRef', gatewaySecret)
-      return inventoryStore.saveOverride(override)
+      saveWithSecrets(
+        override,
+        [
+          ['secretRef', secret],
+          ['gatewaySecretRef', gatewaySecret]
+        ],
+        (o) => inventoryStore.saveOverride(o)
+      )
     }
   )
   ipcMain.handle(IPC.inventoryClearOverride, (_e, nodeId: string) => {

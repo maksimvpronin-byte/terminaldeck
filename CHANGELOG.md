@@ -71,6 +71,15 @@ the other produces a version nobody can install, which is how 0.1.10 through
   terminal, which brackets it when the shell asks for that.
 - **A desktop client could crash on its way out** when a message arrived as the
   session ended. Needs the td-rdp client rebuilt.
+- **Unlocking twice could lose a password saved in between.** A second Unlock
+  of a vault that was already open put back the copy it read before deriving its
+  key. It now leaves an open vault as it is, and the button waits for the first
+  press.
+- **A host that failed to save could already have lost or changed its
+  password.** Saving a host, a group, an account or a local setting now changes
+  its passwords and the item together, and puts the passwords back if the item
+  cannot be saved. Untying or deleting a Sessions folder, and applying a sync to
+  one, only forget anything once the change is saved.
 
 ### Changed
 
