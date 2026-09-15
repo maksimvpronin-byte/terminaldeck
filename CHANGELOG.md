@@ -106,6 +106,16 @@ the other produces a version nobody can install, which is how 0.1.10 through
   also when the disk falls too far behind; a failing desktop pipe ends that
   desktop. A desktop client that does not exit within five seconds of being
   stopped is ended.
+- **A Sessions folder deleted while its repository was being read came back**
+  when the read failed, and one edited meanwhile lost its new settings. The
+  outcome of a read is now recorded only on the folder as it is, if it still
+  reads the same repository.
+- **An inventory sync published the source's old login, port or name** if they
+  were changed while the repository was being read. The tree is built from the
+  source as it is when the sync ends, and saving a source during a sync runs a
+  fresh sync after it.
+- **A git command or an inventory parse that hung held every later sync.** git
+  commands are stopped after five minutes and a parse after two.
 
 ### Changed
 

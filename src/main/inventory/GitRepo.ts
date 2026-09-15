@@ -5,6 +5,16 @@ import { join } from 'path'
 
 const run = promisify(execFile)
 
+/**
+ * How long one git command may run.
+ *
+ * A remote that accepts the connection and then sends nothing — a stalled
+ * proxy, a VPN that dropped halfway — held a sync open for as long as git was
+ * willing to wait, which is indefinitely, and every later sync of the same
+ * checkout queued behind it.
+ */
+const GIT_TIMEOUT_MS = 5 * 60_000
+
 export class GitMissingError extends Error {
   constructor() {
     super('git was not found on this machine. Install it, or make sure it is on PATH.')
@@ -24,12 +34,18 @@ async function git(args: string[], cwd?: string): Promise<string> {
       cwd,
       // Never let git stop for interactive input; fail with a clear error instead.
       env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
-      maxBuffer: 16 * 1024 * 1024
+      maxBuffer: 16 * 1024 * 1024,
+      timeout: GIT_TIMEOUT_MS
     })
     return stdout
   } catch (err) {
-    const e = err as NodeJS.ErrnoException & { stderr?: string }
+    const e = err as NodeJS.ErrnoException & { stderr?: string; killed?: boolean }
     if (e.code === 'ENOENT') throw new GitMissingError()
+    if (e.killed) {
+      throw new Error(
+        `git ${args[0]} did not finish in ${GIT_TIMEOUT_MS / 60_000} minutes and was stopped`
+      )
+    }
     throw new Error((e.stderr || e.message || 'git failed').trim())
   }
 }

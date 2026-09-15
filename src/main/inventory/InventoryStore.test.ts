@@ -92,4 +92,40 @@ describe('a sync overtaken by an edit', () => {
     expect(inventoryStore.allTrees()).toHaveLength(1)
     expect(inventoryStore.sources()[0]).toMatchObject({ name: 'renamed', lastRevision: 'abc123' })
   })
+
+  /**
+   * A login changed while the repository was being read. The source saved the
+   * new one, and the tree was published with the old: hosts went on signing in
+   * as the account that had just been replaced.
+   */
+  it('publishes the source as it is when the sync ends', async () => {
+    inventoryStore.saveSource({ ...source, username: 'old-login' })
+    const syncing = inventoryStore.sync('src')
+    await parsing()
+    inventoryStore.saveSource({ ...source, username: 'new-login', name: 'renamed' })
+    finishParse()
+
+    const tree = await syncing
+    expect(tree.groups[0]).toMatchObject({ name: 'renamed', username: 'new-login' })
+  })
+
+  it('runs a fresh sync for a source saved while one was running', async () => {
+    inventoryStore.saveSource(source)
+    const first = inventoryStore.sync('src')
+    await parsing()
+    const firstFinish = finishParse
+
+    const moved = { ...source, repoUrl: 'git@example.com:new.git' }
+    inventoryStore.saveSource(moved)
+    finishParse = noop
+    const second = inventoryStore.sync('src')
+    expect(second).not.toBe(first)
+
+    firstFinish()
+    await expect(first).rejects.toThrow(/changed/i)
+    await vi.waitFor(() => expect(finishParse).not.toBe(noop))
+    finishParse()
+    await expect(second).resolves.toMatchObject({ sourceId: 'src' })
+    expect(inventoryStore.allTrees()).toHaveLength(1)
+  })
 })

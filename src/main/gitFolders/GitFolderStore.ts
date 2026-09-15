@@ -171,8 +171,19 @@ class GitFolderStore {
     return folder?.git ? { folder, link: folder.git } : undefined
   }
 
-  private saveLink(folder: SessionGroup, patch: Partial<GitFolderLink>): void {
-    sessionStore.saveGroup({ ...folder, git: { ...folder.git!, ...patch } })
+  /**
+   * Records what a read found on the folder as it is now — and only if it is
+   * still the folder, reading what it read.
+   *
+   * This wrote back the folder object taken before the read began. `saveGroup`
+   * adds what it does not find, so a folder deleted while its repository was
+   * being fetched came back the moment the fetch failed; one edited in the
+   * meantime had its new settings replaced with the old.
+   */
+  private saveLink(folderId: string, read: GitFolderLink, patch: Partial<GitFolderLink>): void {
+    const now = this.linkOf(folderId)
+    if (!now || !readsTheSame(now.link, read)) return
+    sessionStore.saveGroup({ ...now.folder, git: { ...now.link, ...patch } })
   }
 
   /** Reads the repository into our shapes, without deciding anything about it. */
@@ -228,7 +239,7 @@ class GitFolderStore {
   async preview(folderId: string): Promise<GitFolderPreview> {
     const found = this.linkOf(folderId)
     if (!found) throw new Error('This folder is not linked to a repository')
-    const { folder, link } = found
+    const { link } = found
 
     let repo: ParsedRepo
     try {
@@ -236,8 +247,13 @@ class GitFolderStore {
     } catch (err) {
       // Recorded on the folder as well as thrown: the tree keeps showing what it
       // has, and says underneath why it is not newer.
-      this.saveLink(folder, { lastError: (err as Error).message })
+      this.saveLink(folderId, link, { lastError: (err as Error).message })
       throw err
+    }
+    // Deleted, untied or re-pointed during the read: what was read is nobody's.
+    const now = this.linkOf(folderId)
+    if (!now || !readsTheSame(now.link, link)) {
+      throw new Error('This folder was changed or removed while it was being read.')
     }
     this.pending.set(folderId, repo)
 
@@ -331,7 +347,7 @@ class GitFolderStore {
       this.rememberRepo(d, found.link.repoUrl, found.link.branch)
     })
     try {
-      this.saveLink(found.folder, {
+      this.saveLink(folderId, found.link, {
         includedGroups: included,
         showGroupFolders: showGroupFolders ?? found.link.showGroupFolders ?? false,
         knownGroups: repo.paths,

@@ -29,6 +29,29 @@ function readsTheSame(a: InventorySource, b: InventorySource): boolean {
   )
 }
 
+/** Everything about a source that shapes the tree a sync publishes. */
+function settingsOf(source: InventorySource): string {
+  const { lastSyncedAt: _t, lastRevision: _r, lastError: _e, lastFiles: _f, ...settings } = source
+  return JSON.stringify(settings)
+}
+
+/** The source itself as the root of its tree, so what is set on it is inherited below. */
+function rootGroupOf(source: InventorySource, rootId: string): InventoryTree['groups'][number] {
+  const {
+    id: _id,
+    name,
+    repoUrl: _url,
+    branch: _br,
+    paths: _p,
+    lastSyncedAt: _t,
+    lastRevision: _r,
+    lastError: _e,
+    lastFiles: _f,
+    ...sourceAuth
+  } = source
+  return { ...withoutBlanks(sourceAuth), id: rootId, name, parentId: null }
+}
+
 /** Replaces the entry with the same key, or adds it at the end. */
 function upsertBy<T>(list: T[], item: T, same: (a: T, b: T) => boolean): void {
   const idx = list.findIndex((existing) => same(existing, item))
@@ -131,13 +154,33 @@ class InventoryStore {
       )
   }
 
-  private syncing = new Map<string, Promise<InventoryTree>>()
+  private syncing = new Map<string, { promise: Promise<InventoryTree>; source: string }>()
+
+  /**
+   * One sync per source at a time — and the one a caller gets is for the source
+   * as it is now.
+   *
+   * Asking while a sync was running handed back the running one. Saving a source
+   * starts a sync straight after, so a save made during a sync got the result of
+   * the settings from before it: the old address, or a tree read with paths
+   * that no longer applied. A request for a source that has changed since the
+   * running sync began now waits for that one and then runs its own.
+   */
   sync(sourceId: string): Promise<InventoryTree> {
-    const pending = this.syncing.get(sourceId)
-    if (pending) return pending
-    const next = this.syncSource(sourceId).finally(() => this.syncing.delete(sourceId))
-    this.syncing.set(sourceId, next)
-    return next
+    const running = this.syncing.get(sourceId)
+    const now = this.doc.data.sources.find((s) => s.id === sourceId)
+    if (running) {
+      if (!now || running.source === settingsOf(now)) return running.promise
+      return running.promise.catch(() => undefined).then(() => this.sync(sourceId))
+    }
+    const entry = {
+      source: now ? settingsOf(now) : '',
+      promise: this.syncSource(sourceId).finally(() => {
+        if (this.syncing.get(sourceId) === entry) this.syncing.delete(sourceId)
+      })
+    }
+    this.syncing.set(sourceId, entry)
+    return entry.promise
   }
 
   /**
@@ -172,13 +215,6 @@ class InventoryStore {
       // The source itself is the tree's root group, so credentials set on it are
       // inherited by every group and host the repository produces.
       const rootId = `inv:${sourceId}:root`
-      const { id: _id, name, repoUrl: _url, branch: _br, paths: _p, ...sourceAuth } = source
-      const tree: InventoryTree = {
-        sourceId,
-        groups: [{ ...withoutBlanks(sourceAuth), id: rootId, name, parentId: null }],
-        sessions: [],
-        memberships: {}
-      }
       const parsed = await parseInWorker({
         dir,
         paths: source.paths,
@@ -187,9 +223,6 @@ class InventoryStore {
         rootId
       })
       const { files } = parsed
-      tree.groups.push(...parsed.groups)
-      tree.sessions = parsed.hosts
-      tree.memberships = parsed.memberships
       const revision = await headRevision(dir).catch(() => undefined)
 
       const current = this.stillCurrent(source)
@@ -199,6 +232,19 @@ class InventoryStore {
             ? 'This source was changed while it was syncing. Sync it again.'
             : 'This source was removed while it was syncing.'
         )
+      }
+      /*
+       * The root group is built from the source as it is now, not as it was when
+       * the sync began. A login, a port or a name changed while the repository
+       * was being read was saved, and the tree was then published with the old
+       * one — so hosts went on connecting as the account that had just been
+       * replaced, until the next sync.
+       */
+      const tree: InventoryTree = {
+        sourceId,
+        groups: [rootGroupOf(current, rootId), ...parsed.groups],
+        sessions: parsed.hosts,
+        memberships: parsed.memberships
       }
       this.noteSync(sourceId, {
         lastSyncedAt: Date.now(),

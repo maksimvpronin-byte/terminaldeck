@@ -289,4 +289,23 @@ describe('a Sessions folder mirroring a repository', () => {
     expect(forgotten).toHaveLength(forgottenBefore)
     sessionStore.deleteGroup('folder-4')
   })
+
+  /**
+   * A folder deleted while its repository was being fetched, and the fetch then
+   * failing. Recording the failure wrote back the folder as it was before the
+   * fetch, which put the deleted folder back.
+   */
+  it('does not bring back a folder deleted while its read failed', async () => {
+    sessionStore.saveGroup({
+      id: 'folder-5',
+      name: 'Gone',
+      parentId: null,
+      git: { repoUrl: join(userData, 'no-such-repo'), paths: ['hosts.yml'], includedGroups: [] }
+    })
+    const reading = gitFolderStore.preview('folder-5')
+    sessionStore.deleteGroup('folder-5')
+
+    await expect(reading).rejects.toThrow()
+    expect(sessionStore.getAll().groups.some((g) => g.id === 'folder-5')).toBe(false)
+  })
 })
