@@ -366,6 +366,9 @@ export const ru: Record<string, string> = {
   'Toggle port forwarding': 'Показать или скрыть проброс портов',
   'Toggle remote monitoring': 'Показать или скрыть мониторинг',
   'Close workspace': 'Закрыть рабочую область',
+  'Sign out of Windows sessions': 'Выйти из сессий Windows',
+  'Sign out of every Windows session in this workspace and close its desktops?':
+    'Выйти из всех сессий Windows в этой рабочей области и закрыть их окна?',
   'Rename…': 'Переименовать…',
   'Save as collection…': 'Сохранить как набор…',
   'Select a session on the left, or quick-connect above.':

@@ -274,7 +274,14 @@ function Pane({
             admin={admin}
             onMeasured={setMeasured}
             onSession={(desktopId) => setPaneDesktop(tabId, node.id, desktopId)}
+            onSignedOut={() => {
+              // As if its close button had been pressed: the session it held is
+              // gone from the host, and the tab goes with its last pane.
+              morphClose(rootRef.current, hostOfLeaf(node))
+              closePane(tabId, node.id)
+            }}
             paneVisible={visible}
+            restored={node.restored}
           />
         )}
         {traits.files && node.sftpOpen && (

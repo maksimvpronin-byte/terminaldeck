@@ -6,6 +6,7 @@ import { rdpKeyFor, substituteCommand, unicodeKey } from '../../../shared/rdpSca
 import { modifierFixes } from '../../../shared/modifierSync'
 import type { ForwardedKey, RdpView } from '../../../shared/types'
 import { isRefusal } from '../../../shared/rdpLogon'
+import { endedBySignOut } from '../../../shared/rdpLogoff'
 
 /**
  * A desktop, drawn from the pixels a client in another process decoded.
@@ -69,6 +70,12 @@ interface Props {
    * beside the progress rather than in place of it.
    */
   onNotice: (text: string) => void
+  /**
+   * The Windows session was signed out of — from inside it, or logged off from
+   * elsewhere. Said instead of a closed phase: there is no session left to show
+   * "Session ended" over, and the pane goes. See `endedBySignOut`.
+   */
+  onSignedOut?: () => void
 }
 
 /** How long to let a drag settle before asking the far end to resize. */
@@ -120,7 +127,8 @@ export default function RemoteScreen({
   onPhase,
   onSession,
   onNotice,
-  onMeasured
+  onMeasured,
+  onSignedOut
 }: Props): JSX.Element {
   const [clipboardStatus, setClipboardStatus] = useState('')
   const t = useT()
@@ -161,6 +169,8 @@ export default function RemoteScreen({
   onMeasuredRef.current = onMeasured
   const onNoticeRef = useRef(onNotice)
   onNoticeRef.current = onNotice
+  const onSignedOutRef = useRef(onSignedOut)
+  onSignedOutRef.current = onSignedOut
   /* Through a ref like the two above: the session's subscriptions are set up
      once, and a function captured there would go on wording the tooltip with
      whatever the density was when the pane opened. */
@@ -531,6 +541,12 @@ export default function RemoteScreen({
                 at: 'failed',
                 reason: String(event.detail || 'Could not connect')
               })
+            } else if (
+              what === 'ended' &&
+              onSignedOutRef.current &&
+              endedBySignOut(event.errinfo, event.code)
+            ) {
+              onSignedOutRef.current()
             } else if (what === 'closed' || what === 'ended') {
               onPhaseRef.current({
                 at: 'closed',

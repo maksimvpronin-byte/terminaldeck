@@ -30,7 +30,9 @@ export default function GraphicalHost({
   admin,
   onMeasured,
   onSession,
-  paneVisible
+  onSignedOut,
+  paneVisible,
+  restored
 }: {
   protocol: Protocol
   host?: string
@@ -59,9 +61,18 @@ export default function GraphicalHost({
   /** Passed straight through to the screen: which live desktop this pane holds,
    *  so the tree can say the machine is open. */
   onSession?: (id: string | undefined) => void
+  /** The Windows session was signed out of, so the pane has nothing left to
+   *  show and closes. Passed straight through to the screen. */
+  onSignedOut?: () => void
   /** False while another tab is in front: a pane nobody is looking at is not
    *  sent any pixels until it comes back. */
   paneVisible: boolean
+  /**
+   * Came back from a saved layout, so it waits for "New session" rather than
+   * connecting — as a terminal does, and for the same reasons: dialling every
+   * saved host at launch would be surprising, and the vault may be locked.
+   */
+  restored?: boolean
 }): JSX.Element {
   const [phase, setPhase] = useState<Phase>({ at: 'loading' })
   const [username, setUsername] = useState('')
@@ -96,6 +107,15 @@ export default function GraphicalHost({
    * costs the far end a resolution change on every session.
    */
   const [look, setLook] = useState<RdpView | null>(null)
+  /**
+   * Whether `look` has been answered at all, which `null` cannot say: it is
+   * both "not yet" and "nothing stated". Connecting on its own must wait for
+   * the answer — a session starts at whatever size it is asked for, and a host
+   * pinned to a fixed one is never asked again.
+   */
+  const [lookSettled, setLookSettled] = useState(false)
+  /** Connecting on its own happens once per pane; a retry is somebody's choice. */
+  const autoStarted = useRef(false)
   /**
    * The size asked for and the size that came back, on the pane's tooltip.
    *
@@ -148,6 +168,9 @@ export default function GraphicalHost({
       .catch(() => {
         // Nothing stated, or a host that has gone. The defaults stand.
         if (alive) setLook(null)
+      })
+      .finally(() => {
+        if (alive) setLookSettled(true)
       })
 
     return () => {
@@ -208,6 +231,21 @@ export default function GraphicalHost({
     setPhase({ at: 'connecting' })
   }
 
+  /**
+   * A pane opened on a desktop connects, without "New session" in between.
+   * With a password saved it goes straight in; without one it asks for it,
+   * which is what the button would have led to anyway.
+   */
+  useEffect(() => {
+    if (restored || autoStarted.current) return
+    if (phase.at !== 'choosing' || !lookSettled) return
+    autoStarted.current = true
+    connectFresh()
+    // `connectFresh` is a new function each render and reads state that
+    // arrives together with the phase this waits for.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase.at, lookSettled, restored])
+
   if (protocol === 'ssh') {
     return (
       <div className="graphical-host">
@@ -237,6 +275,7 @@ export default function GraphicalHost({
           onPhase={setPhase}
           onSession={onSession}
           onNotice={setNotice}
+          onSignedOut={onSignedOut}
           onMeasured={(text) => {
             setAsked(text)
             onMeasured?.(text)

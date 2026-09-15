@@ -1682,8 +1682,13 @@ static void run_session(tdContext* td)
 
 	{
 		const UINT32 code = freerdp_get_last_error(context);
+		/* The host's own reason, kept apart from the last error: that one is
+		 * overwritten by whatever fails next as the transport comes down, and a
+		 * session somebody signed out of is closed by the pane on this alone —
+		 * see src/shared/rdpLogoff.ts. */
+		const UINT32 errinfo = freerdp_error_info(context->instance);
 		char escaped[512];
-		td_event("{\"e\":\"ended\",\"code\":%u,\"detail\":\"%s\"}", code,
+		td_event("{\"e\":\"ended\",\"code\":%u,\"errinfo\":%u,\"detail\":\"%s\"}", code, errinfo,
 		         td_json_escape(escaped, sizeof(escaped),
 		                        freerdp_get_last_error_string(code)));
 	}

@@ -33,6 +33,47 @@ const leaf = {
   target: { kind: 'session', sessionId: windowsHost.id }
 } as Extract<PaneNode, { type: 'leaf' }>
 
+/** A store holding this one pane, and a client that can open a desktop for it. */
+function liveScreen(pane: Extract<PaneNode, { type: 'leaf' }>, hasPassword: boolean): void {
+  useStore.setState({
+    sessions: [],
+    gitFolderTrees: [tree],
+    gitFolderOverrides: [],
+    inventoryTrees: [],
+    inventoryOverrides: [],
+    workspaces: [
+      {
+        id: 'w1',
+        title: 'w',
+        activeTabId: 'tab1',
+        tabs: [{ id: 'tab1', title: 't', activePaneId: pane.id, root: pane }]
+      }
+    ]
+  })
+  // What a canvas and a live screen need from a browser jsdom does not have.
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe(): void {}
+      disconnect(): void {}
+    }
+  )
+  window.matchMedia = vi.fn(
+    () => ({ addEventListener() {}, removeEventListener() {} }) as unknown as MediaQueryList
+  )
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
+    {} as unknown as CanvasRenderingContext2D
+  )
+  window.td.rdp.settings = vi.fn().mockResolvedValue(null)
+  window.td.rdp.login = vi.fn().mockResolvedValue({ username: 'solonkin_adm', hasPassword })
+  window.td.rdp.desktopStart = vi.fn().mockResolvedValue('desktop-1')
+  window.td.rdp.desktopStop = vi.fn().mockResolvedValue(undefined)
+  window.td.rdp.onDesktopEvent = () => () => undefined
+  window.td.rdp.onDesktopFrame = () => () => undefined
+  window.td.rdp.onDesktopCursor = () => () => undefined
+  window.td.ui.onForwardKey = () => () => undefined
+}
+
 /**
  * A host that came from a repository is not in `sessions` — that list is what
  * somebody typed into the Sessions tab. Every reader that forgets it answers
@@ -64,53 +105,70 @@ describe('a pane on a host mirrored from a repository', () => {
    * is on screen.
    */
   it('tells the store which desktop it is holding, so the tree can light up', async () => {
-    useStore.setState({
-      sessions: [],
-      gitFolderTrees: [tree],
-      gitFolderOverrides: [],
-      inventoryTrees: [],
-      inventoryOverrides: [],
-      workspaces: [
-        {
-          id: 'w1',
-          title: 'w',
-          activeTabId: 'tab1',
-          tabs: [{ id: 'tab1', title: 't', activePaneId: leaf.id, root: leaf }]
-        }
-      ]
-    })
-    // What a canvas and a live screen need from a browser jsdom does not have.
-    vi.stubGlobal(
-      'ResizeObserver',
-      class {
-        observe(): void {}
-        disconnect(): void {}
-      }
-    )
-    window.matchMedia = vi.fn(
-      () => ({ addEventListener() {}, removeEventListener() {} }) as unknown as MediaQueryList
-    )
-    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
-      {} as unknown as CanvasRenderingContext2D
-    )
-    window.td.rdp.settings = vi.fn().mockResolvedValue(null)
-    window.td.rdp.login = vi.fn().mockResolvedValue({ username: 'solonkin_adm', hasPassword: true })
-    window.td.rdp.desktopStart = vi.fn().mockResolvedValue('desktop-1')
-    window.td.rdp.desktopStop = vi.fn().mockResolvedValue(undefined)
-    window.td.rdp.onDesktopEvent = () => () => undefined
-    window.td.rdp.onDesktopFrame = () => () => undefined
-    window.td.rdp.onDesktopCursor = () => () => undefined
-    window.td.ui.onForwardKey = () => () => undefined
+    liveScreen(leaf, true)
 
     render(<Pane tabId="tab1" node={leaf} />)
 
-    await userEvent.click(await screen.findByRole('button', { name: 'New session' }))
+    // Connects on its own: nobody presses "New session" for a pane just opened.
     await waitFor(() => expect(window.td.rdp.desktopStart).toHaveBeenCalled())
 
     await waitFor(() => {
       const root = useStore.getState().workspaces[0].tabs[0].root
       expect(root.type === 'leaf' && root.desktopId).toBe('desktop-1')
     })
+  })
+
+  it('closes when the Windows session is signed out of from inside it', async () => {
+    liveScreen(leaf, true)
+    let say: ((event: Record<string, unknown>) => void) | undefined
+    window.td.rdp.onDesktopEvent = (_id, listener) => {
+      say = listener
+      return () => undefined
+    }
+
+    render(<Pane tabId="tab1" node={leaf} />)
+    await waitFor(() => expect(say).toBeDefined())
+
+    say!({ e: 'ended', code: 0x0001000c, errinfo: 0x0000000c, detail: 'logged off' })
+
+    await waitFor(() => expect(useStore.getState().workspaces[0]?.tabs ?? []).toHaveLength(0))
+  })
+
+  it('stays open, saying so, when the session was only disconnected', async () => {
+    liveScreen(leaf, true)
+    let say: ((event: Record<string, unknown>) => void) | undefined
+    window.td.rdp.onDesktopEvent = (_id, listener) => {
+      say = listener
+      return () => undefined
+    }
+
+    render(<Pane tabId="tab1" node={leaf} />)
+    await waitFor(() => expect(say).toBeDefined())
+
+    say!({ e: 'ended', code: 0x0001000b, errinfo: 0x0000000b, detail: 'disconnected' })
+
+    expect(await screen.findByText('Session ended')).toBeInTheDocument()
+    expect(useStore.getState().workspaces[0].tabs).toHaveLength(1)
+  })
+
+  it('asks for the password first when the host has none saved', async () => {
+    liveScreen(leaf, false)
+
+    render(<Pane tabId="tab1" node={leaf} />)
+
+    expect(await screen.findByPlaceholderText('Password')).toBeInTheDocument()
+    expect(window.td.rdp.desktopStart).not.toHaveBeenCalled()
+  })
+
+  /** As a terminal does: a saved layout does not dial every host at launch. */
+  it('waits for "New session" when it came back from a saved layout', async () => {
+    const restored = { ...leaf, restored: true }
+    liveScreen(restored, true)
+
+    render(<Pane tabId="tab1" node={restored} />)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'New session' }))
+    await waitFor(() => expect(window.td.rdp.desktopStart).toHaveBeenCalledTimes(1))
   })
 
   /** The local override wins over the repository, here as everywhere else. */

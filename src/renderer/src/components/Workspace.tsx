@@ -8,6 +8,7 @@ import {
   workspaceHasActivity
 } from '../state/store'
 import { sessionIdsOf } from '../state/workspaces'
+import { desktopPanesOf, protocolIn, signOutWorkspace } from '../state/rdpLogoff'
 import { DRAG_MIME, type DragItem } from '../state/dnd'
 import { dropSide } from '../state/dropZone'
 import SplitContainer from './SplitContainer'
@@ -76,6 +77,22 @@ export default function Workspace(): JSX.Element {
       return
     }
     closeWorkspace(id)
+  }
+
+  /**
+   * Signs the workspace's desktops out of Windows rather than leaving them
+   * disconnected on their hosts, and closes those panes. Asked every time: it
+   * ends whatever was running in those sessions.
+   */
+  function requestSignOut(id: string): void {
+    if (
+      window.confirm(
+        t('Sign out of every Windows session in this workspace and close its desktops?')
+      ) === false
+    ) {
+      return
+    }
+    void signOutWorkspace(useStore.getState, id)
   }
 
   function onWorkspaceDrop(e: ReactDragEvent, workspaceId: string): void {
@@ -147,9 +164,15 @@ export default function Workspace(): JSX.Element {
                     },
                     { label: t('Rename…'), onSelect: () => startRename(w.id, w.title) },
                     {
-                      label: t('Close workspace'),
+                      label: t('Sign out of Windows sessions'),
                       danger: true,
                       separated: true,
+                      disabled: desktopPanesOf(w, protocolIn(useStore.getState())).length === 0,
+                      onSelect: () => requestSignOut(w.id)
+                    },
+                    {
+                      label: t('Close workspace'),
+                      danger: true,
                       onSelect: () => requestCloseWorkspace(w.id, w.title, w.tabs.length)
                     }
                   ]
