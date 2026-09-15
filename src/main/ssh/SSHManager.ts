@@ -249,7 +249,8 @@ function hopFailure(
 async function buildAuthConfig(
   win: BrowserWindow,
   profile: SessionProfile,
-  auth: ResolvedAuth
+  auth: ResolvedAuth,
+  signal?: AbortSignal
 ): Promise<
   Pick<ConnectConfig, 'password' | 'privateKey' | 'passphrase' | 'agent' | 'agentForward'>
 > {
@@ -258,11 +259,16 @@ async function buildAuthConfig(
     if (!password) {
       // Nothing stored: ask, rather than failing authentication silently. This
       // is also the path for people who deliberately don't save passwords.
-      const answers = await requestAuth(win, {
-        host: `${auth.username}@${profile.host}`,
-        title: 'Password required',
-        fields: [{ prompt: 'Password', echo: false }]
-      })
+      const answers = await requestAuth(
+        win,
+        {
+          host: `${auth.username}@${profile.host}`,
+          title: 'Password required',
+          fields: [{ prompt: 'Password', echo: false }]
+        },
+        { signal }
+      )
+      if (signal?.aborted) throw new ConnectCancelledError()
       if (!answers) throw new Error('Authentication cancelled')
       password = answers[0]
     }
@@ -304,20 +310,99 @@ export function forwarding(auth: ResolvedAuth): { agent?: string; agentForward?:
  * (Google Authenticator, Duo) arrive through. Without this such hosts simply
  * cannot be reached.
  */
-function wireKeyboardInteractive(win: BrowserWindow, client: Client, host: string): void {
+function wireKeyboardInteractive(
+  win: BrowserWindow,
+  client: Client,
+  host: string,
+  signal?: AbortSignal
+): void {
+  /*
+   * A challenge outlives its client easily: the server gives up, the network
+   * drops, the pane is closed. The dialog stayed up regardless, asking for a
+   * code that nothing was waiting for — and with the renderer showing one
+   * question at a time, it was in the way of the next real one.
+   */
+  const gone = new AbortController()
+  const withdraw = (): void => gone.abort()
+  client.on('close', withdraw)
+  client.on('error', withdraw)
+  signal?.addEventListener('abort', withdraw, { once: true })
   client.on(
     'keyboard-interactive',
     (name, instructions, _lang, prompts, finish: (answers: string[]) => void) => {
-      requestAuth(win, {
-        host,
-        title: name || 'Additional authentication',
-        instructions,
-        // ssh2 leaves echo optional; a prompt that doesn't say otherwise is a
-        // secret, so it must be masked rather than shown.
-        fields: prompts.map((p) => ({ prompt: p.prompt, echo: p.echo === true }))
-      }).then((answers) => finish(answers ?? []))
+      requestAuth(
+        win,
+        {
+          host,
+          title: name || 'Additional authentication',
+          instructions,
+          // ssh2 leaves echo optional; a prompt that doesn't say otherwise is a
+          // secret, so it must be masked rather than shown.
+          fields: prompts.map((p) => ({ prompt: p.prompt, echo: p.echo === true }))
+        },
+        { signal: gone.signal }
+      ).then((answers) => finish(answers ?? []))
     }
   )
+}
+
+/** A connection given up on before it was finished — by the pane, not the host. */
+export class ConnectCancelledError extends Error {
+  constructor() {
+    super('Connection cancelled')
+    this.name = 'ConnectCancelledError'
+  }
+}
+
+/** Lets go of every client, whatever state each is in. */
+function endClients(clients: Client[]): void {
+  for (const client of clients) {
+    try {
+      client.end()
+    } catch {
+      /* already closed */
+    }
+  }
+}
+
+/**
+ * Connects one client and waits until it has signed in, failed, closed, or been
+ * given up on — whichever comes first. The last two used to be missing: a
+ * client ended from outside emitted `close` and no `error`, and the connect
+ * waited for ever on a promise nothing would settle.
+ */
+function signIn(
+  client: Client,
+  config: ConnectConfig,
+  signal: AbortSignal | undefined,
+  describe: (err: Error) => Error,
+  onSettled: () => void = () => undefined
+): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    let settled = false
+    const settle = (fn: () => void): void => {
+      if (settled) return
+      settled = true
+      signal?.removeEventListener('abort', onAbort)
+      onSettled()
+      fn()
+    }
+    const onAbort = (): void => {
+      settle(() => reject(new ConnectCancelledError()))
+      endClients([client])
+    }
+    if (signal?.aborted) {
+      onAbort()
+      return
+    }
+    signal?.addEventListener('abort', onAbort, { once: true })
+    client.on('ready', () => settle(resolve))
+    client.on('error', (err) => settle(() => reject(describe(err as Error))))
+    client.on('close', () =>
+      settle(() => reject(describe(new Error('the connection closed before signing in'))))
+    )
+    client.connect(config)
+  })
 }
 
 /** Shared connect options: keepalive stops idle sessions dying behind NAT. */
@@ -345,7 +430,8 @@ const COMMON_CONNECT: Partial<ConnectConfig> = {
 async function connectChain(
   win: BrowserWindow,
   profile: SessionProfile,
-  credential?: Credential
+  credential?: Credential,
+  signal?: AbortSignal
 ): Promise<{ target: Client; chain: Client[] }> {
   // Each hop carries its own inherited settings, resolved once up front.
   const hops: Array<{ profile: SessionProfile; auth: ResolvedAuth }> = []
@@ -376,53 +462,67 @@ async function connectChain(
   const chain: Client[] = []
   let sock: Readable | undefined
 
-  for (let i = 0; i < hops.length; i++) {
-    const { profile: hop, auth } = hops[i]
-    const client = new Client()
-    chain.push(client)
-    const authConfig = await buildAuthConfig(win, hop, auth)
-    wireKeyboardInteractive(win, client, `${auth.username}@${hop.host}`)
-    const methods = methodWatcher()
-    await new Promise<void>((resolve, reject) => {
-      client.on('ready', () => {
-        methods.stop()
-        resolve()
-      })
-      // Which machine, as whom, with what, and what it would have taken instead
-      // — none of which ssh2's own message carries, and all of which decide
-      // what to do about it.
-      client.on('error', (err) => {
-        methods.stop()
-        reject(hopFailure(err as Error, hop, auth, methods.seen()))
-      })
-      client.connect({
-        ...COMMON_CONNECT,
-        debug: methods.debug,
-        host: hop.host,
-        port: auth.port,
-        username: auth.username,
-        hostVerifier: makeHostVerifier(win, hop.host, auth.port),
-        ...authConfig,
-        ...(sock ? { sock } : {})
-      })
-    })
+  /*
+   * Any way out of this but success closes every client opened on the way.
+   *
+   * It used to close none of them. Cancelling the password prompt for the
+   * destination threw from `buildAuthConfig` with the jump host already signed
+   * in, and nothing held a reference to it any more: an authenticated session to
+   * the bastion, open until the bastion's own idle timeout or the application
+   * quit. A wrong password, a refused forward or an unreachable destination did
+   * the same.
+   */
+  try {
+    for (let i = 0; i < hops.length; i++) {
+      if (signal?.aborted) throw new ConnectCancelledError()
+      const { profile: hop, auth } = hops[i]
+      const client = new Client()
+      chain.push(client)
+      const authConfig = await buildAuthConfig(win, hop, auth, signal)
+      if (signal?.aborted) throw new ConnectCancelledError()
+      wireKeyboardInteractive(win, client, `${auth.username}@${hop.host}`, signal)
+      const methods = methodWatcher()
+      await signIn(
+        client,
+        {
+          ...COMMON_CONNECT,
+          debug: methods.debug,
+          host: hop.host,
+          port: auth.port,
+          username: auth.username,
+          hostVerifier: makeHostVerifier(win, hop.host, auth.port),
+          ...authConfig,
+          ...(sock ? { sock } : {})
+        },
+        signal,
+        // Which machine, as whom, with what, and what it would have taken instead
+        // — none of which ssh2's own message carries, and all of which decide
+        // what to do about it.
+        (err) => hopFailure(err, hop, auth, methods.seen()),
+        methods.stop
+      )
 
-    const isLast = i === hops.length - 1
-    if (!isLast) {
-      const nextHop = hops[i + 1]
-      sock = await new Promise<Readable>((resolve, reject) => {
-        client.forwardOut(
-          '127.0.0.1',
-          0,
-          nextHop.profile.host,
-          nextHop.auth.port,
-          (err, stream) => {
-            if (err) reject(err)
-            else resolve(stream as unknown as Readable)
-          }
-        )
-      })
+      const isLast = i === hops.length - 1
+      if (!isLast) {
+        const nextHop = hops[i + 1]
+        sock = await new Promise<Readable>((resolve, reject) => {
+          client.forwardOut(
+            '127.0.0.1',
+            0,
+            nextHop.profile.host,
+            nextHop.auth.port,
+            (err, stream) => {
+              if (err) reject(err)
+              else resolve(stream as unknown as Readable)
+            }
+          )
+        })
+      }
     }
+    if (signal?.aborted) throw new ConnectCancelledError()
+  } catch (err) {
+    endClients(chain)
+    throw err
   }
 
   return { target: chain[chain.length - 1], chain }
@@ -549,18 +649,16 @@ class SSHManager {
     cols: number,
     rows: number,
     /** A login chosen for this session alone, in place of the host's own. */
-    credential?: Credential
+    credential?: Credential,
+    /** Names this attempt, so the pane that started it can give up on it. */
+    attemptId?: string
   ): Promise<string> {
     requireUnlocked()
-    const connectionId = randomUUID()
-    try {
-      const { target, chain } = await connectChain(win, profile, credential)
+    return this.attempt(attemptId, win, async (connectionId, signal, opened) => {
+      const { target, chain } = await connectChain(win, profile, credential, signal)
+      opened(chain)
       await this.openShell(win, connectionId, target, chain, cols, rows, profile)
-      return connectionId
-    } catch (err) {
-      this.send(win, connectionId, IPC.sshError, (err as Error).message)
-      throw err
-    }
+    })
   }
 
   /** The same for a connection typed in by hand rather than saved. */
@@ -568,12 +666,13 @@ class SSHManager {
     win: BrowserWindow,
     params: QuickConnectParams,
     cols: number,
-    rows: number
+    rows: number,
+    attemptId?: string
   ): Promise<string> {
     requireUnlocked()
-    const connectionId = randomUUID()
-    try {
+    return this.attempt(attemptId, win, async (connectionId, signal, opened) => {
       const client = new Client()
+      opened([client])
       const auth: Pick<ConnectConfig, 'password' | 'privateKey' | 'passphrase' | 'agent'> =
         params.authMethod === 'password'
           ? { password: params.password }
@@ -584,25 +683,69 @@ class SSHManager {
               }
             : { agent: agentSockForPlatform() }
 
-      wireKeyboardInteractive(win, client, `${params.username}@${params.host}`)
-      await new Promise<void>((resolve, reject) => {
-        client.on('ready', () => resolve())
-        client.on('error', (err) => reject(err))
-        client.connect({
+      wireKeyboardInteractive(win, client, `${params.username}@${params.host}`, signal)
+      await signIn(
+        client,
+        {
           ...COMMON_CONNECT,
           host: params.host,
           port: params.port,
           username: params.username,
           hostVerifier: makeHostVerifier(win, params.host, params.port),
           ...auth
-        })
-      })
+        },
+        signal,
+        (err) => err
+      )
 
       await this.openShell(win, connectionId, client, [client], cols, rows)
+    })
+  }
+
+  /** Connects still in progress, by the id the renderer gave each one. */
+  private attempts = new Map<string, AbortController>()
+
+  /**
+   * Gives up on a connect that has not finished: every prompt it raised comes
+   * down, every client it opened is closed, and it rejects rather than handing
+   * back a session nobody is waiting for.
+   */
+  cancelConnect(attemptId: string): void {
+    this.attempts.get(attemptId)?.abort()
+  }
+
+  /**
+   * The part every way of connecting shares: an id for the session, a signal
+   * for giving up, and the rule that a connect which does not succeed leaves
+   * nothing open behind it — whether it failed, was refused, or was cancelled
+   * after the shell had already opened.
+   */
+  private async attempt(
+    attemptId: string | undefined,
+    win: BrowserWindow,
+    run: (
+      connectionId: string,
+      signal: AbortSignal,
+      opened: (clients: Client[]) => void
+    ) => Promise<void>
+  ): Promise<string> {
+    const connectionId = randomUUID()
+    const controller = new AbortController()
+    if (attemptId) this.attempts.set(attemptId, controller)
+    let clients: Client[] = []
+    try {
+      await run(connectionId, controller.signal, (opened) => {
+        clients = opened
+      })
+      if (controller.signal.aborted) throw new ConnectCancelledError()
       return connectionId
     } catch (err) {
+      if (this.connections.has(connectionId)) this.teardown(connectionId)
+      else endClients(clients)
       this.send(win, connectionId, IPC.sshError, (err as Error).message)
       throw err
+    } finally {
+      if (attemptId && this.attempts.get(attemptId) === controller) this.attempts.delete(attemptId)
     }
   }
 

@@ -70,6 +70,8 @@ export const IPC = {
   sshConnect: 'ssh:connect',
   sshQuickConnect: 'ssh:quickConnect',
   sshDisconnect: 'ssh:disconnect',
+  /** Gives up on a connect still in progress, named by the attempt id it was started with. */
+  sshCancelConnect: 'ssh:cancelConnect',
   /** The window has subscribed; anything held back for it may go now. */
   sshReady: 'ssh:ready',
   sshWrite: 'ssh:write',
@@ -178,6 +180,8 @@ export const IPC = {
   authPrompt: 'auth:prompt',
   /** renderer -> main, suffixed with the request id */
   authPromptReply: 'auth:promptReply',
+  /** main -> renderer: a question withdrawn — its connection went, or it waited too long */
+  authPromptCancel: 'auth:promptCancel',
 
   /** main -> renderer: terminal font zoom, intercepted before Chromium's page zoom */
   uiZoom: 'ui:zoom',

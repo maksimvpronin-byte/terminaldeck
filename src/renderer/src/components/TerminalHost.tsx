@@ -74,6 +74,8 @@ export default function TerminalHost({
   const unsubscribeRef = useRef<Array<() => void>>([])
   /** Bumped on every mount/unmount so stale in-flight connects can be discarded. */
   const generationRef = useRef(0)
+  /** The connect in flight, if any, by the id the main process knows it under. */
+  const attemptRef = useRef<string | null>(null)
 
   // Kept in refs so `connect` can stay referentially stable across renders.
   const targetRef = useRef(target)
@@ -132,6 +134,8 @@ export default function TerminalHost({
       detachListeners()
       setClosed(false)
       term.writeln('Connecting...\r\n')
+      const attemptId = crypto.randomUUID()
+      attemptRef.current = attemptId
       try {
         const { cols, rows } = term
         const tgt = targetRef.current
@@ -140,8 +144,8 @@ export default function TerminalHost({
             ? // The account travels with the pane, so a reconnect signs in as
               // whoever this pane was opened as rather than reverting to the
               // host's own login.
-              await window.td.ssh.connect(tgt.sessionId, cols, rows, tgt.credentialId)
-            : await window.td.ssh.quickConnect(tgt.params, cols, rows)
+              await window.td.ssh.connect(tgt.sessionId, cols, rows, tgt.credentialId, attemptId)
+            : await window.td.ssh.quickConnect(tgt.params, cols, rows, attemptId)
         // The pane was torn down (or reconnected) while we were connecting — React
         // remounts effects in StrictMode, so without this both attempts would end up
         // feeding the same terminal from two separate SSH sessions.
@@ -166,6 +170,8 @@ export default function TerminalHost({
         if (generationRef.current !== generation) return
         term.writeln(`\r\n\x1b[31m[failed to connect] ${(err as Error).message}\x1b[0m`)
         setClosed(true)
+      } finally {
+        if (attemptRef.current === attemptId) attemptRef.current = null
       }
     },
     [attachListeners, detachListeners]
@@ -271,6 +277,13 @@ export default function TerminalHost({
       resizeObserver.disconnect()
       cancelAnimationFrame(resizeFrame)
       term.dispose()
+      /*
+       * A connect still working is given up on, not merely ignored when it
+       * lands. Ignoring it left its password prompt on screen for a pane that
+       * no longer existed, and the jump hosts it had signed in to open until
+       * somebody answered.
+       */
+      if (attemptRef.current) window.td.ssh.cancelConnect(attemptRef.current)
       if (connIdRef.current) window.td.ssh.disconnect(connIdRef.current)
     }
     // Builds the terminal once and tears it down once. Every value it reads is

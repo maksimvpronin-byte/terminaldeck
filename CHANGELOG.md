@@ -35,6 +35,12 @@ the other produces a version nobody can install, which is how 0.1.10 through
   went on to every desktop with clipboard sharing on. The clipboard now crosses
   only while the vault is open and the window has the focus; a desktop that
   missed a copy is given it when its window comes back.
+- **Cancelling a password prompt left the jump host signed in.** Every client a
+  connection opens is now closed when the connection fails or is cancelled, a
+  pane closed while still connecting gives up on the connection and takes its
+  prompt down, and a prompt nobody answers gives up after five minutes.
+- **Several hosts asking for a password at once lost all but the last question.**
+  Prompts now queue and are answered in turn.
 
 ## 0.18.0
 

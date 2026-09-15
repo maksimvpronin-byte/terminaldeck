@@ -35,7 +35,9 @@ export function registerSshHandlers(): void {
        * only. Nothing is written back: the host keeps the account it is saved
        * with, however many times it is reached as somebody else.
        */
-      credentialId?: string
+      credentialId?: string,
+      /** Names the attempt, so the pane can give up on it; see sshCancelConnect. */
+      attemptId?: string
     ) => {
       // Hosts from a repository live in their own store and aren't saved as
       // sessions — whether they came from an Inventory source or from a folder
@@ -51,7 +53,14 @@ export function registerSshHandlers(): void {
       const credential = credentialId ? credentialStore.find(credentialId) : undefined
       if (credentialId && !credential) throw new Error('That saved account no longer exists')
       const win = focusedWin()
-      const connectionId = await sshManager.connectProfile(win, profile, cols, rows, credential)
+      const connectionId = await sshManager.connectProfile(
+        win,
+        profile,
+        cols,
+        rows,
+        credential,
+        typeof attemptId === 'string' ? attemptId : undefined
+      )
       // Bring the profile's tunnels up automatically; a failure here (busy port,
       // server refusing a remote bind) must not take the shell down with it.
       for (const rule of profile.portForwards) {
@@ -71,8 +80,14 @@ export function registerSshHandlers(): void {
   )
   ipcMain.handle(
     IPC.sshQuickConnect,
-    async (_e, params: QuickConnectParams, cols: number, rows: number) => {
-      const connectionId = await sshManager.connectQuick(focusedWin(), params, cols, rows)
+    async (_e, params: QuickConnectParams, cols: number, rows: number, attemptId?: string) => {
+      const connectionId = await sshManager.connectQuick(
+        focusedWin(),
+        params,
+        cols,
+        rows,
+        typeof attemptId === 'string' ? attemptId : undefined
+      )
       return { connectionId }
     }
   )
@@ -106,6 +121,10 @@ export function registerSshHandlers(): void {
   ipcMain.handle(IPC.sshDisconnect, (_e, connectionId: string) => {
     // The release above runs from inside this, for both ways out.
     sshManager.disconnect(connectionId)
+  })
+
+  ipcMain.on(IPC.sshCancelConnect, (_e, attemptId: unknown) => {
+    if (typeof attemptId === 'string') sshManager.cancelConnect(attemptId)
   })
 
   ipcMain.on(IPC.sshReady, (_e, connectionId: string) => {

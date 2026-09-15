@@ -68,7 +68,7 @@ if (typeof window !== 'undefined') {
         onState: () => () => undefined
       }),
       dialogs: stub(),
-      auth: stub({ onPrompt: () => () => undefined })
+      auth: stub({ onPrompt: () => () => undefined, onCancel: () => () => undefined })
     }
   })
 }

@@ -180,15 +180,22 @@ const api = {
       sessionId: string,
       cols: number,
       rows: number,
-      credentialId?: string
+      credentialId?: string,
+      attemptId?: string
     ): Promise<{ connectionId: string }> =>
-      ipcRenderer.invoke(IPC.sshConnect, sessionId, cols, rows, credentialId),
+      ipcRenderer.invoke(IPC.sshConnect, sessionId, cols, rows, credentialId, attemptId),
     quickConnect: (
       params: QuickConnectParams,
       cols: number,
-      rows: number
+      rows: number,
+      attemptId?: string
     ): Promise<{ connectionId: string }> =>
-      ipcRenderer.invoke(IPC.sshQuickConnect, params, cols, rows),
+      ipcRenderer.invoke(IPC.sshQuickConnect, params, cols, rows, attemptId),
+    /**
+     * Gives up on a connect still in progress: its prompts come down and every
+     * client it opened is closed. The connect then rejects.
+     */
+    cancelConnect: (attemptId: string): void => ipcRenderer.send(IPC.sshCancelConnect, attemptId),
     disconnect: (connectionId: string): Promise<void> =>
       ipcRenderer.invoke(IPC.sshDisconnect, connectionId),
     /** Said once the listeners are on; until then the session holds its tongue. */
@@ -447,6 +454,12 @@ const api = {
     },
     reply: (requestId: string, answers: string[] | null): void => {
       ipcRenderer.send(`${IPC.authPromptReply}:${requestId}`, answers)
+    },
+    /** A question withdrawn by the main process: its connection went, or it waited too long. */
+    onCancel: (cb: (requestId: string) => void): (() => void) => {
+      const listener = (_e: unknown, requestId: string): void => cb(requestId)
+      ipcRenderer.on(IPC.authPromptCancel, listener)
+      return () => ipcRenderer.removeListener(IPC.authPromptCancel, listener)
     }
   },
   ui: {

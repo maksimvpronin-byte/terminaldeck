@@ -635,6 +635,7 @@ export const ru: Record<string, string> = {
 
   // Credential prompts and quick connect
   Continue: 'Продолжить',
+  '{count} more waiting': 'Ещё в очереди: {count}',
   'Quick connect': 'Быстрое подключение',
   'Host and username are required': 'Нужно указать адрес и логин',
 
