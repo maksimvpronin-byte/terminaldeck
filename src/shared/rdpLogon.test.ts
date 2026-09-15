@@ -36,13 +36,21 @@ describe("the host's logon message", () => {
     expect(isRefusal(0x00000003, LOGON_MSG_SESSION_CONTINUE)).toBe(false)
   })
 
-  it('is a refusal when the logon itself failed', () => {
-    for (const data of [
-      LOGON_FAILED_BAD_PASSWORD,
-      LOGON_FAILED_UPDATE_PASSWORD,
-      LOGON_FAILED_OTHER
-    ])
+  // Seen intermittently: the automatic logon has not finished, Winlogon carries
+  // on, and a Try again a moment later went straight in. Closing the pane on it
+  // was what made the retry necessary.
+  it('is not a refusal when the logon failed for no stated reason and the session continues', () => {
+    expect(isRefusal(LOGON_FAILED_OTHER, LOGON_MSG_SESSION_CONTINUE)).toBe(false)
+  })
+
+  it('is a refusal when the password was wrong or must change, even if the session continues', () => {
+    for (const data of [LOGON_FAILED_BAD_PASSWORD, LOGON_FAILED_UPDATE_PASSWORD])
       expect(isRefusal(data, LOGON_MSG_SESSION_CONTINUE)).toBe(true)
+  })
+
+  it('is a refusal when the logon failed and the host is not carrying on', () => {
+    for (const type of [LOGON_MSG_SESSION_TERMINATE, LOGON_MSG_NO_PERMISSION])
+      expect(isRefusal(LOGON_FAILED_OTHER, type)).toBe(true)
   })
 
   it('is a refusal when the host says it will not have you', () => {

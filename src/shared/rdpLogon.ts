@@ -53,5 +53,20 @@ const REFUSING_INTENTIONS = new Set([
 export function isRefusal(data: unknown, type: unknown): boolean {
   if (typeof data !== 'number' || typeof type !== 'number') return true
   if (!Number.isInteger(data) || !Number.isInteger(type)) return true
-  return REFUSALS.has(data) || REFUSING_INTENTIONS.has(type)
+  if (REFUSING_INTENTIONS.has(type)) return true
+  /*
+   * "Failed, for no reason given — and the session continues" is not a refusal
+   * either. Windows sends it when the automatic logon has not finished yet but
+   * Winlogon carries on: a disconnected session still being let go of, or a
+   * slow profile or policy load. The logon completes on its own, or the host
+   * shows its own sign-in screen. Taking it for a failure closed the pane in
+   * the middle of that, and pressing Try again at once "fixed" it — by which
+   * time the host had caught up.
+   *
+   * A bad or expired password stays a refusal even here: the password came
+   * from this end, the host is not going to accept it on its own, and saying
+   * so beats a sign-in screen nobody expected.
+   */
+  if (data === LOGON_FAILED_OTHER && type === LOGON_MSG_SESSION_CONTINUE) return false
+  return REFUSALS.has(data)
 }
