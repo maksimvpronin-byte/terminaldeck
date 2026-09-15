@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import { join } from 'path'
 import type { Snippet } from '../../shared/types'
-import { readJson, writeJson } from './jsonFile'
+import { JsonDocument, readJson } from './jsonFile'
 
 interface SnippetFile {
   version: 1
@@ -13,38 +13,45 @@ function storePath(): string {
 }
 
 class SnippetStore {
-  private data: SnippetFile
-
-  constructor() {
-    this.data = this.load()
-  }
-
-  private load(): SnippetFile {
-    // Normalised after reading rather than trusted: a file written by an older
-    // version, or edited by hand, may be missing the list entirely.
-    const parsed = readJson<Partial<SnippetFile>>(storePath(), () => ({}))
+  // Normalised after reading rather than trusted: a file written by an older
+  // version, or edited by hand, may be missing the list entirely.
+  private doc = new JsonDocument<SnippetFile>(storePath, (path) => {
+    const parsed = readJson<Partial<SnippetFile>>(path, () => ({}))
     return { version: 1, snippets: parsed.snippets ?? [] }
-  }
-
-  private persist(): void {
-    writeJson(storePath(), this.data)
-  }
+  })
 
   list(): Snippet[] {
-    return this.data.snippets
+    return this.doc.data.snippets
   }
 
   save(snippet: Snippet): Snippet {
-    const idx = this.data.snippets.findIndex((s) => s.id === snippet.id)
-    if (idx >= 0) this.data.snippets[idx] = snippet
-    else this.data.snippets.push(snippet)
-    this.persist()
+    this.saveMany([snippet])
     return snippet
   }
 
+  /** Several at once, in one write. */
+  saveMany(snippets: Snippet[]): void {
+    this.doc.change((d) => {
+      for (const snippet of snippets) {
+        const idx = d.snippets.findIndex((s) => s.id === snippet.id)
+        if (idx >= 0) d.snippets[idx] = snippet
+        else d.snippets.push(snippet)
+      }
+    })
+  }
+
   remove(id: string): void {
-    this.data.snippets = this.data.snippets.filter((s) => s.id !== id)
-    this.persist()
+    this.doc.change((d) => {
+      d.snippets = d.snippets.filter((s) => s.id !== id)
+    })
+  }
+
+  snapshot(): SnippetFile {
+    return this.doc.snapshot()
+  }
+
+  restore(previous: SnippetFile): void {
+    this.doc.restore(previous)
   }
 }
 

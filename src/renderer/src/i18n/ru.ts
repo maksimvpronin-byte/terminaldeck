@@ -720,6 +720,8 @@ export const ru: Record<string, string> = {
   'Upload file…': 'Загрузить файл…',
   'Upload folder…': 'Загрузить папку…',
   'Uploaded {name}': 'Отправлено: {name}',
+  'Left alone, because something appeared there after the check: {paths}':
+    'Не тронуто — после проверки там что-то появилось: {paths}',
   Refresh: 'Обновить',
   'Up one level': 'На уровень выше',
   'Hide the folder tree': 'Скрыть дерево папок',

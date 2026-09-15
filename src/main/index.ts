@@ -222,7 +222,32 @@ function createWindow(): void {
   }
 }
 
+/**
+ * One copy of the application at a time.
+ *
+ * Every store reads its file once, at start, and from then on writes the whole
+ * of what it holds. Two copies running side by side each held their own
+ * reading, and each save wrote it over whatever the other had saved: a host
+ * added in one window was gone the next time the other one saved anything, and
+ * the vault could end up re-keyed by one copy while the other kept writing
+ * secrets under the old key. A second launch now hands over to the first — its
+ * window comes forward — and exits without having written anything.
+ */
+const primaryInstance = app.requestSingleInstanceLock()
+if (!primaryInstance) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    const win = BrowserWindow.getAllWindows()[0]
+    if (!win) return
+    if (win.isMinimized()) win.restore()
+    win.show()
+    win.focus()
+  })
+}
+
 app.whenReady().then(() => {
+  if (!primaryInstance) return
   electronApp.setAppUserModelId('com.terminaldeck.app')
   buildApplicationMenu()
 

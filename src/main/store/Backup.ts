@@ -476,19 +476,7 @@ export async function importFromFile(
   if (res.canceled || res.filePaths.length === 0) return undefined
   const parsed = validateBackupFile(JSON.parse(readFileSync(res.filePaths[0], 'utf8')) as unknown)
 
-  const summary: ImportSummary = {
-    groups: 0,
-    sessions: 0,
-    snippets: 0,
-    collections: 0,
-    inventorySources: 0,
-    inventoryOverrides: 0,
-    gitFolderOverrides: 0,
-    credentials: 0,
-    secrets: 0
-  }
-
-  // Secrets first: a session is useless if its credential lands later and fails.
+  let secrets: Record<string, string> | undefined
   if (parsed.secrets) {
     if (!password) throw new Error('This export contains credentials and needs its password')
     // Derived outside the try: deriving cannot fail for a wrong password, and
@@ -510,45 +498,155 @@ export async function importFromFile(
     } catch {
       throw new Error('The credentials payload in this export is invalid')
     }
-    const secrets = validateSecretMap(decoded)
-    for (const [ref, value] of Object.entries(secrets)) {
-      vault.setSecret(ref, value)
-      summary.secrets++
+    secrets = validateSecretMap(decoded)
+  }
+
+  const { groups, sessions } = checkRelations(parsed)
+  const snippets = parsed.snippets ?? []
+  const collections = parsed.collections ?? []
+  const sources = parsed.inventorySources ?? []
+  const inventoryOverrides = parsed.inventoryOverrides ?? []
+  const gitFolderOverrides = parsed.gitFolderOverrides ?? []
+  const credentials = parsed.credentials ?? []
+
+  /*
+   * All of it or none of it.
+   *
+   * An import used to write item by item, store by store, and stop at the
+   * first thing that failed — leaving the secrets in, half the hosts in, and
+   * the rest not, with nothing to say where it had stopped. Importing the same
+   * file again then merged over a half-finished one. Now everything is checked
+   * and decrypted before anything is written, each store is written once, and
+   * if one of those writes fails, every store already written is put back as it
+   * was.
+   */
+  const undo: (() => void)[] = []
+  const step = <T>(snapshot: () => T, restore: (previous: T) => void, write: () => void): void => {
+    const previous = snapshot()
+    write()
+    undo.push(() => restore(previous))
+  }
+  try {
+    if (secrets && Object.keys(secrets).length > 0) {
+      const values = secrets
+      step(
+        () => vault.snapshotSecrets(),
+        (previous) => vault.restoreSecrets(previous),
+        () => vault.setSecrets(values)
+      )
+    }
+    step(
+      () => sessionStore.snapshot(),
+      (previous) => sessionStore.restore(previous),
+      () => sessionStore.saveMany(groups, sessions)
+    )
+    step(
+      () => snippetStore.snapshot(),
+      (previous) => snippetStore.restore(previous),
+      () => snippetStore.saveMany(snippets)
+    )
+    step(
+      () => collectionStore.snapshot(),
+      (previous) => collectionStore.restore(previous),
+      () => collectionStore.saveMany(collections)
+    )
+    step(
+      () => inventoryStore.snapshot(),
+      (previous) => inventoryStore.restore(previous),
+      () => inventoryStore.saveMany(sources, inventoryOverrides)
+    )
+    step(
+      () => gitFolderStore.snapshot(),
+      (previous) => gitFolderStore.restore(previous),
+      () => gitFolderStore.saveOverrides(gitFolderOverrides)
+    )
+    step(
+      () => credentialStore.snapshot(),
+      (previous) => credentialStore.restore(previous),
+      () => credentialStore.saveMany(credentials)
+    )
+  } catch (err) {
+    const unrestored: string[] = []
+    for (const put of undo.reverse()) {
+      try {
+        put()
+      } catch (restoreErr) {
+        unrestored.push((restoreErr as Error).message)
+      }
+    }
+    throw new Error(
+      unrestored.length === 0
+        ? `The import failed and nothing was changed: ${(err as Error).message}`
+        : `The import failed (${(err as Error).message}), and putting everything back failed too (${unrestored.join('; ')}). Restart TerminalDeck and check the hosts before importing again.`
+    )
+  }
+
+  return {
+    groups: groups.length,
+    sessions: sessions.length,
+    snippets: snippets.length,
+    collections: collections.length,
+    inventorySources: sources.length,
+    inventoryOverrides: inventoryOverrides.length,
+    gitFolderOverrides: gitFolderOverrides.length,
+    credentials: credentials.length,
+    secrets: secrets ? Object.keys(secrets).length : 0
+  }
+}
+
+/**
+ * What an import's groups and hosts say about each other, checked against what
+ * is already here once it is merged.
+ *
+ * Each item was validated on its own, which says nothing about the tree they
+ * make together. Two entries with one id would be merged silently into one. A
+ * group that names itself as its own ancestor, directly or three levels up,
+ * sends anything that walks up the tree — inheritance, above all — round in a
+ * circle for good. And a host or group whose parent is in neither the file nor
+ * this machine ends up in no folder the sidebar can show: it is imported and
+ * invisible. The first two refuse the file; the last is put at the top level,
+ * where it can be seen and moved.
+ */
+function checkRelations(parsed: BackupFile): {
+  groups: SessionGroup[]
+  sessions: SessionProfile[]
+} {
+  const duplicate = (ids: string[], what: string): void => {
+    const seen = new Set<string>()
+    for (const id of ids) {
+      if (seen.has(id)) invalid(`${what} contains the id ${JSON.stringify(id)} more than once`)
+      seen.add(id)
+    }
+  }
+  duplicate(
+    parsed.groups.map((g) => g.id),
+    'backup.groups'
+  )
+  duplicate(
+    parsed.sessions.map((s) => s.id),
+    'backup.sessions'
+  )
+
+  const merged = new Map(sessionStore.getAll().groups.map((g) => [g.id, g] as const))
+  for (const group of parsed.groups) merged.set(group.id, group)
+
+  const groups = parsed.groups.map((g) =>
+    g.parentId !== null && !merged.has(g.parentId) ? { ...g, parentId: null } : g
+  )
+  for (const group of groups) merged.set(group.id, group)
+
+  for (const group of groups) {
+    const visited = new Set<string>()
+    let cursor: SessionGroup | undefined = group
+    while (cursor && cursor.parentId !== null) {
+      if (visited.has(cursor.id)) invalid(`backup.groups: ${group.name} is its own ancestor`)
+      visited.add(cursor.id)
+      cursor = merged.get(cursor.parentId)
     }
   }
 
-  for (const group of parsed.groups ?? []) {
-    sessionStore.saveGroup(group)
-    summary.groups++
-  }
-  for (const session of parsed.sessions ?? []) {
-    sessionStore.saveSession(session)
-    summary.sessions++
-  }
-  for (const snippet of parsed.snippets ?? []) {
-    snippetStore.save(snippet)
-    summary.snippets++
-  }
-  for (const collection of parsed.collections ?? []) {
-    collectionStore.save(collection)
-    summary.collections++
-  }
-  for (const source of parsed.inventorySources ?? []) {
-    inventoryStore.saveSource(source)
-    summary.inventorySources++
-  }
-  for (const override of parsed.inventoryOverrides ?? []) {
-    inventoryStore.saveOverride(override)
-    summary.inventoryOverrides++
-  }
-  for (const override of parsed.gitFolderOverrides ?? []) {
-    gitFolderStore.saveOverride(override)
-    summary.gitFolderOverrides++
-  }
-  for (const credential of parsed.credentials ?? []) {
-    credentialStore.save(credential)
-    summary.credentials++
-  }
-
-  return summary
+  const sessions = parsed.sessions.map((s) =>
+    s.groupId !== null && !merged.has(s.groupId) ? { ...s, groupId: null } : s
+  )
+  return { groups, sessions }
 }

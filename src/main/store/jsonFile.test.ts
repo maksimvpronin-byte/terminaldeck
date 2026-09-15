@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, readdirSync, existsSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { readJson, writeJson } from './jsonFile'
+import { JsonDocument, readJson, writeJson } from './jsonFile'
 
 /**
  * The rule these six files share, tested where it lives.
@@ -82,5 +82,31 @@ describe('readJson', () => {
     // a test can arrange. Either way, refusing to start would be worse.
     writeFileSync(file(), 'not json', 'utf8')
     expect(readJson(file(), () => ({ hosts: [] }))).toEqual({ hosts: [] })
+  })
+})
+
+describe('JsonDocument', () => {
+  it('keeps nothing in memory that did not reach the disk', () => {
+    const doc = new JsonDocument(file, () => ({ hosts: ['a'] }))
+    doc.change((d) => d.hosts.push('b'))
+
+    // The same failure as above: something sits where the temporary file goes.
+    mkdirSync(`${file()}.tmp`)
+    expect(() => doc.change((d) => d.hosts.push('c'))).toThrow()
+
+    expect(doc.data).toEqual({ hosts: ['a', 'b'] })
+    expect(JSON.parse(readFileSync(file(), 'utf8'))).toEqual({ hosts: ['a', 'b'] })
+  })
+
+  it('never changes what it handed out, so a snapshot can be put back', () => {
+    const doc = new JsonDocument(file, () => ({ hosts: ['a'] }))
+    const before = doc.snapshot()
+
+    doc.change((d) => d.hosts.push('b'))
+    expect(before).toEqual({ hosts: ['a'] })
+
+    doc.restore(before)
+    expect(doc.data).toEqual({ hosts: ['a'] })
+    expect(JSON.parse(readFileSync(file(), 'utf8'))).toEqual({ hosts: ['a'] })
   })
 })

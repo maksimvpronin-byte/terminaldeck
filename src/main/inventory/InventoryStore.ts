@@ -10,7 +10,7 @@ import { parseInWorker } from './parseInWorker'
 import { noInventoryFound } from './files'
 import { syncRepo, headRevision } from './GitRepo'
 import { applyOverride, withoutBlanks } from '../../shared/overrides'
-import { readJson, writeJson } from '../store/jsonFile'
+import { JsonDocument, readJson } from '../store/jsonFile'
 
 function configPath(): string {
   return join(app.getPath('userData'), 'inventories.json')
@@ -20,60 +20,83 @@ function reposRoot(): string {
   return join(app.getPath('userData'), 'inventory-repos')
 }
 
+/** What decides the contents a sync reads; anything else can change under it harmlessly. */
+function readsTheSame(a: InventorySource, b: InventorySource): boolean {
+  return (
+    a.repoUrl === b.repoUrl &&
+    (a.branch ?? '') === (b.branch ?? '') &&
+    JSON.stringify(a.paths) === JSON.stringify(b.paths)
+  )
+}
+
+/** Replaces the entry with the same key, or adds it at the end. */
+function upsertBy<T>(list: T[], item: T, same: (a: T, b: T) => boolean): void {
+  const idx = list.findIndex((existing) => same(existing, item))
+  if (idx >= 0) list[idx] = item
+  else list.push(item)
+}
+
+/** A sync whose source was removed or re-pointed while it ran; its result is dropped. */
+class StaleSyncError extends Error {}
+
 class InventoryStore {
-  private data: InventoryData
+  // Normalised after reading rather than trusted: a file written by an older
+  // version, or edited by hand, may be missing either list.
+  private doc = new JsonDocument<InventoryData>(configPath, (path) => {
+    const parsed = readJson<Partial<InventoryData>>(path, () => ({}))
+    return { version: 1, sources: parsed.sources ?? [], overrides: parsed.overrides ?? [] }
+  })
   /** Last successful parse per source; rebuilt on every sync. */
   private trees = new Map<string, InventoryTree>()
 
-  constructor() {
-    this.data = this.load()
-  }
-
-  private load(): InventoryData {
-    // Normalised after reading rather than trusted: a file written by an older
-    // version, or edited by hand, may be missing either list.
-    const parsed = readJson<Partial<InventoryData>>(configPath(), () => ({}))
-    return { version: 1, sources: parsed.sources ?? [], overrides: parsed.overrides ?? [] }
-  }
-
-  private persist(): void {
-    writeJson(configPath(), this.data)
-  }
-
   sources(): InventorySource[] {
-    return this.data.sources
+    return this.doc.data.sources
   }
 
   overrides(): InventoryOverride[] {
-    return this.data.overrides
+    return this.doc.data.overrides
   }
 
   saveSource(source: InventorySource): InventorySource {
-    const idx = this.data.sources.findIndex((s) => s.id === source.id)
-    if (idx >= 0) this.data.sources[idx] = source
-    else this.data.sources.push(source)
-    this.persist()
+    this.doc.change((d) => upsertBy(d.sources, source, (a, b) => a.id === b.id))
     return source
   }
 
   removeSource(id: string): void {
-    this.data.sources = this.data.sources.filter((s) => s.id !== id)
-    // Overrides for hosts that can no longer appear are dead weight.
-    this.data.overrides = this.data.overrides.filter((o) => !o.nodeId.startsWith(`inv:${id}:`))
+    this.doc.change((d) => {
+      d.sources = d.sources.filter((s) => s.id !== id)
+      // Overrides for hosts that can no longer appear are dead weight.
+      d.overrides = d.overrides.filter((o) => !o.nodeId.startsWith(`inv:${id}:`))
+    })
     this.trees.delete(id)
-    this.persist()
   }
 
   saveOverride(override: InventoryOverride): void {
-    const idx = this.data.overrides.findIndex((o) => o.nodeId === override.nodeId)
-    if (idx >= 0) this.data.overrides[idx] = override
-    else this.data.overrides.push(override)
-    this.persist()
+    this.saveMany([], [override])
+  }
+
+  /** Several sources and overrides in one write, for an import. */
+  saveMany(sources: InventorySource[], overrides: InventoryOverride[]): void {
+    this.doc.change((d) => {
+      for (const source of sources) upsertBy(d.sources, source, (a, b) => a.id === b.id)
+      for (const override of overrides) {
+        upsertBy(d.overrides, override, (a, b) => a.nodeId === b.nodeId)
+      }
+    })
   }
 
   clearOverride(nodeId: string): void {
-    this.data.overrides = this.data.overrides.filter((o) => o.nodeId !== nodeId)
-    this.persist()
+    this.doc.change((d) => {
+      d.overrides = d.overrides.filter((o) => o.nodeId !== nodeId)
+    })
+  }
+
+  snapshot(): InventoryData {
+    return this.doc.snapshot()
+  }
+
+  restore(previous: InventoryData): void {
+    this.doc.restore(previous)
   }
 
   allTrees(): InventoryTree[] {
@@ -87,7 +110,7 @@ class InventoryStore {
       if (!found) continue
       return applyOverride(
         found,
-        this.data.overrides.find((o) => o.nodeId === sessionId)
+        this.doc.data.overrides.find((o) => o.nodeId === sessionId)
       )
     }
     return undefined
@@ -103,7 +126,7 @@ class InventoryStore {
       .map((g) =>
         applyOverride(
           g,
-          this.data.overrides.find((o) => o.nodeId === g.id)
+          this.doc.data.overrides.find((o) => o.nodeId === g.id)
         )
       )
   }
@@ -117,8 +140,30 @@ class InventoryStore {
     return next
   }
 
+  /**
+   * The source as it stands now, if it still reads what `requested` read.
+   *
+   * A sync takes seconds to minutes, and the source can be removed or pointed
+   * at another repository while it runs. Finishing regardless put the old
+   * repository's hosts back under a source that had been deleted — or under the
+   * new address, labelled as synced from it — and wrote its bookkeeping over
+   * whatever had been saved in the meantime.
+   */
+  private stillCurrent(requested: InventorySource): InventorySource | undefined {
+    const now = this.doc.data.sources.find((s) => s.id === requested.id)
+    return now && readsTheSame(now, requested) ? now : undefined
+  }
+
+  /** Records the outcome of a sync on the source as it is now, not as it was. */
+  private noteSync(sourceId: string, patch: Partial<InventorySource>): void {
+    this.doc.change((d) => {
+      const idx = d.sources.findIndex((s) => s.id === sourceId)
+      if (idx >= 0) d.sources[idx] = { ...d.sources[idx], ...patch }
+    })
+  }
+
   private async syncSource(sourceId: string): Promise<InventoryTree> {
-    const source = this.data.sources.find((s) => s.id === sourceId)
+    const source = this.doc.data.sources.find((s) => s.id === sourceId)
     if (!source) throw new Error('Unknown inventory source')
 
     try {
@@ -145,26 +190,35 @@ class InventoryStore {
       tree.groups.push(...parsed.groups)
       tree.sessions = parsed.hosts
       tree.memberships = parsed.memberships
+      const revision = await headRevision(dir).catch(() => undefined)
 
-      this.trees.set(sourceId, tree)
-      source.lastSyncedAt = Date.now()
-      source.lastRevision = await headRevision(dir).catch(() => undefined)
-      source.lastError = undefined
-      source.lastFiles = files.map((f) => relative(dir, f))
-      if (files.length === 0) {
-        source.lastError = noInventoryFound(source.paths)
+      const current = this.stillCurrent(source)
+      if (!current) {
+        throw new StaleSyncError(
+          this.doc.data.sources.some((s) => s.id === sourceId)
+            ? 'This source was changed while it was syncing. Sync it again.'
+            : 'This source was removed while it was syncing.'
+        )
       }
-      this.persist()
+      this.noteSync(sourceId, {
+        lastSyncedAt: Date.now(),
+        lastRevision: revision,
+        lastFiles: files.map((f) => relative(dir, f)),
+        lastError: files.length === 0 ? noInventoryFound(source.paths) : undefined
+      })
+      this.trees.set(sourceId, tree)
       return tree
     } catch (err) {
-      source.lastError = (err as Error).message
-      this.persist()
+      // Said on the source only if it is still the one that failed.
+      if (!(err instanceof StaleSyncError) && this.stillCurrent(source)) {
+        this.noteSync(sourceId, { lastError: (err as Error).message })
+      }
       throw err
     }
   }
 
   async syncAll(): Promise<void> {
-    for (const source of this.data.sources) {
+    for (const source of [...this.doc.data.sources]) {
       // One broken repository must not stop the others from loading.
       await this.sync(source.id).catch(() => undefined)
     }

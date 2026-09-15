@@ -357,18 +357,63 @@ export class ScpShell {
       const source = await handle.stat()
       if (!source.isFile()) throw new Error('SCP uploads require a regular file')
       const existing = await this.statPath(path, true)
-      const write = this.createWriteStream(path, source.size, existing?.permissions ?? '0644')
-      let count = 0
-      const read = handle.createReadStream()
-      read.on('data', (chunk) => {
-        count += chunk.length
-        progress?.(count, source.size)
+      await this.replace(path, async (target) => {
+        const write = this.createWriteStream(target, source.size, existing?.permissions ?? '0644')
+        let count = 0
+        const read = handle.createReadStream({ start: 0, autoClose: false })
+        read.on('data', (chunk) => {
+          count += chunk.length
+          progress?.(count, source.size)
+        })
+        await pipeline(read, write)
       })
-      await pipeline(read, write)
     } finally {
       await handle.close()
     }
   }
+
+  /**
+   * Writes `path` through a hidden name beside it and moves that into place,
+   * so a transfer that stops halfway leaves the old file rather than half of
+   * the new one. The same rules as `SFTPManager.writeRemoteFile`, in shell:
+   * the mode and owner are taken from the file being replaced, and where the
+   * owner cannot be matched the file is written in place as it used to be. A
+   * destination that did not exist is not replaced if something appeared there
+   * meanwhile, and a symlink is written through rather than replaced.
+   */
+  async replace(path: string, write: (target: string) => Promise<void>): Promise<void> {
+    const existing = await this.statPath(path)
+    if (existing?.isDirectory) throw new Error(`Refusing to write over the directory ${path}`)
+    if (existing?.isSymlink) return write(path)
+
+    const partial = posix.join(
+      posix.dirname(path),
+      `.${posix.basename(path)}.td-partial-${process.pid}-${ScpShell.nextPartial++}`
+    )
+    const [p, d] = [pathArg(partial), pathArg(path)]
+    let moved = false
+    let inPlace = false
+    try {
+      await write(partial)
+      if (!existing) {
+        await this.capture(
+          `mv -T -n -- ${p} ${d}; if test -e ${p}; then printf '%s\\n' 'Destination appeared during the transfer and was left alone' >&2; exit 1; fi`
+        )
+        moved = true
+      } else {
+        const outcome = await this.capture(
+          `if test "$(stat -c %u:%g -- ${p})" != "$(stat -c %u:%g -- ${d})" && ! chown --reference=${d} -- ${p} 2>/dev/null; then printf in-place; exit 0; fi; chmod --reference=${d} -- ${p} && mv -f -T -- ${p} ${d} && printf moved`
+        )
+        moved = outcome.toString('utf8') === 'moved'
+        inPlace = !moved
+      }
+    } finally {
+      if (!moved) await this.capture(`rm -f -- ${p}`).catch(() => undefined)
+    }
+    if (inPlace) await write(path)
+  }
+
+  private static nextPartial = 0
   close(): void {
     this.closed = true
     for (const channel of this.channels) channel.destroy()

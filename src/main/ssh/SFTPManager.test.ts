@@ -44,7 +44,7 @@ const localDir = mkdtempSync(join(tmpdir(), 'terminaldeck-sftp-local-'))
 
 /** One recorded call on a stub session: what was asked for, and of what. */
 interface Call {
-  op: 'fastPut' | 'fastGet' | 'mkdir' | 'read' | 'write'
+  op: 'fastPut' | 'fastGet' | 'mkdir' | 'read' | 'write' | 'rename' | 'posixRename' | 'unlink'
   path: string
   to?: string
 }
@@ -52,7 +52,12 @@ interface Call {
 interface Entry {
   size?: number
   dir?: boolean
+  mode?: number
+  uid?: number
 }
+
+/** Where a partial name put down for `path` would be, by its prefix. */
+const PARTIAL = /\/\.[^/]+\.td-partial-\d+-\d+$/
 
 /**
  * A stand-in for one host's SFTP session. `entries` is what it claims to
@@ -63,8 +68,21 @@ interface Entry {
 function stubSession(
   calls: Call[],
   entries: Record<string, Entry> = {},
-  opts: { failReadOpen?: boolean; received?: Record<string, string> } = {}
+  opts: {
+    failReadOpen?: boolean
+    received?: Record<string, string>
+    /** Stops a write partway, the way a dropped link does. */
+    failWrite?: boolean
+  } = {}
 ): SFTPWrapper {
+  const move = (from: string, to: string): void => {
+    entries[to] = entries[from]
+    delete entries[from]
+    if (opts.received && from in opts.received) {
+      opts.received[to] = opts.received[from]
+      delete opts.received[from]
+    }
+  }
   const session = {
     fastPut(
       local: string,
@@ -74,6 +92,37 @@ function stubSession(
     ): void {
       calls.push({ op: 'fastPut', path: local, to: remote })
       transfer.step?.(512, 512, 1024)
+      if (opts.failWrite) {
+        entries[remote] = { size: 512, mode: 0o600, uid: 0 }
+        cb(new Error('Connection lost'))
+        return
+      }
+      entries[remote] = { size: 1024, mode: 0o600, uid: 0 }
+      cb(null)
+    },
+    rename(from: string, to: string, cb: (err?: Error | null) => void): void {
+      calls.push({ op: 'rename', path: from, to })
+      // SSH_FXP_RENAME as most servers have it: never over an existing name.
+      if (entries[to]) return cb(new Error('Failure'))
+      move(from, to)
+      cb(null)
+    },
+    ext_openssh_rename(from: string, to: string, cb: (err?: Error | null) => void): void {
+      calls.push({ op: 'posixRename', path: from, to })
+      move(from, to)
+      cb(null)
+    },
+    chmod(path: string, mode: number, cb: (err?: Error | null) => void): void {
+      if (entries[path]) entries[path].mode = mode
+      cb(null)
+    },
+    chown(path: string, uid: number, _gid: number, cb: (err?: Error | null) => void): void {
+      if (entries[path]) entries[path].uid = uid
+      cb(null)
+    },
+    unlink(path: string, cb: (err?: Error | null) => void): void {
+      calls.push({ op: 'unlink', path })
+      delete entries[path]
       cb(null)
     },
     fastGet(
@@ -108,8 +157,8 @@ function stubSession(
         isSymbolicLink: () => false,
         size: entry.size ?? 0,
         mtime: 0,
-        mode: 0o644,
-        uid: 0,
+        mode: entry.mode ?? 0o644,
+        uid: entry.uid ?? 0,
         gid: 0
       })
     },
@@ -145,6 +194,7 @@ function stubSession(
         },
         final(cb: (err?: Error | null) => void): void {
           if (opts.received) opts.received[path] = Buffer.concat(chunks).toString('utf8')
+          entries[path] = { size: Buffer.concat(chunks).length }
           cb()
         }
       })
@@ -190,10 +240,14 @@ describe('running a transfer plan', () => {
       plan('upload', [item('/local/a.txt', '/srv/a.txt'), item('/local/b.txt', '/srv/b.txt')])
     )
 
-    expect(result).toEqual({ written: 2, skipped: 0 })
-    expect(calls.filter((c) => c.op === 'fastPut')).toEqual([
-      { op: 'fastPut', path: '/local/a.txt', to: '/srv/a.txt' },
-      { op: 'fastPut', path: '/local/b.txt', to: '/srv/b.txt' }
+    expect(result).toEqual({ written: 2, skipped: 0, changed: [] })
+    // Each goes up under a name of its own and is moved into place at the end.
+    const puts = calls.filter((c) => c.op === 'fastPut')
+    expect(puts.map((c) => c.path)).toEqual(['/local/a.txt', '/local/b.txt'])
+    for (const put of puts) expect(put.to).toMatch(PARTIAL)
+    expect(calls.filter((c) => c.op === 'rename').map((c) => c.to)).toEqual([
+      '/srv/a.txt',
+      '/srv/b.txt'
     ])
   })
 
@@ -220,8 +274,8 @@ describe('running a transfer plan', () => {
       decisions
     )
 
-    expect(result).toEqual({ written: 2, skipped: 1 })
-    const written = calls.filter((c) => c.op === 'fastPut').map((c) => c.to)
+    expect(result).toEqual({ written: 2, skipped: 1, changed: [] })
+    const written = calls.filter((c) => c.op === 'rename').map((c) => c.to)
     expect(written).toEqual(['/srv/replace.txt', '/srv/new.txt'])
   })
 
@@ -256,7 +310,7 @@ describe('running a transfer plan', () => {
 
     const result = await sftpManager.runPlan('conn', plan('download', [item('/srv/a.txt', dest)]))
 
-    expect(result).toEqual({ written: 1, skipped: 0 })
+    expect(result).toEqual({ written: 1, skipped: 0, changed: [] })
     expect(existsSync(join(localDir, 'nested', 'deeper'))).toBe(true)
     expect(readFileSync(dest, 'utf8')).toBe('fetched')
 
@@ -292,7 +346,7 @@ describe('running a transfer plan', () => {
 
     const result = await sftpManager.runPlan('conn', withConflict)
 
-    expect(result).toEqual({ written: 0, skipped: 1 })
+    expect(result).toEqual({ written: 0, skipped: 1, changed: [] })
     expect(readFileSync(dest, 'utf8')).toBe('mine')
     expect(calls).toEqual([])
   })
@@ -337,11 +391,14 @@ describe('running a transfer plan', () => {
       'dest'
     )
 
-    expect(result).toEqual({ written: 1, skipped: 0 })
+    expect(result).toEqual({ written: 1, skipped: 0, changed: [] })
     expect(sourceCalls.filter((c) => c.op === 'read').map((c) => c.path)).toEqual(['/srv/a.txt'])
     // The directory is made on the receiving host, not on the sending one.
     expect(destCalls.filter((c) => c.op === 'mkdir').map((c) => c.path)).toEqual(['/incoming/new'])
-    expect(destCalls.filter((c) => c.op === 'write').map((c) => c.path)).toEqual([
+    const writes = destCalls.filter((c) => c.op === 'write').map((c) => c.path)
+    expect(writes).toHaveLength(1)
+    expect(writes[0]).toMatch(PARTIAL)
+    expect(destCalls.filter((c) => c.op === 'rename').map((c) => c.to)).toEqual([
       '/incoming/new/a.txt'
     ])
     expect(sourceCalls.some((c) => c.op === 'write')).toBe(false)
@@ -378,6 +435,67 @@ describe('running a transfer plan', () => {
   })
 })
 
+/**
+ * What a transfer leaves behind when it does not finish, and what it does to a
+ * destination that changed after the plan was made.
+ */
+describe('replacing a remote file', () => {
+  it('leaves the original whole when an upload over it stops halfway', async () => {
+    const calls: Call[] = []
+    const entries: Record<string, Entry> = {
+      '/srv': { dir: true },
+      '/srv/app.conf': { size: 4096 }
+    }
+    attach('conn', stubSession(calls, entries, { failWrite: true }))
+
+    const overwrite = plan('upload', [item('/local/app.conf', '/srv/app.conf')])
+    overwrite.conflicts = [
+      { ...item('/local/app.conf', '/srv/app.conf'), destSize: 4096, destMtime: 0, reason: 'file' }
+    ]
+    await expect(
+      sftpManager.runPlan('conn', overwrite, { '/srv/app.conf': 'overwrite' })
+    ).rejects.toThrow(/connection lost/i)
+
+    // The original is untouched, and the half that did arrive is gone.
+    expect(entries['/srv/app.conf']).toEqual({ size: 4096 })
+    expect(calls.some((c) => c.op === 'fastPut' && c.to === '/srv/app.conf')).toBe(false)
+    expect(Object.keys(entries).filter((p) => PARTIAL.test(p))).toEqual([])
+  })
+
+  it('replaces an existing file keeping its mode and owner', async () => {
+    const calls: Call[] = []
+    const entries: Record<string, Entry> = {
+      '/srv': { dir: true },
+      '/srv/app.conf': { size: 4096, mode: 0o640, uid: 33 }
+    }
+    attach('conn', stubSession(calls, entries))
+
+    const overwrite = plan('upload', [item('/local/app.conf', '/srv/app.conf')])
+    overwrite.conflicts = [
+      { ...item('/local/app.conf', '/srv/app.conf'), destSize: 4096, destMtime: 0, reason: 'file' }
+    ]
+    await sftpManager.runPlan('conn', overwrite, { '/srv/app.conf': 'overwrite' })
+
+    expect(calls.filter((c) => c.op === 'posixRename').map((c) => c.to)).toEqual(['/srv/app.conf'])
+    expect(entries['/srv/app.conf']).toMatchObject({ size: 1024, mode: 0o640, uid: 33 })
+  })
+
+  it('does not write over something that appeared after the plan was made', async () => {
+    const calls: Call[] = []
+    const entries: Record<string, Entry> = { '/srv': { dir: true } }
+    attach('conn', stubSession(calls, entries))
+    // Planned against an empty directory; by the time it runs, a file is there.
+    const planned = plan('upload', [item('/local/a.txt', '/srv/a.txt')])
+    entries['/srv/a.txt'] = { size: 7 }
+
+    const result = await sftpManager.runPlan('conn', planned)
+
+    expect(result).toEqual({ written: 0, skipped: 1, changed: ['/srv/a.txt'] })
+    expect(entries['/srv/a.txt']).toEqual({ size: 7 })
+    expect(calls.some((c) => c.op === 'fastPut')).toBe(false)
+  })
+})
+
 describe('SCP/Shell routing', () => {
   it.each(['source', 'destination'])(
     'relays between SFTP and SCP with the SCP endpoint as %s',
@@ -403,6 +521,9 @@ describe('SCP/Shell routing', () => {
       vi.spyOn(ScpShell.prototype, 'createReadStream').mockImplementation(
         (path) => stub.createReadStream(path) as unknown as PassThrough
       )
+      // Replacing through a partial name is a shell script of its own; the
+      // routing is what is under test here, so it writes straight through.
+      vi.spyOn(ScpShell.prototype, 'replace').mockImplementation((path, write) => write(path))
       const write = vi
         .spyOn(ScpShell.prototype, 'createWriteStream')
         .mockImplementation((path) => stub.createWriteStream(path))

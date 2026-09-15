@@ -24,6 +24,7 @@ import type {
   ImportSummary,
   TransferPlan,
   TransferDecisions,
+  TransferResult,
   FileComparison,
   RdpView
 } from '../shared/types'
@@ -376,7 +377,7 @@ const api = {
       decisions: TransferDecisions,
       /** The far end of a relay; unused by uploads and downloads. */
       destConnectionId?: string
-    ): Promise<{ written: number; skipped: number }> =>
+    ): Promise<TransferResult> =>
       ipcRenderer.invoke(IPC.sftpRunPlan, connectionId, plan, decisions, destConnectionId),
     compare: (
       connectionId: string,

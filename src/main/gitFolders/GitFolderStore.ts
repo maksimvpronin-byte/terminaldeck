@@ -18,7 +18,7 @@ import { parseInWorker } from '../inventory/parseInWorker'
 import { noInventoryFound } from '../inventory/files'
 import { headRevision, syncRepo } from '../inventory/GitRepo'
 import { removeTree } from './removeTree'
-import { readJson, writeJson } from '../store/jsonFile'
+import { JsonDocument, readJson } from '../store/jsonFile'
 import { sessionStore } from '../store/SessionStore'
 
 /**
@@ -72,6 +72,8 @@ function legacyCheckoutFor(folderId: string): string | undefined {
 
 /** The whole repository as parsed, before the chosen groups are cut out of it. */
 interface ParsedRepo {
+  /** The link as it was when this was read; see `readsTheSame`. */
+  link: GitFolderLink
   tree: GitFolderTree
   paths: string[]
   revision?: string
@@ -79,8 +81,30 @@ interface ParsedRepo {
   warning?: string
 }
 
+/** What decides the contents a read produces. */
+function readsTheSame(a: GitFolderLink, b: GitFolderLink): boolean {
+  return (
+    a.repoUrl === b.repoUrl &&
+    (a.branch ?? '') === (b.branch ?? '') &&
+    JSON.stringify(a.paths) === JSON.stringify(b.paths)
+  )
+}
+
 class GitFolderStore {
-  private data: GitFolderData
+  private doc = new JsonDocument<GitFolderData>(dataPath, (path) => {
+    const parsed = readJson<Partial<GitFolderData>>(path, () => ({}))
+    return {
+      version: 1,
+      trees: parsed.trees ?? [],
+      overrides: parsed.overrides ?? [],
+      repos: parsed.repos ?? []
+    }
+  })
+
+  /** Read-only: every change goes through `doc.change`. */
+  private get data(): GitFolderData {
+    return this.doc.data
+  }
   /**
    * What the last preview read, kept until it is applied.
    *
@@ -107,24 +131,6 @@ class GitFolderStore {
     return next
   }
 
-  constructor() {
-    this.data = this.load()
-  }
-
-  private load(): GitFolderData {
-    const parsed = readJson<Partial<GitFolderData>>(dataPath(), () => ({}))
-    return {
-      version: 1,
-      trees: parsed.trees ?? [],
-      overrides: parsed.overrides ?? [],
-      repos: parsed.repos ?? []
-    }
-  }
-
-  private persist(): void {
-    writeJson(dataPath(), this.data)
-  }
-
   trees(): GitFolderTree[] {
     return this.data.trees
   }
@@ -142,20 +148,21 @@ class GitFolderStore {
    * Notes a repository as one to offer next time. Called on a successful sync
    * rather than on save, so what is offered is what has actually been read.
    */
-  private rememberRepo(url: string, branch?: string): void {
-    const repos = this.data.repos ?? []
+  private rememberRepo(draft: GitFolderData, url: string, branch?: string): void {
+    const repos = draft.repos ?? []
     const found = repos.find((r) => r.url === url && (r.branch ?? '') === (branch ?? ''))
     if (found) found.usedAt = Date.now()
     else repos.push({ url, branch, usedAt: Date.now() })
-    this.data.repos = repos
+    draft.repos = repos
   }
 
   /** Drops a saved repository. Any folder still reading it is left alone. */
   forgetRepo(url: string, branch?: string): void {
-    this.data.repos = (this.data.repos ?? []).filter(
-      (r) => !(r.url === url && (r.branch ?? '') === (branch ?? ''))
-    )
-    this.persist()
+    this.doc.change((d) => {
+      d.repos = (d.repos ?? []).filter(
+        (r) => !(r.url === url && (r.branch ?? '') === (branch ?? ''))
+      )
+    })
   }
 
   /** The folder as it is saved, and its link, or nothing if it has none. */
@@ -204,6 +211,7 @@ class GitFolderStore {
         .filter((p): p is string => p !== undefined)
 
       return {
+        link,
         tree,
         paths,
         revision: await headRevision(dir).catch(() => undefined),
@@ -297,16 +305,32 @@ class GitFolderStore {
     if (!found) throw new Error('This folder is not linked to a repository')
     const repo = this.pending.get(folderId)
     if (!repo) throw new Error('Sync this folder again: what it read has been forgotten')
+    /*
+     * What was read belongs to the settings it was read with. The folder can be
+     * edited between the preview and the answer — another repository, another
+     * branch, other paths — and applying the old read then filled the folder
+     * with hosts from a repository it no longer names, stamped as synced from
+     * the one it does.
+     */
+    if (!readsTheSame(repo.link, found.link)) {
+      this.pending.delete(folderId)
+      throw new Error('This folder was changed after it was read. Sync it again.')
+    }
 
     const included = includedGroups.filter((p) => repo.paths.includes(p))
     const tree = pruneTree(folderId, repo.tree, included)
 
-    this.data.trees = [...this.data.trees.filter((t) => t.groupId !== folderId), tree]
-    this.dropOrphanedOverrides(folderId, forgetSecret)
-    // Noted on a successful sync rather than on save, so what is offered to the
-    // next folder is a repository that has actually been read.
-    this.rememberRepo(found.link.repoUrl, found.link.branch)
-    this.persist()
+    let orphaned: InventoryOverride[] = []
+    this.doc.change((d) => {
+      d.trees = [...d.trees.filter((t) => t.groupId !== folderId), tree]
+      orphaned = this.orphanedOverrides(d, folderId)
+      d.overrides = d.overrides.filter((o) => !orphaned.includes(o))
+      // Noted on a successful sync rather than on save, so what is offered to the
+      // next folder is a repository that has actually been read.
+      this.rememberRepo(d, found.link.repoUrl, found.link.branch)
+    })
+    // Forgotten only once nothing saved points at them any more.
+    for (const override of orphaned) forgetSecret(override)
 
     this.saveLink(found.folder, {
       includedGroups: included,
@@ -326,20 +350,14 @@ class GitFolderStore {
    * hold. A host that has gone from the inventory has gone: leaving its override
    * behind would keep a credential in the vault that nothing points at.
    */
-  private dropOrphanedOverrides(
-    folderId: string,
-    forgetSecret: (override: InventoryOverride) => void
-  ): void {
+  private orphanedOverrides(draft: GitFolderData, folderId: string): InventoryOverride[] {
+    const tree = draft.trees.find((t) => t.groupId === folderId)
     const live = new Set([
-      ...(this.treeOf(folderId)?.groups ?? []).map((g) => g.id),
-      ...(this.treeOf(folderId)?.sessions ?? []).map((s) => s.id)
+      ...(tree?.groups ?? []).map((g) => g.id),
+      ...(tree?.sessions ?? []).map((s) => s.id)
     ])
     const prefix = gitNodePrefix(folderId)
-    const orphaned = this.data.overrides.filter(
-      (o) => o.nodeId.startsWith(prefix) && !live.has(o.nodeId)
-    )
-    for (const override of orphaned) forgetSecret(override)
-    this.data.overrides = this.data.overrides.filter((o) => !orphaned.includes(o))
+    return draft.overrides.filter((o) => o.nodeId.startsWith(prefix) && !live.has(o.nodeId))
   }
 
   treeOf(folderId: string): GitFolderTree | undefined {
@@ -353,13 +371,13 @@ class GitFolderStore {
   forget(folderId: string, forgetSecret: (override: InventoryOverride) => void): void {
     this.dropCheckout(folderId)
     const prefix = gitNodePrefix(folderId)
-    for (const override of this.data.overrides.filter((o) => o.nodeId.startsWith(prefix))) {
-      forgetSecret(override)
-    }
-    this.data.overrides = this.data.overrides.filter((o) => !o.nodeId.startsWith(prefix))
-    this.data.trees = this.data.trees.filter((t) => t.groupId !== folderId)
+    const forgotten = this.data.overrides.filter((o) => o.nodeId.startsWith(prefix))
+    this.doc.change((d) => {
+      d.overrides = d.overrides.filter((o) => !o.nodeId.startsWith(prefix))
+      d.trees = d.trees.filter((t) => t.groupId !== folderId)
+    })
     this.pending.delete(folderId)
-    this.persist()
+    for (const override of forgotten) forgetSecret(override)
   }
 
   /**
@@ -386,15 +404,32 @@ class GitFolderStore {
   }
 
   saveOverride(override: InventoryOverride): void {
-    const idx = this.data.overrides.findIndex((o) => o.nodeId === override.nodeId)
-    if (idx >= 0) this.data.overrides[idx] = override
-    else this.data.overrides.push(override)
-    this.persist()
+    this.saveOverrides([override])
+  }
+
+  /** Several at once, in one write. */
+  saveOverrides(overrides: InventoryOverride[]): void {
+    this.doc.change((d) => {
+      for (const override of overrides) {
+        const idx = d.overrides.findIndex((o) => o.nodeId === override.nodeId)
+        if (idx >= 0) d.overrides[idx] = override
+        else d.overrides.push(override)
+      }
+    })
   }
 
   clearOverride(nodeId: string): void {
-    this.data.overrides = this.data.overrides.filter((o) => o.nodeId !== nodeId)
-    this.persist()
+    this.doc.change((d) => {
+      d.overrides = d.overrides.filter((o) => o.nodeId !== nodeId)
+    })
+  }
+
+  snapshot(): GitFolderData {
+    return this.doc.snapshot()
+  }
+
+  restore(previous: GitFolderData): void {
+    this.doc.restore(previous)
   }
 
   /** The host as it will be used: what the repository said, then the local override. */

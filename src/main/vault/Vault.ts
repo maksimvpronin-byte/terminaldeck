@@ -143,11 +143,6 @@ class Vault {
     this.file = null
   }
 
-  private persist(): void {
-    if (!this.file) return
-    writeVaultFile(this.file)
-  }
-
   /**
    * Re-keys the vault: every secret is decrypted with the old key and re-encrypted
    * under a key derived from the new password and a fresh salt.
@@ -224,7 +219,8 @@ class Vault {
      * the two, and adopting a key into a vault that has since been locked would
      * open it again behind the lock screen.
      */
-    if (this.key !== oldKey || this.file !== file) {
+    const live = this.file
+    if (this.generation !== started || this.key !== oldKey || !live) {
       wipe(key)
       throw new VaultLockedError()
     }
@@ -234,10 +230,11 @@ class Vault {
      * from this line to the write is synchronous, so what is re-encrypted is
      * what the vault holds at the moment it is written — a secret saved while
      * the key was being derived is carried across rather than overwritten by a
-     * copy of the file taken before it existed.
+     * copy of the file taken before it existed. `live`, not `file`: saving a
+     * secret replaces the file object rather than changing the old one.
      */
     const secrets: Record<string, EncryptedPayload> = {}
-    for (const [ref, payload] of Object.entries(file.secrets)) {
+    for (const [ref, payload] of Object.entries(live.secrets)) {
       secrets[ref] = encrypt(key, decrypt(oldKey, payload))
     }
 
@@ -253,10 +250,40 @@ class Vault {
     return { key: this.key, file: this.file }
   }
 
+  /**
+   * Stores a secret — on disk first, and only then in memory.
+   *
+   * Changed in place and then written, a failed write left the secret in the
+   * open vault anyway: the host said its password was saved, it worked until
+   * the next restart, and then it was gone, long after the error had been
+   * dismissed.
+   */
   setSecret(ref: string, plaintext: string): void {
+    this.setSecrets({ [ref]: plaintext })
+  }
+
+  /** Several at once, in one write, for an import. */
+  setSecrets(values: Record<string, string>): void {
     const { key, file } = this.requireUnlocked()
-    file.secrets[ref] = encrypt(key, plaintext)
-    this.persist()
+    const secrets = { ...file.secrets }
+    for (const [ref, plaintext] of Object.entries(values)) secrets[ref] = encrypt(key, plaintext)
+    this.replaceFile({ ...file, secrets })
+  }
+
+  /** Writes a changed file and adopts it only once it is on disk. */
+  private replaceFile(next: VaultFile): void {
+    writeVaultFile(next)
+    this.file = next
+  }
+
+  /** The stored ciphertexts as they stand, for putting back after a failed import. */
+  snapshotSecrets(): Record<string, EncryptedPayload> {
+    return this.requireUnlocked().file.secrets
+  }
+
+  restoreSecrets(previous: Record<string, EncryptedPayload>): void {
+    const { file } = this.requireUnlocked()
+    this.replaceFile({ ...file, secrets: previous })
   }
 
   getSecret(ref: string): string | undefined {
@@ -279,8 +306,10 @@ class Vault {
 
   deleteSecret(ref: string): void {
     const { file } = this.requireUnlocked()
-    delete file.secrets[ref]
-    this.persist()
+    if (!(ref in file.secrets)) return
+    const secrets = { ...file.secrets }
+    delete secrets[ref]
+    this.replaceFile({ ...file, secrets })
   }
 }
 

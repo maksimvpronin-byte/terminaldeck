@@ -444,12 +444,22 @@ export default function SftpPanel({
     setPendingTransfer(null)
     setError(null)
     try {
-      await window.td.sftp.runPlan(
+      const result = await window.td.sftp.runPlan(
         source ?? connectionId,
         plan,
         decisions,
         source ? connectionId : undefined
       )
+      // Something arrived at these after the check and before their turn, and
+      // was not overwritten. Said, because a file that was not copied is a file
+      // somebody will go looking for.
+      if (result?.changed?.length) {
+        setError(
+          t('Left alone, because something appeared there after the check: {paths}', {
+            paths: result.changed.join(', ')
+          })
+        )
+      }
     } catch (err) {
       setError((err as Error).message)
     }

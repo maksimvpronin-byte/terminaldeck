@@ -682,6 +682,15 @@ export interface TransferPlan {
 /** Destination path to what to do with it. Anything absent is written. */
 export type TransferDecisions = Record<string, 'overwrite' | 'skip'>
 
+/** What a transfer did. */
+export interface TransferResult {
+  written: number
+  /** Everything not written, including what is listed in `changed`. */
+  skipped: number
+  /** Destinations left alone because they were no longer as the plan found them. */
+  changed: string[]
+}
+
 /** Both sides of a file comparison, or the reason there is nothing to show. */
 export interface FileComparison {
   remotePath: string

@@ -461,4 +461,77 @@ describe('backup import', () => {
     await expect(importFromFile(win)).rejects.toThrow(/needs its password/i)
     expect(sessionStore.getAll().sessions).toEqual([])
   })
+
+  /**
+   * A write that fails partway through an import. The stores used to be
+   * written item by item and left wherever the failure stopped them: the
+   * secrets in, the hosts in, the logins not — and nothing said so.
+   */
+  it('puts every store back when a write fails partway', async () => {
+    populate()
+    saveTo = FILE
+    await exportToFile(win, true, EXPORT_PASSWORD)
+
+    await startAgainWithAnEmptyVault()
+    const before = clone(snapshot())
+    openFrom = FILE
+    vi.spyOn(credentialStore, 'saveMany').mockImplementationOnce(() => {
+      throw new Error('ENOSPC: no space left on device')
+    })
+
+    await expect(importFromFile(win, EXPORT_PASSWORD)).rejects.toThrow(/nothing was changed/i)
+
+    expect(clone(snapshot())).toEqual(before)
+    expect(vault.getSecret('secret-session')).toBeUndefined()
+    // And the files say the same as memory: read afresh, nothing arrived.
+    const onDisk = JSON.parse(readFileSync(join(userData, 'sessions.json'), 'utf8'))
+    expect(onDisk.sessions).toEqual([])
+  })
+
+  function exportWith(changes: Record<string, unknown>): void {
+    writeFileSync(
+      FILE,
+      JSON.stringify({
+        format: 'terminaldeck-backup',
+        version: 1,
+        exportedAt: 1,
+        groups: [],
+        sessions: [],
+        snippets: [],
+        collections: [],
+        inventorySources: [],
+        inventoryOverrides: [],
+        ...changes
+      }),
+      'utf8'
+    )
+    openFrom = FILE
+  }
+
+  it('refuses groups that are their own ancestors', async () => {
+    exportWith({
+      groups: [
+        { ...group, id: 'a', parentId: 'b' },
+        { ...group, id: 'b', parentId: 'a' }
+      ]
+    })
+
+    await expect(importFromFile(win)).rejects.toThrow(/own ancestor/i)
+    expect(sessionStore.getAll().groups).toEqual([])
+  })
+
+  it('refuses two entries with one id', async () => {
+    exportWith({ sessions: [session, { ...session, name: 'another' }] })
+
+    await expect(importFromFile(win)).rejects.toThrow(/more than once/i)
+    expect(sessionStore.getAll().sessions).toEqual([])
+  })
+
+  it('puts a host whose folder is nowhere at the top, where it can be seen', async () => {
+    exportWith({ sessions: [{ ...session, groupId: 'a-folder-that-was-not-exported' }] })
+
+    await importFromFile(win)
+
+    expect(sessionStore.getAll().sessions[0].groupId).toBeNull()
+  })
 })

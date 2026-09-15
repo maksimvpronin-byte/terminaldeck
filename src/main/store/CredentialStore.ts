@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import { join } from 'path'
 import type { Credential } from '../../shared/types'
-import { readJson, writeJson } from './jsonFile'
+import { JsonDocument, readJson } from './jsonFile'
 
 interface CredentialFile {
   version: 1
@@ -26,43 +26,50 @@ function storePath(): string {
  * beside it.
  */
 class CredentialStore {
-  private data: CredentialFile
-
-  constructor() {
-    this.data = this.load()
-  }
-
-  private load(): CredentialFile {
-    // Normalised rather than trusted: a file from an older version, or one
-    // edited by hand, may have no list in it at all.
-    const parsed = readJson<Partial<CredentialFile>>(storePath(), () => ({}))
+  // Normalised rather than trusted: a file from an older version, or one edited
+  // by hand, may have no list in it at all.
+  private doc = new JsonDocument<CredentialFile>(storePath, (path) => {
+    const parsed = readJson<Partial<CredentialFile>>(path, () => ({}))
     return { version: 1, credentials: parsed.credentials ?? [] }
-  }
-
-  private persist(): void {
-    writeJson(storePath(), this.data)
-  }
+  })
 
   list(): Credential[] {
-    return this.data.credentials
+    return this.doc.data.credentials
   }
 
   find(id: string | undefined): Credential | undefined {
     if (!id) return undefined
-    return this.data.credentials.find((c) => c.id === id)
+    return this.doc.data.credentials.find((c) => c.id === id)
   }
 
   save(credential: Credential): Credential {
-    const idx = this.data.credentials.findIndex((c) => c.id === credential.id)
-    if (idx >= 0) this.data.credentials[idx] = credential
-    else this.data.credentials.push(credential)
-    this.persist()
+    this.saveMany([credential])
     return credential
   }
 
+  /** Several at once, in one write. */
+  saveMany(credentials: Credential[]): void {
+    this.doc.change((d) => {
+      for (const credential of credentials) {
+        const idx = d.credentials.findIndex((c) => c.id === credential.id)
+        if (idx >= 0) d.credentials[idx] = credential
+        else d.credentials.push(credential)
+      }
+    })
+  }
+
   remove(id: string): void {
-    this.data.credentials = this.data.credentials.filter((c) => c.id !== id)
-    this.persist()
+    this.doc.change((d) => {
+      d.credentials = d.credentials.filter((c) => c.id !== id)
+    })
+  }
+
+  snapshot(): CredentialFile {
+    return this.doc.snapshot()
+  }
+
+  restore(previous: CredentialFile): void {
+    this.doc.restore(previous)
   }
 }
 

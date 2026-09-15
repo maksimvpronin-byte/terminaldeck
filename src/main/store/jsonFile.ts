@@ -33,6 +33,55 @@ export function writeJson(path: string, data: unknown): void {
 }
 
 /**
+ * One of those files, held in memory, changed only in a way that keeps memory
+ * and disk saying the same thing.
+ *
+ * Every store used to change its data in place and then write it. When the
+ * write failed — a full disk, a file locked by an antivirus scan — the change
+ * stayed in memory anyway: the window showed a host that was saved nowhere, and
+ * the next successful write of anything else saved it after all, long after the
+ * error was reported and dismissed. So a change is made to a copy, the copy is
+ * written, and only a copy that reached the disk becomes what the store holds.
+ *
+ * What `data` hands out is never changed afterwards — every change makes a new
+ * one — so a snapshot is just a reference, and restoring one is writing it back.
+ * That is what lets an import that fails halfway put every store back as it was.
+ */
+export class JsonDocument<T> {
+  private current: T
+
+  constructor(
+    private readonly path: () => string,
+    load: (path: string) => T
+  ) {
+    this.current = load(path())
+  }
+
+  get data(): T {
+    return this.current
+  }
+
+  /** Applies `edit` to a copy, writes the copy, and only then keeps it. */
+  change(edit: (draft: T) => void): T {
+    const draft = structuredClone(this.current)
+    edit(draft)
+    writeJson(this.path(), draft)
+    this.current = draft
+    return draft
+  }
+
+  /** What the store holds now, to hand back to `restore`. */
+  snapshot(): T {
+    return this.current
+  }
+
+  restore(previous: T): void {
+    writeJson(this.path(), previous)
+    this.current = previous
+  }
+}
+
+/**
  * Reads, and does not quietly discard a file it cannot parse.
  *
  * Returning the fallback from a failed parse is the obvious thing and the wrong

@@ -241,4 +241,26 @@ describe('a Sessions folder mirroring a repository', () => {
     expect(readdirSync(join(userData, 'git-folder-repos'))).toEqual([])
     expect(gitFolderStore.repos().map((r) => r.url)).toEqual([repo])
   })
+
+  /**
+   * The folder edited between reading and answering. Applying the old read put
+   * hosts from paths the folder no longer names into it, stamped as synced.
+   */
+  it('refuses to apply a read made with settings the folder no longer has', async () => {
+    const folder: SessionGroup = {
+      id: 'folder-3',
+      name: 'Edited',
+      parentId: null,
+      git: { repoUrl: repo, paths: ['hosts.yml'], includedGroups: [] }
+    }
+    sessionStore.saveGroup(folder)
+    await gitFolderStore.preview('folder-3')
+
+    sessionStore.saveGroup({ ...folder, git: { ...folder.git!, paths: ['elsewhere.yml'] } })
+
+    expect(() => gitFolderStore.apply('folder-3', ['all'], forget)).toThrow(/changed after/i)
+    expect(gitFolderStore.treeOf('folder-3')).toBeUndefined()
+    gitFolderStore.forget('folder-3', forget)
+    sessionStore.deleteGroup('folder-3')
+  })
 })

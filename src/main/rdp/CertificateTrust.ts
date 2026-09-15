@@ -2,7 +2,7 @@ import { app, dialog, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { createHash } from 'crypto'
 import { setCertificateVerifier, type CertificateQuestion } from './certificateVerifier'
-import { readJson, writeJson } from '../store/jsonFile'
+import { JsonDocument, readJson } from '../store/jsonFile'
 
 /**
  * Which TLS certificates a desktop session may be carried over.
@@ -34,32 +34,28 @@ export function certificateKeyOf(host: string, port: number): string {
 }
 
 class CertificateStore {
-  private data: TrustedCertificates = this.load()
-
-  private load(): TrustedCertificates {
-    return readJson<TrustedCertificates>(storePath(), () => ({}))
-  }
-
-  private persist(): void {
-    writeJson(storePath(), this.data)
-  }
+  private doc = new JsonDocument<TrustedCertificates>(storePath, (path) =>
+    readJson<TrustedCertificates>(path, () => ({}))
+  )
 
   get(host: string, port: number): string | undefined {
-    return this.data[certificateKeyOf(host, port)]
+    return this.doc.data[certificateKeyOf(host, port)]
   }
 
   set(host: string, port: number, fingerprint: string): void {
-    this.data[certificateKeyOf(host, port)] = fingerprint
-    this.persist()
+    this.doc.change((d) => {
+      d[certificateKeyOf(host, port)] = fingerprint
+    })
   }
 
   removeByKey(key: string): void {
-    delete this.data[key]
-    this.persist()
+    this.doc.change((d) => {
+      delete d[key]
+    })
   }
 
   all(): TrustedCertificates {
-    return this.data
+    return this.doc.data
   }
 }
 

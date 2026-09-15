@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import { join } from 'path'
 import { createHash } from 'crypto'
-import { readJson, writeJson } from '../store/jsonFile'
+import { JsonDocument, readJson } from '../store/jsonFile'
 
 /** host:port -> OpenSSH-style "SHA256:base64" fingerprint of the server key. */
 type KnownHostsFile = Record<string, string>
@@ -19,27 +19,24 @@ export function hostKeyOf(host: string, port: number): string {
 }
 
 class KnownHosts {
-  private data: KnownHostsFile
-
-  constructor() {
-    this.data = this.load()
-  }
-
-  private load(): KnownHostsFile {
-    return readJson<KnownHostsFile>(storePath(), () => ({}))
-  }
-
-  private persist(): void {
-    writeJson(storePath(), this.data)
-  }
+  /*
+   * Changed through a copy that reached the disk, above all here: a key trusted
+   * in memory and not on disk is trusted for this run and asked about again
+   * after a restart, and the reverse — a key removed on screen that is still in
+   * the file — comes back trusted.
+   */
+  private doc = new JsonDocument<KnownHostsFile>(storePath, (path) =>
+    readJson<KnownHostsFile>(path, () => ({}))
+  )
 
   get(host: string, port: number): string | undefined {
-    return this.data[hostKeyOf(host, port)]
+    return this.doc.data[hostKeyOf(host, port)]
   }
 
   set(host: string, port: number, fp: string): void {
-    this.data[hostKeyOf(host, port)] = fp
-    this.persist()
+    this.doc.change((d) => {
+      d[hostKeyOf(host, port)] = fp
+    })
   }
 
   remove(host: string, port: number): void {
@@ -48,12 +45,13 @@ class KnownHosts {
 
   /** Removes by the stored key, as shown in the trusted-hosts list. */
   removeByKey(key: string): void {
-    delete this.data[key]
-    this.persist()
+    this.doc.change((d) => {
+      delete d[key]
+    })
   }
 
   all(): KnownHostsFile {
-    return this.data
+    return this.doc.data
   }
 }
 

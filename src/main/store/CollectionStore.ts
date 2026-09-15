@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import { join } from 'path'
 import type { HostCollection } from '../../shared/types'
-import { readJson, writeJson } from './jsonFile'
+import { JsonDocument, readJson } from './jsonFile'
 
 interface CollectionFile {
   version: 1
@@ -19,49 +19,57 @@ function storePath(): string {
  * no secrets in it.
  */
 class CollectionStore {
-  private data: CollectionFile
-
-  constructor() {
-    this.data = this.load()
-  }
-
-  private load(): CollectionFile {
-    return readJson<CollectionFile>(storePath(), () => ({ version: 1, collections: [] }))
-  }
-
-  private persist(): void {
-    writeJson(storePath(), this.data)
-  }
+  private doc = new JsonDocument<CollectionFile>(storePath, (path) =>
+    readJson<CollectionFile>(path, () => ({ version: 1, collections: [] }))
+  )
 
   list(): HostCollection[] {
-    return this.data.collections
+    return this.doc.data.collections
   }
 
   save(collection: HostCollection): HostCollection {
+    return this.saveMany([collection])[0]
+  }
+
+  /** Several at once, in one write. */
+  saveMany(collections: HostCollection[]): HostCollection[] {
     // Duplicates would open the same host twice on a single click.
-    const deduped = { ...collection, hostIds: [...new Set(collection.hostIds)] }
-    const idx = this.data.collections.findIndex((c) => c.id === deduped.id)
-    if (idx >= 0) this.data.collections[idx] = deduped
-    else this.data.collections.push(deduped)
-    this.persist()
+    const deduped = collections.map((c) => ({ ...c, hostIds: [...new Set(c.hostIds)] }))
+    this.doc.change((d) => {
+      for (const collection of deduped) {
+        const idx = d.collections.findIndex((c) => c.id === collection.id)
+        if (idx >= 0) d.collections[idx] = collection
+        else d.collections.push(collection)
+      }
+    })
     return deduped
   }
 
   /** Fixes the list order, so it is the user's to arrange rather than an
    * accident of when each set happened to be created. */
   reorder(ids: string[]): void {
-    const byId = new Map(this.data.collections.map((c) => [c.id, c]))
-    const next = ids.map((id) => byId.get(id)).filter((c): c is HostCollection => Boolean(c))
-    for (const c of this.data.collections) {
-      if (!next.includes(c)) next.push(c)
-    }
-    this.data.collections = next
-    this.persist()
+    this.doc.change((d) => {
+      const byId = new Map(d.collections.map((c) => [c.id, c]))
+      const next = ids.map((id) => byId.get(id)).filter((c): c is HostCollection => Boolean(c))
+      for (const c of d.collections) {
+        if (!next.includes(c)) next.push(c)
+      }
+      d.collections = next
+    })
   }
 
   remove(id: string): void {
-    this.data.collections = this.data.collections.filter((c) => c.id !== id)
-    this.persist()
+    this.doc.change((d) => {
+      d.collections = d.collections.filter((c) => c.id !== id)
+    })
+  }
+
+  snapshot(): CollectionFile {
+    return this.doc.snapshot()
+  }
+
+  restore(previous: CollectionFile): void {
+    this.doc.restore(previous)
   }
 }
 

@@ -1,7 +1,7 @@
 import { forEachConcurrent } from './parallel'
 import { ScpShell } from './ScpShell'
 import type { Writable } from 'stream'
-import type { SFTPWrapper } from 'ssh2'
+import type { SFTPWrapper, Stats } from 'ssh2'
 import { readdir, mkdir, stat, lstat, readFile } from 'fs/promises'
 import { renameSync, rmSync } from 'fs'
 import { basename, dirname, join } from 'path'
@@ -20,7 +20,8 @@ import type {
   SftpEntry,
   TransferDecisions,
   TransferItem,
-  TransferPlan
+  TransferPlan,
+  TransferResult
 } from '../../shared/types'
 
 type ProgressFn = (transferred: number, total: number, path: string) => void
@@ -34,9 +35,55 @@ const NO_DECISIONS: TransferDecisions = {}
  */
 const MAX_DIFF_BYTES = 2 * 1024 * 1024
 
+/** An SFTP request with a plain callback, as a promise. */
+function sftpCall(start: (cb: (err?: Error | null) => void) => void): Promise<void> {
+  return new Promise<void>((resolve, reject) => start((err) => (err ? reject(err) : resolve())))
+}
+
+/** lstat that answers null for "not there" and throws for anything else. */
+function lstatRaw(sftp: SFTPWrapper, path: string): Promise<Stats | null> {
+  return new Promise((resolve, reject) => {
+    sftp.lstat(path, (err, stats) => {
+      if (!err) return resolve(stats)
+      const code = (err as { code?: number }).code
+      if (code === 2 || /no such file/i.test(err.message)) resolve(null)
+      else reject(err)
+    })
+  })
+}
+
+/**
+ * A hidden name beside `path` for a copy still on its way there. Beside it and
+ * not in /tmp, because a rename only replaces a file within one filesystem.
+ */
+export function partialNameFor(path: string, n: number): string {
+  return joinRemote(parentOf(path), `.${baseNameOf(path)}.td-partial-${process.pid}-${n}`)
+}
+
+/**
+ * Whether the server offered OpenSSH's `posix-rename`, the only rename that
+ * replaces an existing file. ssh2 records the extensions it was offered, and
+ * throws from the request itself when this one is missing.
+ */
+function supportsPosixRename(sftp: SFTPWrapper): boolean {
+  const offered = (sftp as unknown as { _extensions?: Record<string, string> })._extensions
+  return offered === undefined || offered['posix-rename@openssh.com'] === '1'
+}
+
 /** Text or not: the same test `grep` and `git` use — a NUL byte early on. */
 function looksBinary(buffer: Buffer): boolean {
   return buffer.subarray(0, 8192).includes(0)
+}
+
+/**
+ * Whether a destination may still be written as the plan intended: empty if it
+ * was empty, and if it held a file that somebody agreed to replace, still a
+ * file — never a directory, a link or something that cannot be read.
+ */
+export function stillAsPlanned(wasOccupied: boolean, now: DestInfo | null): boolean {
+  if (!now) return true
+  if (!wasOccupied) return false
+  return !now.isDirectory && !now.isSymlink && !now.unreadable
 }
 
 class SFTPManager {
@@ -244,21 +291,8 @@ class SFTPManager {
   }
 
   /**
-   * Sends a local file to the far end, straight into place.
-   *
-   * Deliberately not through a temporary name and a rename, which is what
-   * `download` above does and what would seem consistent. Two reasons, and
-   * both are worse than the problem they would solve:
-   *
-   * The new file would be created by us, so it would carry our ownership and
-   * our default permissions rather than the ones the file being replaced had.
-   * Uploading over a server's configuration file and quietly changing its mode
-   * or its owner is a larger accident than a transfer that fails partway.
-   *
-   * And SSH_FXP_RENAME is not POSIX rename: on most servers it refuses when the
-   * destination exists. Overwriting needs OpenSSH's `posix-rename` extension,
-   * which is not everywhere, so this would trade one failure mode for a
-   * different one that only shows up on somebody else's server.
+   * Sends a local file to the far end, through a name of its own and then into
+   * place — see `writeRemoteFile` for when, and why not always.
    */
   async upload(
     connectionId: string,
@@ -269,14 +303,99 @@ class SFTPManager {
     const shell = this.getShell(connectionId)
     if (shell) return shell.upload(localPath, remotePath, onProgress)
     const sftp = await this.getSftp(connectionId)
-    await new Promise<void>((resolve, reject) => {
-      sftp.fastPut(
-        localPath,
-        remotePath,
-        { step: (transferred, _chunk, total) => onProgress?.(transferred, total) },
-        (err) => (err ? reject(err) : resolve())
-      )
-    })
+    await this.writeRemoteFile(
+      sftp,
+      remotePath,
+      (target) =>
+        new Promise<void>((resolve, reject) => {
+          sftp.fastPut(
+            localPath,
+            target,
+            { step: (transferred, _chunk, total) => onProgress?.(transferred, total) },
+            (err) => (err ? reject(err) : resolve())
+          )
+        })
+    )
+  }
+
+  /**
+   * Writes a remote file so that a transfer which stops halfway leaves the file
+   * that was there, not the first half of the new one.
+   *
+   * Uploads used to go straight into place. A dropped link then left a
+   * truncated file where a whole one had been — for a configuration file, a
+   * broken service — and nothing on either side said so.
+   *
+   * So the bytes go to a hidden name beside the destination and are moved onto
+   * it at the end. Two things held this back before, and both are dealt with
+   * rather than accepted:
+   *
+   * - The new file is created by this login, so it carries this login's owner
+   *   and default mode. The mode is copied across from the file being replaced,
+   *   and so is the owner where the server permits it. Where it does not, the
+   *   file is written in place as it always was — changing who owns a server's
+   *   configuration is a larger accident than a transfer that fails partway.
+   * - SSH_FXP_RENAME refuses an existing destination on most servers. Replacing
+   *   one needs OpenSSH's `posix-rename`, which is nearly everywhere; where it is
+   *   missing, the same in-place write is the fallback.
+   *
+   * A destination that did not exist is simply renamed into place, and if
+   * something appeared there in the meantime the rename refuses and that
+   * something is left alone. A symlink is written through, as before: renaming
+   * over it would replace the link with a file.
+   */
+  private async writeRemoteFile(
+    sftp: SFTPWrapper,
+    remotePath: string,
+    write: (target: string) => Promise<void>
+  ): Promise<void> {
+    const existing = await lstatRaw(sftp, remotePath)
+    if (existing?.isDirectory())
+      throw new Error(`Refusing to write over the directory ${remotePath}`)
+    if (existing?.isSymbolicLink()) return write(remotePath)
+
+    const partial = partialNameFor(remotePath, this.nextTransfer++)
+    let moved = false
+    let inPlace = false
+    try {
+      await write(partial)
+      if (!existing) {
+        await sftpCall((cb) => sftp.rename(partial, remotePath, cb)).catch((err: Error) => {
+          throw new Error(
+            `${remotePath} could not be put in place (${err.message}). If something appeared there during the transfer, it was left alone.`
+          )
+        })
+        moved = true
+        return
+      }
+      inPlace = !(await this.takeOver(sftp, partial, existing))
+      if (!inPlace) {
+        await sftpCall((cb) => sftp.ext_openssh_rename(partial, remotePath, cb))
+        moved = true
+      }
+    } finally {
+      if (!moved) await sftpCall((cb) => sftp.unlink(partial, cb)).catch(() => undefined)
+    }
+    if (inPlace) await write(remotePath)
+  }
+
+  /**
+   * Makes a freshly written file look like the one it will replace — mode and
+   * owner — and says whether it can replace it by rename at all.
+   */
+  private async takeOver(sftp: SFTPWrapper, partial: string, existing: Stats): Promise<boolean> {
+    if (!supportsPosixRename(sftp)) return false
+    try {
+      await sftpCall((cb) => sftp.chmod(partial, existing.mode & 0o7777, cb))
+      const written = await lstatRaw(sftp, partial)
+      if (!written) return false
+      if (written.uid !== existing.uid || written.gid !== existing.gid) {
+        await sftpCall((cb) => sftp.chown(partial, existing.uid, existing.gid, cb))
+      }
+      return true
+    } catch {
+      return false
+    }
   }
 
   /**
@@ -315,50 +434,59 @@ class SFTPManager {
         ? ((await dstSftp.statPath(dstPath, true))?.permissions ?? '0644')
         : undefined
 
-    await new Promise<void>((resolve, reject) => {
-      const read = srcSftp.createReadStream(srcPath)
-      let write: Writable | null = null
-      let settled = false
+    /*
+     * One pass of the copy into `target`. A function rather than a single run,
+     * because the destination may need writing twice: once under a partial name,
+     * and again in place if that name could not be moved over the original.
+     */
+    const copyInto = (target: string): Promise<void> =>
+      new Promise<void>((resolve, reject) => {
+        const read = srcSftp.createReadStream(srcPath)
+        let write: Writable | null = null
+        let settled = false
 
-      // Either end can fail on its own. Whichever speaks first wins, and the
-      // other is torn down rather than left holding a half-written file open.
-      const fail = (err: Error): void => {
-        if (settled) return
-        settled = true
-        read.destroy()
-        write?.destroy()
-        reject(err)
-      }
-      read.on('error', fail)
-
-      // The destination is not touched until the source is known to be readable.
-      // Opening both at once would leave an empty file behind on the far host
-      // every time a permission error stopped the read — a copy that looks like
-      // it worked until someone opens the result.
-      read.on('open', () => {
-        write =
-          dstSftp instanceof ScpShell
-            ? dstSftp.createWriteStream(dstPath, total, destinationMode)
-            : dstSftp.createWriteStream(dstPath)
-        write.on('error', fail)
-        // 'close', not 'finish': ssh2 emits it once the remote handle is really
-        // closed, and resolving earlier races whatever reads the file next.
-        write.on('close', () => {
+        // Either end can fail on its own. Whichever speaks first wins, and the
+        // other is torn down rather than left holding a half-written file open.
+        const fail = (err: Error): void => {
           if (settled) return
           settled = true
-          resolve()
+          read.destroy()
+          write?.destroy()
+          reject(err)
+        }
+        read.on('error', fail)
+
+        // The destination is not touched until the source is known to be readable.
+        // Opening both at once would leave an empty file behind on the far host
+        // every time a permission error stopped the read — a copy that looks like
+        // it worked until someone opens the result.
+        read.on('open', () => {
+          write =
+            dstSftp instanceof ScpShell
+              ? dstSftp.createWriteStream(target, total, destinationMode)
+              : dstSftp.createWriteStream(target)
+          write.on('error', fail)
+          // 'close', not 'finish': ssh2 emits it once the remote handle is really
+          // closed, and resolving earlier races whatever reads the file next.
+          write.on('close', () => {
+            if (settled) return
+            settled = true
+            resolve()
+          })
+          // Attached here rather than earlier: a 'data' listener puts the stream
+          // into flowing mode, and anything it emitted before `pipe` was attached
+          // would be counted and then dropped.
+          let transferred = 0
+          read.on('data', (chunk: Buffer) => {
+            transferred += chunk.length
+            onProgress?.(transferred, total)
+          })
+          read.pipe(write)
         })
-        // Attached here rather than earlier: a 'data' listener puts the stream
-        // into flowing mode, and anything it emitted before `pipe` was attached
-        // would be counted and then dropped.
-        let transferred = 0
-        read.on('data', (chunk: Buffer) => {
-          transferred += chunk.length
-          onProgress?.(transferred, total)
-        })
-        read.pipe(write)
       })
-    })
+
+    if (dstSftp instanceof ScpShell) await dstSftp.replace(dstPath, copyInto)
+    else await this.writeRemoteFile(dstSftp, dstPath, copyInto)
   }
 
   /**
@@ -599,18 +727,39 @@ class SFTPManager {
     decisions: TransferDecisions = NO_DECISIONS,
     onProgress?: ProgressFn,
     destConnectionId?: string
-  ): Promise<{ written: number; skipped: number }> {
+  ): Promise<TransferResult> {
     if (plan.direction === 'relay' && !destConnectionId) {
       throw new Error('A host-to-host copy needs a destination connection')
     }
     let written = 0
     let skipped = 0
+    const changed: string[] = []
     /* What the plan found already occupied. A conflict with no answer is left
        alone rather than overwritten; see shouldWrite. */
     const conflicted = conflictedPaths(plan)
     for (const item of plan.items) {
       if (!shouldWrite(item.destPath, decisions, conflicted)) {
         skipped++
+        continue
+      }
+      /*
+       * Looked at again, immediately before writing.
+       *
+       * The plan is a picture of the destination taken before anybody answered
+       * the dialog, and a transfer of many files takes a while after that. A
+       * file that was not there when the plan was made — and so was never asked
+       * about — could be there by the time its turn came, and was overwritten
+       * without a question ever having been put. What changed since the plan is
+       * left alone and reported, and the rest of the batch goes on.
+       */
+      const now = await this.destinationNow(
+        plan.direction,
+        plan.direction === 'relay' ? destConnectionId! : connectionId,
+        item.destPath
+      )
+      if (!stillAsPlanned(conflicted.has(item.destPath), now)) {
+        skipped++
+        changed.push(item.destPath)
         continue
       }
       let totalBytes = item.sourceSize
@@ -637,7 +786,38 @@ class SFTPManager {
       report(totalBytes, totalBytes)
       written++
     }
-    return { written, skipped }
+    return { written, skipped, changed }
+  }
+
+  /** What sits at a destination right now, looked up the way planning looks it up. */
+  private async destinationNow(
+    direction: TransferPlan['direction'],
+    connectionId: string,
+    destPath: string
+  ): Promise<DestInfo | null> {
+    try {
+      if (direction === 'download') {
+        const info = await lstat(destPath)
+        return {
+          size: info.size,
+          mtime: info.mtimeMs,
+          isDirectory: info.isDirectory(),
+          isSymlink: info.isSymbolicLink()
+        }
+      }
+      const info = await this.statPath(connectionId, destPath)
+      return info
+        ? {
+            size: info.size,
+            mtime: info.mtime,
+            isDirectory: info.isDirectory,
+            isSymlink: info.isSymlink
+          }
+        : null
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null
+      return { size: 0, mtime: 0, isDirectory: false, isSymlink: false, unreadable: true }
+    }
   }
 
   /** Reads a remote file into memory, refusing anything past the diff cap. */

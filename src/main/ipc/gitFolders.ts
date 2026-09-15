@@ -47,8 +47,8 @@ export function registerGitFolderHandlers(): void {
 
   ipcMain.handle(IPC.gitFolderClearOverride, (_e, nodeId: string) => {
     const override = gitFolderStore.overrides().find((o) => o.nodeId === nodeId)
-    if (override) forgetBoth(override)
-    return gitFolderStore.clearOverride(nodeId)
+    gitFolderStore.clearOverride(nodeId)
+    if (override) forgetBoth({ ...override })
   })
 }
 

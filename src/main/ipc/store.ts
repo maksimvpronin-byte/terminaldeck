@@ -35,12 +35,14 @@ export function registerStoreHandlers(): void {
   ipcMain.handle(IPC.storeDeleteSession, (_e, id: string) => {
     // The credential goes with the host. Left behind it would sit in the vault
     // for good, since nothing points at it any more.
+    // Deleted first and forgotten after, here and below: a delete that fails to
+    // save leaves the host in place, and it must still have its password.
     const session = sessionStore.getAll().sessions.find((s) => s.id === id)
-    if (session) {
-      forgetSecret(session)
-      forgetSecretAt(session, 'gatewaySecretRef')
-    }
     sessionStore.deleteSession(id)
+    if (session) {
+      forgetSecret({ ...session })
+      forgetSecretAt({ ...session }, 'gatewaySecretRef')
+    }
   })
   ipcMain.handle(IPC.storeReorderSessions, (_e, orderedIds: string[]) => {
     sessionStore.reorderSessions(orderedIds)
@@ -65,15 +67,15 @@ export function registerStoreHandlers(): void {
     // Only the group's own credential: hosts and subgroups are re-parented, not
     // deleted, and keep whatever they hold themselves.
     const group = sessionStore.getAll().groups.find((g) => g.id === id)
-    if (group) {
-      forgetSecret(group)
-      forgetSecretAt(group, 'gatewaySecretRef')
-    }
     // A folder tied to git takes its mirrored tree with it, and the local
     // settings and passwords kept for the hosts in it: nothing else can address
     // those nodes once the folder is gone.
     if (group?.git) forgetGitFolder(id)
-    return sessionStore.deleteGroup(id)
+    sessionStore.deleteGroup(id)
+    if (group) {
+      forgetSecret({ ...group })
+      forgetSecretAt({ ...group }, 'gatewaySecretRef')
+    }
   })
 
   // --- Backup ---
@@ -108,8 +110,8 @@ export function registerStoreHandlers(): void {
     // The secret goes with the account. Left behind it would sit in the vault
     // for good, with nothing left pointing at it.
     const credential = credentialStore.find(id)
-    if (credential) forgetSecret(credential)
     credentialStore.remove(id)
+    if (credential) forgetSecret({ ...credential })
   })
 
   ipcMain.handle(IPC.collectionsList, () => collectionStore.list())

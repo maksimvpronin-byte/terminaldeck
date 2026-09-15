@@ -41,6 +41,26 @@ the other produces a version nobody can install, which is how 0.1.10 through
   prompt down, and a prompt nobody answers gives up after five minutes.
 - **Several hosts asking for a password at once lost all but the last question.**
   Prompts now queue and are answered in turn.
+- **An upload that stopped halfway left a truncated file where the old one had
+  been.** Uploads and host-to-host copies go to a hidden name beside the
+  destination and are moved into place at the end, keeping the old file's mode
+  and owner. Where the server cannot keep the owner, or cannot rename over a file,
+  the file is written in place as before.
+- **A file that appeared at a destination after the transfer was planned was
+  overwritten without a question.** Each destination is looked at again just
+  before it is written; anything that changed is left alone and named.
+- **A save that failed to reach the disk still showed as saved** — a host, a
+  trusted key, a password — until a restart lost it. Memory now changes only once
+  the file has.
+- **An import that failed partway left half of it in.** An import is now checked
+  whole — duplicate ids and groups that contain themselves are refused, a host in
+  a folder that exists nowhere goes to the top level — and if any store fails to
+  save, every store is put back as it was.
+- **A second copy of TerminalDeck overwrote the first one's saves.** Launching it
+  again now brings the running window forward.
+- **A sync that finished after its source was changed or removed** put the old
+  repository's hosts back. It is now discarded, and a Sessions folder refuses to
+  apply a read made with settings it no longer has.
 
 ## 0.18.0
 
