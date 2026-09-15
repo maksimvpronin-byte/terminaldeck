@@ -6,6 +6,35 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.18.0
+
+### Added
+
+- A desktop connects as soon as its pane opens, without "New session" in
+  between. A host with no password saved asks for one first; a pane brought
+  back from a saved layout still waits, as a terminal does.
+- Signing out inside a Windows desktop closes its pane. Start → Sign out, or a
+  logoff from elsewhere, leaves no session to go back to, so the pane goes as
+  if its close button had been pressed — and the tab with its last pane. A
+  disconnect, an idle timeout or a dropped network still leaves the pane
+  saying "Session ended". Needs the td-rdp client rebuilt.
+- Sign out of Windows, not just disconnect. Right-click a workspace and choose
+  "Sign out of Windows sessions": every desktop in it is sent Win+R, `logoff`
+  and Enter — typed as characters, so the far keyboard layout does not matter —
+  and its desktop panes close. Terminals in the workspace stay open. A locked
+  session, or a host whose policy removes the Run dialog, is not signed out and
+  is left disconnected as before.
+
+### Fixed
+
+- **A logon that was still finishing closed its own pane.** Now and then a
+  desktop stopped at "LOGON_FAILED_OTHER [LOGON_MSG_SESSION_CONTINUE]", and Try
+  again went straight in. Windows sends that when the automatic logon has not
+  completed yet but Winlogon carries on — an old session still being released,
+  a slow profile — and the pane took it for a refusal and closed the session in
+  the middle of it. It is now shown as a remark and the logon is left to
+  finish. A wrong or expired password is still a refusal.
+
 ## 0.17.0
 
 ### Added
