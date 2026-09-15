@@ -37,13 +37,24 @@ function selfUpdating(): boolean {
 let state: UpdateState = { status: 'idle' }
 /** macOS re-creates the window on activate; handlers must only be bound once. */
 let registered = false
+/**
+ * The window to tell, which is whichever window is newest.
+ *
+ * The handlers are bound once, and they used to close over the window they were
+ * bound with. On a Mac, closing that window and opening the app again from the
+ * Dock makes a new one — and every later word about an update went to the
+ * destroyed first window and was dropped, so a downloaded update never offered
+ * to install.
+ */
+let current: BrowserWindow | undefined
 
-function publish(win: BrowserWindow, next: UpdateState): void {
+function publish(next: UpdateState): void {
   state = next
-  if (!win.isDestroyed()) win.webContents.send(IPC.updateState, next)
+  if (current && !current.isDestroyed()) current.webContents.send(IPC.updateState, next)
 }
 
 export function registerUpdater(win: BrowserWindow): void {
+  current = win
   if (registered) return
   registered = true
 
@@ -53,7 +64,7 @@ export function registerUpdater(win: BrowserWindow): void {
     // The banner offers this only when the build can use it; a call that gets
     // here anyway would download a hundred megabytes to fail at the last step.
     if (!selfUpdating()) throw new Error('This build cannot install an update over itself')
-    publish(win, { status: 'downloading', percent: 0 })
+    publish({ status: 'downloading', percent: 0 })
     await autoUpdater.downloadUpdate()
   })
 
@@ -91,25 +102,25 @@ export function registerUpdater(win: BrowserWindow): void {
   autoUpdater.on('update-available', (info) => {
     // A build that cannot replace itself still says a version is out; it just
     // offers the downloads rather than an install that cannot finish.
-    if (selfUpdating()) publish(win, { status: 'available', version: info.version })
-    else publish(win, { status: 'manual', version: info.version })
+    if (selfUpdating()) publish({ status: 'available', version: info.version })
+    else publish({ status: 'manual', version: info.version })
   })
   autoUpdater.on('update-not-available', () => {
-    publish(win, { status: 'idle' })
+    publish({ status: 'idle' })
   })
   autoUpdater.on('download-progress', (p) => {
-    publish(win, { status: 'downloading', percent: Math.round(p.percent) })
+    publish({ status: 'downloading', percent: Math.round(p.percent) })
   })
   autoUpdater.on('update-downloaded', (info) => {
-    publish(win, { status: 'ready', version: info.version })
+    publish({ status: 'ready', version: info.version })
   })
   autoUpdater.on('error', (err) => {
-    publish(win, { status: 'error', message: err.message })
+    publish({ status: 'error', message: err.message })
   })
 
   const ask = (): void => {
     autoUpdater.checkForUpdates().catch((err: Error) => {
-      publish(win, { status: 'error', message: err.message })
+      publish({ status: 'error', message: err.message })
     })
   }
 

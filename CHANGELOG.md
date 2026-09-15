@@ -49,6 +49,7 @@ the other produces a version nobody can install, which is how 0.1.10 through
 - **A file that appeared at a destination after the transfer was planned was
   overwritten without a question.** Each destination is looked at again just
   before it is written; anything that changed is left alone and named.
+- **Empty folders were lost in a folder transfer.** They are now created.
 - **A save that failed to reach the disk still showed as saved** — a host, a
   trusted key, a password — until a restart lost it. Memory now changes only once
   the file has.
@@ -58,9 +59,23 @@ the other produces a version nobody can install, which is how 0.1.10 through
   save, every store is put back as it was.
 - **A second copy of TerminalDeck overwrote the first one's saves.** Launching it
   again now brings the running window forward.
+- **A reload, a crashed renderer, or a window closed on a Mac left every session
+  running** with nothing showing it: SSH connections signed in, tunnels holding
+  their ports, desktops drawing into nothing. They now close with the page.
 - **A sync that finished after its source was changed or removed** put the old
   repository's hosts back. It is now discarded, and a Sessions folder refuses to
   apply a read made with settings it no longer has.
+- **Update notices went to a closed window on a Mac**, so a downloaded update
+  never offered to install once the first window had been closed.
+- **A multi-line paste ran each line as it arrived.** Paste now goes through the
+  terminal, which brackets it when the shell asks for that.
+- **A desktop client could crash on its way out** when a message arrived as the
+  session ended. Needs the td-rdp client rebuilt.
+
+### Changed
+
+- The main process accepts requests only from the application's own page, and
+  checks a transfer plan's shape before running it.
 
 ## 0.18.0
 

@@ -163,3 +163,26 @@ describe('shouldWrite', () => {
     expect(shouldWrite('/srv/a', { '/srv/a': 'overwrite' }, new Set(['/srv/a']))).toBe(true)
   })
 })
+
+describe('empty folders in a plan', () => {
+  const folder = (destPath: string): TransferItem => ({
+    sourcePath: '/local/empty',
+    destPath,
+    sourceSize: 0,
+    sourceMtime: 0,
+    isDirectory: true
+  })
+
+  it('is no clash when the folder is already there', () => {
+    const plan = buildTransferPlan('upload', [folder('/srv/empty')], () =>
+      file({ isDirectory: true })
+    )
+    expect(plan.conflicts).toEqual([])
+  })
+
+  it('refuses to make a folder where a file stands', () => {
+    const plan = buildTransferPlan('upload', [folder('/srv/empty')], () => file())
+    expect(plan.conflicts.map((c) => c.reason)).toEqual(['not-a-folder'])
+    expect(isRefusable(plan.conflicts[0].reason)).toBe(true)
+  })
+})

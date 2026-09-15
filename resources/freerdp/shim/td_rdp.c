@@ -1863,8 +1863,20 @@ done:
 	{
 		/* The reader is blocked on a pipe that only the far side can close, so
 		 * it is not waited for: the process is ending and the descriptor goes
-		 * with it. */
+		 * with it.
+		 *
+		 * Nor is the context freed under it. Every command the reader reads is
+		 * pushed onto td's queue, under td's lock, and announced on td's event —
+		 * and freeing the context frees all three while the reader can still be
+		 * in the middle of a push. A message sent in the moment a session ends
+		 * (a key, a resize, a frame acknowledgement) then landed in freed memory
+		 * and the client crashed on its way out, which the application reports
+		 * as a client that stopped rather than a session that ended. The session
+		 * is already disconnected by now, and the process takes the memory with
+		 * it when it goes. */
+		td->stopping = 1;
 		(void)CloseHandle(reader);
+		return rc;
 	}
 	freerdp_client_context_free(context);
 	return rc;

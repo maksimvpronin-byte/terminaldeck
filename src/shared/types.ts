@@ -648,6 +648,15 @@ export interface TransferItem {
   destPath: string
   sourceSize: number
   sourceMtime: number
+  /**
+   * A folder with nothing in it, to be made rather than written.
+   *
+   * A plan used to hold files alone, and a folder was made only on the way to
+   * a file inside it — so an empty one, anywhere in the tree, never arrived.
+   * Copying a project skeleton, or a `logs/` a service expects to find, lost
+   * exactly the part that had no content to carry it.
+   */
+  isDirectory?: boolean
 }
 
 /**
@@ -655,7 +664,7 @@ export interface TransferItem {
  * refused outright, because replacing a directory with a file, or writing
  * through a symlink, is never what someone dragging a folder meant to do.
  */
-export type ConflictReason = 'file' | 'directory' | 'symlink' | 'unreadable'
+export type ConflictReason = 'file' | 'directory' | 'symlink' | 'unreadable' | 'not-a-folder'
 
 export interface TransferConflict extends TransferItem {
   destSize: number

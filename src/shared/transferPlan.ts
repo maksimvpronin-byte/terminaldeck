@@ -49,11 +49,13 @@ export function buildTransferPlan(
 
     const info = lookup(item.destPath)
     if (!info) continue
+    // A folder that is already a folder is no clash: there is nothing to make.
+    if (item.isDirectory && info.isDirectory && !info.unreadable) continue
     conflicts.push({
       ...item,
       destSize: info.size,
       destMtime: info.mtime,
-      reason: reasonFor(info)
+      reason: item.isDirectory && !info.unreadable ? 'not-a-folder' : reasonFor(info)
     })
   }
 

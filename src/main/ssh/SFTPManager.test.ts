@@ -496,6 +496,25 @@ describe('replacing a remote file', () => {
   })
 })
 
+describe('folders with nothing in them', () => {
+  it('makes an empty folder at the destination', async () => {
+    mkdirSync(join(localDir, 'project', 'logs'), { recursive: true })
+    writeFileSync(join(localDir, 'project', 'README'), 'hi', 'utf8')
+    const calls: Call[] = []
+    const entries: Record<string, Entry> = { '/srv': { dir: true } }
+    attach('conn', stubSession(calls, entries))
+
+    const planned = await sftpManager.planUpload('conn', join(localDir, 'project'), '/srv')
+    const result = await sftpManager.runPlan('conn', planned)
+
+    expect(planned.items.filter((i) => i.isDirectory).map((i) => i.destPath)).toEqual([
+      '/srv/project/logs'
+    ])
+    expect(result.written).toBe(2)
+    expect(entries['/srv/project/logs']).toEqual({ dir: true })
+  })
+})
+
 describe('SCP/Shell routing', () => {
   it.each(['source', 'destination'])(
     'relays between SFTP and SCP with the SCP endpoint as %s',

@@ -80,10 +80,20 @@ function looksBinary(buffer: Buffer): boolean {
  * was empty, and if it held a file that somebody agreed to replace, still a
  * file — never a directory, a link or something that cannot be read.
  */
-export function stillAsPlanned(wasOccupied: boolean, now: DestInfo | null): boolean {
+export function stillAsPlanned(
+  wasOccupied: boolean,
+  now: DestInfo | null,
+  folder = false
+): boolean {
   if (!now) return true
+  if (folder) return now.isDirectory && !now.unreadable
   if (!wasOccupied) return false
   return !now.isDirectory && !now.isSymlink && !now.unreadable
+}
+
+/** An empty folder in a plan: made at the destination, with nothing to copy into it. */
+function folderItem(sourcePath: string, destPath: string, mtime: number): TransferItem {
+  return { sourcePath, destPath, sourceSize: 0, sourceMtime: mtime, isDirectory: true }
 }
 
 class SFTPManager {
@@ -535,6 +545,8 @@ class SFTPManager {
         })
       }
     }
+    // Nothing below it will make it on the way to a file, so it is made itself.
+    if (out.length === 0) out.push(folderItem(localPath, dest, info.mtimeMs))
     return out
   }
 
@@ -580,6 +592,7 @@ class SFTPManager {
         })
       }
     }
+    if (out.length === 0) out.push(folderItem(remotePath, destDir, info.mtime))
     return out
   }
 
@@ -757,9 +770,23 @@ class SFTPManager {
         plan.direction === 'relay' ? destConnectionId! : connectionId,
         item.destPath
       )
-      if (!stillAsPlanned(conflicted.has(item.destPath), now)) {
+      if (!stillAsPlanned(conflicted.has(item.destPath), now, item.isDirectory)) {
         skipped++
         changed.push(item.destPath)
+        continue
+      }
+      if (item.isDirectory) {
+        if (plan.direction === 'download') await mkdir(item.destPath, { recursive: true })
+        else {
+          const host = plan.direction === 'relay' ? destConnectionId! : connectionId
+          await this.ensureRemoteDir(host, item.destPath)
+          // ensureRemoteDir swallows its errors for the file that follows; here
+          // there is no file to report one, so the folder is checked for.
+          if (!(await this.statPath(host, item.destPath))?.isDirectory) {
+            throw new Error(`Could not create the folder ${item.destPath}`)
+          }
+        }
+        written++
         continue
       }
       let totalBytes = item.sourceSize

@@ -21,6 +21,8 @@ function when(t: Translate, ms: number): string {
 function refusedBecause(t: Translate, reason: string): string {
   if (reason === 'directory') return t('a folder is already there — cannot be replaced by a file')
   if (reason === 'symlink') return t('a symlink is already there — not written through')
+  if (reason === 'not-a-folder')
+    return t('a file is already there — a folder cannot be made in its place')
   return t('could not be read, so it is left alone')
 }
 

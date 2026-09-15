@@ -635,6 +635,8 @@ export const ru: Record<string, string> = {
 
   // Credential prompts and quick connect
   Continue: 'Продолжить',
+  'a file is already there — a folder cannot be made in its place':
+    'там уже есть файл — папку на его месте создать нельзя',
   '{count} more waiting': 'Ещё в очереди: {count}',
   'Quick connect': 'Быстрое подключение',
   'Host and username are required': 'Нужно указать адрес и логин',

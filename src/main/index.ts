@@ -1,12 +1,14 @@
 import { app, shell, BrowserWindow, Menu, type MenuItemConstructorOptions } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { installSenderCheck } from './ipc/guard'
 import { registerIpcHandlers } from './ipc/handlers'
 import { desktopHoldsKeyboard, releaseKeyboard } from './keyboardCapture'
 import { installCertificateVerifier } from './rdp/CertificateTrust'
 import { freeRdpBridge } from './rdp/FreeRdpBridge'
 import { remoteEdit } from './ssh/RemoteEdit'
 import { remoteMonitor } from './ssh/RemoteMonitor'
+import { sshManager } from './ssh/SSHManager'
 import { registerUpdater } from './updater'
 import { IPC } from '../shared/ipc-channels'
 
@@ -56,6 +58,22 @@ const HELD_MODIFIERS = new Set([
   'CapsLock'
 ])
 
+/**
+ * Whether a frame is showing this application's own page — the bundled
+ * renderer, or in development the server electron-vite started for it.
+ */
+function isOwnPage(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+      return parsed.origin === new URL(process.env['ELECTRON_RENDERER_URL']).origin
+    }
+    return parsed.protocol === 'file:' && /\/renderer\/index\.html$/i.test(parsed.pathname)
+  } catch {
+    return false
+  }
+}
+
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
     width: 1280,
@@ -94,6 +112,34 @@ function createWindow(): void {
   // A window that has just loaded is holding no session, whatever the one
   // before it was doing. See releaseKeyboard.
   mainWindow.webContents.on('did-finish-load', releaseKeyboard)
+
+  /**
+   * What the page opened goes when the page does.
+   *
+   * Sessions were closed by the components that showed them, as they
+   * unmounted — which is every way a page ends except the ones that matter
+   * here. A reload, a renderer that crashed, or a window closed on a Mac with
+   * the application still running unmounted nothing: the SSH connections stayed
+   * signed in with nothing reading them, their tunnels kept their ports, and the
+   * desktops kept drawing into a page that was no longer there. The new page
+   * then opened its own on top.
+   */
+  const releaseSessions = (): void => {
+    sshManager.releaseAll()
+    freeRdpBridge.stopAll()
+    remoteMonitor.stopAll()
+  }
+  let loadedOnce = false
+  mainWindow.webContents.on('did-finish-load', () => {
+    loadedOnce = true
+  })
+  mainWindow.webContents.on('did-start-navigation', (details) => {
+    // The first load has nothing before it; an anchor jump keeps the document.
+    if (!loadedOnce || !details.isMainFrame || details.isSameDocument) return
+    releaseSessions()
+  })
+  mainWindow.webContents.on('render-process-gone', releaseSessions)
+  mainWindow.on('closed', releaseSessions)
 
   // Chromium zooms the page on Cmd/Ctrl with +, - or 0 on its own, quite apart
   // from the menu, and swallows the keys before the renderer sees them. Claiming
@@ -255,6 +301,8 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
+  // Before any handler exists, so that every one of them is behind it.
+  installSenderCheck(isOwnPage)
   registerIpcHandlers()
   // Answers the desktop code's question about a TLS certificate. Installed
   // rather than imported there: those modules are tested under plain Node,

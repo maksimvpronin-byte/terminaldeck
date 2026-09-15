@@ -317,11 +317,22 @@ export default function TerminalHost({
     termRef.current?.focus()
   }
 
+  /**
+   * Pastes through the terminal rather than around it.
+   *
+   * The text used to be written straight to the connection, which skipped what
+   * xterm does for a paste: wrap it in bracketed-paste markers when the shell
+   * has asked for them, and turn line feeds into the carriage returns a
+   * terminal sends. Without the markers a shell cannot tell a pasted line from
+   * a typed one, so every newline in a multi-line paste ran as a command the
+   * moment it arrived — including in every pane a broadcast was typing into.
+   * `term.paste` does both and hands the result to `onData`, which is where the
+   * broadcast targets are already resolved.
+   */
   function paste(): void {
     const text = window.td.clipboard.read()
-    const own = connIdRef.current
-    if (!text || !own) return
-    for (const cid of resolveWriteTargetsRef.current(own)) window.td.ssh.write(cid, text)
+    if (!text || !connIdRef.current) return
+    termRef.current?.paste(text)
   }
 
   function copySelection(): void {

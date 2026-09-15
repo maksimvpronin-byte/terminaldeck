@@ -715,6 +715,18 @@ class SSHManager {
   }
 
   /**
+   * Every session and every connect still in progress, let go of at once — for
+   * when the page that opened them has gone and nothing will ever close them
+   * one by one.
+   */
+  releaseAll(): void {
+    for (const controller of this.attempts.values()) controller.abort()
+    for (const connectionId of [...this.connections.keys()]) this.teardown(connectionId)
+    for (const conn of this.closing.values()) if (conn.readyTimer) clearTimeout(conn.readyTimer)
+    this.closing.clear()
+  }
+
+  /**
    * The part every way of connecting shares: an id for the session, a signal
    * for giving up, and the rule that a connect which does not succeed leaves
    * nothing open behind it — whether it failed, was refused, or was cancelled

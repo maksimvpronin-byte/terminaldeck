@@ -6,6 +6,7 @@ import { sftpManager } from '../ssh/SFTPManager'
 import { requireUnlocked } from '../vault/locked'
 import { transferProgress } from '../ssh/transferProgress'
 import { focusedWin } from './win'
+import { checkTransferPlan, isOptionalString, isString } from './guard'
 
 /** The file browser: listing, transfers, and editing a remote file locally. */
 
@@ -71,10 +72,13 @@ export function registerSftpHandlers(): void {
     (
       _e,
       connectionId: string,
-      plan: TransferPlan,
-      decisions: TransferDecisions,
+      untrustedPlan: TransferPlan,
+      untrustedDecisions: TransferDecisions,
       destConnectionId?: string
     ) => {
+      isString(connectionId, 'connectionId')
+      isOptionalString(destConnectionId, 'destConnectionId')
+      const { plan, decisions } = checkTransferPlan(untrustedPlan, untrustedDecisions)
       let lastProgress: { path: string; transferred: number; total: number } | undefined
       const report = transferProgress<{ path: string; transferred: number; total: number }>((p) => {
         reportTransfer(connectionId, p.path, p.transferred, p.total)
