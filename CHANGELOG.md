@@ -6,6 +6,18 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## Unreleased
+
+### Fixed
+
+- **The host filter stopped taking input until the window was minimised.** On
+  Windows, any confirmation — deleting a host or a group, closing a workspace,
+  signing out of its desktops — left the window unable to focus a text field
+  once the dialog closed: clicks landed, but no caret appeared and nothing could
+  be typed until the window lost focus and got it back. Every confirmation now
+  hands the keyboard back as it closes, and the linter refuses a bare
+  `window.confirm`.
+
 ## 0.18.0
 
 ### Added

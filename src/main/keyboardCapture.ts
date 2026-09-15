@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { BrowserWindow, ipcMain } from 'electron'
 import { IPC } from '../shared/ipc-channels'
 
 /**
@@ -36,5 +36,28 @@ export function releaseKeyboard(): void {
 export function registerKeyboardCapture(): void {
   ipcMain.on(IPC.uiKeyboardCapture, (_e, capture: boolean) => {
     held = capture === true
+  })
+
+  /**
+   * The keyboard, given back to a window a `confirm()` took it from.
+   *
+   * On Windows, once the page's own dialog closes, the window is in front and
+   * clicks still land, but nothing in it can take focus again: an input shows
+   * no caret and swallows every keystroke — the host filter was where it was
+   * noticed — until the window loses and regains focus, which is why
+   * minimising and restoring it "fixed" it. `webContents.focus()` does not
+   * undo it; taking the focus away and giving it back does, and it does so
+   * even for a window already in that state. A dialog raised by this process
+   * (`dialog.showMessageBox`) does not cause it.
+   *
+   * Only there: elsewhere the dialog does not break anything, and blurring a
+   * macOS window deactivates the application for a moment.
+   */
+  ipcMain.on(IPC.uiRefocus, (event) => {
+    if (process.platform !== 'win32') return
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (!win || win.isDestroyed()) return
+    win.blur()
+    win.focus()
   })
 }

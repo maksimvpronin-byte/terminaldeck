@@ -3,6 +3,7 @@ import { nanoid } from 'nanoid'
 import type { AuthMethod, Credential } from '../../../shared/types'
 import { useStore } from '../state/store'
 import { useT, type Translate } from '../i18n'
+import { confirmAction } from '../confirm'
 import Hint from './Hint'
 
 /**
@@ -100,7 +101,7 @@ export default function CredentialsSettings(): JSX.Element {
 
   async function remove(credential: Credential): Promise<void> {
     if (
-      !window.confirm(
+      !confirmAction(
         `${t('Delete the account “{name}”?', { name: credential.name })}\n\n${t(
           'Its password is deleted with it. Sessions already open are not affected.'
         )}`

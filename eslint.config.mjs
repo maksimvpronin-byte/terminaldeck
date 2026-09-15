@@ -90,7 +90,31 @@ export default tseslint.config(
       // three suppressions that were suppressing nothing at all. The ten that
       // remain each say in a comment why they are there — which is the bar for
       // adding another.
-      'react-hooks/exhaustive-deps': 'error'
+      'react-hooks/exhaustive-deps': 'error',
+
+      // A bare `confirm()` leaves a Windows window unable to focus anything
+      // once it closes, until it is minimised and restored. `confirmAction`
+      // in src/renderer/src/confirm.ts gives the keyboard back.
+      'no-restricted-properties': [
+        'error',
+        { object: 'window', property: 'confirm', message: 'Use confirmAction from confirm.ts.' },
+        {
+          object: 'window',
+          property: 'alert',
+          message: 'Breaks focus on Windows; see confirm.ts.'
+        },
+        {
+          object: 'window',
+          property: 'prompt',
+          message: 'Breaks focus on Windows; see confirm.ts.'
+        }
+      ],
+      'no-restricted-globals': [
+        'error',
+        { name: 'confirm', message: 'Use confirmAction from confirm.ts.' },
+        { name: 'alert', message: 'Breaks focus on Windows; see confirm.ts.' },
+        { name: 'prompt', message: 'Breaks focus on Windows; see confirm.ts.' }
+      ]
     }
   },
 

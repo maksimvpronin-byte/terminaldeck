@@ -462,6 +462,8 @@ const api = {
      * has to be told; it then hands them over rather than acting on them.
      */
     setKeyboardCapture: (held: boolean): void => ipcRenderer.send(IPC.uiKeyboardCapture, held),
+    /** Hands the keyboard back to the page after a `confirm()`; see renderer `confirm.ts`. */
+    refocus: (): void => ipcRenderer.send(IPC.uiRefocus),
     /** A key main had to claim, arriving as its `code`, for the session to send. */
     onForwardKey: (cb: (key: ForwardedKey) => void): (() => void) => {
       const listener = (_e: unknown, key: ForwardedKey): void => cb(key)

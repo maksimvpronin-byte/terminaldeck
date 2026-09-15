@@ -58,7 +58,11 @@ if (typeof window !== 'undefined') {
       sftp: stub(),
       monitor: stub(),
       rdp: stub(),
-      ui: stub({ onZoom: () => () => undefined, onForwardKey: () => () => undefined }),
+      ui: stub({
+        onZoom: () => () => undefined,
+        onForwardKey: () => () => undefined,
+        refocus: () => undefined
+      }),
       updates: stub({
         getState: () => Promise.resolve({ status: 'idle' }),
         onState: () => () => undefined

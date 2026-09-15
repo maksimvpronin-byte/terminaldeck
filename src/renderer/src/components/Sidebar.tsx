@@ -38,6 +38,7 @@ import { paneTitle } from '../state/connect'
 import { keyHint } from '../state/keys'
 import { ago } from '../state/syncStatus'
 import { useT } from '../i18n'
+import { confirmAction } from '../confirm'
 import {
   SIDEBAR_MAX,
   SIDEBAR_MIN,
@@ -282,7 +283,7 @@ export default function Sidebar({
     if (names.length === 0) return
     const what =
       names.length === 1 ? `“${names[0]}”` : `${names.length} hosts:\n\n${names.join('\n')}`
-    if (!window.confirm(`Delete ${what}?\n\nThis cannot be undone.`)) return
+    if (!confirmAction(`Delete ${what}?\n\nThis cannot be undone.`)) return
     for (const id of doomed) await removeSession(id)
     clearHostSelection()
   }
@@ -616,7 +617,7 @@ export default function Sidebar({
             mirroredCount > 0
               ? `\n\nThe ${mirroredCount} host(s) mirrored from git go with it, along with the local settings and passwords kept for them.`
               : ''
-          if (window.confirm(`Delete the group “${group?.name ?? ''}”?${note}${gitNote}`)) {
+          if (confirmAction(`Delete the group “${group?.name ?? ''}”?${note}${gitNote}`)) {
             removeGroup(groupId)
           }
         }

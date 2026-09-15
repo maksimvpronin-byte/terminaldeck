@@ -17,6 +17,7 @@ import CollectionDialog from './CollectionDialog'
 import { hostOfTab, morphClose, tabElement } from './hostMorph'
 import { CloseIcon } from './icons'
 import { useT } from '../i18n'
+import { confirmAction } from '../confirm'
 
 export default function Workspace(): JSX.Element {
   const t = useT()
@@ -72,7 +73,7 @@ export default function Workspace(): JSX.Element {
   function requestCloseWorkspace(id: string, title: string, tabCount: number): void {
     if (
       tabCount > 1 &&
-      window.confirm(`Close “${title}” and disconnect its ${tabCount} terminals?`) === false
+      confirmAction(`Close “${title}” and disconnect its ${tabCount} terminals?`) === false
     ) {
       return
     }
@@ -86,7 +87,7 @@ export default function Workspace(): JSX.Element {
    */
   function requestSignOut(id: string): void {
     if (
-      window.confirm(
+      confirmAction(
         t('Sign out of every Windows session in this workspace and close its desktops?')
       ) === false
     ) {

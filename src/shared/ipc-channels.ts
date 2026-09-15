@@ -191,6 +191,8 @@ export const IPC = {
   uiKeyboardCapture: 'ui:keyboardCapture',
   /** main -> renderer: a key main had to claim, for the session to send on. */
   uiForwardKey: 'ui:forwardKey',
+  /** renderer -> main: give the window its keyboard back after `confirm()`. See renderer confirm.ts. */
+  uiRefocus: 'ui:refocus',
 
   /**
    * The two things a sandboxed preload cannot do for itself.
