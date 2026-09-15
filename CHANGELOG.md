@@ -116,6 +116,12 @@ the other produces a version nobody can install, which is how 0.1.10 through
   fresh sync after it.
 - **A git command or an inventory parse that hung held every later sync.** git
   commands are stopped after five minutes and a parse after two.
+- **A desktop in the background could replace this machine's clipboard**, and
+  desktops kept serving the last copied text and files after TerminalDeck
+  locked. What a desktop copies is now taken only while its window has the
+  focus, and locking offers every desktop an empty clipboard, cancelling any
+  file download from one. All desktops with clipboard sharing still receive
+  what is copied here while the window is in use.
 
 ### Changed
 

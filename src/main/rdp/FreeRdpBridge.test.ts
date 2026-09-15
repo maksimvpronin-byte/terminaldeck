@@ -15,7 +15,7 @@ vi.mock('electron', () => ({
   app: { getPath: (): string => '/tmp', isPackaged: false },
   clipboard: {
     readText: vi.fn(() => ''),
-    writeText: () => undefined,
+    writeText: vi.fn(),
     read: () => '',
     readBuffer: () => Buffer.alloc(0)
   },
@@ -37,6 +37,7 @@ const { readFileClipboard, writeClipboardFiles } = await import('./clipboardFile
 const { cleanClipboardDownloads } = await import('./ClipboardDownload')
 const { clipboard } = await import('electron')
 const { freeRdpBridge } = await import('./FreeRdpBridge')
+const { RECORD } = await import('./recordStream')
 
 interface Innards {
   sessions: Map<string, unknown>
@@ -230,5 +231,36 @@ describe('clipboard while nobody is here', () => {
     const sent = Buffer.concat(written).toString()
     expect(sent).toContain('copied elsewhere')
     expect(sent.split('copied elsewhere')).toHaveLength(2)
+  })
+
+  it('offers every desktop an empty clipboard once when the vault locks', async () => {
+    const { session, written } = liveSession()
+    innards().sessions.set('withdrawn', session)
+    session.clipboardSent = 3
+    vaultState.unlocked = false
+
+    await innards().pollClipboard()
+    await innards().pollClipboard()
+
+    const sent = Buffer.concat(written).toString()
+    expect(sent.split('clipset')).toHaveLength(2)
+    expect(session.clipboardSent).toBeUndefined()
+  })
+
+  /**
+   * A desktop in a background pane, or behind another application, went on
+   * replacing this machine's clipboard with whatever it copied.
+   */
+  it('does not take what a desktop copied while its window is in the background', () => {
+    const { session, focused } = liveSession()
+    innards().sessions.set('remote-copy', session)
+    focused.value = false
+
+    innards().receive('remote-copy', session, RECORD.clipboard, Buffer.from('from the far end'))
+    expect(clipboard.writeText).not.toHaveBeenCalled()
+
+    focused.value = true
+    innards().receive('remote-copy', session, RECORD.clipboard, Buffer.from('from the far end'))
+    expect(clipboard.writeText).toHaveBeenCalledWith('from the far end')
   })
 })

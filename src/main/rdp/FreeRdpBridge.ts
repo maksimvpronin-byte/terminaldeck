@@ -387,10 +387,57 @@ class FreeRdpBridge {
    */
   private clipboardChange = 0
 
+  /**
+   * Whether this desktop may put what it copied onto this machine's clipboard.
+   *
+   * The same two conditions as the other direction. A desktop in a background
+   * pane, or one left open while somebody works in another application, went on
+   * replacing the local clipboard whenever anything on it copied — so a paste
+   * elsewhere could bring in whatever that machine had last selected. What a
+   * desktop copies now arrives while its window is the one being used.
+   */
+  private mayGiveClipboard(session: Session): boolean {
+    return (
+      session.clipboard &&
+      !session.stopping &&
+      isUnlocked() &&
+      !session.window.isDestroyed() &&
+      session.window.isFocused()
+    )
+  }
+
+  /** Whether the local clipboard has been taken back from the desktops for the lock. */
+  private clipboardWithdrawn = false
+
+  /**
+   * Takes the local clipboard back from every desktop when the vault locks.
+   *
+   * Stopping the poll stops new copies from going out, but a desktop still held
+   * the last text and file list it was offered, and went on handing them to
+   * anything on that machine that asked — files included, read from this disk on
+   * request. Each desktop is now offered an empty clipboard, which is what it
+   * then serves, and any download from a desktop in progress is cancelled. On
+   * unlock, each is offered the local clipboard afresh.
+   */
+  private withdrawClipboard(): void {
+    if (this.clipboardWithdrawn) return
+    this.clipboardWithdrawn = true
+    this.cancelClipboardDownloads()
+    for (const [id, session] of this.sessions) {
+      if (!session.clipboard || !session.ready || session.stopping) continue
+      this.write(id, { a: 'clipset', text: '', uris: '' })
+      session.clipboardSent = undefined
+    }
+  }
+
   private async pollClipboard(): Promise<void> {
     if (this.clipboardPolling || this.clipboardPublishing) return
     // Nothing is read at all while nobody may be sent it.
-    if (!isUnlocked()) return
+    if (!isUnlocked()) {
+      this.withdrawClipboard()
+      return
+    }
+    this.clipboardWithdrawn = false
     if (![...this.sessions.values()].some((s) => this.mayReceiveClipboard(s))) return
     this.clipboardPolling = true
     const epoch = this.clipboardEpoch
@@ -568,7 +615,7 @@ class FreeRdpBridge {
     if (type === RECORD.clipboardReset) {
       if (session.clipboard) {
         this.cancelClipboardDownloads()
-        if (payload[0] === 1 && isUnlocked()) {
+        if (payload[0] === 1 && this.mayGiveClipboard(session)) {
           this.say(session, id, {
             e: 'clipboard-transfer',
             state: 'receiving',
@@ -587,9 +634,7 @@ class FreeRdpBridge {
       return
     }
     if (type === RECORD.clipboardFiles) {
-      if (session.clipboard && !session.stopping && isUnlocked()) {
-        this.beginClipboardDownload(id, session, payload)
-      }
+      if (this.mayGiveClipboard(session)) this.beginClipboardDownload(id, session, payload)
       return
     }
     if (type === RECORD.clipboardChunk) {
@@ -598,7 +643,7 @@ class FreeRdpBridge {
     }
 
     if (type === RECORD.clipboard) {
-      if (!session.clipboard || !isUnlocked()) return
+      if (!this.mayGiveClipboard(session)) return
       const text = payload.toString('utf8')
       /*
        * Remembered before it is written, and that order is the whole trick:
