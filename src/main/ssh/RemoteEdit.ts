@@ -5,6 +5,7 @@ import { mkdtempSync, existsSync, statSync, rmSync, watch, type FSWatcher } from
 import { tmpdir } from 'os'
 import { IPC } from '../../shared/ipc-channels'
 import { sftpManager } from './SFTPManager'
+import { localChild, safeLocalName } from '../localName'
 
 interface EditSession {
   connectionId: string
@@ -101,10 +102,17 @@ class RemoteEditManager {
       return existing.localPath
     }
 
-    const name = remotePath.split('/').pop() || 'file'
+    /*
+     * The last segment of a remote path is not a safe local name. On a Unix
+     * server `..\..\x` is one file, and `join` on Windows walked it out of the
+     * temporary directory and wrote the download wherever it pointed. Repaired
+     * first, and then checked against the directory anyway, so a case the
+     * repair missed is refused rather than written.
+     */
+    const name = safeLocalName(remotePath.split('/').pop() ?? '')
     const dir = mkdtempSync(join(tmpdir(), 'terminaldeck-edit-'))
     this.dirs.add(dir)
-    const localPath = join(dir, name)
+    const localPath = localChild(dir, name)
 
     await sftpManager.download(connectionId, remotePath, localPath)
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { VaultStatus } from '../../shared/types'
+import { MIN_MASTER_PASSWORD_LENGTH, type VaultStatus } from '../../shared/types'
 import { useStore } from './state/store'
 import { applyUiPalette } from './state/settings'
 import { useT } from './i18n'
@@ -12,7 +12,7 @@ function CreateVaultScreen({ onCreated }: { onCreated: () => void }): JSX.Elemen
   const t = useT()
 
   async function submit(): Promise<void> {
-    if (password.length < 8) {
+    if (password.length < MIN_MASTER_PASSWORD_LENGTH) {
       setError(t('Master password must be at least 8 characters'))
       return
     }

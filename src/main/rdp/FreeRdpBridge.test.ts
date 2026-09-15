@@ -14,7 +14,7 @@ import { PassThrough } from 'stream'
 vi.mock('electron', () => ({
   app: { getPath: (): string => '/tmp', isPackaged: false },
   clipboard: {
-    readText: () => '',
+    readText: vi.fn(() => ''),
     writeText: () => undefined,
     read: () => '',
     readBuffer: () => Buffer.alloc(0)
@@ -27,8 +27,15 @@ vi.mock('./clipboardFiles', () => ({
   writeClipboardFiles: vi.fn(async () => '2'),
   pathsToUris: (paths: string[]) => paths.map((p) => `file://${p}`).join('\r\n')
 }))
+/** Open unless a test says otherwise; the lock is what some of these are about. */
+const vaultState = { unlocked: true }
+vi.mock('../vault/locked', () => ({
+  isUnlocked: () => vaultState.unlocked,
+  requireUnlocked: () => undefined
+}))
 const { readFileClipboard, writeClipboardFiles } = await import('./clipboardFiles')
 const { cleanClipboardDownloads } = await import('./ClipboardDownload')
+const { clipboard } = await import('electron')
 const { freeRdpBridge } = await import('./FreeRdpBridge')
 
 interface Innards {
@@ -57,7 +64,11 @@ function stubSession(): {
   stdin.on('data', (chunk: Buffer) => written.push(chunk))
   const session = {
     child: { stdin },
-    window: { isDestroyed: () => false, webContents: { send: () => undefined } },
+    window: {
+      isDestroyed: () => false,
+      isFocused: () => true,
+      webContents: { send: () => undefined }
+    },
     host: 'h',
     port: 3389,
     clipboard: true
@@ -105,6 +116,8 @@ describe('speaking to a desktop client', () => {
 })
 
 afterEach(() => {
+  vaultState.unlocked = true
+  vi.mocked(clipboard.readText).mockReturnValue('')
   cleanClipboardDownloads()
   vi.clearAllMocks()
   innards().sessions.clear()
@@ -114,7 +127,7 @@ describe('file clipboard coordination', () => {
   it('forwards a native upload failure to the session UI without ending the session', () => {
     const { session } = stubSession()
     const send = vi.fn()
-    session.window = { isDestroyed: () => false, webContents: { send } }
+    session.window = { isDestroyed: () => false, isFocused: () => true, webContents: { send } }
     session.ready = true
     const event = {
       e: 'clipboard-transfer',
@@ -138,7 +151,7 @@ describe('file clipboard coordination', () => {
     await innards().pollClipboard()
     expect(Buffer.concat(written).toString()).toContain('existing.txt')
     expect(Buffer.concat(written).toString()).toContain('clipset')
-    expect(session.clipboardSeeded).toBe(true)
+    expect(session.clipboardSent).toBeDefined()
   })
   it.each([false, true])(
     'publishes a completed batch only if the local clipboard is unchanged (changed=%s)',
@@ -158,4 +171,64 @@ describe('file clipboard coordination', () => {
       expect(writeClipboardFiles).toHaveBeenCalledTimes(changed ? 0 : 1)
     }
   )
+})
+
+/**
+ * What crosses to a desktop while nobody is at TerminalDeck.
+ *
+ * The poll read the local clipboard and sent every change to every open desktop
+ * whatever the state of the application: locked, in the background, or both.
+ * A password copied out of a password manager after locking went straight to
+ * each desktop left open behind the lock.
+ */
+describe('clipboard while nobody is here', () => {
+  function liveSession(): ReturnType<typeof stubSession> & { focused: { value: boolean } } {
+    const stub = stubSession()
+    const focused = { value: true }
+    stub.session.ready = true
+    stub.session.window = {
+      isDestroyed: () => false,
+      isFocused: () => focused.value,
+      webContents: { send: () => undefined }
+    }
+    return { ...stub, focused }
+  }
+
+  function reset(text: string): void {
+    innards().lastClipboardText = text
+    innards().lastClipboardFiles = ''
+    innards().lastClipboardVersion = ''
+    innards().nextFilesPoll = Date.now() + 60_000
+  }
+
+  it('sends nothing while the vault is locked', async () => {
+    const { session, written } = liveSession()
+    innards().sessions.set('locked', session)
+    reset('before')
+    vaultState.unlocked = false
+
+    vi.mocked(clipboard.readText).mockReturnValue('copied after locking')
+    await innards().pollClipboard()
+
+    expect(Buffer.concat(written).toString()).not.toContain('copied after locking')
+  })
+
+  it('holds a change for a desktop whose window is in the background, and sends it once back', async () => {
+    const { session, written, focused } = liveSession()
+    innards().sessions.set('background', session)
+    reset('before')
+    session.clipboardSent = 0
+    focused.value = false
+
+    vi.mocked(clipboard.readText).mockReturnValue('copied elsewhere')
+    await innards().pollClipboard()
+    expect(Buffer.concat(written).toString()).not.toContain('copied elsewhere')
+
+    focused.value = true
+    await innards().pollClipboard()
+    await innards().pollClipboard()
+    const sent = Buffer.concat(written).toString()
+    expect(sent).toContain('copied elsewhere')
+    expect(sent.split('copied elsewhere')).toHaveLength(2)
+  })
 })

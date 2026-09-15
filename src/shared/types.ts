@@ -530,6 +530,9 @@ export interface VaultStatus {
   unlocked: boolean
 }
 
+/** Shortest master password the vault accepts, on either side of IPC. */
+export const MIN_MASTER_PASSWORD_LENGTH = 8
+
 /**
  * A key the main process had to take before the window could see it, and the
  * modifiers that were down as it did.

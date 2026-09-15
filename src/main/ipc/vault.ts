@@ -2,7 +2,7 @@ import { ipcMain } from 'electron'
 import { IPC } from '../../shared/ipc-channels'
 import { trustedCertificates } from '../rdp/CertificateTrust'
 import { knownHosts } from '../ssh/KnownHosts'
-import { WrongPasswordError, vault } from '../vault/Vault'
+import { VaultLockedError, WrongPasswordError, vault } from '../vault/Vault'
 
 /** The vault itself, and the keys and certificates trusted by hand. */
 
@@ -18,7 +18,9 @@ export function registerVaultHandlers(): void {
       await vault.unlock(password)
       return { ok: true, status: vault.status() }
     } catch (err) {
-      if (err instanceof WrongPasswordError) return { ok: false, error: err.message }
+      if (err instanceof WrongPasswordError || err instanceof VaultLockedError) {
+        return { ok: false, error: err.message }
+      }
       throw err
     }
   })
@@ -31,7 +33,9 @@ export function registerVaultHandlers(): void {
       await vault.changePassword(current, next)
       return { ok: true }
     } catch (err) {
-      if (err instanceof WrongPasswordError) return { ok: false, error: err.message }
+      if (err instanceof WrongPasswordError || err instanceof VaultLockedError) {
+        return { ok: false, error: err.message }
+      }
       throw err
     }
   })

@@ -1,4 +1,4 @@
-import { vault } from './Vault'
+import { VaultLockedError, vault } from './Vault'
 
 /**
  * The lock, as something the main process enforces rather than something the
@@ -22,14 +22,17 @@ import { vault } from './Vault'
  * to lunch — it is refusing to start anything new and refusing to hand anything
  * out while nobody is there to say so.
  */
-export class VaultLockedError extends Error {
-  constructor() {
-    super('The vault is locked. Unlock TerminalDeck to continue.')
-    this.name = 'VaultLockedError'
-  }
-}
+export { VaultLockedError }
 
 /** Throws unless the vault is open. */
 export function requireUnlocked(): void {
-  if (!vault.status().unlocked) throw new VaultLockedError()
+  if (!isUnlocked()) throw new VaultLockedError()
+}
+
+/**
+ * For what runs on its own rather than on request — a poll, a timer — and
+ * should quietly do nothing while the vault is shut rather than throw.
+ */
+export function isUnlocked(): boolean {
+  return vault.isUnlocked()
 }

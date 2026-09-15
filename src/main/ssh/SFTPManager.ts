@@ -4,8 +4,9 @@ import type { Writable } from 'stream'
 import type { SFTPWrapper } from 'ssh2'
 import { readdir, mkdir, stat, lstat, readFile } from 'fs/promises'
 import { renameSync, rmSync } from 'fs'
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'path'
+import { basename, dirname, join } from 'path'
 import { sshManager } from './SSHManager'
+import { localChild } from '../localName'
 import {
   buildTransferPlan,
   conflictedPaths,
@@ -36,28 +37,6 @@ const MAX_DIFF_BYTES = 2 * 1024 * 1024
 /** Text or not: the same test `grep` and `git` use — a NUL byte early on. */
 function looksBinary(buffer: Buffer): boolean {
   return buffer.subarray(0, 8192).includes(0)
-}
-
-/**
- * Joins one SFTP directory entry to a local directory without letting a remote
- * filename select a parent, sibling, drive, or UNC path on the local machine.
- */
-function localChild(parent: string, name: string): string {
-  const root = resolve(parent)
-  const target = resolve(root, name)
-  const rel = relative(root, target)
-  if (
-    !name ||
-    name.includes('\0') ||
-    basename(name) !== name ||
-    rel === '' ||
-    rel === '..' ||
-    rel.startsWith(`..${sep}`) ||
-    isAbsolute(rel)
-  ) {
-    throw new Error(`Refusing unsafe remote file name: ${JSON.stringify(name)}`)
-  }
-  return target
 }
 
 class SFTPManager {

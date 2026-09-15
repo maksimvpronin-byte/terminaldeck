@@ -3,6 +3,7 @@ import Hint from './Hint'
 import { useStore } from '../state/store'
 import { useT } from '../i18n'
 import ModalBackdrop from './ModalBackdrop'
+import { MIN_MASTER_PASSWORD_LENGTH } from '../../../shared/types'
 
 interface TrustedHost {
   host: string
@@ -153,7 +154,7 @@ export default function SecuritySettings(): JSX.Element {
   async function changePassword(): Promise<void> {
     setPwError(null)
     setPwDone(false)
-    if (next.length < 8) {
+    if (next.length < MIN_MASTER_PASSWORD_LENGTH) {
       setPwError(t('New password must be at least 8 characters'))
       return
     }

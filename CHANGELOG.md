@@ -17,6 +17,24 @@ the other produces a version nobody can install, which is how 0.1.10 through
   be typed until the window lost focus and got it back. Every confirmation now
   hands the keyboard back as it closes, and the linter refuses a bare
   `window.confirm`.
+- **A remote file opened for editing could be written outside its temporary
+  folder.** On a Unix server `..\..\name` is one file name; on Windows it walked
+  the download out of the folder made for it. Names are now repaired and then
+  checked against the folder, and a download refuses a name Windows would read
+  as a path, a device (`NUL`, `COM1`) or an NTFS stream (`file:stream`).
+- **An inventory could read YAML from outside its checkout.** A host or group
+  named `../../something` in the repository read that file as its vars, and a
+  committed symlink could point `group_vars/` anywhere. Names with separators
+  are ignored and every file is judged by where it really is.
+- **Creating a vault could replace the one already there**, emptying every saved
+  password. It now refuses. A lock that arrived while the vault was still opening
+  no longer lets it open behind the lock screen, and the master password's length
+  is checked by the main process as well as by the window.
+- **A locked TerminalDeck kept sharing the clipboard with open desktops.** What
+  was copied anywhere on this machine — a password from a password manager, say —
+  went on to every desktop with clipboard sharing on. The clipboard now crosses
+  only while the vault is open and the window has the focus; a desktop that
+  missed a copy is given it when its window comes back.
 
 ## 0.18.0
 

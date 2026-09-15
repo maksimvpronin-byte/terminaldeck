@@ -2,7 +2,7 @@ import { app } from 'electron'
 import { join } from 'path'
 import { readFileSync, writeFileSync, renameSync, existsSync, mkdirSync } from 'fs'
 import { deriveKey, newSalt, encrypt, decrypt, wipe, type EncryptedPayload } from './crypto'
-import type { VaultStatus } from '../../shared/types'
+import { MIN_MASTER_PASSWORD_LENGTH, type VaultStatus } from '../../shared/types'
 
 const VERIFIER_PLAINTEXT = 'terminaldeck-vault-v1'
 
@@ -36,39 +36,91 @@ export class WrongPasswordError extends Error {
   }
 }
 
+/** Also what `vault/locked.ts` refuses with, so there is one error for one state. */
+export class VaultLockedError extends Error {
+  constructor() {
+    super('The vault is locked. Unlock TerminalDeck to continue.')
+    this.name = 'VaultLockedError'
+  }
+}
+
+/**
+ * The renderer checks the length before it asks, but the renderer is not where
+ * the vault is. Checked again here, where the password is actually used.
+ */
+function requireAcceptablePassword(password: unknown): asserts password is string {
+  if (typeof password !== 'string' || password.length < MIN_MASTER_PASSWORD_LENGTH) {
+    throw new Error(`Master password must be at least ${MIN_MASTER_PASSWORD_LENGTH} characters`)
+  }
+}
+
 class Vault {
   private key: Buffer | null = null
   private file: VaultFile | null = null
 
   status(): VaultStatus {
-    return { exists: existsSync(vaultPath()), unlocked: this.key !== null }
+    return { exists: existsSync(vaultPath()), unlocked: this.isUnlocked() }
   }
 
+  /** Whether it is open, without asking the disk whether it exists. */
+  isUnlocked(): boolean {
+    return this.key !== null
+  }
+
+  /**
+   * Makes a new, empty vault — and only where there is none.
+   *
+   * It used to write over whatever was there. The renderer only offers it when
+   * `status` says there is no vault, but a request that says "create" is not
+   * proof of that: a second window, a stale screen, or a renderer that is not
+   * behaving would replace every stored credential with an empty file, and the
+   * old one is not kept anywhere.
+   */
   async create(password: string): Promise<void> {
-    const dir = app.getPath('userData')
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-    const salt = newSalt()
-    const key = await deriveKey(password, salt)
-    const verifier = encrypt(key, VERIFIER_PLAINTEXT)
-    const file: VaultFile = { salt, verifier, secrets: {} }
-    writeVaultFile(file)
-    this.adopt(file, key)
+    return this.serially(async (started) => {
+      requireAcceptablePassword(password)
+      if (existsSync(vaultPath())) throw new Error('A vault already exists')
+      const salt = newSalt()
+      const key = await deriveKey(password, salt)
+      if (this.generation !== started || existsSync(vaultPath())) {
+        wipe(key)
+        throw new Error('The vault changed while it was being created')
+      }
+      const verifier = encrypt(key, VERIFIER_PLAINTEXT)
+      const file: VaultFile = { salt, verifier, secrets: {} }
+      writeVaultFile(file)
+      this.adopt(file, key)
+    })
   }
 
+  /**
+   * Opens the vault — unless it was locked while the key was being derived.
+   *
+   * The derivation is long and off the main thread, so a lock can arrive in the
+   * middle of it: the idle timer, the lock button, the window going away.
+   * Finishing anyway put the key back, and the vault was open again behind a
+   * lock that everyone else had already been told about.
+   */
   async unlock(password: string): Promise<void> {
-    const raw = readFileSync(vaultPath(), 'utf8')
-    const file = JSON.parse(raw) as VaultFile
-    const key = await deriveKey(password, file.salt)
-    try {
-      const plain = decrypt(key, file.verifier)
-      if (plain !== VERIFIER_PLAINTEXT) throw new Error('mismatch')
-    } catch {
-      // This key never becomes the vault's, so it is overwritten here rather
-      // than left lying in the heap for whoever guesses next.
-      wipe(key)
-      throw new WrongPasswordError()
-    }
-    this.adopt(file, key)
+    return this.serially(async (started) => {
+      const raw = readFileSync(vaultPath(), 'utf8')
+      const file = JSON.parse(raw) as VaultFile
+      const key = await deriveKey(password, file.salt)
+      if (this.generation !== started) {
+        wipe(key)
+        throw new VaultLockedError()
+      }
+      try {
+        const plain = decrypt(key, file.verifier)
+        if (plain !== VERIFIER_PLAINTEXT) throw new Error('mismatch')
+      } catch {
+        // This key never becomes the vault's, so it is overwritten here rather
+        // than left lying in the heap for whoever guesses next.
+        wipe(key)
+        throw new WrongPasswordError()
+      }
+      this.adopt(file, key)
+    })
   }
 
   /** Takes on a key, overwriting whichever one it replaces. */
@@ -78,7 +130,14 @@ class Vault {
     this.key = key
   }
 
+  /**
+   * Closes the vault, and makes stale every key still being derived.
+   *
+   * Synchronous and never queued: a lock takes effect the moment it is asked
+   * for, not after an unlock that is still working has finished.
+   */
   lock(): void {
+    this.generation++
     if (this.key) wipe(this.key)
     this.key = null
     this.file = null
@@ -112,29 +171,47 @@ class Vault {
    * before the wait that precedes it.
    */
   async changePassword(current: string, next: string): Promise<void> {
-    return (this.rekeying = this.rekeying.then(
-      () => this.rekey(current, next),
-      () => this.rekey(current, next)
-    ))
+    return this.serially((started) => this.rekey(current, next, started))
   }
 
   /**
-   * One at a time. Two of these at once would each write the whole file from
-   * its own reading of it, and the second would undo the first — including
-   * leaving the vault keyed to a password nobody was told about.
+   * Every operation that waits on a key derivation, one at a time.
+   *
+   * Two of them at once would each work from their own reading of the vault,
+   * and the second would undo the first — two changes of password leaving it
+   * keyed to one nobody was told about, or an unlock adopting a file that a
+   * create had just replaced.
    */
-  private rekeying: Promise<void> = Promise.resolve()
+  private queue: Promise<void> = Promise.resolve()
 
-  private async rekey(current: string, next: string): Promise<void> {
+  /**
+   * The generation is read when the operation is asked for, not when its turn
+   * comes: a lock that arrives while it is still waiting in line overtakes it
+   * just the same.
+   */
+  private serially(operation: (started: number) => Promise<void>): Promise<void> {
+    const started = this.generation
+    const go = (): Promise<void> => operation(started)
+    const run = this.queue.then(go, go)
+    this.queue = run.catch(() => undefined)
+    return run
+  }
+
+  /** Moved by every lock. An operation that sees it move has been overtaken. */
+  private generation = 0
+
+  private async rekey(current: string, next: string, started: number): Promise<void> {
+    requireAcceptablePassword(next)
+    if (this.generation !== started) throw new VaultLockedError()
     const { key: oldKey, file } = this.requireUnlocked()
     const check = await deriveKey(current, file.salt)
     // Deriving a key takes long enough for the idle timer to lock the vault
     // underneath this. Checked before the comparison rather than after: locking
     // overwrites the key being compared against, so the comparison would fail
     // and report a wrong password for what is really a closed vault.
-    if (this.key !== oldKey) {
+    if (this.generation !== started || this.key !== oldKey) {
       wipe(check)
-      throw new Error('Vault is locked')
+      throw new VaultLockedError()
     }
     const matches = check.equals(oldKey)
     wipe(check)
@@ -149,7 +226,7 @@ class Vault {
      */
     if (this.key !== oldKey || this.file !== file) {
       wipe(key)
-      throw new Error('Vault is locked')
+      throw new VaultLockedError()
     }
 
     /*
@@ -172,7 +249,7 @@ class Vault {
   }
 
   private requireUnlocked(): { key: Buffer; file: VaultFile } {
-    if (!this.key || !this.file) throw new Error('Vault is locked')
+    if (!this.key || !this.file) throw new VaultLockedError()
     return { key: this.key, file: this.file }
   }
 

@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'fs'
 import { extname, join } from 'path'
 import { parse } from 'yaml'
 import type { AnsibleVars } from './ansible'
-import { insideCheckout } from './checkout'
+import { isPlainName, reallyInsideCheckout } from './checkout'
 
 /**
  * Finding and reading the YAML of a checkout.
@@ -17,22 +17,33 @@ export function isYaml(file: string): boolean {
   return ['.yml', '.yaml'].includes(extname(file).toLowerCase())
 }
 
-/** Reads `<dir>/<name>.yml` or every *.yml under `<dir>/<name>/`, as Ansible does. */
+/**
+ * Reads `<dir>/<name>.yml` or every *.yml under `<dir>/<name>/`, as Ansible does.
+ *
+ * `repoDir` is the checkout every read must stay inside. The name is checked
+ * before it is joined, and every file after it is found — by where it really
+ * is, so a committed symlink cannot point a vars file at something outside.
+ */
 export function readVarsFor(
+  repoDir: string,
   baseDir: string,
   kind: 'group_vars' | 'host_vars',
   name: string
 ): AnsibleVars {
+  if (!isPlainName(name)) return {}
+  const inside = (path: string): boolean => reallyInsideCheckout(repoDir, path)
+
   const candidates: string[] = []
   const flat = join(baseDir, kind, `${name}.yml`)
   const flatYaml = join(baseDir, kind, `${name}.yaml`)
   const nested = join(baseDir, kind, name)
 
-  if (existsSync(flat)) candidates.push(flat)
-  if (existsSync(flatYaml)) candidates.push(flatYaml)
-  if (existsSync(nested) && statSync(nested).isDirectory()) {
+  if (existsSync(flat) && inside(flat)) candidates.push(flat)
+  if (existsSync(flatYaml) && inside(flatYaml)) candidates.push(flatYaml)
+  if (existsSync(nested) && inside(nested) && statSync(nested).isDirectory()) {
     for (const f of readdirSync(nested)) {
-      if (isYaml(f)) candidates.push(join(nested, f))
+      const full = join(nested, f)
+      if (isYaml(f) && inside(full)) candidates.push(full)
     }
   }
 
@@ -53,13 +64,15 @@ export function resolveInventoryFiles(repoDir: string, paths: string[]): string[
   const files: string[] = []
   for (const rel of paths.length > 0 ? paths : ['.']) {
     const target = join(repoDir, rel)
-    if (!insideCheckout(repoDir, target)) continue
     if (!existsSync(target)) continue
+    if (!reallyInsideCheckout(repoDir, target)) continue
     if (statSync(target).isDirectory()) {
       for (const f of readdirSync(target)) {
         const full = join(target, f)
         // Only the directory itself; group_vars/ and host_vars/ are read separately.
-        if (isYaml(f) && statSync(full).isFile()) files.push(full)
+        if (isYaml(f) && reallyInsideCheckout(repoDir, full) && statSync(full).isFile()) {
+          files.push(full)
+        }
       }
     } else if (isYaml(target)) {
       files.push(target)

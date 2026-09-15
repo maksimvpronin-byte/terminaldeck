@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { existsSync, writeFileSync } from 'fs'
+import { basename, dirname } from 'path'
 import type { BrowserWindow } from 'electron'
 
 /**
@@ -66,6 +67,16 @@ describe('remote editing', () => {
     remoteEdit.cleanUp()
     expect(existsSync(local)).toBe(false)
     expect(remoteEdit.temporaryDirs()).toEqual([])
+  })
+
+  it('keeps a hostile remote name inside its temporary directory', async () => {
+    // One legal file name on a Unix server; two steps up a tree on Windows.
+    const local = await remoteEdit.open(win, 'connection-3', '/tmp/..\\..\\evil.dll', 'true')
+    const [dir] = remoteEdit.temporaryDirs()
+
+    expect(dirname(local)).toBe(dir)
+    expect(basename(local)).toMatch(/evil\.dll$/)
+    remoteEdit.cleanUp()
   })
 
   it('removes a copy whose session is still live', async () => {

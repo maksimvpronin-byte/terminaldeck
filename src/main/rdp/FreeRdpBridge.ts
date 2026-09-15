@@ -4,7 +4,7 @@ import { X509Certificate } from 'crypto'
 import { app, clipboard, type BrowserWindow } from 'electron'
 import { IPC } from '../../shared/ipc-channels'
 import { askAboutCertificate } from './certificateVerifier'
-import { requireUnlocked } from '../vault/locked'
+import { isUnlocked, requireUnlocked } from '../vault/locked'
 import { createRecordReader, encodeCommand, readCursor, readFrame, RECORD } from './recordStream'
 import { complaintIn, failureText } from './clientLog'
 import { ClipboardDownload, cleanClipboardDownloads } from './ClipboardDownload'
@@ -81,7 +81,8 @@ interface Session {
    */
   stopping?: boolean
   ready?: boolean
-  clipboardSeeded?: boolean
+  /** Which local clipboard change this desktop was last sent; see `clipboardChange`. */
+  clipboardSent?: number
   download?: ClipboardDownload
   clipboardManifestTimer?: NodeJS.Timeout
   /** The client's last complaint, which is usually the reason it stopped. */
@@ -331,8 +332,39 @@ class FreeRdpBridge {
     this.clipboardTimer.unref?.()
   }
 
+  /**
+   * Whether this desktop may be handed the local clipboard right now.
+   *
+   * Only while the vault is open and only while its window has the focus.
+   * Without either condition, whatever anybody copied anywhere on this machine
+   * went on arriving at every open desktop four times a second — a password
+   * copied out of a password manager after TerminalDeck was locked and left,
+   * included. With them, the clipboard crosses when the person is here and
+   * looking at this application, which is the moment a paste could be meant.
+   * A desktop that missed a change is handed it once its window is back.
+   */
+  private mayReceiveClipboard(session: Session): boolean {
+    return (
+      session.clipboard &&
+      Boolean(session.ready) &&
+      !session.stopping &&
+      !session.window.isDestroyed() &&
+      session.window.isFocused()
+    )
+  }
+
+  /**
+   * Counts changes to the local clipboard. A desktop remembers the count it was
+   * last sent, so one that was out of focus for a change can be brought up to
+   * date when it comes back, without being sent the same thing twice.
+   */
+  private clipboardChange = 0
+
   private async pollClipboard(): Promise<void> {
     if (this.clipboardPolling || this.clipboardPublishing) return
+    // Nothing is read at all while nobody may be sent it.
+    if (!isUnlocked()) return
+    if (![...this.sessions.values()].some((s) => this.mayReceiveClipboard(s))) return
     this.clipboardPolling = true
     const epoch = this.clipboardEpoch
     try {
@@ -351,15 +383,20 @@ class FreeRdpBridge {
         text !== this.lastClipboardText ||
         files !== this.lastClipboardFiles ||
         (this.lastClipboardVersion !== '' && version !== this.lastClipboardVersion)
-      if (changed) this.cancelClipboardDownloads()
+      if (changed) {
+        this.cancelClipboardDownloads()
+        this.clipboardChange++
+      }
       this.lastClipboardText = text
       this.lastClipboardFiles = files
       this.lastClipboardVersion = version
+      // Locked in the time the native read took: nothing goes out after all.
+      if (!isUnlocked()) return
       for (const [id, session] of this.sessions) {
-        if (!session.clipboard || !session.ready || session.stopping) continue
-        if (changed || !session.clipboardSeeded) {
+        if (!this.mayReceiveClipboard(session)) continue
+        if (session.clipboardSent !== this.clipboardChange) {
           this.write(id, { a: 'clipset', text, uris: files })
-          session.clipboardSeeded = true
+          session.clipboardSent = this.clipboardChange
         }
       }
     } catch (error) {
@@ -379,6 +416,10 @@ class FreeRdpBridge {
       (paths) => {
         void (async () => {
           if (epoch !== this.clipboardEpoch || session.stopping) return
+          if (!isUnlocked()) {
+            this.say(session, id, { e: 'clipboard-transfer', state: 'cancelled' })
+            return
+          }
           this.clipboardPublishing = true
           try {
             // Do not overwrite a newer local copy with a transfer that took seconds.
@@ -491,10 +532,16 @@ class FreeRdpBridge {
       return
     }
 
+    /*
+     * The other direction pauses with the lock as well. A desktop left open
+     * behind a locked TerminalDeck is somebody else's to type into for as long
+     * as nobody is here, and what it copies has no business landing on this
+     * machine's clipboard while so.
+     */
     if (type === RECORD.clipboardReset) {
       if (session.clipboard) {
         this.cancelClipboardDownloads()
-        if (payload[0] === 1) {
+        if (payload[0] === 1 && isUnlocked()) {
           this.say(session, id, {
             e: 'clipboard-transfer',
             state: 'receiving',
@@ -513,7 +560,9 @@ class FreeRdpBridge {
       return
     }
     if (type === RECORD.clipboardFiles) {
-      if (session.clipboard && !session.stopping) this.beginClipboardDownload(id, session, payload)
+      if (session.clipboard && !session.stopping && isUnlocked()) {
+        this.beginClipboardDownload(id, session, payload)
+      }
       return
     }
     if (type === RECORD.clipboardChunk) {
@@ -522,7 +571,7 @@ class FreeRdpBridge {
     }
 
     if (type === RECORD.clipboard) {
-      if (!session.clipboard) return
+      if (!session.clipboard || !isUnlocked()) return
       const text = payload.toString('utf8')
       /*
        * Remembered before it is written, and that order is the whole trick:

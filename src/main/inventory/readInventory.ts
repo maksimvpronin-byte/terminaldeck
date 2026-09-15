@@ -27,7 +27,10 @@ export function readInventory(request: InventoryRead): ParsedInventory & { files
       (kind, name) => {
         const key = JSON.stringify([base, kind, name])
         if (!vars.has(key))
-          vars.set(key, readVarsFor(base, kind === 'group' ? 'group_vars' : 'host_vars', name))
+          vars.set(
+            key,
+            readVarsFor(request.dir, base, kind === 'group' ? 'group_vars' : 'host_vars', name)
+          )
         return vars.get(key)!
       },
       request.prefix

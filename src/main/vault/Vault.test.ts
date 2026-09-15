@@ -237,6 +237,51 @@ describe('vault', () => {
   })
 
   /**
+   * A second create wrote an empty vault over the first, and every stored
+   * credential went with it. The renderer only offers create when there is no
+   * vault, but that is the renderer's belief, not a fact the vault checked.
+   */
+  it('refuses to create a vault over one that exists', async () => {
+    await vault.create(OLD)
+    vault.setSecret('host-1', 'hunter2')
+    const before = onDisk()
+
+    await expect(vault.create(NEW)).rejects.toThrow(/already exists/)
+
+    expect(onDisk()).toEqual(before)
+    vault.lock()
+    await vault.unlock(OLD)
+    expect(vault.getSecret('host-1')).toBe('hunter2')
+  })
+
+  it('refuses a master password too short to be one', async () => {
+    await expect(vault.create('short')).rejects.toThrow(/at least 8/)
+    expect(vault.status().exists).toBe(false)
+
+    await vault.create(OLD)
+    await expect(vault.changePassword(OLD, 'short')).rejects.toThrow(/at least 8/)
+  })
+
+  /**
+   * A lock that lands while the key is being derived. Finishing the unlock
+   * anyway opened the vault again behind a lock everyone had been told about.
+   */
+  it('stays closed when it is locked while it opens', async () => {
+    await vault.create(OLD)
+    vault.lock()
+
+    const unlocking = vault.unlock(OLD)
+    vault.lock()
+
+    await expect(unlocking).rejects.toThrow(/locked/i)
+    expect(vault.status().unlocked).toBe(false)
+
+    // And the next honest attempt is not affected by the one that was overtaken.
+    await vault.unlock(OLD)
+    expect(vault.status().unlocked).toBe(true)
+  })
+
+  /**
    * The point of the asynchronous derivation. Were scrypt run synchronously the
    * timer below could not fire until it finished, because nothing else runs at
    * all — which in the app means no terminal draws and no keystroke is
