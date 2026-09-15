@@ -18,6 +18,8 @@ class FakeClient extends EventEmitter {
   ended = false
   /** Whether connecting signs in, or waits for somebody to end it. */
   static signsIn = true
+  /** Whether a request for a channel is ever answered. */
+  static channelsAnswer = true
   constructor() {
     super()
     clients.push(this)
@@ -37,11 +39,11 @@ class FakeClient extends EventEmitter {
     _d: number,
     cb: (err: Error | undefined, stream: unknown) => void
   ): void {
-    setImmediate(() => cb(undefined, new EventEmitter()))
+    if (FakeClient.channelsAnswer) setImmediate(() => cb(undefined, new EventEmitter()))
   }
   shell(_opts: unknown, cb: (err: Error | undefined, stream: unknown) => void): void {
     const stream = Object.assign(new EventEmitter(), { stderr: new EventEmitter(), close() {} })
-    setImmediate(() => cb(undefined, stream))
+    if (FakeClient.channelsAnswer) setImmediate(() => cb(undefined, stream))
   }
 }
 
@@ -57,8 +59,12 @@ vi.mock('./authPrompt', () => ({ requestAuth: (...args: unknown[]) => requestAut
 vi.mock('./hostVerifier', () => ({ makeHostVerifier: () => () => undefined }))
 vi.mock('../vault/locked', () => ({ requireUnlocked: () => undefined }))
 vi.mock('../vault/Vault', () => ({ vault: { getSecret: () => undefined } }))
-vi.mock('../inventory/InventoryStore', () => ({ inventoryStore: { allGroups: () => [] } }))
-vi.mock('../gitFolders/GitFolderStore', () => ({ gitFolderStore: { allGroups: () => [] } }))
+vi.mock('../inventory/InventoryStore', () => ({
+  inventoryStore: { allGroups: () => [], findSession: () => undefined }
+}))
+vi.mock('../gitFolders/GitFolderStore', () => ({
+  gitFolderStore: { allGroups: () => [], findSession: () => undefined }
+}))
 
 function host(id: string, extra: Partial<SessionProfile> = {}): SessionProfile {
   return {
@@ -79,8 +85,13 @@ function host(id: string, extra: Partial<SessionProfile> = {}): SessionProfile {
 
 const bastion = host('bastion')
 const target = host('target', { jumpHostId: 'bastion' })
+const orphan = host('orphan', { jumpHostId: 'a-bastion-that-was-deleted' })
+const loopA = host('loopA', { jumpHostId: 'loopB' })
+const loopB = host('loopB', { jumpHostId: 'loopA' })
 vi.mock('../store/SessionStore', () => ({
-  sessionStore: { getAll: () => ({ sessions: [bastion, target], groups: [] }) }
+  sessionStore: {
+    getAll: () => ({ sessions: [bastion, target, orphan, loopA, loopB], groups: [] })
+  }
 }))
 
 const { sshManager, ConnectCancelledError } = await import('./SSHManager')
@@ -93,6 +104,7 @@ const win = {
 beforeEach(() => {
   clients.length = 0
   FakeClient.signsIn = true
+  FakeClient.channelsAnswer = true
   requestAuth.mockReset()
 })
 
@@ -138,5 +150,50 @@ describe('a connect that does not finish', () => {
 
     await expect(connecting).rejects.toBeInstanceOf(ConnectCancelledError)
     expect(clients[0].ended).toBe(true)
+  })
+})
+
+/**
+ * Past the sign-in, where a cancel used to change a flag and nothing more: the
+ * far end accepts the login and then never answers the request for a channel.
+ */
+describe('a connect waiting on a silent host', () => {
+  it('gives up on a jump host that never opens the way through', async () => {
+    requestAuth.mockResolvedValue(['a password'])
+    FakeClient.channelsAnswer = false
+
+    const connecting = sshManager.connectProfile(win, target, 80, 24, undefined, 'silent-forward')
+    await vi.waitFor(() => expect(clients).toHaveLength(1))
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    sshManager.cancelConnect('silent-forward')
+
+    await expect(connecting).rejects.toBeInstanceOf(ConnectCancelledError)
+    expect(clients.every((c) => c.ended)).toBe(true)
+  })
+
+  it('gives up on a host that never opens the shell', async () => {
+    requestAuth.mockResolvedValue(['a password'])
+    FakeClient.channelsAnswer = false
+
+    const connecting = sshManager.connectProfile(win, bastion, 80, 24, undefined, 'silent-shell')
+    await vi.waitFor(() => expect(clients).toHaveLength(1))
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    sshManager.cancelConnect('silent-shell')
+
+    await expect(connecting).rejects.toBeInstanceOf(ConnectCancelledError)
+    expect(clients[0].ended).toBe(true)
+  })
+})
+
+describe('a route through jump hosts', () => {
+  /** Going on without the bastion is connecting directly — not what was set. */
+  it('refuses a jump host that no longer exists, before opening anything', async () => {
+    await expect(sshManager.connectProfile(win, orphan, 80, 24)).rejects.toThrow(/no longer exists/)
+    expect(clients).toEqual([])
+  })
+
+  it('refuses jump hosts that lead back to themselves', async () => {
+    await expect(sshManager.connectProfile(win, loopA, 80, 24)).rejects.toThrow(/lead back/)
+    expect(clients).toEqual([])
   })
 })

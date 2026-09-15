@@ -14,8 +14,17 @@ import type { PortForwardRule } from '../../shared/types'
 
 interface ActiveForward {
   rule: PortForwardRule
+  /**
+   * Opening until the listener is up. A forward is registered the moment it is
+   * asked for, not once it is open: anything that stops it in between — Stop,
+   * a disconnect, a reload — has to be able to find it.
+   */
+  state: 'opening' | 'active'
+  stopped: boolean
   server?: Server
   cleanupRemote?: () => void
+  /** Connections carried by this forward, closed with it. */
+  sockets: Set<Socket>
 }
 
 function targetClient(connectionId: string): Client {
@@ -125,14 +134,60 @@ function handleSocks5(socket: Socket, client: Client): void {
 
 class PortForwardManager {
   private active = new Map<string, ActiveForward>()
+  /** A start still in progress, shared by anyone who asks for the same rule. */
+  private opening = new Map<string, Promise<void>>()
 
-  async start(connectionId: string, rule: PortForwardRule): Promise<void> {
-    const client = targetClient(connectionId)
+  /**
+   * Opens a forward, unless it is stopped first.
+   *
+   * A forward used to be recorded only once its listener was up. Stopping it, or
+   * losing the connection, before that point found nothing to stop — and the
+   * listener then came up anyway, bound to its port with no connection behind
+   * it and listed as active. Now it is recorded as opening straight away, and a
+   * listener that finishes opening after it was stopped is closed on arrival.
+   */
+  start(connectionId: string, rule: PortForwardRule): Promise<void> {
     const key = `${connectionId}:${rule.id}`
-    if (this.active.has(key)) return
+    const inProgress = this.opening.get(key)
+    if (inProgress) return inProgress
+    if (this.active.has(key)) return Promise.resolve()
 
-    if (rule.type === 'local') {
+    const client = targetClient(connectionId)
+    const entry: ActiveForward = { rule, state: 'opening', stopped: false, sockets: new Set() }
+    this.active.set(key, entry)
+    const opening = this.open(client, entry)
+      .then(() => {
+        if (entry.stopped) throw new Error(`The forward ${rule.id} was stopped before it opened`)
+        entry.state = 'active'
+      })
+      .catch((err) => {
+        this.release(entry)
+        if (this.active.get(key) === entry) this.active.delete(key)
+        throw err
+      })
+      .finally(() => this.opening.delete(key))
+    this.opening.set(key, opening)
+    return opening
+  }
+
+  private track(entry: ActiveForward, socket: Socket): void {
+    if (entry.stopped) {
+      socket.destroy()
+      return
+    }
+    entry.sockets.add(socket)
+    socket.on('close', () => entry.sockets.delete(socket))
+  }
+
+  private async open(client: Client, entry: ActiveForward): Promise<void> {
+    const { rule } = entry
+    if (rule.type === 'local' || rule.type === 'dynamic') {
       const server = net.createServer((socket) => {
+        this.track(entry, socket)
+        if (rule.type === 'dynamic') {
+          handleSocks5(socket, client)
+          return
+        }
         client.forwardOut(
           rule.srcHost,
           rule.srcPort,
@@ -147,21 +202,11 @@ class PortForwardManager {
           }
         )
       })
+      entry.server = server
       await new Promise<void>((resolve, reject) => {
         server.once('error', reject)
         server.listen(rule.srcPort, rule.srcHost, () => resolve())
       })
-      this.active.set(key, { rule, server })
-      return
-    }
-
-    if (rule.type === 'dynamic') {
-      const server = net.createServer((socket) => handleSocks5(socket, client))
-      await new Promise<void>((resolve, reject) => {
-        server.once('error', reject)
-        server.listen(rule.srcPort, rule.srcHost, () => resolve())
-      })
-      this.active.set(key, { rule, server })
       return
     }
 
@@ -187,6 +232,7 @@ class PortForwardManager {
       if (info.destPort !== rule.srcPort) return
 
       const socket = net.connect(rule.dstPort ?? 0, rule.dstHost ?? '127.0.0.1')
+      this.track(entry, socket)
       socket.on('error', () => reject())
       socket.on('connect', () => {
         const stream = accept()
@@ -194,37 +240,48 @@ class PortForwardManager {
       })
     }
     client.on('tcp connection', onTcpConnection)
-    this.active.set(key, {
-      rule,
-      cleanupRemote: () => {
-        client.unforwardIn(rule.srcHost, rule.srcPort, () => undefined)
-        client.removeListener('tcp connection', onTcpConnection)
-      }
-    })
+    entry.cleanupRemote = () => {
+      client.unforwardIn(rule.srcHost, rule.srcPort, () => undefined)
+      client.removeListener('tcp connection', onTcpConnection)
+    }
+    // Stopped while the server was still agreeing: undo it now it has.
+    if (entry.stopped) this.release(entry)
+  }
+
+  /**
+   * Closes whatever a forward holds. Stop means stop: the connections it is
+   * carrying close too, rather than living on through a forward the list says
+   * is gone.
+   */
+  private release(entry: ActiveForward): void {
+    entry.server?.close()
+    entry.cleanupRemote?.()
+    entry.cleanupRemote = undefined
+    for (const socket of entry.sockets) socket.destroy()
+    entry.sockets.clear()
   }
 
   stop(connectionId: string, ruleId: string): void {
     const key = `${connectionId}:${ruleId}`
     const fwd = this.active.get(key)
     if (!fwd) return
-    fwd.server?.close()
-    fwd.cleanupRemote?.()
+    fwd.stopped = true
+    this.release(fwd)
     this.active.delete(key)
   }
 
   stopAllForConnection(connectionId: string): void {
-    for (const key of this.active.keys()) {
+    for (const key of [...this.active.keys()]) {
       if (key.startsWith(`${connectionId}:`)) {
-        const [, ruleId] = key.split(':')
-        this.stop(connectionId, ruleId)
+        this.stop(connectionId, key.slice(connectionId.length + 1))
       }
     }
   }
 
   listActive(connectionId: string): string[] {
-    return [...this.active.keys()]
-      .filter((k) => k.startsWith(`${connectionId}:`))
-      .map((k) => k.split(':')[1])
+    return [...this.active.entries()]
+      .filter(([k, fwd]) => k.startsWith(`${connectionId}:`) && fwd.state === 'active')
+      .map(([k]) => k.slice(connectionId.length + 1))
   }
 }
 

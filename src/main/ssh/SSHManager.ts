@@ -17,8 +17,7 @@ import { applyCredential } from '../../shared/credentials'
 import { IPC } from '../../shared/ipc-channels'
 import { OSC7_SHELL_SETUP, scanOsc7 } from '../../shared/osc7'
 import { EchoSuppressor } from './echoSuppressor'
-import { sessionStore } from '../store/SessionStore'
-import { everyGroup } from '../store/hosts'
+import { everyGroup, findProfile } from '../store/hosts'
 import { vault } from '../vault/Vault'
 import { makeHostVerifier } from './hostVerifier'
 import { requireUnlocked } from '../vault/locked'
@@ -391,6 +390,73 @@ function signIn(
   })
 }
 
+/**
+ * Waits for one callback from the far end — a forwarded channel, a shell —
+ * and stops waiting when the connect is given up on or the far end takes too
+ * long.
+ *
+ * Signing in could be cancelled, and everything after it could not. A bastion
+ * that accepted the login and then never answered the request for a channel
+ * held the connect open with nothing to end it: cancelling changed a flag
+ * nobody was reading, and closing the pane or reloading the window left an
+ * authenticated session behind. An answer that arrives after the wait is over
+ * is not dropped on the floor either: whatever it opened is closed.
+ */
+export function answerOrGiveUp<T>(
+  what: string,
+  ask: (answer: (err: Error | undefined | null, value?: T) => void) => void,
+  signal: AbortSignal | undefined,
+  timeoutMs: number,
+  discard: (late: T) => void
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    let over = false
+    const finish = (fn: () => void): void => {
+      if (over) return
+      over = true
+      clearTimeout(timer)
+      signal?.removeEventListener('abort', onAbort)
+      fn()
+    }
+    const onAbort = (): void => finish(() => reject(new ConnectCancelledError()))
+    const timer = setTimeout(
+      () =>
+        finish(() =>
+          reject(new Error(`${what} did not answer in ${Math.round(timeoutMs / 1000)} s`))
+        ),
+      timeoutMs
+    )
+    timer.unref?.()
+    if (signal?.aborted) {
+      onAbort()
+      return
+    }
+    signal?.addEventListener('abort', onAbort, { once: true })
+    ask((err, value) => {
+      if (over) {
+        if (!err && value !== undefined) discard(value)
+        return
+      }
+      finish(() => (err ? reject(err) : resolve(value as T)))
+    })
+  })
+}
+
+/** The most a background command may print before it is cut off. */
+const EXEC_OUTPUT_LIMIT = 1024 * 1024
+
+/** How long a channel request may go unanswered once signed in. */
+const CHANNEL_TIMEOUT_MS = 30_000
+
+/**
+ * How far a session log may fall behind the disk before logging stops.
+ *
+ * A write to a slow or network disk queues in memory, and that queue had no
+ * bound: `cat` of a large file into a logged session grew it for as long as
+ * the output lasted, whatever the terminal's own flow control was doing.
+ */
+const LOG_BACKLOG_LIMIT = 8 * 1024 * 1024
+
 /** Shared connect options: keepalive stops idle sessions dying behind NAT. */
 const COMMON_CONNECT: Partial<ConnectConfig> = {
   // Generous: the handshake pauses while the user reads a host-key prompt or
@@ -417,13 +483,27 @@ async function connectChain(
   win: BrowserWindow,
   profile: SessionProfile,
   credential?: Credential,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  /** Told of each client the moment it exists, so a cancel can close it at once. */
+  track: (client: Client) => void = () => undefined
 ): Promise<{ target: Client; chain: Client[] }> {
   // Each hop carries its own inherited settings, resolved once up front.
   const hops: Array<{ profile: SessionProfile; auth: ResolvedAuth }> = []
   let cursor: SessionProfile | undefined = profile
   const seen = new Set<string>()
-  while (cursor && !seen.has(cursor.id)) {
+  while (cursor) {
+    /*
+     * The whole route is settled before a single socket opens. A jump host
+     * that had been deleted used to end the walk quietly, and the connect went
+     * ahead without it — straight to the destination, bypassing the bastion it
+     * was meant to go through. A loop of jump hosts ended it just as quietly.
+     * Either is now refused with the route that could not be followed.
+     */
+    if (seen.has(cursor.id)) {
+      throw new Error(
+        `The jump hosts of ${profile.name} lead back to ${cursor.name}, so there is no route to follow.`
+      )
+    }
     seen.add(cursor.id)
     /*
      * The first turn of this loop is the destination itself; every later one is
@@ -440,9 +520,14 @@ async function connectChain(
         ? applyCredential(effectiveAuth(cursor), credential)
         : effectiveAuth(cursor)
     hops.unshift({ profile: cursor, auth })
-    cursor = auth.jumpHostId
-      ? sessionStore.getAll().sessions.find((s) => s.id === auth.jumpHostId)
-      : undefined
+    if (!auth.jumpHostId) break
+    const jump = findProfile(auth.jumpHostId)
+    if (!jump) {
+      throw new Error(
+        `${cursor.name} is set to connect through a jump host that no longer exists. Choose another one, or none, before connecting.`
+      )
+    }
+    cursor = jump
   }
 
   const chain: Client[] = []
@@ -464,6 +549,7 @@ async function connectChain(
       const { profile: hop, auth } = hops[i]
       const client = new Client()
       chain.push(client)
+      track(client)
       const authConfig = await buildAuthConfig(win, hop, auth, signal)
       if (signal?.aborted) throw new ConnectCancelledError()
       wireKeyboardInteractive(win, client, `${auth.username}@${hop.host}`, signal)
@@ -491,18 +577,20 @@ async function connectChain(
       const isLast = i === hops.length - 1
       if (!isLast) {
         const nextHop = hops[i + 1]
-        sock = await new Promise<Readable>((resolve, reject) => {
-          client.forwardOut(
-            '127.0.0.1',
-            0,
-            nextHop.profile.host,
-            nextHop.auth.port,
-            (err, stream) => {
-              if (err) reject(err)
-              else resolve(stream as unknown as Readable)
-            }
-          )
-        })
+        sock = await answerOrGiveUp<Readable>(
+          `${hop.name}, asked for a way through to ${nextHop.profile.name},`,
+          (answer) =>
+            client.forwardOut(
+              '127.0.0.1',
+              0,
+              nextHop.profile.host,
+              nextHop.auth.port,
+              (err, stream) => answer(err, stream as unknown as Readable)
+            ),
+          signal,
+          CHANNEL_TIMEOUT_MS,
+          (late) => (late as unknown as { destroy: () => void }).destroy()
+        )
       }
     }
     if (signal?.aborted) throw new ConnectCancelledError()
@@ -640,10 +728,9 @@ class SSHManager {
     attemptId?: string
   ): Promise<string> {
     requireUnlocked()
-    return this.attempt(attemptId, win, async (connectionId, signal, opened) => {
-      const { target, chain } = await connectChain(win, profile, credential, signal)
-      opened(chain)
-      await this.openShell(win, connectionId, target, chain, cols, rows, profile)
+    return this.attempt(attemptId, win, async (connectionId, signal, track) => {
+      const { target, chain } = await connectChain(win, profile, credential, signal, track)
+      await this.openShell(win, connectionId, target, chain, cols, rows, signal, profile)
     })
   }
 
@@ -656,9 +743,9 @@ class SSHManager {
     attemptId?: string
   ): Promise<string> {
     requireUnlocked()
-    return this.attempt(attemptId, win, async (connectionId, signal, opened) => {
+    return this.attempt(attemptId, win, async (connectionId, signal, track) => {
       const client = new Client()
-      opened([client])
+      track(client)
       const auth: Pick<ConnectConfig, 'password' | 'privateKey' | 'passphrase' | 'agent'> =
         params.authMethod === 'password'
           ? { password: params.password }
@@ -684,7 +771,7 @@ class SSHManager {
         (err) => err
       )
 
-      await this.openShell(win, connectionId, client, [client], cols, rows)
+      await this.openShell(win, connectionId, client, [client], cols, rows, signal)
     })
   }
 
@@ -724,16 +811,16 @@ class SSHManager {
     run: (
       connectionId: string,
       signal: AbortSignal,
-      opened: (clients: Client[]) => void
+      track: (client: Client) => void
     ) => Promise<void>
   ): Promise<string> {
     const connectionId = randomUUID()
     const controller = new AbortController()
     if (attemptId) this.attempts.set(attemptId, controller)
-    let clients: Client[] = []
+    const clients: Client[] = []
     try {
-      await run(connectionId, controller.signal, (opened) => {
-        clients = opened
+      await run(connectionId, controller.signal, (client) => {
+        clients.push(client)
       })
       if (controller.signal.aborted) throw new ConnectCancelledError()
       return connectionId
@@ -754,109 +841,142 @@ class SSHManager {
     chain: Client[],
     cols: number,
     rows: number,
+    signal?: AbortSignal,
     profile?: SessionProfile
   ): Promise<void> {
-    return new Promise((resolve, reject) => {
-      target.shell({ term: 'xterm-256color', cols, rows }, (err, stream) => {
-        if (err) {
-          reject(err)
-          return
-        }
+    return answerOrGiveUp<ClientChannel>(
+      'The host, asked for a shell,',
+      (answer) => target.shell({ term: 'xterm-256color', cols, rows }, answer),
+      signal,
+      CHANNEL_TIMEOUT_MS,
+      (late) => late.close()
+    ).then((stream) => {
+      const auth = profile ? effectiveAuth(profile) : undefined
 
-        let logStream: WriteStream | undefined
-        if (profile?.logToFile) {
-          const dir = join(app.getPath('userData'), 'logs')
-          if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-          const filename = `${profile.name.replace(/[^a-z0-9-_]+/gi, '_')}_${Date.now()}.log`
-          logStream = createWriteStream(join(dir, filename), { flags: 'a' })
-        }
+      // The saved setting is only the starting point; the SFTP panel can turn
+      // it on and off afterwards. Scanning is skipped entirely while it is off.
+      const connection: LiveConnection = {
+        fileAccess: auth?.fileAccess,
+        id: connectionId,
+        clients: chain,
+        stream,
+        followCwd: auth?.followTerminalCwd === true,
+        outbox: [],
+        outboxBytes: 0,
+        inFlight: 0,
+        paused: false,
+        ready: false,
+        pending: []
+      }
+      /*
+       * A window that never subscribes must not silence a session for good.
+       * The renderer does it within a round trip of learning the id, so this
+       * is only ever reached by one that crashed, was replaced mid-connect,
+       * or belongs to a build that predates the handshake.
+       */
+      connection.readyTimer = setTimeout(() => this.markReady(win, connectionId), READY_GRACE_MS)
+      connection.readyTimer.unref?.()
+      this.connections.set(connectionId, connection)
+      if (profile?.logToFile) this.startLog(win, connection, profile)
 
-        const auth = profile ? effectiveAuth(profile) : undefined
-        // The saved setting is only the starting point; the SFTP panel can turn
-        // it on and off afterwards. Scanning is skipped entirely while it is off.
-        const connection: LiveConnection = {
-          fileAccess: auth?.fileAccess,
-          id: connectionId,
-          clients: chain,
-          stream,
-          logStream,
-          followCwd: auth?.followTerminalCwd === true,
-          outbox: [],
-          outboxBytes: 0,
-          inFlight: 0,
-          paused: false,
-          ready: false,
-          pending: []
-        }
-        /*
-         * A window that never subscribes must not silence a session for good.
-         * The renderer does it within a round trip of learning the id, so this
-         * is only ever reached by one that crashed, was replaced mid-connect,
-         * or belongs to a build that predates the handshake.
-         */
-        connection.readyTimer = setTimeout(() => this.markReady(win, connectionId), READY_GRACE_MS)
-        connection.readyTimer.unref?.()
-        this.connections.set(connectionId, connection)
+      let pending = ''
+      let lastCwd: string | undefined
 
-        let pending = ''
-        let lastCwd: string | undefined
+      stream.on('data', (raw: Buffer) => {
+        // Still mid-login, or mid-anything: the setup line can wait.
+        connection.setupWait?.restart()
+        // The setup line is ours, not the user's, so its echo is taken back
+        // out before anyone sees it. Scanning still runs on the full stream:
+        // the sequence we are looking for rides in that same echo.
+        const suppressor = connection.echoSuppressor
+        const data = suppressor && !suppressor.done ? suppressor.push(raw) : raw
 
-        stream.on('data', (raw: Buffer) => {
-          // Still mid-login, or mid-anything: the setup line can wait.
-          connection.setupWait?.restart()
-          // The setup line is ours, not the user's, so its echo is taken back
-          // out before anyone sees it. Scanning still runs on the full stream:
-          // the sequence we are looking for rides in that same echo.
-          const suppressor = connection.echoSuppressor
-          const data = suppressor && !suppressor.done ? suppressor.push(raw) : raw
-
-          if (data.length > 0) {
-            this.queueOutput(win, connection, data)
-            logStream?.write(data)
-          }
-          if (!connection.followCwd) return
-          const scan = scanOsc7(pending + raw.toString('utf8'))
-          pending = scan.rest
-          if (scan.path && scan.path !== lastCwd) {
-            lastCwd = scan.path
-            this.send(win, connectionId, IPC.sshCwd, scan.path)
-          }
-        })
-        stream.stderr.on('data', (data: Buffer) => {
+        if (data.length > 0) {
           this.queueOutput(win, connection, data)
-        })
-        stream.on('close', () => {
-          // Whatever is still held back is the last thing the host said — an
-          // error message, usually. Flushed before the status, so a connection
-          // that ends inside a flush interval does not take it with it.
-          this.flushOutput(win, connection)
-          this.send(win, connectionId, IPC.sshStatus, 'closed')
-          this.teardown(connectionId)
-        })
-        target.on('error', (e) => {
-          this.send(win, connectionId, IPC.sshError, e.message)
-        })
-
-        this.send(win, connectionId, IPC.sshStatus, 'connected')
-
-        // Typed in rather than run on a separate exec channel, so the command
-        // and its output show up in the terminal, `cd` sticks, and `sudo -i`
-        // hands over the session the user is looking at. A reconnect repeats it.
-        // The shell only reports its directory if it has been told to. Sent as
-        // one line so the echo is a line rather than a screenful, and appended
-        // to any PROMPT_COMMAND already there rather than replacing it.
-        if (connection.followCwd) this.sendSetupQuietly(connection)
-
-        if (auth) {
-          const command = auth.onConnectCommand?.trim()
-          if (command) {
-            for (const line of command.split('\n')) stream.write(`${line}\n`)
-          }
+          this.writeLog(win, connection, data)
         }
-
-        resolve()
+        if (!connection.followCwd) return
+        const scan = scanOsc7(pending + raw.toString('utf8'))
+        pending = scan.rest
+        if (scan.path && scan.path !== lastCwd) {
+          lastCwd = scan.path
+          this.send(win, connectionId, IPC.sshCwd, scan.path)
+        }
       })
+      stream.stderr.on('data', (data: Buffer) => {
+        this.queueOutput(win, connection, data)
+      })
+      stream.on('close', () => {
+        // Whatever is still held back is the last thing the host said — an
+        // error message, usually. Flushed before the status, so a connection
+        // that ends inside a flush interval does not take it with it.
+        this.flushOutput(win, connection)
+        this.send(win, connectionId, IPC.sshStatus, 'closed')
+        this.teardown(connectionId)
+      })
+      target.on('error', (e) => {
+        this.send(win, connectionId, IPC.sshError, e.message)
+      })
+
+      this.send(win, connectionId, IPC.sshStatus, 'connected')
+
+      // Typed in rather than run on a separate exec channel, so the command
+      // and its output show up in the terminal, `cd` sticks, and `sudo -i`
+      // hands over the session the user is looking at. A reconnect repeats it.
+      // The shell only reports its directory if it has been told to. Sent as
+      // one line so the echo is a line rather than a screenful, and appended
+      // to any PROMPT_COMMAND already there rather than replacing it.
+      if (connection.followCwd) this.sendSetupQuietly(connection)
+
+      if (auth) {
+        const command = auth.onConnectCommand?.trim()
+        if (command) {
+          for (const line of command.split('\n')) stream.write(`${line}\n`)
+        }
+      }
     })
+  }
+
+  /**
+   * Opens a session's log file, or says why it could not and carries on without.
+   *
+   * Every way a log can fail — a folder that cannot be made, a file that cannot
+   * be opened, a disk that fills — used to surface as an error event nobody
+   * listened for, which in the main process is an uncaught exception. A log is
+   * worth less than the session it records, so a failing one stops and says so.
+   */
+  private startLog(win: BrowserWindow, conn: LiveConnection, profile: SessionProfile): void {
+    try {
+      const dir = join(app.getPath('userData'), 'logs')
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+      const filename = `${profile.name.replace(/[^a-z0-9-_]+/gi, '_')}_${Date.now()}.log`
+      const log = createWriteStream(join(dir, filename), { flags: 'a' })
+      log.on('error', (err) => this.stopLog(win, conn, err.message))
+      conn.logStream = log
+    } catch (err) {
+      this.stopLog(win, conn, (err as Error).message)
+    }
+  }
+
+  private writeLog(win: BrowserWindow, conn: LiveConnection, data: Buffer): void {
+    const log = conn.logStream
+    if (!log) return
+    if (log.writableLength > LOG_BACKLOG_LIMIT) {
+      this.stopLog(win, conn, 'the disk is not keeping up with the output')
+      return
+    }
+    log.write(data)
+  }
+
+  private stopLog(win: BrowserWindow, conn: LiveConnection, why: string): void {
+    const log = conn.logStream
+    conn.logStream = undefined
+    if (log) {
+      log.removeAllListeners('error')
+      log.on('error', () => undefined)
+      log.destroy()
+    }
+    this.send(win, conn.id, IPC.sshError, `Logging to a file stopped: ${why}`)
   }
 
   /**
@@ -954,34 +1074,54 @@ class SSHManager {
     const target = chain[chain.length - 1]
 
     return new Promise((resolve, reject) => {
+      let out = ''
+      let settled = false
+      let channel: ClientChannel | undefined
+      const finish = (fn: () => void): void => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        fn()
+      }
+      const close = (stream: ClientChannel | undefined): void => {
+        try {
+          stream?.close()
+        } catch {
+          /* already gone */
+        }
+      }
+      /*
+       * Started before the channel is asked for, not once it opens. A host that
+       * never answers the request for a channel left the poll pending for ever,
+       * because the timer that was meant to catch a silent host only began
+       * inside the answer it never gave.
+       */
+      const timer = setTimeout(() => {
+        finish(() => {
+          close(channel)
+          reject(new Error('Timed out'))
+        })
+      }, timeoutMs)
+
       target.exec(command, (err, stream) => {
-        if (err) {
-          reject(err)
+        if (settled) {
+          close(stream)
           return
         }
-        let out = ''
-        let settled = false
-        const finish = (fn: () => void): void => {
-          if (settled) return
-          settled = true
-          clearTimeout(timer)
-          fn()
+        if (err) {
+          finish(() => reject(err))
+          return
         }
-        // A host that accepts the channel and then says nothing must not leave
-        // a poll pending for ever.
-        const timer = setTimeout(() => {
-          finish(() => {
-            try {
-              stream.close()
-            } catch {
-              /* already gone */
-            }
-            reject(new Error('Timed out'))
-          })
-        }, timeoutMs)
-
+        channel = stream
         stream.on('data', (chunk: Buffer) => {
           out += chunk.toString('utf8')
+          // A probe that prints without end is not a probe.
+          if (out.length > EXEC_OUTPUT_LIMIT) {
+            finish(() => {
+              close(stream)
+              reject(new Error('The command printed more than a probe should'))
+            })
+          }
         })
         stream.stderr.resume()
         stream.on('close', () => finish(() => resolve(out)))

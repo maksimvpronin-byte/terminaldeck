@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { mkdtempSync } from 'fs'
+import { mkdtempSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 
@@ -376,5 +376,52 @@ describe('when a connection ends on its own', () => {
 
     expect(told).toEqual(['c-exit'])
     expect(innards().connections.has('c-exit')).toBe(false)
+  })
+})
+
+/**
+ * A session log that cannot be written. Every failure — a folder that cannot
+ * be made, a file that cannot be opened, a full disk — used to be an error
+ * event nobody listened for: an uncaught exception in the main process.
+ */
+describe('a session log that fails', () => {
+  interface LogInnards {
+    startLog: (win: unknown, conn: unknown, profile: unknown) => void
+    writeLog: (win: unknown, conn: unknown, data: Buffer) => void
+  }
+  const logs = (): LogInnards => sshManager as unknown as LogInnards
+
+  it('stops logging and says so when the log folder cannot be made', () => {
+    vi.useRealTimers()
+    const sent: Sent[] = []
+    const win = stubWindow(sent)
+    const { conn } = stubConnection('c-log')
+    attach('c-log', conn)
+    const realUserData = userData
+    // A file where the logs folder would go: making the folder fails.
+    userData = join(realUserData, 'not-a-folder.txt')
+    writeFileSync(userData, 'x')
+
+    expect(() => logs().startLog(win, conn, { name: 'web' })).not.toThrow()
+    expect(conn.logStream).toBeUndefined()
+    expect(sent.map((s) => s.payload)).toContainEqual(
+      expect.stringMatching(/Logging to a file stopped/)
+    )
+    userData = realUserData
+  })
+
+  it('stops logging when the open file reports an error later', async () => {
+    vi.useRealTimers()
+    const sent: Sent[] = []
+    const win = stubWindow(sent)
+    const { conn } = stubConnection('c-log-2')
+    attach('c-log-2', conn)
+
+    logs().startLog(win, conn, { name: 'web' })
+    const log = conn.logStream as NodeJS.EventEmitter
+    log.emit('error', new Error('ENOSPC: no space left on device'))
+
+    expect(conn.logStream).toBeUndefined()
+    expect(sent.map((s) => s.payload)).toContainEqual(expect.stringMatching(/ENOSPC/))
   })
 })

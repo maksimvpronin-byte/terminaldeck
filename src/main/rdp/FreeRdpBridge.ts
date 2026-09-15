@@ -99,6 +99,9 @@ interface Session {
  */
 const CLIPBOARD_POLL_MS = 250
 
+/** How long a desktop client has to exit after being told to stop. */
+const STOP_GRACE_MS = 5000
+
 /**
  * A line in the terminal running the app, on the same switch the rest of the
  * desktop side uses. Off by default: a session logs several lines per frame at
@@ -179,6 +182,19 @@ class FreeRdpBridge {
         this.say(session, id, { e: 'failed', detail: `the client's output made no sense: ${why}` })
     )
     child.stdout?.on('data', (chunk: Buffer) => reader.push(chunk))
+
+    /*
+     * The client's input can fail on its own — it exited, crashed, or closed the
+     * pipe — and a write already under way then reports EPIPE as an event on the
+     * pipe, not as an exception at the call. With no listener that event is an
+     * uncaught exception, and it took the whole application down with the one
+     * desktop. The session is ended instead; its exit says the rest.
+     */
+    child.stdin?.on('error', (err: Error) => {
+      trace(`${id} input pipe failed: ${err.message}`)
+      session.stopping = true
+      if (child.exitCode === null) child.kill()
+    })
 
     /**
      * The client's own log, which is where the reason for a failure lives.
@@ -285,6 +301,17 @@ class FreeRdpBridge {
     // Closing the pipe is the backstop: the client exits on end-of-input
     // whether or not the message arrived.
     session.child.stdin?.end()
+    /*
+     * And this is the backstop for the backstop. A client stuck in a call that
+     * never returns reads neither the message nor the end of its input, and the
+     * process stayed behind after its pane had gone. Given a few seconds to
+     * finish, it is then ended.
+     */
+    const kill = setTimeout(() => {
+      if (session.child.exitCode === null) session.child.kill()
+    }, STOP_GRACE_MS)
+    kill.unref?.()
+    session.child.once?.('exit', () => clearTimeout(kill))
   }
 
   stopAll(): void {

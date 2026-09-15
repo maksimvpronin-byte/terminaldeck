@@ -90,6 +90,22 @@ the other produces a version nobody can install, which is how 0.1.10 through
   now stays until the next transfer or until it is clicked away, and a conflict
   question left open when the panel moves to another connection is dropped
   rather than answered against the new one.
+- **Closing a pane could leave a signed-in jump host behind** when the host went
+  quiet after the login. Asking a jump host for the way through and asking for
+  the shell now stop when the connect is given up on, or after 30 seconds, and
+  every client is closed from the moment it exists.
+- **A deleted jump host was quietly skipped**, so the connection went straight
+  to the destination instead of through the bastion. A missing jump host, or
+  jump hosts that lead back to each other, now stop the connection before
+  anything opens.
+- **A tunnel stopped while it was still opening came up anyway**, listening
+  with no connection behind it. Stopping a tunnel also closes the connections it
+  carries.
+- **A session log that could not be written, or a desktop client that closed
+  its input, could crash the application.** A failing log stops with a message,
+  also when the disk falls too far behind; a failing desktop pipe ends that
+  desktop. A desktop client that does not exit within five seconds of being
+  stopped is ended.
 
 ### Changed
 
