@@ -1,0 +1,17 @@
+# Line endings: LF in the repository and LF in every working copy.
+#
+# Prettier writes LF, and `format:check` compares against LF. With Git for
+# Windows' default `core.autocrlf=true`, every file came out of a checkout with
+# CRLF — so on Windows the check reported every file in the tree, and the only
+# changes that mattered were lost among them. Stated here, the rule no longer
+# depends on how each machine's Git happens to be configured.
+#
+# Nothing in the repository changes: what is committed was already LF, because
+# autocrlf converts on the way in. An existing working copy keeps its CRLF files
+# until they are checked out again (`git add --renormalize .` followed by a
+# fresh checkout of anything unmodified).
+* text=auto eol=lf
+
+*.png binary
+*.ico binary
+*.icns binary

@@ -76,6 +76,9 @@ the other produces a version nobody can install, which is how 0.1.10 through
 
 - The main process accepts requests only from the application's own page, and
   checks a transfer plan's shape before running it.
+- Checks now also run the tests on Windows and macOS.
+- Line endings are LF in every working copy, set in `.gitattributes`, so
+  `format:check` means the same on Windows.
 
 ## 0.18.0
 

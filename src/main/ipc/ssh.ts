@@ -1,8 +1,6 @@
 import { ipcMain } from 'electron'
 import { IPC } from '../../shared/ipc-channels'
 import type { PortForwardRule, QuickConnectParams } from '../../shared/types'
-import { gitFolderStore } from '../gitFolders/GitFolderStore'
-import { inventoryStore } from '../inventory/InventoryStore'
 import { portForwardManager } from '../ssh/PortForwardManager'
 import { remoteEdit } from '../ssh/RemoteEdit'
 import { remoteMonitor } from '../ssh/RemoteMonitor'
@@ -10,7 +8,7 @@ import { sftpManager } from '../ssh/SFTPManager'
 import { sshManager } from '../ssh/SSHManager'
 import { readSshConfigHosts } from '../ssh/sshConfig'
 import { credentialStore } from '../store/CredentialStore'
-import { sessionStore } from '../store/SessionStore'
+import { findProfile } from '../store/hosts'
 import { focusedWin } from './win'
 
 /** Shell sessions, the tunnels beside them, monitoring, and `~/.ssh/config`. */
@@ -42,10 +40,7 @@ export function registerSshHandlers(): void {
       // Hosts from a repository live in their own store and aren't saved as
       // sessions — whether they came from an Inventory source or from a folder
       // on the Sessions tab that mirrors one.
-      const profile =
-        sessionStore.getAll().sessions.find((s) => s.id === sessionId) ??
-        inventoryStore.findSession(sessionId) ??
-        gitFolderStore.findSession(sessionId)
+      const profile = findProfile(sessionId)
       if (!profile) throw new Error('Unknown session')
       // An id that names nothing is refused rather than quietly ignored: the
       // account was asked for, and connecting as the host's own instead is a

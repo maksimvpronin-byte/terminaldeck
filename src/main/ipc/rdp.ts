@@ -6,11 +6,9 @@ import { protocolOf } from '../../shared/protocols'
 import { resolveRdp } from '../../shared/rdpResolution'
 import type { ResolvedAuth, RdpView, SessionGroup, SessionProfile } from '../../shared/types'
 import { splitLogin } from '../../shared/rdpLogin'
-import { gitFolderStore } from '../gitFolders/GitFolderStore'
-import { inventoryStore } from '../inventory/InventoryStore'
 import { type DesktopGateway, type DesktopRequest, freeRdpBridge } from '../rdp/FreeRdpBridge'
 import { credentialStore } from '../store/CredentialStore'
-import { sessionStore } from '../store/SessionStore'
+import { everyGroup, findProfile } from '../store/hosts'
 import { vault } from '../vault/Vault'
 import { focusedWin } from './win'
 
@@ -25,19 +23,9 @@ import { focusedWin } from './win'
 function findHost(
   sessionId: string
 ): { profile: SessionProfile; groups: SessionGroup[] } | undefined {
-  const profile =
-    sessionStore.getAll().sessions.find((s) => s.id === sessionId) ??
-    inventoryStore.findSession(sessionId) ??
-    gitFolderStore.findSession(sessionId)
+  const profile = findProfile(sessionId)
   if (!profile) return undefined
-  return {
-    profile,
-    groups: [
-      ...sessionStore.getAll().groups,
-      ...inventoryStore.allGroups(),
-      ...gitFolderStore.allGroups()
-    ]
-  }
+  return { profile, groups: everyGroup() }
 }
 
 /**

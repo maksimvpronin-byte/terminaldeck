@@ -1,12 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from 'react'
-import type { SftpEntry, TransferDecisions, TransferPlan } from '../../../shared/types'
+import type { SftpEntry } from '../../../shared/types'
 import { parentOf, segmentsOf } from '../../../shared/remotePath'
 import { formatChanged, formatPermissions, kindOf } from '../../../shared/permissions'
 import { formatSize } from '../../../shared/fileSize'
 import SftpTree from './SftpTree'
 import SftpProgress from './SftpProgress'
 import { useVirtualRows, FILE_ROW_HEIGHT } from '../hooks/useVirtualRows'
+import { useTransfers } from '../hooks/useTransfers'
 import ModalBackdrop from './ModalBackdrop'
 import ContextMenu, { type MenuItem } from './ContextMenu'
 import TransferConflictDialog from './TransferConflictDialog'
@@ -65,8 +66,6 @@ export default function SftpPanel({
   const [draftPath, setDraftPath] = useState('.')
   const [entries, setEntries] = useState<SftpEntry[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [transferring, setTransferring] = useState(false)
-  const [progressKey, setProgressKey] = useState(0)
   const [dragging, setDragging] = useState(false)
   const [draggedPath, setDraggedPath] = useState<string | null>(null)
   /**
@@ -82,14 +81,17 @@ export default function SftpPanel({
   const [renaming, setRenaming] = useState<{ entry: SftpEntry; value: string } | null>(null)
   const [pendingDelete, setPendingDelete] = useState<SftpEntry[] | null>(null)
   const [newFolder, setNewFolder] = useState<string | null>(null)
-  /** A planned transfer waiting on an answer about what it would overwrite. */
-  const [pendingTransfer, setPendingTransfer] = useState<{
-    plan: TransferPlan
-    /** The host the files come from, when they come from another one. */
-    source?: string
-  } | null>(null)
   /** A file being compared, remote against local. */
   const [comparing, setComparing] = useState<{ remote: string; local: string } | null>(null)
+  const transfers = useTransfers({
+    connectionId,
+    onError: setError,
+    // A download changes nothing this panel lists; the other two change the
+    // directory being looked at.
+    onFinished: (plan) => {
+      if (plan.direction !== 'download') load(pathRef.current)
+    }
+  })
   /**
    * Whether this connection is tracking the shell's directory. The host setting
    * only decides how it starts; from here on it is a property of the live
@@ -360,7 +362,7 @@ export default function SftpPanel({
   useEffect(() => {
     if (!connectionId) return
     if (!visible) return
-    const busy = transferring || renaming !== null || newFolder !== null || menu !== null
+    const busy = transfers.transferring || renaming !== null || newFolder !== null || menu !== null
     if (busy) return
     const id = setInterval(() => refresh(true), 5000)
     return () => clearInterval(id)
@@ -369,7 +371,7 @@ export default function SftpPanel({
     // a new identity every render would restart the five-second clock on every
     // render, which is a poll that never fires.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connectionId, path, visible, transferring, renaming, newFolder, menu])
+  }, [connectionId, path, visible, transfers.transferring, renaming, newFolder, menu])
 
   const wasVisible = useRef(visible)
   useEffect(() => {
@@ -416,58 +418,6 @@ export default function SftpPanel({
     setMenu({ x: e.clientX, y: e.clientY, entries: targets })
   }
 
-  /**
-   * Plans a transfer, asks about anything it would trample, then runs it.
-   * Every batch asks afresh — no answer is remembered between transfers, so a
-   * decision made once in a hurry never governs a later copy.
-   */
-  async function runTransfer(plan: TransferPlan, source?: string): Promise<void> {
-    if (plan.items.length === 0) return
-    if (plan.conflicts.length === 0 && plan.collisions.length === 0) {
-      await execute(plan, {}, source)
-      return
-    }
-    setPendingTransfer({ plan, source })
-  }
-
-  /**
-   * `source` is the host a relayed batch comes from. It leads the call because
-   * `runPlan` reads from the first connection and writes to the second, and for
-   * a relay this panel is the writing end.
-   */
-  async function execute(
-    plan: TransferPlan,
-    decisions: TransferDecisions,
-    source?: string
-  ): Promise<void> {
-    if (!connectionId) return
-    setPendingTransfer(null)
-    setError(null)
-    try {
-      const result = await window.td.sftp.runPlan(
-        source ?? connectionId,
-        plan,
-        decisions,
-        source ? connectionId : undefined
-      )
-      // Something arrived at these after the check and before their turn, and
-      // was not overwritten. Said, because a file that was not copied is a file
-      // somebody will go looking for.
-      if (result?.changed?.length) {
-        setError(
-          t('Left alone, because something appeared there after the check: {paths}', {
-            paths: result.changed.join(', ')
-          })
-        )
-      }
-    } catch (err) {
-      setError((err as Error).message)
-    }
-    setTransferring(false)
-    setProgressKey((key) => key + 1)
-    if (plan.direction !== 'download') load(path)
-  }
-
   async function planAndUpload(localPaths: string[], destination = path): Promise<void> {
     if (!connectionId) return
     setError(null)
@@ -475,7 +425,7 @@ export default function SftpPanel({
       // Sequential on purpose: fastPut on one SFTP channel dislikes concurrent
       // writers, and one dialog per dropped item is clearer than one merged.
       for (const localPath of localPaths.filter(Boolean)) {
-        await runTransfer(await window.td.sftp.planUpload(connectionId, localPath, destination))
+        await transfers.run(await window.td.sftp.planUpload(connectionId, localPath, destination))
       }
     } catch (err) {
       setError((err as Error).message)
@@ -496,7 +446,7 @@ export default function SftpPanel({
       // One plan per dropped item, for the same reason uploads are sequential:
       // a single merged dialog would hide which item each clash belongs to.
       for (const remotePath of payload.paths) {
-        await runTransfer(
+        await transfers.run(
           await window.td.sftp.planRelay(
             payload.connectionId,
             remotePath,
@@ -522,7 +472,7 @@ export default function SftpPanel({
     try {
       // A folder mirrors into a directory; a single file goes to the exact name
       // the save dialog returned, and is checked against that name.
-      await runTransfer(
+      await transfers.run(
         entry.isDirectory
           ? await window.td.sftp.planDownload(
               connectionId,
@@ -984,14 +934,12 @@ export default function SftpPanel({
         </div>
       )}
 
-      {pendingTransfer && (
+      {transfers.pending && (
         <TransferConflictDialog
-          plan={pendingTransfer.plan}
+          plan={transfers.pending.plan}
           onCompare={(remote, local) => setComparing({ remote, local })}
-          onCancel={() => setPendingTransfer(null)}
-          onConfirm={(decisions) =>
-            execute(pendingTransfer.plan, decisions, pendingTransfer.source)
-          }
+          onCancel={transfers.cancel}
+          onConfirm={transfers.confirm}
         />
       )}
 
@@ -1007,9 +955,9 @@ export default function SftpPanel({
       {saved && <div className="sftp-saved">{t('Uploaded {name}', { name: saved })}</div>}
 
       <SftpProgress
-        key={`${connectionId}:${progressKey}`}
+        key={`${connectionId}:${transfers.progressKey}`}
         connectionId={connectionId}
-        onBusy={setTransferring}
+        onBusy={transfers.setTransferring}
       />
 
       <div style={{ padding: 6, borderTop: '1px solid var(--border)' }}>

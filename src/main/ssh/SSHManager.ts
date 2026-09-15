@@ -8,7 +8,6 @@ import type { Readable } from 'stream'
 import { app, BrowserWindow } from 'electron'
 import type {
   Credential,
-  SessionGroup,
   SessionProfile,
   QuickConnectParams,
   ResolvedAuth
@@ -19,8 +18,7 @@ import { IPC } from '../../shared/ipc-channels'
 import { OSC7_SHELL_SETUP, scanOsc7 } from '../../shared/osc7'
 import { EchoSuppressor } from './echoSuppressor'
 import { sessionStore } from '../store/SessionStore'
-import { gitFolderStore } from '../gitFolders/GitFolderStore'
-import { inventoryStore } from '../inventory/InventoryStore'
+import { everyGroup } from '../store/hosts'
 import { vault } from '../vault/Vault'
 import { makeHostVerifier } from './hostVerifier'
 import { requireUnlocked } from '../vault/locked'
@@ -146,18 +144,6 @@ function agentSockForPlatform(): string | undefined {
 function effectiveAuth(profile: SessionProfile): ResolvedAuth {
   const auth = resolveAuthChain(profile, profile.groupId, everyGroup())
   return auth.username ? auth : { ...auth, username: userInfo().username }
-}
-
-/**
- * Every group a host can inherit from — the saved ones, an Inventory source's,
- * and those a Sessions folder mirrors out of git.
- */
-function everyGroup(): SessionGroup[] {
-  return [
-    ...sessionStore.getAll().groups,
-    ...inventoryStore.allGroups(),
-    ...gitFolderStore.allGroups()
-  ]
 }
 
 /**

@@ -67,9 +67,7 @@ jobs:
       - name: Format
         run: npm run format:check
 
-      # One runner, not the release matrix: the tests are pure Node modules with
-      # no platform branches. A three-OS matrix belongs here the day a platform
-      # difference actually bites, not before.
+      # Windows and macOS run these too, in the `platforms` job below.
       - name: Tests
         run: npm test
 
@@ -85,3 +83,35 @@ jobs:
 
       - name: Verify the built inventory worker
         run: npm run verify:performance
+
+  # The tests again, on the two systems the application ships to that this
+  # runner is not. They were once pure Node modules with no platform branches;
+  # they are not any more, and the ones that matter most are Windows-only in
+  # effect — a remote file name that is harmless on Linux and a path out of a
+  # directory on Windows, a junction in a checkout, a line ending. Finding out
+  # at the release tag, on the runner about to publish, is finding out too late.
+  # Type-check and tests only: lint, format and the bundle say the same on every
+  # system, and are already said above.
+  platforms:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm test
