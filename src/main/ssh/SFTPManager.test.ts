@@ -54,6 +54,8 @@ interface Entry {
   dir?: boolean
   mode?: number
   uid?: number
+  /** A symlink, and what it points at. */
+  link?: string
 }
 
 /** Where a partial name put down for `path` would be, by its prefix. */
@@ -73,6 +75,10 @@ function stubSession(
     received?: Record<string, string>
     /** Stops a write partway, the way a dropped link does. */
     failWrite?: boolean
+    /** A login that cannot change a file's owner. */
+    failChown?: boolean
+    /** A server that does not offer posix-rename@openssh.com. */
+    noPosixRename?: boolean
   } = {}
 ): SFTPWrapper {
   const move = (from: string, to: string): void => {
@@ -84,6 +90,10 @@ function stubSession(
     }
   }
   const session = {
+    _extensions: opts.noPosixRename ? {} : { 'posix-rename@openssh.com': '1' },
+    realpath(path: string, cb: (err: Error | null, resolved?: string) => void): void {
+      cb(null, entries[path]?.link ?? path)
+    },
     fastPut(
       local: string,
       remote: string,
@@ -117,6 +127,7 @@ function stubSession(
       cb(null)
     },
     chown(path: string, uid: number, _gid: number, cb: (err?: Error | null) => void): void {
+      if (opts.failChown) return cb(new Error('Permission denied'))
       if (entries[path]) entries[path].uid = uid
       cb(null)
     },
@@ -154,7 +165,7 @@ function stubSession(
       }
       cb(null, {
         isDirectory: () => entry.dir === true,
-        isSymbolicLink: () => false,
+        isSymbolicLink: () => entry.link !== undefined,
         size: entry.size ?? 0,
         mtime: 0,
         mode: entry.mode ?? 0o644,
@@ -440,6 +451,75 @@ describe('running a transfer plan', () => {
  * destination that changed after the plan was made.
  */
 describe('replacing a remote file', () => {
+  const overwriting = (dest: string): TransferPlan => {
+    const planned = plan('upload', [item('/local/file', dest)])
+    planned.conflicts = [
+      { ...item('/local/file', dest), destSize: 4096, destMtime: 0, reason: 'file' }
+    ]
+    return planned
+  }
+
+  /**
+   * The fallback that used to follow a refused chown was a write straight over
+   * the original — the one write that destroys it if the link drops.
+   */
+  it('leaves a file it cannot give the same owner unchanged, and says why', async () => {
+    const calls: Call[] = []
+    const entries: Record<string, Entry> = {
+      '/srv': { dir: true },
+      '/srv/app.conf': { size: 4096, mode: 0o640, uid: 33 }
+    }
+    attach('conn', stubSession(calls, entries, { failChown: true }))
+
+    await expect(
+      sftpManager.runPlan('conn', overwriting('/srv/app.conf'), { '/srv/app.conf': 'overwrite' })
+    ).rejects.toThrow(/left unchanged.*owner/i)
+
+    expect(entries['/srv/app.conf']).toEqual({ size: 4096, mode: 0o640, uid: 33 })
+    expect(calls.some((c) => c.op === 'fastPut' && c.to === '/srv/app.conf')).toBe(false)
+    expect(Object.keys(entries).filter((k) => PARTIAL.test(k))).toEqual([])
+  })
+
+  it('replaces a file on a server without posix-rename by moving the original aside', async () => {
+    const calls: Call[] = []
+    const entries: Record<string, Entry> = {
+      '/srv': { dir: true },
+      '/srv/app.conf': { size: 4096 }
+    }
+    attach('conn', stubSession(calls, entries, { noPosixRename: true }))
+
+    await sftpManager.runPlan('conn', overwriting('/srv/app.conf'), {
+      '/srv/app.conf': 'overwrite'
+    })
+
+    expect(entries['/srv/app.conf']).toMatchObject({ size: 1024 })
+    expect(calls.some((c) => c.op === 'posixRename')).toBe(false)
+    expect(calls.some((c) => c.op === 'fastPut' && c.to === '/srv/app.conf')).toBe(false)
+    // Nothing is left beside it: neither the copy nor the original.
+    expect(Object.keys(entries).sort()).toEqual(['/srv', '/srv/app.conf'])
+  })
+
+  it('saves through a symlink by replacing what it points at, keeping the link', async () => {
+    const calls: Call[] = []
+    const entries: Record<string, Entry> = {
+      '/srv': { dir: true },
+      '/srv/current.conf': { link: '/srv/releases/app.conf' },
+      '/srv/releases': { dir: true },
+      '/srv/releases/app.conf': { size: 4096 }
+    }
+    attach('conn', stubSession(calls, entries))
+
+    // A plan refuses a symlink outright; a file opened for editing is saved back
+    // through `upload`, and a config reached through a link is the ordinary case.
+    await sftpManager.upload('conn', '/local/app.conf', '/srv/current.conf')
+
+    expect(entries['/srv/current.conf']).toEqual({ link: '/srv/releases/app.conf' })
+    expect(entries['/srv/releases/app.conf']).toMatchObject({ size: 1024 })
+    expect(calls.filter((c) => c.op === 'posixRename').map((c) => c.to)).toEqual([
+      '/srv/releases/app.conf'
+    ])
+  })
+
   it('leaves the original whole when an upload over it stops halfway', async () => {
     const calls: Call[] = []
     const entries: Record<string, Entry> = {

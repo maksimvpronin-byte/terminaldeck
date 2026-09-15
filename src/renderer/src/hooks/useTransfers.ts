@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { TransferDecisions, TransferPlan } from '../../../shared/types'
 import { useT } from '../i18n'
 
@@ -7,24 +7,23 @@ export interface PendingTransfer {
   plan: TransferPlan
   /** The host the files come from, when they come from another one. */
   source?: string
+  /** The connection this panel was showing when the plan was made. */
+  connectionId: string
 }
 
 /**
  * Running a planned transfer, for a file panel that is the writing end of it.
  *
  * Planning stays with the panel — it is where the dialogs are, and where a drop
- * says what to plan — but everything from "here is a plan" onwards was woven
- * through the same component as rows, columns, renaming and drag and drop: the
- * question about conflicts, the run, the progress strip starting afresh, and
- * what went wrong. This is that part on its own.
+ * says what to plan — but everything from "here is a plan" onwards lives here:
+ * the question about conflicts, the run, the progress strip starting afresh,
+ * and what the last transfer came to.
  */
 export function useTransfers({
   connectionId,
-  onError,
   onFinished
 }: {
   connectionId?: string
-  onError: (message: string | null) => void
   /** After every run, whether or not it succeeded; the listing may have changed. */
   onFinished: (plan: TransferPlan) => void
 }): {
@@ -33,6 +32,15 @@ export function useTransfers({
   setTransferring: (busy: boolean) => void
   /** Changes after each run, so the progress strip starts again from nothing. */
   progressKey: number
+  /**
+   * What went wrong with the last transfer, kept apart from the listing's own
+   * error. The two shared one message, and refreshing the directory after a
+   * failed upload — which is what happens after every upload — cleared the
+   * failure the moment it was shown: a listing that loaded said nothing about
+   * whether the copy had worked, and read as if it had.
+   */
+  outcome: string | null
+  dismissOutcome: () => void
   run: (plan: TransferPlan, source?: string) => Promise<void>
   confirm: (decisions: TransferDecisions) => Promise<void>
   cancel: () => void
@@ -41,6 +49,18 @@ export function useTransfers({
   const [pending, setPending] = useState<PendingTransfer | null>(null)
   const [transferring, setTransferring] = useState(false)
   const [progressKey, setProgressKey] = useState(0)
+  const [outcome, setOutcome] = useState<string | null>(null)
+
+  /*
+   * A plan belongs to the connection it was made on. The panel can be pointed
+   * at another one — a reconnect, another tab — while the conflict dialog is
+   * still open, and answering it then ran the old plan's paths against the new
+   * connection. The question goes, and so does the last transfer's message.
+   */
+  useEffect(() => {
+    setPending(null)
+    setOutcome(null)
+  }, [connectionId])
 
   /**
    * `source` is the host a relayed batch comes from. It leads the call because
@@ -54,7 +74,7 @@ export function useTransfers({
   ): Promise<void> {
     if (!connectionId) return
     setPending(null)
-    onError(null)
+    setOutcome(null)
     try {
       const result = await window.td.sftp.runPlan(
         source ?? connectionId,
@@ -66,14 +86,14 @@ export function useTransfers({
       // was not overwritten. Said, because a file that was not copied is a file
       // somebody will go looking for.
       if (result?.changed?.length) {
-        onError(
+        setOutcome(
           t('Left alone, because something appeared there after the check: {paths}', {
             paths: result.changed.join(', ')
           })
         )
       }
     } catch (err) {
-      onError((err as Error).message)
+      setOutcome((err as Error).message)
     }
     setTransferring(false)
     setProgressKey((key) => key + 1)
@@ -86,16 +106,21 @@ export function useTransfers({
    * in a hurry never governs a later copy.
    */
   async function run(plan: TransferPlan, source?: string): Promise<void> {
-    if (plan.items.length === 0) return
+    if (plan.items.length === 0 || !connectionId) return
     if (plan.conflicts.length === 0 && plan.collisions.length === 0) {
       await execute(plan, {}, source)
       return
     }
-    setPending({ plan, source })
+    setPending({ plan, source, connectionId })
   }
 
   async function confirm(decisions: TransferDecisions): Promise<void> {
-    if (pending) await execute(pending.plan, decisions, pending.source)
+    if (!pending) return
+    if (pending.connectionId !== connectionId) {
+      setPending(null)
+      return
+    }
+    await execute(pending.plan, decisions, pending.source)
   }
 
   return {
@@ -103,6 +128,8 @@ export function useTransfers({
     transferring,
     setTransferring,
     progressKey,
+    outcome,
+    dismissOutcome: () => setOutcome(null),
     run,
     confirm,
     cancel: () => setPending(null)

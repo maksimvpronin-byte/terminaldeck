@@ -375,24 +375,30 @@ export class ScpShell {
   /**
    * Writes `path` through a hidden name beside it and moves that into place,
    * so a transfer that stops halfway leaves the old file rather than half of
-   * the new one. The same rules as `SFTPManager.writeRemoteFile`, in shell:
-   * the mode and owner are taken from the file being replaced, and where the
-   * owner cannot be matched the file is written in place as it used to be. A
+   * the new one. The same rules as `SFTPManager.writeRemoteFile`, in shell: the
+   * mode and owner are taken from the file being replaced, and where the owner
+   * cannot be matched nothing is replaced and the reason is given — never a
+   * write over the original. `mv` renames, so the swap itself is atomic. A
    * destination that did not exist is not replaced if something appeared there
-   * meanwhile, and a symlink is written through rather than replaced.
+   * meanwhile, and a symlink's target is replaced rather than the link.
    */
   async replace(path: string, write: (target: string) => Promise<void>): Promise<void> {
-    const existing = await this.statPath(path)
-    if (existing?.isDirectory) throw new Error(`Refusing to write over the directory ${path}`)
-    if (existing?.isSymlink) return write(path)
+    let target = path
+    let existing = await this.statPath(path)
+    if (existing?.isSymlink) {
+      const resolved = await this.capture(`readlink -f -z -- ${pathArg(path)}`)
+      if (resolved.at(-1) !== 0) throw new Error(`${path} is a link that cannot be followed`)
+      target = resolved.subarray(0, -1).toString('utf8')
+      existing = await this.statPath(target)
+    }
+    if (existing?.isDirectory) throw new Error(`Refusing to write over the directory ${target}`)
 
     const partial = posix.join(
-      posix.dirname(path),
-      `.${posix.basename(path)}.td-partial-${process.pid}-${ScpShell.nextPartial++}`
+      posix.dirname(target),
+      `.${posix.basename(target)}.td-partial-${process.pid}-${ScpShell.nextPartial++}`
     )
-    const [p, d] = [pathArg(partial), pathArg(path)]
+    const [p, d] = [pathArg(partial), pathArg(target)]
     let moved = false
-    let inPlace = false
     try {
       await write(partial)
       if (!existing) {
@@ -402,15 +408,18 @@ export class ScpShell {
         moved = true
       } else {
         const outcome = await this.capture(
-          `if test "$(stat -c %u:%g -- ${p})" != "$(stat -c %u:%g -- ${d})" && ! chown --reference=${d} -- ${p} 2>/dev/null; then printf in-place; exit 0; fi; chmod --reference=${d} -- ${p} && mv -f -T -- ${p} ${d} && printf moved`
+          `if test "$(stat -c %u:%g -- ${p})" != "$(stat -c %u:%g -- ${d})" && ! chown --reference=${d} -- ${p} 2>/dev/null; then printf owner; exit 0; fi; chmod --reference=${d} -- ${p} && mv -f -T -- ${p} ${d} && printf moved`
         )
         moved = outcome.toString('utf8') === 'moved'
-        inPlace = !moved
+        if (!moved) {
+          throw new Error(
+            `${target} was left unchanged: this login cannot give a new copy the owner the file has. Replacing it would change who owns it, and writing over it in place would destroy it if the transfer stopped halfway.`
+          )
+        }
       }
     } finally {
       if (!moved) await this.capture(`rm -f -- ${p}`).catch(() => undefined)
     }
-    if (inPlace) await write(path)
   }
 
   private static nextPartial = 0

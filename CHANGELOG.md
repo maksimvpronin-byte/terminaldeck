@@ -80,6 +80,16 @@ the other produces a version nobody can install, which is how 0.1.10 through
   its passwords and the item together, and puts the passwords back if the item
   cannot be saved. Untying or deleting a Sessions folder, and applying a sync to
   one, only forget anything once the change is saved.
+- **An upload over a file with another owner, or to a server without
+  `posix-rename`, could still truncate it.** Both used to fall back to writing
+  straight over the original. A server without `posix-rename` now gets the
+  original moved aside and the new copy moved in; a file whose owner cannot be
+  kept is left unchanged, with the reason. Saving through a symlink replaces what
+  it points at and keeps the link.
+- **A failed transfer's message vanished as soon as the folder refreshed.** It
+  now stays until the next transfer or until it is clicked away, and a conflict
+  question left open when the panel moves to another connection is dropped
+  rather than answered against the new one.
 
 ### Changed
 

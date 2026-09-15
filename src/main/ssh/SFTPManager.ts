@@ -330,81 +330,121 @@ class SFTPManager {
 
   /**
    * Writes a remote file so that a transfer which stops halfway leaves the file
-   * that was there, not the first half of the new one.
+   * that was there, not the first half of the new one — whatever the server
+   * supports.
    *
-   * Uploads used to go straight into place. A dropped link then left a
-   * truncated file where a whole one had been — for a configuration file, a
-   * broken service — and nothing on either side said so.
+   * The bytes go to a hidden name beside the destination and are moved onto it
+   * at the end. A destination that did not exist is renamed into place, and if
+   * something appeared there meanwhile the rename refuses and it is left alone.
    *
-   * So the bytes go to a hidden name beside the destination and are moved onto
-   * it at the end. Two things held this back before, and both are dealt with
-   * rather than accepted:
+   * Replacing a file that exists takes more:
    *
-   * - The new file is created by this login, so it carries this login's owner
-   *   and default mode. The mode is copied across from the file being replaced,
-   *   and so is the owner where the server permits it. Where it does not, the
-   *   file is written in place as it always was — changing who owns a server's
-   *   configuration is a larger accident than a transfer that fails partway.
-   * - SSH_FXP_RENAME refuses an existing destination on most servers. Replacing
-   *   one needs OpenSSH's `posix-rename`, which is nearly everywhere; where it is
-   *   missing, the same in-place write is the fallback.
+   * - The copy is given the old file's mode, and its owner where it differs. A
+   *   login that cannot give it the same owner is told so and the file is left
+   *   as it was. This used to fall back to writing straight over the original,
+   *   which is the one thing all of this exists to avoid, and it did so without
+   *   a word: a dropped link then truncated exactly the files — someone else's,
+   *   often a service's configuration — where it mattered most.
+   * - OpenSSH's `posix-rename` swaps the copy in atomically. A server without it
+   *   gets two renames instead: the original moved aside, the copy moved in, the
+   *   original removed. The name is briefly empty, but at no moment is either
+   *   file half-written, and a failed second rename moves the original back.
    *
-   * A destination that did not exist is simply renamed into place, and if
-   * something appeared there in the meantime the rename refuses and that
-   * something is left alone. A symlink is written through, as before: renaming
-   * over it would replace the link with a file.
+   * A symlink stays a symlink: what it points at is replaced the same way.
+   * Renaming over the link itself would turn it into a file.
    */
   private async writeRemoteFile(
     sftp: SFTPWrapper,
     remotePath: string,
     write: (target: string) => Promise<void>
   ): Promise<void> {
-    const existing = await lstatRaw(sftp, remotePath)
-    if (existing?.isDirectory())
-      throw new Error(`Refusing to write over the directory ${remotePath}`)
-    if (existing?.isSymbolicLink()) return write(remotePath)
+    let target = remotePath
+    let existing = await lstatRaw(sftp, remotePath)
+    if (existing?.isSymbolicLink()) {
+      target = await new Promise<string>((resolve, reject) =>
+        sftp.realpath(remotePath, (err, resolved) =>
+          err
+            ? reject(
+                new Error(`${remotePath} is a link to nothing that can be written (${err.message})`)
+              )
+            : resolve(resolved)
+        )
+      )
+      existing = await lstatRaw(sftp, target)
+    }
+    if (existing?.isDirectory()) throw new Error(`Refusing to write over the directory ${target}`)
 
-    const partial = partialNameFor(remotePath, this.nextTransfer++)
+    const n = this.nextTransfer++
+    const partial = partialNameFor(target, n)
     let moved = false
-    let inPlace = false
     try {
       await write(partial)
       if (!existing) {
-        await sftpCall((cb) => sftp.rename(partial, remotePath, cb)).catch((err: Error) => {
+        await sftpCall((cb) => sftp.rename(partial, target, cb)).catch((err: Error) => {
           throw new Error(
-            `${remotePath} could not be put in place (${err.message}). If something appeared there during the transfer, it was left alone.`
+            `${target} could not be put in place (${err.message}). If something appeared there during the transfer, it was left alone.`
           )
         })
         moved = true
         return
       }
-      inPlace = !(await this.takeOver(sftp, partial, existing))
-      if (!inPlace) {
-        await sftpCall((cb) => sftp.ext_openssh_rename(partial, remotePath, cb))
+
+      await this.matchMetadata(sftp, partial, existing, target)
+
+      if (supportsPosixRename(sftp)) {
+        await sftpCall((cb) => sftp.ext_openssh_rename(partial, target, cb))
         moved = true
+        return
       }
+
+      const aside = joinRemote(
+        parentOf(target),
+        `.${baseNameOf(target)}.td-previous-${process.pid}-${n}`
+      )
+      await sftpCall((cb) => sftp.rename(target, aside, cb))
+      try {
+        await sftpCall((cb) => sftp.rename(partial, target, cb))
+        moved = true
+      } catch (err) {
+        await sftpCall((cb) => sftp.rename(aside, target, cb)).catch((restoreErr: Error) => {
+          throw new Error(
+            `${target} could not be replaced (${(err as Error).message}), and the original could not be moved back from ${aside} (${restoreErr.message})`
+          )
+        })
+        throw err
+      }
+      // The new file is in place; the old one is a hidden leftover at worst.
+      await sftpCall((cb) => sftp.unlink(aside, cb)).catch(() => undefined)
     } finally {
       if (!moved) await sftpCall((cb) => sftp.unlink(partial, cb)).catch(() => undefined)
     }
-    if (inPlace) await write(remotePath)
   }
 
   /**
-   * Makes a freshly written file look like the one it will replace — mode and
-   * owner — and says whether it can replace it by rename at all.
+   * Gives a freshly written copy the mode and owner of the file it replaces, or
+   * refuses the replacement with the reason.
    */
-  private async takeOver(sftp: SFTPWrapper, partial: string, existing: Stats): Promise<boolean> {
-    if (!supportsPosixRename(sftp)) return false
+  private async matchMetadata(
+    sftp: SFTPWrapper,
+    partial: string,
+    existing: Stats,
+    target: string
+  ): Promise<void> {
     try {
       await sftpCall((cb) => sftp.chmod(partial, existing.mode & 0o7777, cb))
-      const written = await lstatRaw(sftp, partial)
-      if (!written) return false
-      if (written.uid !== existing.uid || written.gid !== existing.gid) {
-        await sftpCall((cb) => sftp.chown(partial, existing.uid, existing.gid, cb))
-      }
-      return true
+    } catch (err) {
+      throw new Error(
+        `${target} was left unchanged: the new copy could not be given its permissions (${(err as Error).message}).`
+      )
+    }
+    const written = await lstatRaw(sftp, partial)
+    if (!written || (written.uid === existing.uid && written.gid === existing.gid)) return
+    try {
+      await sftpCall((cb) => sftp.chown(partial, existing.uid, existing.gid, cb))
     } catch {
-      return false
+      throw new Error(
+        `${target} was left unchanged: it belongs to ${existing.uid}:${existing.gid}, and this login cannot give a new copy that owner. Replacing it would change who owns it, and writing over it in place would destroy it if the transfer stopped halfway. Upload it as its owner, or remove it first.`
+      )
     }
   }
 

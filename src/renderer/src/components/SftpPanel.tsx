@@ -85,7 +85,6 @@ export default function SftpPanel({
   const [comparing, setComparing] = useState<{ remote: string; local: string } | null>(null)
   const transfers = useTransfers({
     connectionId,
-    onError: setError,
     // A download changes nothing this panel lists; the other two change the
     // directory being looked at.
     onFinished: (plan) => {
@@ -931,6 +930,11 @@ export default function SftpPanel({
       {error && (
         <div className="error-text" style={{ padding: 6 }}>
           {error}
+        </div>
+      )}
+      {transfers.outcome && (
+        <div className="error-text" style={{ padding: 6 }} onClick={transfers.dismissOutcome}>
+          {transfers.outcome}
         </div>
       )}
 
