@@ -1,7 +1,9 @@
-import { dialog, type BrowserWindow } from 'electron'
-import { readFileSync, writeFileSync } from 'fs'
+import { app, dialog, type BrowserWindow } from 'electron'
+import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
+import { join } from 'path'
 import { deriveKey, newSalt, encrypt, decrypt, wipe, type EncryptedPayload } from '../vault/crypto'
-import { vault } from '../vault/Vault'
+import { vault, type SealedSecrets } from '../vault/Vault'
+import { writeJson } from './jsonFile'
 import { sessionStore } from './SessionStore'
 import { snippetStore } from './SnippetStore'
 import { collectionStore } from './CollectionStore'
@@ -459,7 +461,11 @@ export async function exportToFile(
   })
   if (res.canceled || !res.filePath) return undefined
 
-  writeFileSync(res.filePath, JSON.stringify(backup, null, 2), 'utf8')
+  // Through a temporary name, like every other file this application writes:
+  // saving over last week's export must not leave half of this week's.
+  const tmp = `${res.filePath}.tmp`
+  writeFileSync(tmp, JSON.stringify(backup, null, 2), 'utf8')
+  renameSync(tmp, res.filePath)
   return res.filePath
 }
 
@@ -520,6 +526,25 @@ export async function importFromFile(
    * if one of those writes fails, every store already written is put back as it
    * was.
    */
+  /*
+   * Written down before the first store changes, and removed once the import
+   * has either finished or been put back. The rollback below covers a write that
+   * fails; it cannot cover the process ending between two writes — a crash, a
+   * forced quit, the power. A journal left behind is that case, and the next
+   * start puts every store back from it. See `recoverInterruptedImport`.
+   */
+  writeJson(journalPath(), {
+    version: 1,
+    startedAt: Date.now(),
+    vault: secrets && Object.keys(secrets).length > 0 ? vault.sealedSecrets() : undefined,
+    sessions: sessionStore.snapshot(),
+    snippets: snippetStore.snapshot(),
+    collections: collectionStore.snapshot(),
+    inventory: inventoryStore.snapshot(),
+    gitFolders: gitFolderStore.snapshot(),
+    credentials: credentialStore.snapshot()
+  } satisfies ImportJournal)
+
   const undo: (() => void)[] = []
   const step = <T>(snapshot: () => T, restore: (previous: T) => void, write: () => void): void => {
     const previous = snapshot()
@@ -574,12 +599,16 @@ export async function importFromFile(
         unrestored.push((restoreErr as Error).message)
       }
     }
+    // Put back in full: the journal has done its work. Otherwise it stays, and
+    // the next start finishes the job.
+    if (unrestored.length === 0) rmSync(journalPath(), { force: true })
     throw new Error(
       unrestored.length === 0
         ? `The import failed and nothing was changed: ${(err as Error).message}`
-        : `The import failed (${(err as Error).message}), and putting everything back failed too (${unrestored.join('; ')}). Restart TerminalDeck and check the hosts before importing again.`
+        : `The import failed (${(err as Error).message}), and putting everything back failed too (${unrestored.join('; ')}). Restart TerminalDeck: it will put back what was left before anything else.`
     )
   }
+  rmSync(journalPath(), { force: true })
 
   return {
     groups: groups.length,
@@ -592,6 +621,58 @@ export async function importFromFile(
     credentials: credentials.length,
     secrets: secrets ? Object.keys(secrets).length : 0
   }
+}
+
+function journalPath(): string {
+  return join(app.getPath('userData'), 'import-journal.json')
+}
+
+/** What every store held before an import began. */
+interface ImportJournal {
+  version: 1
+  startedAt: number
+  vault?: SealedSecrets
+  sessions: ReturnType<typeof sessionStore.snapshot>
+  snippets: ReturnType<typeof snippetStore.snapshot>
+  collections: ReturnType<typeof collectionStore.snapshot>
+  inventory: ReturnType<typeof inventoryStore.snapshot>
+  gitFolders: ReturnType<typeof gitFolderStore.snapshot>
+  credentials: ReturnType<typeof credentialStore.snapshot>
+}
+
+/**
+ * Finishes undoing an import the application did not live through.
+ *
+ * Called at start, before anything can read or change a store. Returns what
+ * happened, so the caller can say so: an import that silently was not there
+ * any more would be its own kind of puzzle.
+ */
+export function recoverInterruptedImport(): 'none' | 'restored' | 'failed' {
+  const path = journalPath()
+  if (!existsSync(path)) return 'none'
+  let journal: ImportJournal
+  try {
+    journal = JSON.parse(readFileSync(path, 'utf8')) as ImportJournal
+    if (journal.version !== 1) throw new Error('unknown journal version')
+  } catch {
+    // Written through a temporary name, so a damaged one was never finished —
+    // and an import never starts writing before its journal is whole.
+    renameSync(path, `${path}.damaged-${Date.now()}`)
+    return 'none'
+  }
+  try {
+    sessionStore.restore(journal.sessions)
+    snippetStore.restore(journal.snippets)
+    collectionStore.restore(journal.collections)
+    inventoryStore.restore(journal.inventory)
+    gitFolderStore.restore(journal.gitFolders)
+    credentialStore.restore(journal.credentials)
+    if (journal.vault) vault.restoreSealedSecrets(journal.vault)
+  } catch {
+    return 'failed'
+  }
+  rmSync(path, { force: true })
+  return 'restored'
 }
 
 /**

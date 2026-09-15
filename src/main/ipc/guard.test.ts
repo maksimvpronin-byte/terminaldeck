@@ -21,7 +21,13 @@ vi.mock('electron', () => ({
 }))
 
 const { ipcMain } = await import('electron')
-const { installSenderCheck, checkTransferPlan } = await import('./guard')
+const {
+  installSenderCheck,
+  checkTransferPlan,
+  checkForwardRule,
+  checkQuickConnect,
+  isTerminalSize
+} = await import('./guard')
 installSenderCheck((url) => url === 'file:///app/renderer/index.html')
 
 function from(url: string, topFrame = true): unknown {
@@ -73,5 +79,35 @@ describe('a transfer plan handed back', () => {
       checkTransferPlan({ ...plan, items: [{ ...plan.items[0], destPath: 42 }] }, {})
     ).toThrow(/destPath/)
     expect(() => checkTransferPlan(plan, { 'C:\\a': 'always' })).toThrow(/decision/)
+  })
+})
+
+describe('values a channel takes', () => {
+  it('refuses a terminal no server should be asked for', () => {
+    expect(() => isTerminalSize(80, 24)).not.toThrow()
+    expect(() => isTerminalSize(1e6, 24)).toThrow(/cols/)
+    expect(() => isTerminalSize(80, 0)).toThrow(/rows/)
+    expect(() => isTerminalSize('80', 24)).toThrow()
+  })
+
+  it('refuses a forward rule that is not one', () => {
+    const rule = {
+      id: 'r',
+      type: 'local',
+      srcHost: '127.0.0.1',
+      srcPort: 8080,
+      dstHost: 'db',
+      dstPort: 5432
+    }
+    expect(() => checkForwardRule(rule)).not.toThrow()
+    expect(() => checkForwardRule({ ...rule, srcPort: 70000 })).toThrow(/srcPort/)
+    expect(() => checkForwardRule({ ...rule, type: 'sideways' })).toThrow(/type/)
+  })
+
+  it('refuses a hand-typed host that ssh would read as an option', () => {
+    const params = { host: 'db', port: 22, username: 'me', authMethod: 'agent' }
+    expect(() => checkQuickConnect(params)).not.toThrow()
+    expect(() => checkQuickConnect({ ...params, host: '-oProxyCommand=x' })).toThrow(/host/)
+    expect(() => checkQuickConnect({ ...params, port: 0 })).toThrow(/port/)
   })
 })

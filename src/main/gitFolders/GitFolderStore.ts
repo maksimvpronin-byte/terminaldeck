@@ -18,7 +18,7 @@ import { parseInWorker } from '../inventory/parseInWorker'
 import { noInventoryFound } from '../inventory/files'
 import { headRevision, syncRepo } from '../inventory/GitRepo'
 import { removeTree } from './removeTree'
-import { JsonDocument, readJson } from '../store/jsonFile'
+import { JsonDocument, hasLists, readJson } from '../store/jsonFile'
 import { sessionStore } from '../store/SessionStore'
 
 /**
@@ -92,7 +92,11 @@ function readsTheSame(a: GitFolderLink, b: GitFolderLink): boolean {
 
 class GitFolderStore {
   private doc = new JsonDocument<GitFolderData>(dataPath, (path) => {
-    const parsed = readJson<Partial<GitFolderData>>(path, () => ({}))
+    const parsed = readJson<Partial<GitFolderData>>(
+      path,
+      () => ({}),
+      (v) => hasLists(v, { trees: 'groupId', overrides: 'nodeId', repos: 'url' })
+    )
     return {
       version: 1,
       trees: parsed.trees ?? [],

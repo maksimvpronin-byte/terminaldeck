@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import { join } from 'path'
 import { createHash } from 'crypto'
-import { JsonDocument, readJson } from '../store/jsonFile'
+import { JsonDocument, isStringMap, readJson } from '../store/jsonFile'
 
 /** host:port -> OpenSSH-style "SHA256:base64" fingerprint of the server key. */
 type KnownHostsFile = Record<string, string>
@@ -26,7 +26,7 @@ class KnownHosts {
    * the file — comes back trusted.
    */
   private doc = new JsonDocument<KnownHostsFile>(storePath, (path) =>
-    readJson<KnownHostsFile>(path, () => ({}))
+    readJson<KnownHostsFile>(path, () => ({}), isStringMap)
   )
 
   get(host: string, port: number): string | undefined {

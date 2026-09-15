@@ -1,8 +1,10 @@
-import { app, shell, BrowserWindow, Menu, type MenuItemConstructorOptions } from 'electron'
-import { join } from 'path'
+import { app, dialog, shell, BrowserWindow, Menu, type MenuItemConstructorOptions } from 'electron'
+import { join, resolve } from 'path'
+import { fileURLToPath } from 'url'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { installSenderCheck } from './ipc/guard'
 import { registerIpcHandlers } from './ipc/handlers'
+import { recoverInterruptedImport } from './store/Backup'
 import { desktopHoldsKeyboard, releaseKeyboard } from './keyboardCapture'
 import { installCertificateVerifier } from './rdp/CertificateTrust'
 import { freeRdpBridge } from './rdp/FreeRdpBridge'
@@ -68,7 +70,12 @@ function isOwnPage(url: string): boolean {
     if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
       return parsed.origin === new URL(process.env['ELECTRON_RENDERER_URL']).origin
     }
-    return parsed.protocol === 'file:' && /\/renderer\/index\.html$/i.test(parsed.pathname)
+    // The exact file this build loads, not any page of that name: matching the
+    // end of the path accepted a renderer/index.html anywhere on the disk.
+    if (parsed.protocol !== 'file:') return false
+    const same = (path: string): string =>
+      process.platform === 'win32' ? resolve(path).toLowerCase() : resolve(path)
+    return same(fileURLToPath(parsed)) === same(join(__dirname, '../renderer/index.html'))
   } catch {
     return false
   }
@@ -300,6 +307,19 @@ app.whenReady().then(() => {
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
+
+  // Before anything reads a store: an import the application did not live
+  // through is put back first.
+  const recovery = recoverInterruptedImport()
+  if (recovery !== 'none') {
+    void dialog.showMessageBox({
+      type: recovery === 'restored' ? 'info' : 'error',
+      message:
+        recovery === 'restored'
+          ? 'An import was interrupted, and everything it had changed has been put back.'
+          : 'An import was interrupted, and putting back what it had changed failed. Check your hosts before importing again.'
+    })
+  }
 
   // Before any handler exists, so that every one of them is behind it.
   installSenderCheck(isOwnPage)

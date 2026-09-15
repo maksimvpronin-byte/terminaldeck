@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, readdirSync, existsSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { JsonDocument, readJson, writeJson } from './jsonFile'
+import { JsonDocument, hasLists, readJson, writeJson } from './jsonFile'
 
 /**
  * The rule these six files share, tested where it lives.
@@ -82,6 +82,34 @@ describe('readJson', () => {
     // a test can arrange. Either way, refusing to start would be worse.
     writeFileSync(file(), 'not json', 'utf8')
     expect(readJson(file(), () => ({ hosts: [] }))).toEqual({ hosts: [] })
+  })
+})
+
+describe('readJson checking what it read', () => {
+  it('sets aside JSON that parses but is not this store', () => {
+    writeFileSync(file(), JSON.stringify({ hosts: [{ name: 'no id' }] }), 'utf8')
+
+    const read = readJson(
+      file(),
+      () => ({ hosts: [] }),
+      (v) => hasLists(v, { hosts: 'id' })
+    )
+
+    expect(read).toEqual({ hosts: [] })
+    expect(readdirSync(dir).some((n) => n.startsWith('thing.json.damaged-'))).toBe(true)
+  })
+
+  it('takes a store whose lists are all it should be', () => {
+    writeFileSync(file(), JSON.stringify({ hosts: [{ id: 'a' }] }), 'utf8')
+    expect(
+      readJson(
+        file(),
+        () => ({ hosts: [] }),
+        (v) => hasLists(v, { hosts: 'id' })
+      )
+    ).toEqual({
+      hosts: [{ id: 'a' }]
+    })
   })
 })
 

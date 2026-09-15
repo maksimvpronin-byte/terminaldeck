@@ -122,11 +122,22 @@ the other produces a version nobody can install, which is how 0.1.10 through
   focus, and locking offers every desktop an empty clipboard, cancelling any
   file download from one. All desktops with clipboard sharing still receive
   what is copied here while the window is in use.
+- **An import cut short by a crash or a forced quit stayed half done.** What
+  every store held is written down before an import begins, and the next start
+  puts it all back, saying so.
+- **A settings file that could not be read — held by a scan, say — was treated
+  as damaged**, and the empty store that replaced it was saved over the intact
+  file. Such a read is retried and then refused with the reason; a file that
+  parses but is not the store it should be is set aside like one that does not
+  parse.
+- **Saving an export over an older one could leave half a file.** Exports are
+  written through a temporary name.
 
 ### Changed
 
-- The main process accepts requests only from the application's own page, and
-  checks a transfer plan's shape before running it.
+- The main process accepts requests only from the application's own page — the
+  exact file it loaded — and checks a transfer plan's shape, terminal sizes,
+  typed-in connections and tunnel rules before acting on them.
 - Checks now also run the tests on Windows and macOS.
 - Line endings are LF in every working copy, set in `.gitattributes`, so
   `format:check` means the same on Windows.

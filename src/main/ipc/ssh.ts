@@ -10,6 +10,14 @@ import { readSshConfigHosts } from '../ssh/sshConfig'
 import { credentialStore } from '../store/CredentialStore'
 import { findProfile } from '../store/hosts'
 import { focusedWin } from './win'
+import {
+  MAX_TERMINAL_WRITE,
+  checkForwardRule,
+  checkQuickConnect,
+  isOptionalString,
+  isString,
+  isTerminalSize
+} from './guard'
 
 /** Shell sessions, the tunnels beside them, monitoring, and `~/.ssh/config`. */
 
@@ -37,6 +45,9 @@ export function registerSshHandlers(): void {
       /** Names the attempt, so the pane can give up on it; see sshCancelConnect. */
       attemptId?: string
     ) => {
+      isString(sessionId, 'sessionId')
+      isTerminalSize(cols, rows)
+      isOptionalString(credentialId, 'credentialId')
       // Hosts from a repository live in their own store and aren't saved as
       // sessions — whether they came from an Inventory source or from a folder
       // on the Sessions tab that mirrors one.
@@ -76,6 +87,8 @@ export function registerSshHandlers(): void {
   ipcMain.handle(
     IPC.sshQuickConnect,
     async (_e, params: QuickConnectParams, cols: number, rows: number, attemptId?: string) => {
+      checkQuickConnect(params)
+      isTerminalSize(cols, rows)
       const connectionId = await sshManager.connectQuick(
         focusedWin(),
         params,
@@ -125,14 +138,28 @@ export function registerSshHandlers(): void {
   ipcMain.on(IPC.sshReady, (_e, connectionId: string) => {
     sshManager.markReady(focusedWin(), connectionId)
   })
-  ipcMain.on(IPC.sshWrite, (_e, connectionId: string, data: string) => {
+  /*
+   * These three arrive many times a second and answer nothing, so a message of
+   * the wrong shape is dropped rather than thrown: there is nobody to throw to.
+   */
+  ipcMain.on(IPC.sshWrite, (_e, connectionId: unknown, data: unknown) => {
+    if (typeof connectionId !== 'string' || typeof data !== 'string') return
+    if (data.length > MAX_TERMINAL_WRITE) return
     sshManager.write(connectionId, data)
   })
-  ipcMain.on(IPC.sshAck, (_e, connectionId: string, bytes: number) => {
+  ipcMain.on(IPC.sshAck, (_e, connectionId: unknown, bytes: unknown) => {
+    if (typeof connectionId !== 'string' || typeof bytes !== 'number') return
+    if (!Number.isFinite(bytes) || bytes < 0) return
     sshManager.acknowledge(connectionId, bytes)
   })
-  ipcMain.on(IPC.sshResize, (_e, connectionId: string, cols: number, rows: number) => {
-    sshManager.resize(connectionId, cols, rows)
+  ipcMain.on(IPC.sshResize, (_e, connectionId: unknown, cols: unknown, rows: unknown) => {
+    if (typeof connectionId !== 'string') return
+    try {
+      isTerminalSize(cols, rows)
+    } catch {
+      return
+    }
+    sshManager.resize(connectionId, cols as number, rows as number)
   })
 
   // --- Remote monitoring ---
@@ -144,9 +171,11 @@ export function registerSshHandlers(): void {
   })
 
   // --- Port forwarding ---
-  ipcMain.handle(IPC.pfStart, (_e, connectionId: string, rule: PortForwardRule) =>
-    portForwardManager.start(connectionId, rule)
-  )
+  ipcMain.handle(IPC.pfStart, (_e, connectionId: string, rule: PortForwardRule) => {
+    isString(connectionId, 'connectionId')
+    checkForwardRule(rule)
+    return portForwardManager.start(connectionId, rule)
+  })
   ipcMain.handle(IPC.pfStop, (_e, connectionId: string, ruleId: string) =>
     portForwardManager.stop(connectionId, ruleId)
   )

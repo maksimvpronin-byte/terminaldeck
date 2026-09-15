@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import { join } from 'path'
 import type { HostCollection } from '../../shared/types'
-import { JsonDocument, readJson } from './jsonFile'
+import { JsonDocument, hasLists, readJson } from './jsonFile'
 
 interface CollectionFile {
   version: 1
@@ -19,9 +19,15 @@ function storePath(): string {
  * no secrets in it.
  */
 class CollectionStore {
-  private doc = new JsonDocument<CollectionFile>(storePath, (path) =>
-    readJson<CollectionFile>(path, () => ({ version: 1, collections: [] }))
-  )
+  private doc = new JsonDocument<CollectionFile>(storePath, (path) => ({
+    version: 1,
+    collections:
+      readJson<Partial<CollectionFile>>(
+        path,
+        () => ({}),
+        (v) => hasLists(v, { collections: 'id' })
+      ).collections ?? []
+  }))
 
   list(): HostCollection[] {
     return this.doc.data.collections

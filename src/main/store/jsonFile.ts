@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, renameSync, existsSync, mkdirSync } from 'fs'
+import { copyFileSync, readFileSync, writeFileSync, renameSync, existsSync, mkdirSync } from 'fs'
 import { dirname } from 'path'
 
 /**
@@ -93,18 +93,109 @@ export class JsonDocument<T> {
  *
  * A file that is simply absent is not damaged, and nothing is said about it.
  */
-export function readJson<T>(path: string, fallback: () => T): T {
+export function readJson<T>(
+  path: string,
+  fallback: () => T,
+  /**
+   * Whether what was parsed is this store's file at all. JSON that parses is
+   * not yet a store: a file edited by hand into a list where an object belongs,
+   * or with hosts that have no id, would otherwise be taken as it is and fail
+   * later, in whatever code first reached for a field that is not there.
+   */
+  valid: (value: unknown) => boolean = () => true
+): T {
   if (!existsSync(path)) return fallback()
+  const text = readWithRetry(path)
+  let parsed: unknown
   try {
-    return JSON.parse(readFileSync(path, 'utf8')) as T
+    parsed = JSON.parse(text)
   } catch {
-    try {
-      renameSync(path, `${path}.damaged-${Date.now()}`)
-    } catch {
-      // Nowhere to put it — a read-only directory, or it went between the two
-      // calls. Starting from the fallback is still better than refusing to
-      // start at all.
-    }
+    setAside(path)
     return fallback()
   }
+  if (!valid(parsed)) {
+    setAside(path)
+    return fallback()
+  }
+  return parsed as T
+}
+
+/**
+ * Reads a file that exists, and refuses rather than pretend when it cannot.
+ *
+ * A read that failed — the file locked by an antivirus scan, a permission taken
+ * away — was treated like a file that did not parse: the store started empty,
+ * and the first save wrote that emptiness over a file that was perfectly
+ * intact. A read that fails is tried again briefly, since a scan lets go within
+ * moments, and then reported as what it is.
+ */
+function readWithRetry(path: string): string {
+  let last: unknown
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      return readFileSync(path, 'utf8')
+    } catch (err) {
+      last = err
+      const code = (err as NodeJS.ErrnoException).code
+      if (code !== 'EBUSY' && code !== 'EPERM' && code !== 'EACCES') break
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100)
+    }
+  }
+  throw new Error(
+    `${path} exists but could not be read (${(last as Error).message}). It was left untouched; close whatever is holding it and start TerminalDeck again.`
+  )
+}
+
+/**
+ * Keeps a damaged file under a name of its own. Moved if it can be, copied if
+ * it cannot — and if neither works, nothing starts on top of it: an empty store
+ * saved over the only copy is the loss this exists to prevent.
+ */
+function setAside(path: string): void {
+  const aside = `${path}.damaged-${Date.now()}`
+  try {
+    renameSync(path, aside)
+    return
+  } catch {
+    // A read-only directory, or a file held open; try a copy.
+  }
+  try {
+    copyFileSync(path, aside)
+  } catch (err) {
+    throw new Error(
+      `${path} is damaged and could not be set aside (${(err as Error).message}); it was left untouched.`
+    )
+  }
+}
+
+/** Shape checks shared by the stores: a list of records that each carry a string key. */
+export function isListOf(value: unknown, key: string): boolean {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (item) =>
+        typeof item === 'object' &&
+        item !== null &&
+        typeof (item as Record<string, unknown>)[key] === 'string'
+    )
+  )
+}
+
+/** An object whose named lists, where present, pass `isListOf`. */
+export function hasLists(value: unknown, lists: Record<string, string>): boolean {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
+  const record = value as Record<string, unknown>
+  return Object.entries(lists).every(
+    ([name, key]) => record[name] === undefined || isListOf(record[name], key)
+  )
+}
+
+/** A record of strings to strings, the shape of the trust stores. */
+export function isStringMap(value: unknown): boolean {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.values(value).every((v) => typeof v === 'string')
+  )
 }

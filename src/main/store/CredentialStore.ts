@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import { join } from 'path'
 import type { Credential } from '../../shared/types'
-import { JsonDocument, readJson } from './jsonFile'
+import { JsonDocument, hasLists, readJson } from './jsonFile'
 
 interface CredentialFile {
   version: 1
@@ -29,7 +29,11 @@ class CredentialStore {
   // Normalised rather than trusted: a file from an older version, or one edited
   // by hand, may have no list in it at all.
   private doc = new JsonDocument<CredentialFile>(storePath, (path) => {
-    const parsed = readJson<Partial<CredentialFile>>(path, () => ({}))
+    const parsed = readJson<Partial<CredentialFile>>(
+      path,
+      () => ({}),
+      (v) => hasLists(v, { credentials: 'id' })
+    )
     return { version: 1, credentials: parsed.credentials ?? [] }
   })
 

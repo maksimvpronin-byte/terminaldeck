@@ -29,6 +29,12 @@ function writeVaultFile(file: VaultFile): void {
   renameSync(tmp, target)
 }
 
+/** Secrets as they are stored — encrypted — and the salt of the vault they came from. */
+export interface SealedSecrets {
+  salt: string
+  secrets: Record<string, EncryptedPayload>
+}
+
 export class WrongPasswordError extends Error {
   constructor() {
     super('Incorrect master password')
@@ -298,6 +304,35 @@ class Vault {
   /** The stored ciphertexts as they stand, for putting back after a failed import. */
   snapshotSecrets(): Record<string, EncryptedPayload> {
     return this.requireUnlocked().file.secrets
+  }
+
+  /**
+   * The same, with the salt that says which vault they belong to — for writing
+   * down before an import, where they may have to be put back after a restart.
+   * Ciphertexts only: nothing here can be read without the master password.
+   */
+  sealedSecrets(): SealedSecrets {
+    const { file } = this.requireUnlocked()
+    return { salt: file.salt, secrets: file.secrets }
+  }
+
+  /**
+   * Puts sealed secrets back, open or not. Refused — returning false — when the
+   * vault is no longer the one they were sealed from: a different salt means a
+   * changed master password, and ciphertexts under the old key would be
+   * unreadable under the new one.
+   */
+  restoreSealedSecrets(sealed: SealedSecrets): boolean {
+    if (this.key && this.file) {
+      if (this.file.salt !== sealed.salt) return false
+      this.restoreSecrets(sealed.secrets)
+      return true
+    }
+    if (!existsSync(vaultPath())) return false
+    const onDisk = JSON.parse(readFileSync(vaultPath(), 'utf8')) as VaultFile
+    if (onDisk.salt !== sealed.salt) return false
+    writeVaultFile({ ...onDisk, secrets: sealed.secrets })
+    return true
   }
 
   restoreSecrets(previous: Record<string, EncryptedPayload>): void {

@@ -45,7 +45,7 @@ const { snippetStore } = await import('./SnippetStore')
 const { collectionStore } = await import('./CollectionStore')
 const { credentialStore } = await import('./CredentialStore')
 const { inventoryStore } = await import('../inventory/InventoryStore')
-const { exportToFile, importFromFile } = await import('./Backup')
+const { exportToFile, importFromFile, recoverInterruptedImport } = await import('./Backup')
 
 /** The dialog is mocked, so nothing here ever reaches a real window. */
 const win = {} as BrowserWindow
@@ -533,5 +533,38 @@ describe('backup import', () => {
     await importFromFile(win)
 
     expect(sessionStore.getAll().sessions[0].groupId).toBeNull()
+  })
+})
+
+/**
+ * The process ending between two stores' writes — a crash, a forced quit. The
+ * in-process rollback never runs; the journal written before the first write
+ * is what the next start puts every store back from.
+ */
+describe('an import the application did not live through', () => {
+  it('is put back at the next start', async () => {
+    populate()
+    saveTo = FILE
+    await exportToFile(win, true, EXPORT_PASSWORD)
+    await startAgainWithAnEmptyVault()
+    const before = clone(snapshot())
+
+    // Stands in for the process dying after the sessions were written: the
+    // credentials write never returns, and nothing after it runs.
+    openFrom = FILE
+    vi.spyOn(credentialStore, 'saveMany').mockImplementationOnce(() => {
+      throw new Error('the process died here')
+    })
+    const restore = vi.spyOn(sessionStore, 'restore').mockImplementationOnce(() => {
+      throw new Error('and never rolled back')
+    })
+    await expect(importFromFile(win, EXPORT_PASSWORD)).rejects.toThrow()
+    restore.mockRestore()
+    expect(sessionStore.getAll().sessions).not.toEqual([])
+
+    expect(recoverInterruptedImport()).toBe('restored')
+    expect(clone(snapshot())).toEqual(before)
+    expect(vault.getSecret('secret-session')).toBeUndefined()
+    expect(recoverInterruptedImport()).toBe('none')
   })
 })

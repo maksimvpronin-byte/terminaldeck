@@ -85,6 +85,58 @@ export function isCount(value: unknown, what: string): asserts value is number {
   }
 }
 
+/** An integer within bounds. */
+export function isInt(
+  value: unknown,
+  min: number,
+  max: number,
+  what: string
+): asserts value is number {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < min || value > max) {
+    refuse(`${what} must be a whole number from ${min} to ${max}`)
+  }
+}
+
+/**
+ * A terminal's size. The far end is told this, and a pseudo-terminal of a
+ * million columns is a request some servers take literally.
+ */
+export function isTerminalSize(cols: unknown, rows: unknown): void {
+  isInt(cols, 1, 2000, 'cols')
+  isInt(rows, 1, 1000, 'rows')
+}
+
+/** The most one keystroke message may carry: a large paste, not a file. */
+export const MAX_TERMINAL_WRITE = 4 * 1024 * 1024
+
+/** A connection typed in by hand, checked before anything dials it. */
+export function checkQuickConnect(params: unknown): void {
+  if (typeof params !== 'object' || params === null) refuse('connection details must be an object')
+  const p = params as Record<string, unknown>
+  isString(p.host, 'host')
+  if (!p.host.trim() || p.host.startsWith('-')) refuse('host is not a host name')
+  isInt(p.port, 1, 65535, 'port')
+  isString(p.username, 'username')
+  if (!['password', 'privateKey', 'agent'].includes(p.authMethod as string)) {
+    refuse('authMethod is not one this application knows')
+  }
+  isOptionalString(p.password, 'password')
+  isOptionalString(p.privateKeyPath, 'privateKeyPath')
+  isOptionalString(p.passphrase, 'passphrase')
+}
+
+/** A port forwarding rule, checked before a port is bound or a remote asked to listen. */
+export function checkForwardRule(rule: unknown): void {
+  if (typeof rule !== 'object' || rule === null) refuse('the rule must be an object')
+  const r = rule as Record<string, unknown>
+  isString(r.id, 'rule id')
+  if (!['local', 'remote', 'dynamic'].includes(r.type as string)) refuse('rule type is unknown')
+  isString(r.srcHost, 'srcHost')
+  isInt(r.srcPort, 0, 65535, 'srcPort')
+  isOptionalString(r.dstHost, 'dstHost')
+  if (r.dstPort !== undefined) isInt(r.dstPort, 0, 65535, 'dstPort')
+}
+
 const DIRECTIONS = ['upload', 'download', 'relay']
 const REASONS = ['file', 'directory', 'symlink', 'unreadable', 'not-a-folder']
 

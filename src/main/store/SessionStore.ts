@@ -2,7 +2,7 @@ import { app } from 'electron'
 import { join } from 'path'
 import type { SessionGroup, SessionProfile, SessionStoreData } from '../../shared/types'
 import { applyOrder } from '../../shared/ordering'
-import { JsonDocument, readJson } from './jsonFile'
+import { JsonDocument, hasLists, readJson } from './jsonFile'
 
 function storePath(): string {
   return join(app.getPath('userData'), 'sessions.json')
@@ -32,9 +32,12 @@ class SessionStore {
    * tree over the file that still held them. A damaged file is put aside under
    * a name of its own instead, so what is left of it can be repaired by hand.
    */
-  private doc = new JsonDocument<SessionStoreData>(storePath, (path) =>
-    readJson<SessionStoreData>(path, empty)
-  )
+  private doc = new JsonDocument<SessionStoreData>(storePath, (path) => {
+    const parsed = readJson<Partial<SessionStoreData>>(path, empty, (v) =>
+      hasLists(v, { groups: 'id', sessions: 'id' })
+    )
+    return { ...parsed, version: 1, groups: parsed.groups ?? [], sessions: parsed.sessions ?? [] }
+  })
 
   getAll(): SessionStoreData {
     return this.doc.data

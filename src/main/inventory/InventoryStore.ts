@@ -10,7 +10,7 @@ import { parseInWorker } from './parseInWorker'
 import { noInventoryFound } from './files'
 import { syncRepo, headRevision } from './GitRepo'
 import { applyOverride, withoutBlanks } from '../../shared/overrides'
-import { JsonDocument, readJson } from '../store/jsonFile'
+import { JsonDocument, hasLists, readJson } from '../store/jsonFile'
 
 function configPath(): string {
   return join(app.getPath('userData'), 'inventories.json')
@@ -66,7 +66,11 @@ class InventoryStore {
   // Normalised after reading rather than trusted: a file written by an older
   // version, or edited by hand, may be missing either list.
   private doc = new JsonDocument<InventoryData>(configPath, (path) => {
-    const parsed = readJson<Partial<InventoryData>>(path, () => ({}))
+    const parsed = readJson<Partial<InventoryData>>(
+      path,
+      () => ({}),
+      (v) => hasLists(v, { sources: 'id', overrides: 'nodeId' })
+    )
     return { version: 1, sources: parsed.sources ?? [], overrides: parsed.overrides ?? [] }
   })
   /** Last successful parse per source; rebuilt on every sync. */

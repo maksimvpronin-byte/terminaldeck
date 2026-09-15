@@ -2,7 +2,7 @@ import { app, dialog, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { createHash } from 'crypto'
 import { setCertificateVerifier, type CertificateQuestion } from './certificateVerifier'
-import { JsonDocument, readJson } from '../store/jsonFile'
+import { JsonDocument, isStringMap, readJson } from '../store/jsonFile'
 
 /**
  * Which TLS certificates a desktop session may be carried over.
@@ -35,7 +35,7 @@ export function certificateKeyOf(host: string, port: number): string {
 
 class CertificateStore {
   private doc = new JsonDocument<TrustedCertificates>(storePath, (path) =>
-    readJson<TrustedCertificates>(path, () => ({}))
+    readJson<TrustedCertificates>(path, () => ({}), isStringMap)
   )
 
   get(host: string, port: number): string | undefined {
