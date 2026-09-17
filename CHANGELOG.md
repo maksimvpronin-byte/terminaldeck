@@ -6,6 +6,32 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.18.2
+
+### Fixed
+
+- **Ctrl combinations did not reach a desktop in a window.** Ctrl+R to refresh a
+  page on the far machine, and the rest of the keys an application menu answers
+  first, were taken by this one whenever the desktop was not full screen — and
+  after leaving full screen the claim could outlive it, so Ctrl combinations
+  went nowhere at all while letters still typed. A desktop now takes the whole
+  keyboard while it has the focus, full screen or not, and gives it back the
+  moment the focus goes: to another pane, to another window, or with the pane
+  hidden or closed. Click outside the desktop and this app has its shortcuts
+  back.
+
+### Added
+
+- **A diagnostics journal**, for faults that do not happen on demand — a
+  terminal that stops answering after Ctrl+D, a key that never reaches a
+  desktop. `diagnostics.log`, in the folder Settings → Security → Open logs
+  folder opens, records how each SSH session opened and ended (the exit status,
+  the end of output, the channel closing), what was sent to it as counts and
+  control characters, and which modifiers and Ctrl combinations went to a
+  desktop. Nothing typed is written: a line of text is its length, and a letter
+  pressed on its own is not recorded at all. The file is kept under 2 MB with one
+  older copy beside it.
+
 ## 0.18.1
 
 ### Fixed
