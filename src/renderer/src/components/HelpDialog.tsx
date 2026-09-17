@@ -101,12 +101,14 @@ const SECTIONS: Section[] = [
       { keys: 'F11', what: 'Full screen, which is the only way Alt+Tab reaches the far side' },
       { what: 'On a Mac that is ⌥Tab: ⌘Tab belongs to macOS and cannot be taken from it' },
       { what: 'Hold Escape to leave full screen: while there, it belongs to the session' },
-      { what: 'Full screen also hands over every shortcut this app owns, ⌘W and Ctrl+W included' },
+      {
+        what: 'A desktop with the focus takes every shortcut this app owns, ⌘W and Ctrl+W included'
+      },
       { what: 'So a key aimed at the far machine cannot close a tab on this one instead' },
       {
         what: 'Nothing is held back: F11 and holding Escape are the way out, and neither is a shortcut'
       },
-      { what: 'In a window rather than full screen the app keeps its shortcuts as before' },
+      { what: 'Click outside the desktop and this app has its shortcuts back' },
       { what: 'The pane toolbar goes entirely, so the desktop is the size of the display' },
       {
         what: 'There is nothing of this app over the picture — the top edge belongs to the far side'

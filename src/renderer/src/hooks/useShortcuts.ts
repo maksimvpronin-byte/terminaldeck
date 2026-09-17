@@ -10,7 +10,7 @@ function clampFontSize(size: number): number {
 }
 
 /**
- * Whether a remote desktop is full screen, and so owns every key on the board.
+ * Whether a remote desktop has focus or is full screen and owns the keyboard.
  *
  * Asked of the DOM rather than kept as state, because the DOM is where the
  * answer already is and a flag would be one more thing to leave stale when a
@@ -22,6 +22,7 @@ function clampFontSize(size: number): number {
  * desktop, and F11 is only handled by one.
  */
 function desktopHoldsKeyboard(): boolean {
+  if (document.activeElement?.closest('.graphical-screen')) return true
   const full = document.fullscreenElement
   return full !== null && full.querySelector('.graphical-screen') !== null
 }
@@ -127,7 +128,7 @@ export function useShortcuts(actions: {
       if (isTyping(e.target)) return
 
       /**
-       * A full-screen desktop takes the whole keyboard, this app included.
+       * A focused desktop takes the whole keyboard, this app included.
        *
        * The capture phase is what makes this necessary rather than merely
        * tidy. These handlers run before the session's own, so every shortcut

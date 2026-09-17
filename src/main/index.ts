@@ -6,6 +6,7 @@ import { installSenderCheck } from './ipc/guard'
 import { registerIpcHandlers } from './ipc/handlers'
 import { recoverInterruptedImport } from './store/Backup'
 import { desktopHoldsKeyboard, releaseKeyboard } from './keyboardCapture'
+import { diag } from './diagnostics'
 import { installCertificateVerifier } from './rdp/CertificateTrust'
 import { freeRdpBridge } from './rdp/FreeRdpBridge'
 import { remoteEdit } from './ssh/RemoteEdit'
@@ -119,6 +120,9 @@ function createWindow(): void {
   // A window that has just loaded is holding no session, whatever the one
   // before it was doing. See releaseKeyboard.
   mainWindow.webContents.on('did-finish-load', releaseKeyboard)
+  // Leaving full screen can keep focus inside RDP. Only losing window focus
+  // clears the native claim; the renderer renews it when focus returns.
+  mainWindow.on('blur', releaseKeyboard)
 
   /**
    * What the page opened goes when the page does.
@@ -157,7 +161,7 @@ function createWindow(): void {
     if (input.type !== 'keyDown' || !(input.control || input.meta)) return
 
     /**
-     * A full-screen desktop owns the keyboard, and this is the only place that
+     * A focused desktop owns the keyboard, and this is the only place that
      * can actually give it to one.
      *
      * The window can stop its own shortcuts and does, but a menu accelerator
@@ -176,6 +180,7 @@ function createWindow(): void {
      */
     if (desktopHoldsKeyboard() && !input.alt && !HELD_MODIFIERS.has(input.code)) {
       event.preventDefault()
+      diag('keys', `taken for the focused desktop: ${input.code}`)
       // With the modifiers that were down, because this keystroke is one the
       // window will never see: it is how the session learns that its idea of
       // what is held still matches the keyboard.

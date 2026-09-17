@@ -2,10 +2,10 @@ import { BrowserWindow, ipcMain } from 'electron'
 import { IPC } from '../shared/ipc-channels'
 
 /**
- * Whether a desktop session is currently full screen and owning the keyboard.
+ * Whether a desktop session currently has focus and owns the keyboard.
  *
- * The window decides this — it is the only side that knows which pane is full
- * screen — but the main process needs the answer, because two kinds of key
+ * The renderer decides this — it knows which pane has focus — but the main
+ * process needs the answer, because two kinds of key
  * never reach the window at all. Chromium zooms the whole interface on Ctrl
  * with `+`, `-` or `0`; and a menu accelerator, ⌘W for Close Window among them,
  * is answered before the page is told anything. Both are settled in

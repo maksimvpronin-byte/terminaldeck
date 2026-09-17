@@ -3,12 +3,24 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render } from '@testing-library/react'
 import RemoteScreen from './RemoteScreen'
 import { PTR } from '../../../shared/rdpInput'
+import type { ForwardedKey } from '../../../shared/types'
+import { useShortcuts } from '../hooks/useShortcuts'
 
 let frame: Parameters<typeof window.td.rdp.onDesktopFrame>[1]
 let event: Parameters<typeof window.td.rdp.onDesktopEvent>[1]
 const putImageData = vi.fn()
 const desktopSend = vi.fn()
+const setKeyboardCapture = vi.fn()
+const forwarded = new Set<(key: ForwardedKey) => void>()
 beforeEach(() => {
+  Object.defineProperty(document, 'fullscreenElement', {
+    configurable: true,
+    get: () => null
+  })
+  Object.defineProperty(navigator, 'keyboard', {
+    configurable: true,
+    value: { lock: vi.fn(async () => undefined), unlock: vi.fn() }
+  })
   vi.stubGlobal(
     'ResizeObserver',
     class {
@@ -46,7 +58,172 @@ beforeEach(() => {
     event = cb
     return () => undefined
   }
-  window.td.ui.onForwardKey = () => () => undefined
+  setKeyboardCapture.mockClear()
+  window.td.ui.setKeyboardCapture = setKeyboardCapture
+  forwarded.clear()
+  window.td.ui.onForwardKey = (cb) => {
+    forwarded.add(cb)
+    return () => {
+      forwarded.delete(cb)
+    }
+  }
+})
+
+describe('desktop shortcuts', () => {
+  const props = {
+    sessionId: 'host',
+    look: null,
+    onPhase: vi.fn(),
+    onNotice: vi.fn(),
+    onMeasured: vi.fn()
+  }
+  const ctrlR: ForwardedKey = {
+    code: 'KeyR',
+    control: true,
+    shift: false,
+    alt: false,
+    meta: false
+  }
+  const forward = (key = ctrlR): void => {
+    act(() => {
+      for (const cb of forwarded) cb(key)
+    })
+  }
+  const keys = (): unknown[] =>
+    desktopSend.mock.calls.filter(([, fields]) => fields.a === 'key').map(([, fields]) => fields)
+
+  it('claims menu shortcuts in a windowed desktop and forwards Ctrl+R with its modifier', async () => {
+    const view = render(<RemoteScreen {...props} visible />)
+    await act(async () => {})
+    const screen = view.container.querySelector<HTMLElement>('.graphical-screen')!
+    act(() => screen.focus())
+    expect(setKeyboardCapture).toHaveBeenLastCalledWith(true)
+    desktopSend.mockClear()
+
+    // Ctrl may have been pressed before the pane gained focus.
+    forward()
+    expect(keys()).toEqual([
+      { a: 'key', code: 0x1d, down: true, ext: false },
+      { a: 'key', code: 0x13, down: true, ext: false },
+      { a: 'key', code: 0x13, down: false, ext: false }
+    ])
+    expect(setKeyboardCapture).toHaveBeenLastCalledWith(true)
+    fireEvent.keyUp(screen, { code: 'ControlLeft', key: 'Control' })
+    expect(keys().at(-1)).toEqual({ a: 'key', code: 0x1d, down: false, ext: false })
+  })
+
+  it('releases held modifiers on Alt+Tab and restores capture when the window returns', async () => {
+    const view = render(<RemoteScreen {...props} visible />)
+    await act(async () => {})
+    act(() => view.container.querySelector<HTMLElement>('.graphical-screen')!.focus())
+    forward()
+    fireEvent.blur(window)
+    expect(setKeyboardCapture).toHaveBeenLastCalledWith(false)
+    expect(keys().at(-1)).toEqual({ a: 'key', code: 0x1d, down: false, ext: false })
+    fireEvent.focus(window)
+    expect(setKeyboardCapture).toHaveBeenLastCalledWith(true)
+    desktopSend.mockClear()
+    forward()
+    expect(keys()[0]).toEqual({ a: 'key', code: 0x1d, down: true, ext: false })
+  })
+
+  it('keeps capture after leaving full screen while the desktop still has focus', async () => {
+    const view = render(<RemoteScreen {...props} visible />)
+    await act(async () => {})
+    const screen = view.container.querySelector<HTMLElement>('.graphical-screen')!
+    act(() => screen.focus())
+    const fullscreen = vi.spyOn(document, 'fullscreenElement', 'get')
+    fullscreen.mockReturnValue(screen)
+    fireEvent(document, new Event('fullscreenchange'))
+    fullscreen.mockReturnValue(null)
+    fireEvent(document, new Event('fullscreenchange'))
+    expect(setKeyboardCapture).toHaveBeenLastCalledWith(true)
+    desktopSend.mockClear()
+    forward()
+    expect(keys()).toHaveLength(3)
+  })
+
+  it('delivers a forwarded shortcut only to the focused pane and gives capture back to local inputs', async () => {
+    const view = render(
+      <>
+        <RemoteScreen {...props} visible />
+        <RemoteScreen {...props} sessionId="second" visible />
+        <input aria-label="local" />
+      </>
+    )
+    await act(async () => {})
+    const screens = view.container.querySelectorAll<HTMLElement>('.graphical-screen')
+    act(() => screens[0].focus())
+    act(() => screens[1].focus())
+    expect(setKeyboardCapture).toHaveBeenLastCalledWith(true)
+    desktopSend.mockClear()
+    forward()
+    expect(keys()).toHaveLength(3)
+
+    act(() => view.getByLabelText('local').focus())
+    expect(setKeyboardCapture).toHaveBeenLastCalledWith(false)
+    desktopSend.mockClear()
+    forward()
+    expect(keys()).toEqual([])
+  })
+
+  it('releases capture when the focused desktop is hidden or closed', async () => {
+    const view = render(<RemoteScreen {...props} visible />)
+    await act(async () => {})
+    const screen = view.container.querySelector<HTMLElement>('.graphical-screen')!
+    act(() => screen.focus())
+    view.rerender(<RemoteScreen {...props} visible={false} />)
+    expect(setKeyboardCapture).toHaveBeenLastCalledWith(false)
+    desktopSend.mockClear()
+    forward()
+    expect(keys()).toEqual([])
+    view.rerender(<RemoteScreen {...props} visible />)
+    act(() => screen.focus())
+    view.unmount()
+    expect(setKeyboardCapture).toHaveBeenLastCalledWith(false)
+    expect(forwarded.size).toBe(0)
+  })
+
+  it('keeps the focused desktop captured when an unfocused sibling closes', async () => {
+    const first = render(<RemoteScreen {...props} visible />)
+    const second = render(<RemoteScreen {...props} sessionId="second" visible />)
+    await act(async () => {})
+    act(() => second.container.querySelector<HTMLElement>('.graphical-screen')!.focus())
+    first.unmount()
+    expect(setKeyboardCapture).toHaveBeenLastCalledWith(true)
+    fireEvent.blur(window)
+    fireEvent.focus(window)
+    expect(setKeyboardCapture).toHaveBeenLastCalledWith(true)
+    desktopSend.mockClear()
+    forward()
+    expect(keys()).toHaveLength(3)
+  })
+
+  it('keeps application shortcuts out of the windowed desktop and restores them outside it', async () => {
+    const openSnippets = vi.fn()
+    function Shortcuts(): null {
+      useShortcuts({ openSnippets, openHelp: vi.fn(), openHosts: vi.fn() })
+      return null
+    }
+    const view = render(
+      <>
+        <Shortcuts />
+        <RemoteScreen {...props} visible />
+        <button>Local</button>
+      </>
+    )
+    await act(async () => {})
+    const screen = view.container.querySelector<HTMLElement>('.graphical-screen')!
+    act(() => screen.focus())
+    fireEvent.keyDown(screen, { code: 'ControlLeft', key: 'Control', ctrlKey: true })
+    fireEvent.keyDown(screen, { code: 'KeyK', key: 'K', ctrlKey: true, shiftKey: true })
+    expect(openSnippets).not.toHaveBeenCalled()
+    expect(keys()).toContainEqual({ a: 'key', code: 0x25, down: true, ext: false })
+    const local = view.getByText('Local')
+    act(() => local.focus())
+    fireEvent.keyDown(local, { code: 'KeyK', key: 'K', ctrlKey: true, shiftKey: true })
+    expect(openSnippets).toHaveBeenCalledOnce()
+  })
 })
 
 describe('console mode', () => {

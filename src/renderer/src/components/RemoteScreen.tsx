@@ -7,6 +7,8 @@ import { modifierFixes } from '../../../shared/modifierSync'
 import type { ForwardedKey, RdpView } from '../../../shared/types'
 import { isRefusal } from '../../../shared/rdpLogon'
 import { endedBySignOut } from '../../../shared/rdpLogoff'
+import { diag, diagKey } from '../diag'
+import { describeModifiers } from '../../../shared/diagnostics'
 
 /**
  * A desktop, drawn from the pixels a client in another process decoded.
@@ -221,6 +223,12 @@ export default function RemoteScreen({
       ignore: options.ignore,
       press: options.press
     })
+    if (fixes.length > 0) {
+      diag(
+        'rdp',
+        `modifier repair ${fixes.map((f) => `${f.code} ${f.down ? 'down' : 'up'}`).join(', ')}`
+      )
+    }
     for (const fix of fixes) {
       if (!sendKey(fix.code, fix.down)) continue
       if (fix.down) heldRef.current.add(fix.code)
@@ -594,6 +602,10 @@ export default function RemoteScreen({
   useEffect(() => {
     tell({ a: 'visible', value: visible })
     if (visible) applyCursor()
+    else if (containerRef.current?.contains(document.activeElement)) {
+      const focused = document.activeElement as HTMLElement
+      focused.blur()
+    }
     // Session starts separately and sends the current visibility after it opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible])
@@ -698,6 +710,7 @@ export default function RemoteScreen({
     const onKeyDown = (event: KeyboardEvent): void => {
       if (!container.contains(document.activeElement)) return
       const code = substituteCommand(event.code, lookRef.current?.commandAsControl === true)
+      diagKey('rdp', event, `held=${[...held].join(',') || '-'}`)
       // Every key carries the truth about every modifier, so the one this event
       // is about is left alone and the rest are made to agree.
       syncModifiers(event, { ignore: code })
@@ -763,6 +776,7 @@ export default function RemoteScreen({
     const onKeyUp = (event: KeyboardEvent): void => {
       if (!container.contains(document.activeElement)) return
       const code = substituteCommand(event.code, lookRef.current?.commandAsControl === true)
+      diagKey('rdp', event, `held=${[...held].join(',') || '-'}`)
       event.preventDefault()
       event.stopPropagation()
       held.delete(code)
@@ -779,9 +793,28 @@ export default function RemoteScreen({
 
     /** Everything still down goes up, because nothing else will report it. */
     const releaseAll = (): void => {
+      diag('rdp', `focus lost, releasing ${[...held].join(',') || 'nothing'}`)
       for (const code of held) sendKey(code, false)
       held.clear()
       tell({ a: 'focus', flags: 0 })
+    }
+
+    // Menu accelerators must belong to the focused desktop in windowed mode
+    // too. Use the destination on blur: activeElement can briefly be body,
+    // and moving between desktops must not let another pane clear the claim.
+    const captureFor = (target: EventTarget | null): void => {
+      window.td.ui.setKeyboardCapture(
+        target instanceof Element && target.closest('.graphical-screen') !== null
+      )
+    }
+    const onFocus = (): void => captureFor(document.activeElement)
+    const onBlur = (event: FocusEvent): void => {
+      releaseAll()
+      captureFor(event.relatedTarget)
+    }
+    const onWindowBlur = (): void => {
+      releaseAll()
+      window.td.ui.setKeyboardCapture(false)
     }
 
     /**
@@ -790,18 +823,22 @@ export default function RemoteScreen({
      * Two reasons it has to, and both are things this end cannot reach. Chromium
      * zooms the whole interface on Ctrl with `+`, `-` or `0`; and a menu
      * accelerator — ⌘W for Close Window, ⌘R, ⌘Q — is answered before the page
-     * is told anything at all. While a session is full screen the main process
+     * is told anything at all. While a session has focus the main process
      * takes every combination for that reason and hands it back here, where it
      * goes to the far end like any other key.
      *
      * The modifier itself was never taken, so it is already down over there and
      * the pair arrives as the combination it was typed as.
      *
-     * Every mounted pane hears this; only the one actually holding the screen
+     * Every mounted pane hears this; only the one actually holding focus
      * acts on it.
      */
     const stopForwarded = window.td.ui.onForwardKey((key) => {
-      if (document.fullscreenElement !== fullscreenTarget(container)) return
+      if (!visibleRef.current || !container.contains(document.activeElement)) return
+      diag(
+        'rdp',
+        `forwarded from main ${key.code} mods=${describeModifiers({ ctrl: key.control, shift: key.shift, alt: key.alt, meta: key.meta })}`
+      )
       /*
        * The modifiers first, from the state this keystroke carried.
        *
@@ -821,15 +858,25 @@ export default function RemoteScreen({
 
     container.addEventListener('keydown', onKeyDown)
     container.addEventListener('keyup', onKeyUp)
-    container.addEventListener('blur', releaseAll, true)
-    window.addEventListener('blur', releaseAll)
+    container.addEventListener('focus', onFocus, true)
+    container.addEventListener('blur', onBlur, true)
+    window.addEventListener('focus', onFocus)
+    window.addEventListener('blur', onWindowBlur)
+    document.addEventListener('fullscreenchange', onFocus)
 
     return () => {
       stopForwarded()
       container.removeEventListener('keydown', onKeyDown)
       container.removeEventListener('keyup', onKeyUp)
-      container.removeEventListener('blur', releaseAll, true)
-      window.removeEventListener('blur', releaseAll)
+      container.removeEventListener('focus', onFocus, true)
+      container.removeEventListener('blur', onBlur, true)
+      window.removeEventListener('focus', onFocus)
+      window.removeEventListener('blur', onWindowBlur)
+      document.removeEventListener('fullscreenchange', onFocus)
+      // React has already removed this element when passive cleanup runs.
+      // Re-read the destination so closing an unfocused pane keeps its
+      // neighbour's claim, while closing the focused one releases it.
+      captureFor(document.activeElement)
     }
     /* Once. The keyboard is bound to the element, not to any value, and what it
        reads about the host it reads through a ref.
@@ -926,9 +973,6 @@ export default function RemoteScreen({
       } else {
         keyboard?.unlock()
       }
-      // And the main process is told, so the keys it claims before this window
-      // sees them are handed over rather than acted on here.
-      window.td.ui.setKeyboardCapture(held)
     }
 
     document.addEventListener('fullscreenchange', onChange)
@@ -938,7 +982,6 @@ export default function RemoteScreen({
       // claim left standing would go on taking keys for a session that is gone.
       if (holding) {
         keyboard?.unlock()
-        window.td.ui.setKeyboardCapture(false)
       }
     }
   }, [])

@@ -1058,14 +1058,14 @@ export const ru: Record<string, string> = {
   'Twenty at once is the limit — every one of them is a real login on the far end':
     'Больше двадцати за раз нельзя — каждое это настоящий вход на той стороне',
   ', {accounts} saved accounts': ', учётных записей: {accounts}',
-  'Full screen also hands over every shortcut this app owns, ⌘W and Ctrl+W included':
-    'Полный экран также отдаёт все собственные сочетания приложения, включая ⌘W и Ctrl+W',
+  'A desktop with the focus takes every shortcut this app owns, ⌘W and Ctrl+W included':
+    'Рабочий стол в фокусе забирает все собственные сочетания приложения, включая ⌘W и Ctrl+W',
   'So a key aimed at the far machine cannot close a tab on this one instead':
     'Чтобы клавиша, адресованная удалённой машине, не закрывала вкладку на этой',
   'Nothing is held back: F11 and holding Escape are the way out, and neither is a shortcut':
     'Ничего не удерживается: выход — F11 или удержание Escape, ни то ни другое не является сочетанием',
-  'In a window rather than full screen the app keeps its shortcuts as before':
-    'В оконном режиме, а не в полном экране, сочетания приложения работают как раньше',
+  'Click outside the desktop and this app has its shortcuts back':
+    'Щёлкните вне рабочего стола, и сочетания приложения снова работают',
   '⌘Q and ⌘Tab stay with macOS in a window, and go to the session in full screen':
     '⌘Q и ⌘Tab остаются за macOS в окне и уходят в сеанс в полном экране',
   'The size this desktop asked for, and what the server gave back.':
