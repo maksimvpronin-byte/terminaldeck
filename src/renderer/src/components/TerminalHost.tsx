@@ -11,6 +11,7 @@ import { useAppearance } from '../hooks/useAppearance'
 import ContextMenu, { type MenuItem } from './ContextMenu'
 import { IS_MAC } from '../state/keys'
 import { useT } from '../i18n'
+import { diag, diagKey } from '../diag'
 
 interface Props {
   target: PaneTarget
@@ -116,6 +117,7 @@ export default function TerminalHost({
         onOutputRef.current?.()
       }),
       window.td.ssh.onStatus(cid, (status) => {
+        diag('terminal', `${cid.slice(0, 8)} status ${status}`)
         if (status === 'closed') {
           term.writeln('\r\n\x1b[31m[connection closed]\x1b[0m')
           setClosed(true)
@@ -203,6 +205,10 @@ export default function TerminalHost({
     if (active) term.focus()
 
     term.attachCustomKeyEventHandler((e) => {
+      // Modifiers and combinations only, and which session they were for.
+      if (e.type === 'keydown' || e.type === 'keyup') {
+        diagKey('terminal', e, connIdRef.current?.slice(0, 8) ?? 'no session')
+      }
       if (e.type !== 'keydown') return true
       const mod = e.metaKey || e.ctrlKey
       if (!mod) return true
@@ -232,6 +238,17 @@ export default function TerminalHost({
       }
       return true
     })
+
+    /*
+     * A terminal that has lost the keyboard looks exactly like one whose session
+     * has stopped answering, so the journal says which of the two it was.
+     */
+    term.textarea?.addEventListener('focus', () =>
+      diag('terminal', `${connIdRef.current?.slice(0, 8) ?? 'no session'} focus`)
+    )
+    term.textarea?.addEventListener('blur', () =>
+      diag('terminal', `${connIdRef.current?.slice(0, 8) ?? 'no session'} blur`)
+    )
 
     term.onData((data) => {
       const own = connIdRef.current

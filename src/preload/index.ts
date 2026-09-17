@@ -502,6 +502,11 @@ const api = {
   logs: {
     reveal: (): Promise<string> => ipcRenderer.invoke(IPC.logsReveal)
   },
+  /**
+   * One line for the diagnostics journal. Say what happened, never what was
+   * typed — `shared/diagnostics.ts` has the helpers that keep it that way.
+   */
+  diag: (source: string, message: string): void => ipcRenderer.send(IPC.diagLog, source, message),
   files: {
     /** Electron 32+ dropped File.path; this is the supported replacement. */
     pathFor: (file: File): string => webUtils.getPathForFile(file)

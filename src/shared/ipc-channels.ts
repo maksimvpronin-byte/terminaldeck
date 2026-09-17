@@ -186,7 +186,7 @@ export const IPC = {
   /** main -> renderer: terminal font zoom, intercepted before Chromium's page zoom */
   uiZoom: 'ui:zoom',
   /**
-   * renderer -> main: whether a full-screen desktop owns the keyboard.
+   * renderer -> main: whether a focused desktop owns the keyboard.
    *
    * The main process has to claim the zoom keys before Chromium can act on
    * them, which puts it in front of a session that should be receiving every
@@ -214,6 +214,8 @@ export const IPC = {
 
   // Session logs
   logsReveal: 'logs:reveal',
+  /** A line for the diagnostics journal, from the window; see main/diagnostics.ts. */
+  diagLog: 'diag:log',
 
   // Dialogs
   dialogPickPrivateKey: 'dialog:pickPrivateKey',

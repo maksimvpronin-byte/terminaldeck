@@ -22,6 +22,8 @@ import { vault } from '../vault/Vault'
 import { makeHostVerifier } from './hostVerifier'
 import { requireUnlocked } from '../vault/locked'
 import { requestAuth } from './authPrompt'
+import { diag } from '../diagnostics'
+import { describeInput } from '../../shared/diagnostics'
 
 interface LiveConnection {
   fileAccess?: import('../../shared/types').FileAccess
@@ -602,6 +604,44 @@ async function connectChain(
   return { target: chain[chain.length - 1], chain }
 }
 
+/** The first block of an id: enough to tell sessions apart in the journal. */
+function short(connectionId: string): string {
+  return connectionId.slice(0, 8)
+}
+
+/**
+ * Output, as the journal sees it: how much, not what, and at most a line a
+ * second per session — a build log would otherwise be the whole journal.
+ */
+const received = new Map<string, { bytes: number; chunks: number; timer?: NodeJS.Timeout }>()
+
+function noteReceived(connectionId: string, bytes: number): void {
+  let tally = received.get(connectionId)
+  if (!tally) {
+    tally = { bytes: 0, chunks: 0 }
+    received.set(connectionId, tally)
+  }
+  tally.bytes += bytes
+  tally.chunks++
+  if (!tally.timer) {
+    const t = tally
+    t.timer = setTimeout(() => reportReceived(connectionId, t), 1000)
+    t.timer.unref?.()
+  }
+}
+
+function reportReceived(
+  connectionId: string,
+  tally: { bytes: number; chunks: number; timer?: NodeJS.Timeout }
+): void {
+  if (tally.timer) clearTimeout(tally.timer)
+  tally.timer = undefined
+  if (tally.chunks === 0) return
+  diag('ssh', `${short(connectionId)} received ${tally.bytes} bytes in ${tally.chunks} chunks`)
+  tally.bytes = 0
+  tally.chunks = 0
+}
+
 class SSHManager {
   private connections = new Map<string, LiveConnection>()
 
@@ -625,6 +665,7 @@ class SSHManager {
   markReady(win: BrowserWindow, connectionId: string): void {
     const conn = this.connections.get(connectionId) ?? this.closing.get(connectionId)
     if (!conn || conn.ready) return
+    diag('ssh', `${short(connectionId)} window listening, ${conn.pending.length} held back`)
     if (conn.readyTimer) clearTimeout(conn.readyTimer)
     conn.readyTimer = undefined
     conn.ready = true
@@ -685,6 +726,7 @@ class SSHManager {
 
     if (!conn.paused && conn.inFlight >= HIGH_WATER) {
       conn.paused = true
+      diag('ssh', `${short(conn.id)} paused, ${conn.inFlight} bytes unacknowledged`)
       // Both halves: stderr is a readable of its own on the same channel, and a
       // build pouring warnings out of it floods just as well as stdout does.
       conn.stream.pause()
@@ -706,6 +748,7 @@ class SSHManager {
     conn.inFlight = Math.max(0, conn.inFlight - bytes)
     if (conn.paused && conn.inFlight <= LOW_WATER) {
       conn.paused = false
+      diag('ssh', `${short(connectionId)} resumed`)
       conn.stream.resume()
       conn.stream.stderr.resume()
     }
@@ -882,7 +925,12 @@ class SSHManager {
       let pending = ''
       let lastCwd: string | undefined
 
+      diag(
+        'ssh',
+        `${short(connectionId)} shell open, ${chain.length} hop(s), follow cwd ${connection.followCwd}`
+      )
       stream.on('data', (raw: Buffer) => {
+        noteReceived(connectionId, raw.length)
         // Still mid-login, or mid-anything: the setup line can wait.
         connection.setupWait?.restart()
         // The setup line is ours, not the user's, so its echo is taken back
@@ -906,7 +954,24 @@ class SSHManager {
       stream.stderr.on('data', (data: Buffer) => {
         this.queueOutput(win, connection, data)
       })
+      /*
+       * The steps a shell takes on the way out, each written down: the exit
+       * status, the end of its output, and the channel closing. A session that
+       * stops answering without reaching the last of them says here which one
+       * it never got to.
+       */
+      stream.on('exit', (code: number | null, signal?: string) => {
+        diag('ssh', `${short(connectionId)} remote exit code=${code} signal=${signal ?? '-'}`)
+      })
+      stream.on('end', () => diag('ssh', `${short(connectionId)} remote end of output`))
+      stream.on('error', (e: Error) =>
+        diag('ssh', `${short(connectionId)} channel error: ${e.message}`)
+      )
+      target.on('close', () => diag('ssh', `${short(connectionId)} client connection closed`))
       stream.on('close', () => {
+        const tally = received.get(connectionId)
+        if (tally) reportReceived(connectionId, tally)
+        diag('ssh', `${short(connectionId)} channel closed, telling the window`)
         // Whatever is still held back is the last thing the host said — an
         // error message, usually. Flushed before the status, so a connection
         // that ends inside a flush interval does not take it with it.
@@ -1041,7 +1106,13 @@ class SSHManager {
   }
 
   write(connectionId: string, data: string): void {
-    this.connections.get(connectionId)?.stream.write(data)
+    const conn = this.connections.get(connectionId)
+    // What arrived, as counts and control characters — see shared/diagnostics.ts.
+    diag(
+      'ssh',
+      `${short(connectionId)} write ${describeInput(data)}${conn ? (conn.paused ? ' (paused)' : '') : ' to no live session'}`
+    )
+    conn?.stream.write(data)
   }
 
   resize(connectionId: string, cols: number, rows: number): void {
@@ -1049,6 +1120,7 @@ class SSHManager {
   }
 
   disconnect(connectionId: string): void {
+    diag('ssh', `${short(connectionId)} disconnect asked for by the window`)
     this.teardown(connectionId)
   }
 
@@ -1133,6 +1205,10 @@ class SSHManager {
   private teardown(connectionId: string): void {
     const conn = this.connections.get(connectionId)
     if (!conn) return
+    diag('ssh', `${short(connectionId)} teardown`)
+    const tally = received.get(connectionId)
+    if (tally?.timer) clearTimeout(tally.timer)
+    received.delete(connectionId)
     /*
      * Announced before anything is closed, so whatever runs here still sees a
      * connection it can work with — the SFTP channels, the port forwards, the
