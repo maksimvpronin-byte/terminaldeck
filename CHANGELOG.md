@@ -6,6 +6,45 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.18.3
+
+### Fixed
+
+- **A desktop could go on reading files after the clipboard was taken back.**
+  Files copied here and offered to a desktop stayed readable from it after the
+  vault locked, the window lost the focus or something else was copied: the
+  desktop client kept the list it had built for the paste and answered from it.
+  It now refuses the bytes of any copy that is no longer the one held.
+- **A desktop in a background tab shared the clipboard.** With the window in
+  focus, every desktop in it was handed what was copied — including one in a
+  tab nobody was looking at, perhaps on another network — and could replace the
+  local clipboard. Only a desktop on screen shares it now; one in a hidden tab
+  is brought up to date when the tab is shown. A vault locked while files from a
+  desktop were being put on the clipboard now stops that too.
+- **A mouse button stayed held on the desktop.** A press on a desktop released
+  over the toolbar, another pane or outside the window never reached the far
+  end, which went on dragging or selecting. The release is now heard wherever it
+  happens, and a button still down when the window loses the focus is let go.
+- **A mistyped password could not be corrected.** After a failed connect, Try
+  again sent the same password again. A host with no saved password now offers
+  Another password… beside it.
+- **A 5K display ended its own desktop.** Asked for at the display's full
+  density, a desktop of 5120×2880 sent a first frame larger than the window
+  accepts, and the session ended. The size asked for is now kept within 4K,
+  keeping its shape.
+- **The host palette showed the repository's login** for a host whose group has
+  a login set here, and searched by it. It now shows the one a connection uses.
+- **A drag whose save failed left the tree as dragged.** The host or folder
+  looked moved though nothing was kept; the tree now goes back to what is saved.
+- **Deleting several hosts** rewrote the host file once per host, and a failure
+  halfway left half of them gone. The selection is now deleted in one write, all
+  or none.
+
+### Changed
+
+- The sidebar and inventory trees are indexed once per change instead of being
+  searched once per row, so a large inventory redraws and filters faster.
+
 ## 0.18.2
 
 ### Fixed
