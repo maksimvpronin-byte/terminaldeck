@@ -6,6 +6,16 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.19.0
+
+### Added
+
+- **Clicking a host that is open shows it.** A single click on a host in the
+  tree, the inventory or a collection brings its pane forward, switching
+  workspace and tab if it is elsewhere. Open in several places, each click
+  goes to the next one. A host that is not open is only selected, as before,
+  and connecting is still a double-click.
+
 ## 0.18.5
 
 ### Fixed
