@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
 import { MAX_DESKTOP_AREA, desktopSizeFor } from './desktopSize'
-import { createRecordReader } from '../main/rdp/recordStream'
 import type { RdpView } from './types'
 
 /** A host that has decided nothing in particular. */
@@ -155,26 +154,11 @@ describe('the size a desktop is asked for', () => {
 
 /**
  * A whole frame crosses to the window as one record, and the reader refuses a
- * record larger than a 4K desktop. A size asked for past that is a session
- * ended by its own first full frame — a 5K display did exactly that.
+ * record larger than a 4K desktop (see recordStream.test). A size asked for past
+ * that is a session ended by its own first full frame — a 5K display did exactly
+ * that.
  */
 describe('a desktop larger than a frame can carry', () => {
-  /** Whether a whole frame of this size gets through the reader. */
-  function frameArrives(size: { width: number; height: number }): boolean {
-    let arrived = false
-    const reader = createRecordReader(() => (arrived = true))
-    const pixels = size.width * size.height * 4
-    const header = Buffer.alloc(13)
-    header[0] = 2
-    header.writeUInt32LE(8 + pixels, 1)
-    reader.push(header)
-    // Only the header is needed to be refused, so only a refusal is checked
-    // without allocating the frame itself.
-    if (reader.broken) return false
-    reader.push(Buffer.alloc(pixels))
-    return arrived
-  }
-
   it('is asked for smaller when a 5K display would ask for its own pixels', () => {
     const size = desktopSizeFor(
       { ...plain, magnification: 100, pixelBudget: 100 },
@@ -183,7 +167,6 @@ describe('a desktop larger than a frame can carry', () => {
     )!
     expect(size.width * size.height).toBeLessThanOrEqual(MAX_DESKTOP_AREA)
     expect(size.width / size.height).toBeCloseTo(16 / 9, 2)
-    expect(frameArrives(size)).toBe(true)
   })
 
   it('is asked for smaller when a pinned size is larger than 4K', () => {
@@ -195,7 +178,6 @@ describe('a desktop larger than a frame can carry', () => {
     expect(size.width * size.height).toBeLessThanOrEqual(MAX_DESKTOP_AREA)
     expect(size.width % 2).toBe(0)
     expect(size.height % 2).toBe(0)
-    expect(frameArrives(size)).toBe(true)
   })
 
   it('leaves a 4K desktop as it is', () => {

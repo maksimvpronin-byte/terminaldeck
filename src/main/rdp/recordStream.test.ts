@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { createRecordReader, encodeCommand, readCursor, readFrame, RECORD } from './recordStream'
+import { MAX_DESKTOP_AREA } from '../../shared/desktopSize'
 
 /** One record, framed the way the client frames it. */
 function record(type: number, payload: Buffer): Buffer {
@@ -163,5 +164,30 @@ describe('encodeCommand', () => {
 
   it('sends a flag as the client reads it', () => {
     expect(encodeCommand({ sound: true, composition: false })).toBe('sound\t1\ncomposition\t0\n\n')
+  })
+})
+
+/**
+ * The reader and the size a desktop is asked for are held to one number, so a
+ * size asked for is a size whose full frame can arrive.
+ */
+describe('the largest frame', () => {
+  function header(pixels: number): Buffer {
+    const out = Buffer.alloc(5)
+    out[0] = RECORD.frame
+    out.writeUInt32LE(8 + pixels * 4, 1)
+    return out
+  }
+
+  it('lets through a whole desktop of the largest size asked for', () => {
+    const reader = createRecordReader(() => undefined)
+    reader.push(header(MAX_DESKTOP_AREA))
+    expect(reader.broken).toBe(false)
+  })
+
+  it('refuses a whole 5K desktop, which is why none is asked for', () => {
+    const reader = createRecordReader(() => undefined)
+    reader.push(header(5120 * 2880))
+    expect(reader.broken).toBe(true)
   })
 })
