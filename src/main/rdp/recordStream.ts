@@ -11,6 +11,7 @@
  * it bytes, including the cruel splits: a length cut in half, a header alone,
  * a chunk holding the end of one record and the start of two more.
  */
+import { MAX_DESKTOP_AREA } from '../../shared/desktopSize'
 
 /** The first byte of a record. Mirrors td_proto.h, and must stay in step. */
 export const RECORD = {
@@ -35,7 +36,7 @@ const HEADER = 5
  * happens to say. Stopping is the only safe answer, because a stream that has
  * lost its place never finds it again.
  */
-const LIMIT = 3840 * 2160 * 4 + 64
+const LIMIT = MAX_DESKTOP_AREA * 4 + 64
 
 export type OnRecord = (type: number, payload: Buffer) => void
 

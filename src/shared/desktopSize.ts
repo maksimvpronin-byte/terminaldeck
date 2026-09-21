@@ -35,6 +35,28 @@ const evenWithinLimits = (pixels: number): number =>
   Math.min(MAX_EDGE, Math.max(MIN_EDGE, Math.round(pixels))) & ~1
 
 /**
+ * The most pixels a desktop may have: a 4K one.
+ *
+ * Not the protocol's limit, which is larger — this application's. A whole
+ * frame crosses from the desktop client to the window in one record, and the
+ * reader refuses a record larger than this as the sign of a stream that has
+ * lost its place (see recordStream). A 5K display at its own density asked for
+ * 5120×2880, the first full frame was refused, and the session ended. The two
+ * are held to one number so that a size asked for is a size that can arrive.
+ */
+export const MAX_DESKTOP_AREA = 3840 * 2160
+
+/** The same shape, shrunk until it fits, and still even on both sides. */
+function withinArea(width: number, height: number): { width: number; height: number } {
+  if (width * height <= MAX_DESKTOP_AREA) return { width, height }
+  const shrink = Math.sqrt(MAX_DESKTOP_AREA / (width * height))
+  return {
+    width: Math.floor(width * shrink) & ~1,
+    height: Math.floor(height * shrink) & ~1
+  }
+}
+
+/**
  * How big the desktop should be asked for, in the far end's own pixels.
  *
  * A pinned size is stated as it is. Otherwise the pane decides — measured in
@@ -71,7 +93,7 @@ export function desktopSizeFor(
   if (look?.resolution === 'fixed') {
     // A pinned desktop is asked for exactly as it is stated, and nothing is
     // said about its density: the size is the whole of what was decided.
-    return { width: look.desktopWidth, height: look.desktopHeight, factor: 1 }
+    return { ...withinArea(look.desktopWidth, look.desktopHeight), factor: 1 }
   }
   if (!pane || pane.width < 1 || pane.height < 1) return null
 
@@ -81,11 +103,11 @@ export function desktopSizeFor(
   const budget = (look?.pixelBudget ?? 3.5) * 1_000_000
   const wanted = dpr / magnify
   const full = pane.width * wanted * pane.height * wanted
-  const factor = full <= budget ? wanted : wanted * Math.sqrt(budget / full)
+  const limit = Math.min(budget, MAX_DESKTOP_AREA)
+  const factor = full <= limit ? wanted : wanted * Math.sqrt(limit / full)
 
   return {
-    width: evenWithinLimits(pane.width * factor),
-    height: evenWithinLimits(pane.height * factor),
+    ...withinArea(evenWithinLimits(pane.width * factor), evenWithinLimits(pane.height * factor)),
     factor
   }
 }

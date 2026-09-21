@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { desktopSizeFor } from './desktopSize'
+import { MAX_DESKTOP_AREA, desktopSizeFor } from './desktopSize'
+import { createRecordReader } from '../main/rdp/recordStream'
 import type { RdpView } from './types'
 
 /** A host that has decided nothing in particular. */
@@ -137,16 +138,72 @@ describe('the size a desktop is asked for', () => {
     })
 
     it('never asks for more than the ceiling', () => {
-      // A budget high enough that only the protocol's own limit is left to bite.
+      // A budget high enough that only the protocol's own limit is left to bite,
+      // on a pane wide enough to reach it without the area doing so first.
       const look = { ...plain, sendDensity: true, pixelBudget: 500 }
-      const size = desktopSizeFor(look, { width: 6000, height: 4000 }, 2)
+      const size = desktopSizeFor(look, { width: 10000, height: 300 }, 1)
 
       expect(size!.width).toBe(8192)
-      expect(size!.height).toBe(8000)
+      expect(size!.height).toBe(300)
     })
   })
 
   it('treats a display that reports no density as an ordinary one', () => {
     expect(desktopSizeFor(plain, pane, 0)).toEqual({ width: 1400, height: 900, factor: 1 })
+  })
+})
+
+/**
+ * A whole frame crosses to the window as one record, and the reader refuses a
+ * record larger than a 4K desktop. A size asked for past that is a session
+ * ended by its own first full frame — a 5K display did exactly that.
+ */
+describe('a desktop larger than a frame can carry', () => {
+  /** Whether a whole frame of this size gets through the reader. */
+  function frameArrives(size: { width: number; height: number }): boolean {
+    let arrived = false
+    const reader = createRecordReader(() => (arrived = true))
+    const pixels = size.width * size.height * 4
+    const header = Buffer.alloc(13)
+    header[0] = 2
+    header.writeUInt32LE(8 + pixels, 1)
+    reader.push(header)
+    // Only the header is needed to be refused, so only a refusal is checked
+    // without allocating the frame itself.
+    if (reader.broken) return false
+    reader.push(Buffer.alloc(pixels))
+    return arrived
+  }
+
+  it('is asked for smaller when a 5K display would ask for its own pixels', () => {
+    const size = desktopSizeFor(
+      { ...plain, magnification: 100, pixelBudget: 100 },
+      { width: 2560, height: 1440 },
+      2
+    )!
+    expect(size.width * size.height).toBeLessThanOrEqual(MAX_DESKTOP_AREA)
+    expect(size.width / size.height).toBeCloseTo(16 / 9, 2)
+    expect(frameArrives(size)).toBe(true)
+  })
+
+  it('is asked for smaller when a pinned size is larger than 4K', () => {
+    const size = desktopSizeFor(
+      { ...plain, resolution: 'fixed', desktopWidth: 5120, desktopHeight: 2880 },
+      pane,
+      1
+    )!
+    expect(size.width * size.height).toBeLessThanOrEqual(MAX_DESKTOP_AREA)
+    expect(size.width % 2).toBe(0)
+    expect(size.height % 2).toBe(0)
+    expect(frameArrives(size)).toBe(true)
+  })
+
+  it('leaves a 4K desktop as it is', () => {
+    const size = desktopSizeFor(
+      { ...plain, resolution: 'fixed', desktopWidth: 3840, desktopHeight: 2160 },
+      pane,
+      1
+    )
+    expect(size).toEqual({ width: 3840, height: 2160, factor: 1 })
   })
 })
