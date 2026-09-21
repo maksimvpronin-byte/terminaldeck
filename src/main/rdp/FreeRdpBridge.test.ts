@@ -248,6 +248,67 @@ describe('clipboard while nobody is here', () => {
   })
 
   /**
+   * The window having the focus said nothing about which of its desktops was
+   * in use: one in a background tab went on being handed everything copied
+   * while somebody worked in the tab next to it.
+   */
+  it('holds a change for a desktop in a hidden tab, and sends it once shown', async () => {
+    const { session, written } = liveSession()
+    innards().sessions.set('hidden-tab', session)
+    reset('before')
+    session.clipboardSent = 0
+
+    freeRdpBridge.send('hidden-tab', { a: 'visible', value: false })
+    vi.mocked(clipboard.readText).mockReturnValue('meant for the other tab')
+    await innards().pollClipboard()
+    expect(Buffer.concat(written).toString()).not.toContain('meant for the other tab')
+
+    freeRdpBridge.send('hidden-tab', { a: 'visible', value: true })
+    await innards().pollClipboard()
+    expect(Buffer.concat(written).toString()).toContain('meant for the other tab')
+  })
+
+  it('does not take what a desktop in a hidden tab copied', () => {
+    const { session } = liveSession()
+    innards().sessions.set('hidden-copy', session)
+    freeRdpBridge.send('hidden-copy', { a: 'visible', value: false })
+
+    innards().receive('hidden-copy', session, RECORD.clipboard, Buffer.from('from behind'))
+    expect(clipboard.writeText).not.toHaveBeenCalled()
+  })
+
+  /**
+   * A download being published made the poll return early, so a lock in that
+   * time was not acted on — and the publishing, whose only check of the vault
+   * came before its wait, went on to put the files on this machine anyway.
+   */
+  it('withdraws the clipboard and publishes nothing when the vault locks mid-publish', async () => {
+    const { session, written } = liveSession()
+    innards().sessions.set('publishing', session)
+    reset('')
+    let finishRead: (value: { paths: string[]; version: string }) => void = () => undefined
+    vi.mocked(readFileClipboard).mockImplementationOnce(
+      () => new Promise((resolve) => (finishRead = resolve))
+    )
+    const bridge = freeRdpBridge as unknown as {
+      beginClipboardDownload: (id: string, session: unknown, manifest: Buffer) => void
+      clipboardPublishing: boolean
+    }
+    bridge.beginClipboardDownload('publishing', session, Buffer.alloc(4))
+    const download = session.download as unknown as { complete: (paths: string[]) => void }
+    download.complete(['/staged/file.txt'])
+    expect(bridge.clipboardPublishing).toBe(true)
+
+    vaultState.unlocked = false
+    await innards().pollClipboard()
+    expect(Buffer.concat(written).toString()).toContain('clipset')
+
+    finishRead({ paths: [], version: '1' })
+    await new Promise((resolve) => setImmediate(resolve))
+    expect(writeClipboardFiles).not.toHaveBeenCalled()
+  })
+
+  /**
    * A desktop in a background pane, or behind another application, went on
    * replacing this machine's clipboard with whatever it copied.
    */

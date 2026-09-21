@@ -83,6 +83,11 @@ interface Session {
   ready?: boolean
   /** Which local clipboard change this desktop was last sent; see `clipboardChange`. */
   clipboardSent?: number
+  /**
+   * Whether its pane is on screen, as the window last said. A desktop in a tab
+   * nobody is looking at is not where a paste is meant; see mayReceiveClipboard.
+   */
+  hidden?: boolean
   download?: ClipboardDownload
   clipboardManifestTimer?: NodeJS.Timeout
   /** The client's last complaint, which is usually the reason it stopped. */
@@ -286,6 +291,8 @@ class FreeRdpBridge {
 
   /** Anything the renderer wants said: input, a new size, an acknowledgement. */
   send(id: string, fields: Record<string, string | number | boolean | undefined>): void {
+    const session = this.sessions.get(id)
+    if (session && fields.a === 'visible') session.hidden = fields.value === false
     this.write(id, fields)
   }
 
@@ -369,12 +376,19 @@ class FreeRdpBridge {
    * included. With them, the clipboard crosses when the person is here and
    * looking at this application, which is the moment a paste could be meant.
    * A desktop that missed a change is handed it once its window is back.
+   *
+   * And only while its pane is on screen. The window having the focus said
+   * nothing about which of its desktops was being used: one in a background
+   * tab — another network, another customer — went on being handed everything
+   * copied while somebody worked in the tab next to it. It is brought up to
+   * date when its tab is shown again.
    */
   private mayReceiveClipboard(session: Session): boolean {
     return (
       session.clipboard &&
       Boolean(session.ready) &&
       !session.stopping &&
+      !session.hidden &&
       !session.window.isDestroyed() &&
       session.window.isFocused()
     )
@@ -400,6 +414,7 @@ class FreeRdpBridge {
     return (
       session.clipboard &&
       !session.stopping &&
+      !session.hidden &&
       isUnlocked() &&
       !session.window.isDestroyed() &&
       session.window.isFocused()
@@ -431,12 +446,14 @@ class FreeRdpBridge {
   }
 
   private async pollClipboard(): Promise<void> {
-    if (this.clipboardPolling || this.clipboardPublishing) return
-    // Nothing is read at all while nobody may be sent it.
+    // Before anything else, the lock: a download being published used to make
+    // the poll return early, and a vault locked meanwhile was not acted on until
+    // the publishing was over — which it then finished.
     if (!isUnlocked()) {
       this.withdrawClipboard()
       return
     }
+    if (this.clipboardPolling || this.clipboardPublishing) return
     this.clipboardWithdrawn = false
     if (![...this.sessions.values()].some((s) => this.mayReceiveClipboard(s))) return
     this.clipboardPolling = true
@@ -499,9 +516,12 @@ class FreeRdpBridge {
             // Do not overwrite a newer local copy with a transfer that took seconds.
             const snapshot = await readFileClipboard()
             const files = pathsToUris(snapshot.paths)
+            // Asked again after the wait, not only before it: the vault may
+            // have locked while the local clipboard was being read.
             if (
               epoch !== this.clipboardEpoch ||
               session.stopping ||
+              !isUnlocked() ||
               clipboard.readText() !== this.lastClipboardText ||
               files !== this.lastClipboardFiles ||
               (this.lastClipboardVersion !== '' && snapshot.version !== this.lastClipboardVersion)
