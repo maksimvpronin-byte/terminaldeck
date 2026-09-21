@@ -369,6 +369,8 @@ export const ru: Record<string, string> = {
   'Sign out of Windows sessions': 'Выйти из сессий Windows',
   'Sign out of every Windows session in this workspace and close its desktops?':
     'Выйти из всех сессий Windows в этой рабочей области и закрыть их окна?',
+  'Desktops that did not confirm signing out: {count}. They may still be signed in on their hosts. Close them anyway?':
+    'Рабочих столов без подтверждения выхода: {count}. Возможно, на своих хостах они всё ещё в системе. Всё равно закрыть их?',
   'Rename…': 'Переименовать…',
   'Save as collection…': 'Сохранить как набор…',
   'Select a session on the left, or quick-connect above.':

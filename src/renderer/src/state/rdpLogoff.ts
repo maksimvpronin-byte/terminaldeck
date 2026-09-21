@@ -44,29 +44,65 @@ async function signOut(desktopId: string): Promise<void> {
 }
 
 /**
- * Signs every live desktop in a workspace out of Windows, then closes all of
- * its desktop panes. Terminals in the same workspace are left alone.
+ * How long a desktop has to confirm it signed out, counted from the keys.
  *
- * The sessions are asked together and the panes close together, once the last
- * of them has had its keys delivered.
+ * Signing out is confirmed by the host ending the session with a sign-out as
+ * its reason, which closes the pane on its own (see `endedBySignOut`). A busy
+ * host with a long list of programs to close can take a while over it.
+ */
+export const SIGN_OUT_CONFIRM_WAIT = 20_000
+const CONFIRM_POLL = 250
+
+/** Whether the pane is still open, looked up as the store is now. */
+function isOpen(getState: () => AppState, pane: DesktopPane): boolean {
+  const tab = getState()
+    .workspaces.flatMap((w) => w.tabs)
+    .find((t) => t.id === pane.tabId)
+  return Boolean(tab && collectLeaves(tab.root).some((l) => l.id === pane.paneId))
+}
+
+function close(getState: () => AppState, pane: DesktopPane): void {
+  // By id against the store as it is now: a pane may have been closed by hand,
+  // or its tab moved, while the keys were on their way.
+  if (isOpen(getState, pane)) getState().closePane(pane.tabId, pane.paneId)
+}
+
+/**
+ * Signs every live desktop in a workspace out of Windows. Terminals in the same
+ * workspace are left alone.
+ *
+ * A desktop's pane closes when its host says it signed out, not when the keys
+ * have been sent. The keys are a person's way of asking and nothing more: a
+ * locked session types the word into its password box, a policy can take the
+ * Run dialog away, a slow desktop can miss them. Closing every pane on a timer
+ * reported all of those as signed out, and left the sessions running on their
+ * hosts with nothing on this side to show it.
+ *
+ * So what has not confirmed within the wait stays open, and `closeUnconfirmed`
+ * is asked — with how many — whether to close them anyway. A pane that never
+ * connected has nothing to sign out of, and closes at once.
  */
 export async function signOutWorkspace(
   getState: () => AppState,
-  workspaceId: string
+  workspaceId: string,
+  closeUnconfirmed: (count: number) => boolean,
+  wait = SIGN_OUT_CONFIRM_WAIT
 ): Promise<void> {
   const workspace = getState().workspaces.find((w) => w.id === workspaceId)
   if (!workspace) return
   const panes = desktopPanesOf(workspace, protocolIn(getState()))
+  const live = panes.filter((p) => p.desktopId)
 
-  await Promise.all(panes.flatMap((p) => (p.desktopId ? [signOut(p.desktopId)] : [])))
+  for (const pane of panes) if (!pane.desktopId) close(getState, pane)
 
-  // Closed by id against the store as it is now: a pane may have been closed
-  // by hand, or its tab moved, while the keys were on their way.
-  for (const pane of panes) {
-    const tab = getState()
-      .workspaces.flatMap((w) => w.tabs)
-      .find((t) => t.id === pane.tabId)
-    if (tab && collectLeaves(tab.root).some((l) => l.id === pane.paneId))
-      getState().closePane(pane.tabId, pane.paneId)
+  await Promise.all(live.map((p) => signOut(p.desktopId!)))
+
+  for (let waited = 0; waited < wait; waited += CONFIRM_POLL) {
+    if (!live.some((p) => isOpen(getState, p))) return
+    await pause(CONFIRM_POLL)
   }
+
+  const unconfirmed = live.filter((p) => isOpen(getState, p))
+  if (unconfirmed.length === 0 || !closeUnconfirmed(unconfirmed.length)) return
+  for (const pane of unconfirmed) close(getState, pane)
 }

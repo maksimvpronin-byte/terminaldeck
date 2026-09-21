@@ -93,7 +93,14 @@ export default function Workspace(): JSX.Element {
     ) {
       return
     }
-    void signOutWorkspace(useStore.getState, id)
+    void signOutWorkspace(useStore.getState, id, (count) =>
+      confirmAction(
+        t(
+          'Desktops that did not confirm signing out: {count}. They may still be signed in on their hosts. Close them anyway?',
+          { count }
+        )
+      )
+    )
   }
 
   function onWorkspaceDrop(e: ReactDragEvent, workspaceId: string): void {
