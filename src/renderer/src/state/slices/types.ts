@@ -77,6 +77,8 @@ export interface SessionsSlice {
     gatewaySecret?: string | null
   ) => Promise<void>
   removeSession: (id: string) => Promise<void>
+  /** Several hosts in one write, for a selection. */
+  removeSessions: (ids: string[]) => Promise<void>
   upsertGroup: (
     group: SessionGroup,
     secret?: string | null,

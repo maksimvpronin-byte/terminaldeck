@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react'
 import type { InventorySource, SessionGroup, SessionProfile } from '../../../shared/types'
 import { resolveAuth } from '../../../shared/authResolution'
@@ -18,6 +18,7 @@ import MultiConnectDialog from './MultiConnectDialog'
 import { connectMenuItems } from './connectMenu'
 import { morphOpen } from './hostMorph'
 import { paneTitle } from '../state/connect'
+import { overridesByNode } from '../state/hosts'
 import { useT } from '../i18n'
 import { ago } from '../state/syncStatus'
 import { DesktopIcon, RefreshIcon, TerminalIcon } from './icons'
@@ -87,34 +88,60 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
 
   const needle = query.trim().toLowerCase()
 
+  const overrideOf = useMemo(() => overridesByNode(overrides), [overrides])
+
   /** Local settings layered over a derived node, blank fields ignored. */
   function withOverride<T extends { id: string }>(node: T): T {
-    return applyOverride(
-      node,
-      overrides.find((x) => x.nodeId === node.id)
-    )
+    return applyOverride(node, overrideOf.get(node.id))
   }
 
   // Groups carry overrides too, so a whole Ansible group can be pointed at a
   // different bastion or user without touching the repository.
-  const allGroups: SessionGroup[] = trees.flatMap((tree) => tree.groups).map(withOverride)
+  const allGroups = useMemo<SessionGroup[]>(
+    () => trees.flatMap((tree) => tree.groups).map((g) => applyOverride(g, overrideOf.get(g.id))),
+    [trees, overrideOf]
+  )
 
   /**
-   * Hosts a group names. A host in several groups appears under each of them —
-   * it is one host throughout, so selecting or colouring it in one place shows
-   * everywhere. Older synced trees have no memberships; those fall back to the
-   * single parent they were stored with.
+   * The tree indexed once per change rather than searched once per row: a group
+   * looked up its hosts by walking every host of every source, and its
+   * subgroups by walking every group — for each group, on every redraw.
    */
+  const childrenOf = useMemo(() => {
+    const byParent = new Map<string | null, SessionGroup[]>()
+    for (const g of allGroups) {
+      const siblings = byParent.get(g.parentId)
+      if (siblings) siblings.push(g)
+      else byParent.set(g.parentId, [g])
+    }
+    return byParent
+  }, [allGroups])
+
+  /**
+   * Hosts each group names. A host in several groups appears under each of
+   * them — it is one host throughout, so selecting or colouring it in one place
+   * shows everywhere. Older synced trees have no memberships; those fall back
+   * to the single parent they were stored with.
+   */
+  const hostsByGroup = useMemo(() => {
+    const byGroup = new Map<string, SessionProfile[]>()
+    for (const tree of trees) {
+      for (const raw of tree.sessions) {
+        const host = applyOverride(raw, overrideOf.get(raw.id))
+        for (const groupId of new Set(tree.memberships?.[raw.id] ?? [raw.groupId])) {
+          if (groupId === null) continue
+          const list = byGroup.get(groupId)
+          if (list) list.push(host)
+          else byGroup.set(groupId, [host])
+        }
+      }
+    }
+    return byGroup
+  }, [trees, overrideOf])
+
   function hostsOf(groupId: string): SessionProfile[] {
-    return trees
-      .flatMap((tree) =>
-        tree.sessions.filter((h) => {
-          const claims = tree.memberships?.[h.id]
-          return claims ? claims.includes(groupId) : h.groupId === groupId
-        })
-      )
-      .map(withOverride)
-      .filter((h) => !needle || `${h.name} ${h.host}`.toLowerCase().includes(needle))
+    const hosts = hostsByGroup.get(groupId) ?? []
+    return needle ? hosts.filter((h) => `${h.name} ${h.host}`.toLowerCase().includes(needle)) : hosts
   }
 
   /** How many groups name this host, so the tree can point out the duplicates. */
@@ -126,9 +153,33 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
     return 1
   }
 
+  /**
+   * Groups holding a match somewhere below them, worked out once per search
+   * rather than again for every group on the way down.
+   */
+  const matchingGroups = useMemo(() => {
+    const found = new Map<string, boolean>()
+    if (!needle) return found
+    const visit = (groupId: string): boolean => {
+      const known = found.get(groupId)
+      if (known !== undefined) return known
+      // Settled as "no" before looking down, so a loop in a broken tree ends.
+      found.set(groupId, false)
+      let match = (hostsByGroup.get(groupId) ?? []).some((h) =>
+        `${h.name} ${h.host}`.toLowerCase().includes(needle)
+      )
+      for (const child of childrenOf.get(groupId) ?? []) {
+        if (visit(child.id)) match = true
+      }
+      found.set(groupId, match)
+      return match
+    }
+    for (const g of allGroups) visit(g.id)
+    return found
+  }, [needle, hostsByGroup, childrenOf, allGroups])
+
   function subtreeHasMatch(groupId: string): boolean {
-    if (hostsOf(groupId).length > 0) return true
-    return allGroups.filter((g) => g.parentId === groupId).some((g) => subtreeHasMatch(g.id))
+    return matchingGroups.get(groupId) === true
   }
 
   /** What the last sync actually produced for a source, shown next to the revision. */
@@ -303,8 +354,7 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
   }
 
   function renderGroups(parentId: string, depth: number, colour?: string): JSX.Element[] {
-    return allGroups
-      .filter((g) => g.parentId === parentId)
+    return (childrenOf.get(parentId) ?? [])
       .filter((g) => !needle || subtreeHasMatch(g.id))
       .map((g) => {
         const isCollapsed = needle === '' && collapsed.has(g.id)
@@ -343,7 +393,7 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
   /** Ids in on-screen order, so Shift-click can take a range. */
   function flattenOrder(parentId: string): string[] {
     const out: string[] = [...hostsOf(parentId).map((h) => h.id)]
-    for (const g of allGroups.filter((g) => g.parentId === parentId)) {
+    for (const g of childrenOf.get(parentId) ?? []) {
       if (needle === '' && collapsed.has(g.id)) continue
       out.push(...flattenOrder(g.id))
     }

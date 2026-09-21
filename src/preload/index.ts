@@ -75,6 +75,9 @@ const api = {
     ): Promise<SessionProfile> =>
       ipcRenderer.invoke(IPC.storeSaveSession, session, secret, gatewaySecret),
     deleteSession: (id: string): Promise<void> => ipcRenderer.invoke(IPC.storeDeleteSession, id),
+    /** Several hosts in one write, for a selection. */
+    deleteSessions: (ids: string[]): Promise<void> =>
+      ipcRenderer.invoke(IPC.storeDeleteSessions, ids),
     /** The full list of session ids, in the order the tree should show them. */
     reorderSessions: (orderedIds: string[]): Promise<void> =>
       ipcRenderer.invoke(IPC.storeReorderSessions, orderedIds),

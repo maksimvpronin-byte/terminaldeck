@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { nanoid } from 'nanoid'
 import type {
   CSSProperties,
@@ -35,6 +35,7 @@ import ContextMenu, { type MenuItem } from './ContextMenu'
 import { connectMenuItems } from './connectMenu'
 import { morphOpen } from './hostMorph'
 import { paneTitle } from '../state/connect'
+import { overridesByNode } from '../state/hosts'
 import { keyHint } from '../state/keys'
 import { ago } from '../state/syncStatus'
 import { useT } from '../i18n'
@@ -96,7 +97,7 @@ export default function Sidebar({
   const previewGitFolder = useStore((s) => s.previewGitFolder)
   const clearGitFolderOverride = useStore((s) => s.clearGitFolderOverride)
   const removeGroup = useStore((s) => s.removeGroup)
-  const removeSession = useStore((s) => s.removeSession)
+  const removeSessions = useStore((s) => s.removeSessions)
   const upsertSession = useStore((s) => s.upsertSession)
   const openTab = useStore((s) => s.openTab)
   const lockVault = useStore((s) => s.lockVault)
@@ -127,30 +128,50 @@ export default function Sidebar({
    * a mirrored host sits in a folder somebody made, inherits from it, and is
    * selected, coloured and opened by exactly the same code. What separates them
    * is what may be *done* to them, and that is asked node by node below.
+   *
+   * Merged, sorted and indexed once per change rather than on every redraw: a
+   * drag, a resize or a hover redraws the whole tree.
    */
-  function withGitOverride<T extends { id: string }>(node: T): T {
-    return applyOverride(
-      node,
-      gitOverrides.find((o) => o.nodeId === node.id)
-    )
-  }
-  const groups: SessionGroup[] = [
-    ...savedGroups,
-    ...gitTrees.flatMap((tree) => tree.groups).map(withGitOverride)
-  ]
-  const sessions: SessionProfile[] = [
-    ...savedSessions,
-    ...gitTrees.flatMap((tree) =>
-      tree.sessions.map(withGitOverride).sort((a, b) => a.name.localeCompare(b.name))
-    )
-  ]
+  const gitOverrideOf = useMemo(() => overridesByNode(gitOverrides), [gitOverrides])
+  const groups = useMemo<SessionGroup[]>(
+    () => [
+      ...savedGroups,
+      ...gitTrees
+        .flatMap((tree) => tree.groups)
+        .map((g) => applyOverride(g, gitOverrideOf.get(g.id)))
+    ],
+    [savedGroups, gitTrees, gitOverrideOf]
+  )
+  const sessions = useMemo<SessionProfile[]>(
+    () => [
+      ...savedSessions,
+      ...gitTrees.flatMap((tree) =>
+        tree.sessions
+          .map((s) => applyOverride(s, gitOverrideOf.get(s.id)))
+          .sort((a, b) => a.name.localeCompare(b.name))
+      )
+    ],
+    [savedSessions, gitTrees, gitOverrideOf]
+  )
 
-  const { visibleGroupIds, hostsByGroup } = gitFolderLayout(gitTrees, savedGroups)
-  const groupIsVisible = (id: string): boolean => !isGitNode(id) || visibleGroupIds.has(id)
-  function hostsIn(groupId: string, list: SessionProfile[]): SessionProfile[] {
-    const mirrored = hostsByGroup.get(groupId)
-    return list.filter((s) => (isGitNode(s.id) ? mirrored?.has(s.id) : s.groupId === groupId))
-  }
+  const { visibleGroupIds, hostsByGroup } = useMemo(
+    () => gitFolderLayout(gitTrees, savedGroups),
+    [gitTrees, savedGroups]
+  )
+  /**
+   * The groups shown under each parent, in the order they are kept. Git groups
+   * appear only when their folder opts into the hierarchy.
+   */
+  const childrenOf = useMemo(() => {
+    const byParent = new Map<string | null, SessionGroup[]>()
+    for (const g of groups) {
+      if (isGitNode(g.id) && !visibleGroupIds.has(g.id)) continue
+      const siblings = byParent.get(g.parentId)
+      if (siblings) siblings.push(g)
+      else byParent.set(g.parentId, [g])
+    }
+    return byParent
+  }, [groups, visibleGroupIds])
 
   const [editingSession, setEditingSession] = useState<SessionProfile | undefined | 'new'>(
     undefined
@@ -234,20 +255,87 @@ export default function Sidebar({
   }
 
   const needle = query.trim().toLowerCase()
-  const visible = needle
-    ? sessions.filter((s) =>
-        [s.name, s.host, addressOf(s), ...s.tags].some((f) => f.toLowerCase().includes(needle))
-      )
-    : sessions
+  const visible = useMemo(
+    () =>
+      needle
+        ? sessions.filter((s) => {
+            const { username } = resolveAuth(s, s.groupId, groups)
+            const address = username ? `${username}@${s.host}` : s.host
+            return [s.name, s.host, address, ...s.tags].some((f) =>
+              f.toLowerCase().includes(needle)
+            )
+          })
+        : sessions,
+    [sessions, groups, needle]
+  )
+
+  /**
+   * Hosts under each group, for the whole tree and for what the search left.
+   * A mirrored host sits wherever its folder's layout puts it — possibly under
+   * several groups; a saved one sits in its own group.
+   */
+  const byGroupOf = useMemo(() => {
+    const mirroredIn = new Map<string, string[]>()
+    for (const [groupId, hostIds] of hostsByGroup) {
+      for (const id of hostIds) {
+        const placed = mirroredIn.get(id)
+        if (placed) placed.push(groupId)
+        else mirroredIn.set(id, [groupId])
+      }
+    }
+    const index = (list: SessionProfile[]): Map<string, SessionProfile[]> => {
+      const byGroup = new Map<string, SessionProfile[]>()
+      for (const s of list) {
+        const placed = isGitNode(s.id) ? mirroredIn.get(s.id) ?? [] : s.groupId ? [s.groupId] : []
+        for (const groupId of placed) {
+          const hosts = byGroup.get(groupId)
+          if (hosts) hosts.push(s)
+          else byGroup.set(groupId, [s])
+        }
+      }
+      return byGroup
+    }
+    return index
+  }, [hostsByGroup])
+  const allByGroup = useMemo(() => byGroupOf(sessions), [byGroupOf, sessions])
+  const visibleByGroup = useMemo(
+    () => (visible === sessions ? allByGroup : byGroupOf(visible)),
+    [byGroupOf, visible, sessions, allByGroup]
+  )
+
+  function hostsIn(groupId: string, list: SessionProfile[]): SessionProfile[] {
+    const index = list === visible ? visibleByGroup : list === sessions ? allByGroup : byGroupOf(list)
+    return index.get(groupId) ?? []
+  }
+
+  /** Groups holding a match somewhere below them, once per search. */
+  const matchingGroups = useMemo(() => {
+    const found = new Map<string, boolean>()
+    if (!needle) return found
+    const visit = (groupId: string): boolean => {
+      const known = found.get(groupId)
+      if (known !== undefined) return known
+      // Settled as "no" before looking down, so a loop in a broken tree ends.
+      found.set(groupId, false)
+      let match = (visibleByGroup.get(groupId)?.length ?? 0) > 0
+      for (const child of childrenOf.get(groupId) ?? []) {
+        if (visit(child.id)) match = true
+      }
+      found.set(groupId, match)
+      return match
+    }
+    for (const g of groups) visit(g.id)
+    return found
+  }, [needle, visibleByGroup, childrenOf, groups])
 
   const rootSessions = visible.filter((s) => s.groupId === null)
 
   /** Ids in the order they appear on screen, so Shift-click can take a range. */
   function flattenOrder(parentId: string | null): string[] {
     const out: string[] = []
-    for (const g of groups
-      .filter((x) => x.parentId === parentId && groupIsVisible(x.id))
-      .filter((g) => !needle || groupHasMatch(g.id))) {
+    for (const g of (childrenOf.get(parentId) ?? []).filter(
+      (g) => !needle || groupHasMatch(g.id)
+    )) {
       if (needle === '' && collapsed.has(g.id)) continue
       out.push(...hostsIn(g.id, visible).map((s) => s.id))
       out.push(...flattenOrder(g.id))
@@ -284,14 +372,13 @@ export default function Sidebar({
     const what =
       names.length === 1 ? `“${names[0]}”` : `${names.length} hosts:\n\n${names.join('\n')}`
     if (!confirmAction(`Delete ${what}?\n\nThis cannot be undone.`)) return
-    for (const id of doomed) await removeSession(id)
+    await removeSessions(doomed)
     clearHostSelection()
   }
 
   /** A group survives filtering if it, or any descendant, still holds a match. */
   function groupHasMatch(groupId: string): boolean {
-    if (hostsIn(groupId, visible).length > 0) return true
-    return groups.filter((g) => g.parentId === groupId).some((g) => groupHasMatch(g.id))
+    return matchingGroups.get(groupId) === true
   }
 
   function startDrag(e: ReactDragEvent, item: DragItem, label: string): void {
@@ -706,16 +793,13 @@ export default function Sidebar({
 
   function renderGroups(parentId: string | null, depth: number): JSX.Element[] {
     return (
-      groups
-        // Git groups appear only when their folder opts into the hierarchy.
-        .filter((g) => g.parentId === parentId && groupIsVisible(g.id))
+      (childrenOf.get(parentId) ?? [])
         .filter((g) => !needle || groupHasMatch(g.id))
         .map((g) => {
           // While filtering, stay expanded — matches must not hide inside a closed group.
           const isCollapsed = needle === '' && collapsed.has(g.id)
           const childCount =
-            hostsIn(g.id, visible).length +
-            groups.filter((x) => x.parentId === g.id && groupIsVisible(x.id)).length
+            hostsIn(g.id, visible).length + (childrenOf.get(g.id)?.length ?? 0)
           const isSyncing = gitSyncing.includes(g.id)
 
           return (

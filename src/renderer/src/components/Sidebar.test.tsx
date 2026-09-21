@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import Sidebar from './Sidebar'
 import { useStore } from '../state/store'
-import type { SessionProfile } from '../../../shared/types'
+import type { SessionGroup, SessionProfile } from '../../../shared/types'
 
 function host(over: Partial<SessionProfile>): SessionProfile {
   return {
@@ -147,5 +147,69 @@ describe('what a host row shows', () => {
     // A desktop is as open as a shell, and only the terminal ever said so.
     expect(rowFor('win-box').querySelector('.session-kind')?.className).toContain('live')
     expect(rowFor('idle-box').querySelector('.session-kind')?.className).not.toContain('live')
+  })
+})
+
+/**
+ * The tree is indexed once per change rather than searched once per row, so
+ * the search and the placement of mirrored hosts are checked against it here.
+ */
+describe('what the tree holds', () => {
+  const group = (id: string, parentId: string | null, over: Partial<SessionGroup> = {}) =>
+    ({ id, name: id, parentId, ...over }) as SessionGroup
+
+  it('keeps a folder whose match is two levels down, and drops its empty sibling', () => {
+    useStore.setState({
+      groups: [group('outer', null), group('inner', 'outer'), group('empty', null)],
+      sessions: [
+        host({ id: 'h1', name: 'deep-db', groupId: 'inner' }),
+        host({ id: 'h2', name: 'web', groupId: 'empty' })
+      ],
+      inventoryTrees: [],
+      gitFolderTrees: [],
+      gitFolderOverrides: [],
+      inventoryOverrides: []
+    })
+    render(<Sidebar onOpenSnippets={() => {}} onOpenHelp={() => {}} />)
+
+    fireEvent.change(screen.getByPlaceholderText('Filter hosts…'), { target: { value: 'deep' } })
+
+    // A folder row reads "📁 outer", so the name is matched at its end.
+    expect(screen.getByText(/ outer$/)).toBeTruthy()
+    expect(screen.getByText(/ inner$/)).toBeTruthy()
+    expect(screen.getByText('deep-db')).toBeTruthy()
+    expect(screen.queryByText(/ empty$/)).toBeNull()
+    expect(screen.queryByText('web')).toBeNull()
+  })
+
+  it('shows a mirrored host under every group that names it', () => {
+    const mirrored = host({ id: 'git:folder:h:db1', name: 'db1', groupId: 'git:folder:g:a' })
+    useStore.setState({
+      groups: [
+        group('folder', null, {
+          git: {
+            repoUrl: 'git@example.com:x.git',
+            paths: [],
+            includedGroups: [],
+            showGroupFolders: true
+          }
+        })
+      ],
+      sessions: [],
+      inventoryTrees: [],
+      gitFolderTrees: [
+        {
+          groupId: 'folder',
+          groups: [group('git:folder:g:a', 'folder'), group('git:folder:g:b', 'folder')],
+          sessions: [mirrored],
+          memberships: { [mirrored.id]: ['git:folder:g:a', 'git:folder:g:b'] }
+        }
+      ],
+      gitFolderOverrides: [],
+      inventoryOverrides: []
+    })
+    render(<Sidebar onOpenSnippets={() => {}} onOpenHelp={() => {}} />)
+
+    expect(screen.getAllByText('db1')).toHaveLength(2)
   })
 })

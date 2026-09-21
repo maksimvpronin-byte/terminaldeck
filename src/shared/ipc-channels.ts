@@ -17,6 +17,7 @@ export const IPC = {
   storeLoad: 'store:load',
   storeSaveSession: 'store:saveSession',
   storeDeleteSession: 'store:deleteSession',
+  storeDeleteSessions: 'store:deleteSessions',
   storeReorderSessions: 'store:reorderSessions',
   storeSaveGroup: 'store:saveGroup',
   storeReorderGroups: 'store:reorderGroups',

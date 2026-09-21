@@ -14,7 +14,7 @@ vi.mock('electron', () => ({ app: { getPath: (): string => userData } }))
 userData = mkdtempSync(join(tmpdir(), 'terminaldeck-secrets-'))
 
 const { vault } = await import('../vault/Vault')
-const { saveWithSecrets } = await import('./secrets')
+const { forgetSecretsAt, saveWithSecrets } = await import('./secrets')
 
 const MASTER = 'correct horse battery staple'
 const failingSave = (): never => {
@@ -68,5 +68,25 @@ describe('saving a host with its passwords', () => {
     const write = vi.spyOn(vault, 'changeSecrets')
     saveWithSecrets({ id: 'h', secretRef: 'host-ref' }, [['secretRef', undefined]], (h) => h)
     expect(write).not.toHaveBeenCalled()
+  })
+})
+
+describe('forgetting the passwords of several hosts', () => {
+  it('drops each host’s own and gateway password, and nothing else', () => {
+    vault.setSecret('kept-ref', 'someone else’s')
+
+    forgetSecretsAt(
+      [{ secretRef: 'host-ref' }, { gatewaySecretRef: 'gateway-ref' }, {}],
+      ['secretRef', 'gatewaySecretRef']
+    )
+
+    expect(vault.getSecret('host-ref')).toBeUndefined()
+    expect(vault.getSecret('gateway-ref')).toBeUndefined()
+    expect(vault.getSecret('kept-ref')).toBe('someone else’s')
+  })
+
+  it('leaves the vault alone while it is locked', () => {
+    vault.lock()
+    expect(() => forgetSecretsAt([{ secretRef: 'host-ref' }], ['secretRef'])).not.toThrow()
   })
 })

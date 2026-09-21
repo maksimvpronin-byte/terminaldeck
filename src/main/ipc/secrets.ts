@@ -37,6 +37,21 @@ export function forgetSecretAt<K extends string>(
 }
 
 /**
+ * Drops the credentials of several items at once, in one write of the vault —
+ * for deleting many hosts, where one write each would rewrite the vault as many
+ * times. Like forgetSecretAt, nothing is removed while the vault is locked.
+ */
+export function forgetSecretsAt<K extends string>(
+  items: Array<Partial<Record<K, string | undefined>>>,
+  fields: K[]
+): void {
+  const refs = items.flatMap((item) =>
+    fields.map((field) => item[field]).filter((ref): ref is string => Boolean(ref))
+  )
+  if (refs.length > 0 && vault.status().unlocked) vault.changeSecrets({}, refs)
+}
+
+/**
  * Saves an item together with the secrets typed for it, as one change.
  *
  * For each named reference: a string stores it (minting a reference if there is

@@ -90,3 +90,17 @@ describe('the session store', () => {
     expect(readFileSync(join(userData, kept[0]), 'utf8')).toContain('"id": "a"')
   })
 })
+
+describe('deleting a selection', () => {
+  it('removes every chosen host in one write and keeps the rest', async () => {
+    vi.resetModules()
+    const { sessionStore } = await import('./SessionStore')
+    for (const id of ['a', 'b', 'c', 'd']) sessionStore.saveSession(host(id))
+
+    sessionStore.deleteSessions(['b', 'd', 'missing'])
+
+    const onDisk = JSON.parse(readFileSync(FILE(), 'utf8')).sessions as SessionProfile[]
+    expect(onDisk.map((s) => s.id)).toEqual(['a', 'c'])
+    expect(sessionStore.getAll().sessions.map((s) => s.id)).toEqual(['a', 'c'])
+  })
+})

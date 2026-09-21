@@ -4,6 +4,26 @@ import type { AppState, SessionsSlice } from './types'
 import { moveRelativeTo } from '../../../../shared/ordering'
 import { descendsFrom } from '../../../../shared/groups'
 
+/**
+ * Saves what a drag has already shown.
+ *
+ * The tree moves the moment the row is dropped, before anything is written, so
+ * a drag does not wait on the disk. When the save fails the tree has to be put
+ * back — to what the disk holds, not to what it was before the drag: a move is
+ * two writes, and the first may have landed. The error still reaches the
+ * caller; the tree just stops claiming something that was not kept.
+ */
+async function settleOrRereadStore(get: () => AppState, save: () => Promise<void>): Promise<void> {
+  try {
+    await save()
+  } catch (err) {
+    await get()
+      .loadStore()
+      .catch(() => undefined)
+    throw err
+  }
+}
+
 export const createSessionsSlice: StateCreator<AppState, [], [], SessionsSlice> = (set, get) => ({
   groups: [],
   sessions: [],
@@ -25,6 +45,15 @@ export const createSessionsSlice: StateCreator<AppState, [], [], SessionsSlice> 
   removeSession: async (id) => {
     await window.td.store.deleteSession(id)
     set((s) => ({ sessions: s.sessions.filter((x) => x.id !== id) }))
+  },
+
+  removeSessions: async (ids) => {
+    if (ids.length === 0) return
+    // Main forgets the passwords after the hosts are written away, so a failure
+    // there still means the hosts are gone: read back what the disk now holds.
+    await settleOrRereadStore(get, () => window.td.store.deleteSessions(ids))
+    const doomed = new Set(ids)
+    set((s) => ({ sessions: s.sessions.filter((x) => !doomed.has(x.id)) }))
   },
 
   upsertGroup: async (group, secret, gatewaySecret) => {
@@ -89,8 +118,10 @@ export const createSessionsSlice: StateCreator<AppState, [], [], SessionsSlice> 
     )
 
     set({ sessions: next })
-    if (moved !== dragged) await window.td.store.saveSession(moved)
-    await window.td.store.reorderSessions(next.map((s) => s.id))
+    await settleOrRereadStore(get, async () => {
+      if (moved !== dragged) await window.td.store.saveSession(moved)
+      await window.td.store.reorderSessions(next.map((s) => s.id))
+    })
   },
 
   reorderGroup: async (groupId, targetId, place) => {
@@ -120,8 +151,10 @@ export const createSessionsSlice: StateCreator<AppState, [], [], SessionsSlice> 
     )
 
     set({ groups: next })
-    if (moved !== dragged) await window.td.store.saveGroup(moved)
-    await window.td.store.reorderGroups(next.map((g) => g.id))
+    await settleOrRereadStore(get, async () => {
+      if (moved !== dragged) await window.td.store.saveGroup(moved)
+      await window.td.store.reorderGroups(next.map((g) => g.id))
+    })
   },
 
   moveGroup: async (groupId, parentId) => {

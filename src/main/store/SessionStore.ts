@@ -56,8 +56,18 @@ class SessionStore {
   }
 
   deleteSession(id: string): void {
+    this.deleteSessions([id])
+  }
+
+  /**
+   * Several hosts in one write. Deleted one at a time, each would copy and
+   * rewrite the whole file, and a failure halfway through would leave half the
+   * selection gone.
+   */
+  deleteSessions(ids: string[]): void {
+    const doomed = new Set(ids)
     this.doc.change((d) => {
-      d.sessions = d.sessions.filter((s) => s.id !== id)
+      d.sessions = d.sessions.filter((s) => !doomed.has(s.id))
     })
   }
 

@@ -31,14 +31,12 @@ export interface FoundHost {
  * said, with the local overrides layered on top. The raw tree is what synced;
  * this is what the user actually configured.
  */
-export function inventoryGroups(state: AppState): SessionGroup[] {
+export function inventoryGroups(
+  state: Pick<AppState, 'inventoryTrees' | 'inventoryOverrides'>
+): SessionGroup[] {
+  const byNode = overridesByNode(state.inventoryOverrides)
   return state.inventoryTrees.flatMap((tree) =>
-    tree.groups.map((g) =>
-      applyOverride(
-        g,
-        state.inventoryOverrides.find((o) => o.nodeId === g.id)
-      )
-    )
+    tree.groups.map((g) => applyOverride(g, byNode.get(g.id)))
   )
 }
 
@@ -49,15 +47,23 @@ export function inventoryGroups(state: AppState): SessionGroup[] {
  * chain from a mirrored host runs up through the repository's groups and then
  * into the folder somebody made, which is an ordinary saved group.
  */
-export function gitFolderGroups(state: AppState): SessionGroup[] {
+export function gitFolderGroups(
+  state: Pick<AppState, 'gitFolderTrees' | 'gitFolderOverrides'>
+): SessionGroup[] {
+  const byNode = overridesByNode(state.gitFolderOverrides)
   return state.gitFolderTrees.flatMap((tree) =>
-    tree.groups.map((g) =>
-      applyOverride(
-        g,
-        state.gitFolderOverrides.find((o) => o.nodeId === g.id)
-      )
-    )
+    tree.groups.map((g) => applyOverride(g, byNode.get(g.id)))
   )
+}
+
+/**
+ * Overrides looked up by the node they address, rather than searched for each
+ * one. The first for a node wins, as it did when each was found with `find`.
+ */
+export function overridesByNode<O extends { nodeId: string }>(overrides: O[]): Map<string, O> {
+  const byNode = new Map<string, O>()
+  for (const o of overrides) if (!byNode.has(o.nodeId)) byNode.set(o.nodeId, o)
+  return byNode
 }
 
 /**

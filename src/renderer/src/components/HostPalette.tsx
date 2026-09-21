@@ -1,23 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
-import type { SessionProfile } from '../../../shared/types'
-import { resolveAuth } from '../../../shared/authResolution'
-import { applyOverride } from '../../../shared/overrides'
-import { groupPath } from '../../../shared/groups'
 import { useStore } from '../state/store'
-import type { OpenMode, PaneTarget } from '../state/store'
+import type { OpenMode } from '../state/store'
+import { paletteEntries } from '../state/palette'
+import type { PaletteEntry as Entry } from '../state/palette'
 import ModalBackdrop from './ModalBackdrop'
 import { useT } from '../i18n'
-
-interface Entry {
-  id: string
-  title: string
-  /** "Prod / Databases" or "Repo / all / db", so duplicates are tellable apart. */
-  path: string
-  address: string
-  color?: string
-  target: PaneTarget
-}
 
 export default function HostPalette({ onClose }: { onClose: () => void }): JSX.Element {
   const t = useT()
@@ -35,61 +23,18 @@ export default function HostPalette({ onClose }: { onClose: () => void }): JSX.E
   const [picked, setPicked] = useState<Set<string>>(new Set())
   const listRef = useRef<HTMLDivElement | null>(null)
 
-  const entries = useMemo<Entry[]>(() => {
-    const out: Entry[] = []
-
-    for (const s of sessions) {
-      const auth = resolveAuth(s, s.groupId, groups)
-      out.push({
-        id: s.id,
-        title: s.name,
-        path: groupPath(s.groupId, groups),
-        address: auth.username ? `${auth.username}@${s.host}` : s.host,
-        color: s.color,
-        target: { kind: 'session', sessionId: s.id }
-      })
-    }
-
-    const invGroups = trees.flatMap((tree) => tree.groups)
-    for (const tree of trees) {
-      for (const raw of tree.sessions) {
-        const host: SessionProfile = applyOverride(
-          raw,
-          overrides.find((x) => x.nodeId === raw.id)
-        )
-        const auth = resolveAuth(host, host.groupId, invGroups)
-        out.push({
-          id: host.id,
-          title: host.name,
-          path: groupPath(host.groupId, invGroups),
-          address: auth.username ? `${auth.username}@${host.host}` : host.host,
-          color: host.color,
-          target: { kind: 'session', sessionId: host.id }
-        })
-      }
-    }
-    // Hosts a Sessions folder mirrors out of git. Their path runs through the
-    // folder somebody made, so the saved groups are part of the chain here.
-    const folderGroups = [...groups, ...gitTrees.flatMap((tree) => tree.groups)]
-    for (const tree of gitTrees) {
-      for (const raw of tree.sessions) {
-        const host: SessionProfile = applyOverride(
-          raw,
-          gitOverrides.find((x) => x.nodeId === raw.id)
-        )
-        const auth = resolveAuth(host, host.groupId, folderGroups)
-        out.push({
-          id: host.id,
-          title: host.name,
-          path: groupPath(host.groupId, folderGroups),
-          address: auth.username ? `${auth.username}@${host.host}` : host.host,
-          color: host.color,
-          target: { kind: 'session', sessionId: host.id }
-        })
-      }
-    }
-    return out
-  }, [sessions, groups, trees, overrides, gitTrees, gitOverrides])
+  const entries = useMemo<Entry[]>(
+    () =>
+      paletteEntries({
+        sessions,
+        groups,
+        inventoryTrees: trees,
+        inventoryOverrides: overrides,
+        gitFolderTrees: gitTrees,
+        gitFolderOverrides: gitOverrides
+      }),
+    [sessions, groups, trees, overrides, gitTrees, gitOverrides]
+  )
 
   const matches = useMemo(() => {
     const needle = query.trim().toLowerCase()

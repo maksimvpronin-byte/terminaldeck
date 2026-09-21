@@ -13,7 +13,7 @@ import { credentialStore } from '../store/CredentialStore'
 import { sessionStore } from '../store/SessionStore'
 import { snippetStore } from '../store/SnippetStore'
 import { forgetGitFolder } from './gitFolders'
-import { forgetSecret, forgetSecretAt, saveWithSecrets } from './secrets'
+import { forgetSecret, forgetSecretAt, forgetSecretsAt, saveWithSecrets } from './secrets'
 import { focusedWin } from './win'
 
 /**
@@ -48,7 +48,14 @@ export function registerStoreHandlers(): void {
       forgetSecretAt({ ...session }, 'gatewaySecretRef')
     }
   })
-  ipcMain.handle(IPC.storeReorderSessions, (_e, orderedIds: string[]) => {
+  ipcMain.handle(IPC.storeDeleteSessions, (_e, ids: string[]) => {
+    // Many at once, for a selection: the file and the vault are each written once.
+    const doomed = new Set(ids)
+    const sessions = sessionStore.getAll().sessions.filter((s) => doomed.has(s.id))
+    sessionStore.deleteSessions(ids)
+    forgetSecretsAt(sessions, ['secretRef', 'gatewaySecretRef'])
+  })
+  ipcMain.handle(IPC.storeReorderSessions,(_e, orderedIds: string[]) => {
     sessionStore.reorderSessions(orderedIds)
   })
   ipcMain.handle(
