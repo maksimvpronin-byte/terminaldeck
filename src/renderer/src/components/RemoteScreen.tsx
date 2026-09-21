@@ -679,21 +679,30 @@ export default function RemoteScreen({
     if (!container) return
 
     let pending: number | undefined
+    /*
+     * A pinned size is asked for too — not when the pane changes, which it
+     * ignores by being the same size whatever the pane does, but when the pin
+     * itself changes. Returning early for it meant a new fixed size saved for an
+     * open desktop was never sent at all.
+     */
     const send = (): void => {
       layOut()
-      if (lookRef.current?.resolution === 'fixed') return
+      if (!idRef.current) return
       const size = desired()
       if (!size) return
-      const stated = `${size.width}×${size.height}`
-      if (stated === askedRef.current) return
-      askedRef.current = stated
       // Zero leaves the field unstated, which the far end must ignore — so a
       // host that never asked for this is unaffected by it.
-      scaleRef.current = lookRef.current?.sendDensity
+      const scale = lookRef.current?.sendDensity
         ? Math.min(500, Math.max(100, Math.round(size.factor * 100)))
         : 0
+      const stated = `${size.width}×${size.height}`
+      // The density is half of the request: a change of it alone, at the same
+      // size, went unsent when only the size was compared.
+      if (stated === askedRef.current && scale === scaleRef.current) return
+      askedRef.current = stated
+      scaleRef.current = scale
 
-      tell({ a: 'resize', width: size.width, height: size.height, scale: scaleRef.current })
+      tell({ a: 'resize', width: size.width, height: size.height, scale })
       onMeasuredRef.current(measuredRef.current())
     }
 
@@ -723,6 +732,10 @@ export default function RemoteScreen({
       density.addEventListener('change', onDensity)
     }
     watch()
+    // The settings this effect follows have just changed, or the pane has just
+    // opened: either way, ask for what they now make of it. A session not yet
+    // started is sized when it starts, and asks nothing here.
+    send()
 
     return () => {
       observer.disconnect()

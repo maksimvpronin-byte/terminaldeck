@@ -157,6 +157,13 @@ typedef struct
 
 	/** The size last asked of the server, so a repeat can be ignored. */
 	UINT32 want_width, want_height, want_scale;
+	/**
+	 * The size the far end has actually been given: the one the session
+	 * connected at, then each layout sent. Apart from `want_*` because a resize
+	 * asked for before Display Control is ready has nowhere to go — and was
+	 * lost, since a repeat of it looked like a size already asked for.
+	 */
+	UINT32 sent_width, sent_height, sent_scale;
 
 	int stopping;
 } tdContext;
@@ -505,6 +512,8 @@ static BOOL register_pointer(rdpGraphics* graphics)
 
 /* --------------------------------------------------------------- the resize */
 
+static void td_send_wanted_size(tdContext* td);
+
 static UINT td_display_caps(DispClientContext* disp, UINT32 maxNumMonitors,
                             UINT32 maxMonitorAreaFactorA, UINT32 maxMonitorAreaFactorB)
 {
@@ -518,7 +527,11 @@ static UINT td_display_caps(DispClientContext* disp, UINT32 maxNumMonitors,
 	 * why the driving side is told, rather than left to guess from a desktop
 	 * that quietly kept its original size. */
 	if (td)
+	{
 		td->disp_ready = 1;
+		/* A size asked for while the channel was not yet open is sent now. */
+		td_send_wanted_size(td);
+	}
 	td_event("{\"e\":\"resizable\"}");
 	return CHANNEL_RC_OK;
 }
@@ -528,6 +541,10 @@ static void send_size(tdContext* td, UINT32 width, UINT32 height, UINT32 scale)
 	DISPLAY_CONTROL_MONITOR_LAYOUT layout = { 0 };
 
 	if (!td->disp || !td->disp_ready || !td->disp->SendMonitorLayout)
+		return;
+	/* Only in the one place it could change, so both of the callers — a resize
+	 * arriving, the channel becoming ready — agree on what was sent. */
+	if (width == td->sent_width && height == td->sent_height && scale == td->sent_scale)
 		return;
 
 	layout.Flags = DISPLAY_CONTROL_MONITOR_PRIMARY;
@@ -541,7 +558,21 @@ static void send_size(tdContext* td, UINT32 width, UINT32 height, UINT32 scale)
 	layout.DesktopScaleFactor = scale;
 	layout.DeviceScaleFactor = scale ? 100 : 0;
 
-	(void)td->disp->SendMonitorLayout(td->disp, 1, &layout);
+	if (td->disp->SendMonitorLayout(td->disp, 1, &layout) != CHANNEL_RC_OK)
+	{
+		/* Left as not sent, so the next resize or a reconnected channel tries
+		 * again rather than believing it already has this size. */
+		WLog_WARN(TAG, "resize: the layout %ux%u could not be sent", width, height);
+		return;
+	}
+	td->sent_width = width;
+	td->sent_height = height;
+	td->sent_scale = scale;
+}
+
+static void td_send_wanted_size(tdContext* td)
+{
+	send_size(td, td->want_width, td->want_height, td->want_scale);
 }
 
 /* ------------------------------------------------------------- the clipboard */
@@ -1427,13 +1458,15 @@ static void apply_command(tdContext* td, const td_cmd* cmd)
 		 * and quietly rounded by others, which is worse. */
 		const UINT32 w = width & ~1u;
 		const UINT32 h = height & ~1u;
-		if (w >= 200 && h >= 200 &&
-		    (w != td->want_width || h != td->want_height || scale != td->want_scale))
+		/* Held even when it cannot be sent yet: the channel opens a second or
+		 * two into the session, and a pane measured before then still wants
+		 * this size once it does. send_size ignores what was already sent. */
+		if (w >= 200 && h >= 200)
 		{
 			td->want_width = w;
 			td->want_height = h;
 			td->want_scale = scale;
-			send_size(td, w, h, scale);
+			td_send_wanted_size(td);
 		}
 	}
 	else if (strcmp(action, "ack") == 0)
@@ -1681,6 +1714,10 @@ static BOOL configure(tdContext* td, const td_cmd* start)
 
 	td->want_width = freerdp_settings_get_uint32(s, FreeRDP_DesktopWidth);
 	td->want_height = freerdp_settings_get_uint32(s, FreeRDP_DesktopHeight);
+	/* What the session connects at is, in effect, the first size sent. */
+	td->sent_width = td->want_width;
+	td->sent_height = td->want_height;
+	td->sent_scale = td->want_scale;
 	return TRUE;
 }
 

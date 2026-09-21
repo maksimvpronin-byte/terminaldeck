@@ -405,6 +405,45 @@ describe('a mouse button pressed on the desktop', () => {
   })
 })
 
+/**
+ * A fixed size ignores the pane by design, and the handler that ignored the
+ * pane ignored the setting with it: a new fixed size saved for an open desktop
+ * was never asked for.
+ */
+describe('a pinned desktop whose pin changes', () => {
+  const pinned = (width: number, height: number) => ({
+    resolution: 'fixed' as const,
+    desktopWidth: width,
+    desktopHeight: height,
+    pixelBudget: 3.5,
+    magnification: 0,
+    sendDensity: false,
+    commandAsControl: false
+  })
+  const props = {
+    sessionId: 'host',
+    onPhase: vi.fn(),
+    onNotice: vi.fn(),
+    onMeasured: vi.fn()
+  }
+  const resizes = (): unknown[] =>
+    desktopSend.mock.calls.map(([, fields]) => fields).filter((fields) => fields.a === 'resize')
+
+  it('is asked for at the new size, once', async () => {
+    const view = render(<RemoteScreen {...props} look={pinned(1280, 800)} visible />)
+    await act(async () => {})
+    expect(resizes()).toEqual([])
+
+    view.rerender(<RemoteScreen {...props} look={pinned(1920, 1080)} visible />)
+    await act(async () => {})
+    view.rerender(<RemoteScreen {...props} look={pinned(1920, 1080)} visible />)
+    await act(async () => {})
+
+    expect(resizes()).toEqual([{ a: 'resize', width: 1920, height: 1080, scale: 0 }])
+    view.unmount()
+  })
+})
+
 describe('a file copy that failed', () => {
   /**
    * The reason is translated and the path is not, and both have to survive:
