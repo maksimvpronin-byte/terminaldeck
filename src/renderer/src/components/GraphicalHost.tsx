@@ -359,6 +359,22 @@ export default function GraphicalHost({
                 >
                   {t('Try again')}
                 </button>
+                {/* "Try again" repeats what was used, which is right for a
+                    network that failed and wrong for a password that did: the
+                    same mistyped password went round again with no way to
+                    correct it short of closing the pane. Only for a password
+                    typed here: a saved one wins over anything typed, and is
+                    changed in the host's dialog. */}
+                {!hasStoredPassword && lastTyped.current !== undefined && (
+                  <button
+                    onClick={() => {
+                      setPassword('')
+                      setPhase({ at: 'password' })
+                    }}
+                  >
+                    {t('Another password…')}
+                  </button>
+                )}
               </>
             )}
           </div>

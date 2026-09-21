@@ -557,6 +557,7 @@ export const ru: Record<string, string> = {
   'The host says': 'Хост сообщает',
   'Session ended': 'Сессия завершена',
   'Try again': 'Повторить',
+  'Another password…': 'Другой пароль…',
   'Not a desktop': 'Это не рабочий стол',
   'Negotiating with the server.': 'Согласование с сервером.',
   'Reading the login for this host.': 'Читаю логин для этого хоста.',

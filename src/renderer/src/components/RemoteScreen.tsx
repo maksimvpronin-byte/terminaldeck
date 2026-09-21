@@ -408,6 +408,60 @@ export default function RemoteScreen({
     }
   }
 
+  /**
+   * Buttons pressed on the desktop and not yet let go, and where the pointer
+   * last was on it.
+   *
+   * A press starts on the desktop but may end anywhere — over the toolbar,
+   * another pane, outside the window. Listened for on the pane alone, that
+   * release never reached the far end, which went on holding the button: a
+   * selection that followed the pointer, a window stuck to it. So while a
+   * button is down the release is listened for on the whole document, and a
+   * button still down when the window loses focus is let go of by hand.
+   */
+  const heldButtons = useRef(new Set<number>())
+  const lastPoint = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
+
+  function sendButton(button: number, down: boolean, at: { x: number; y: number }): void {
+    const event = buttonEvent(button, down)
+    if (!event) return
+    tell({ a: event.extended ? 'xmouse' : 'mouse', flags: event.flags, x: at.x, y: at.y })
+  }
+
+  function releaseButton(event: MouseEvent): void {
+    if (!heldButtons.current.delete(event.button)) return
+    const at = pointOf(event) ?? lastPoint.current
+    lastPoint.current = at
+    sendButton(event.button, false, at)
+    if (heldButtons.current.size === 0) {
+      document.removeEventListener('mouseup', onDocumentMouseUp, true)
+    }
+  }
+  const releaseButtonRef = useRef(releaseButton)
+  releaseButtonRef.current = releaseButton
+  // One listener for the life of the pane, so the one added is the one removed.
+  const onDocumentMouseUp = useRef((event: MouseEvent) => releaseButtonRef.current(event)).current
+
+  function pressButton(event: React.MouseEvent, at: { x: number; y: number }): void {
+    if (!buttonEvent(event.button, true)) return
+    if (heldButtons.current.size === 0) {
+      document.addEventListener('mouseup', onDocumentMouseUp, true)
+    }
+    heldButtons.current.add(event.button)
+    sendButton(event.button, true, at)
+  }
+
+  /** Every button still down goes up, where the pointer last was. */
+  function releaseButtons(): void {
+    for (const button of heldButtons.current) sendButton(button, false, lastPoint.current)
+    heldButtons.current.clear()
+    document.removeEventListener('mouseup', onDocumentMouseUp, true)
+  }
+  const releaseButtonsRef = useRef(releaseButtons)
+  releaseButtonsRef.current = releaseButtons
+
+  useEffect(() => () => releaseButtonsRef.current(), [])
+
   /* ------------------------------------------------------------ the session */
 
   useEffect(() => {
@@ -796,6 +850,7 @@ export default function RemoteScreen({
       diag('rdp', `focus lost, releasing ${[...held].join(',') || 'nothing'}`)
       for (const code of held) sendKey(code, false)
       held.clear()
+      releaseButtonsRef.current()
       tell({ a: 'focus', flags: 0 })
     }
 
@@ -1000,19 +1055,15 @@ export default function RemoteScreen({
      */
     syncModifiers(event)
 
+    lastPoint.current = at
     if (down === null) {
       tell({ a: 'mouse', flags: PTR.move, x: at.x, y: at.y })
       return
     }
-    const button = buttonEvent(event.button, down)
-    if (!button) return
+    if (!buttonEvent(event.button, down)) return
     event.preventDefault()
-    tell({
-      a: button.extended ? 'xmouse' : 'mouse',
-      flags: button.flags,
-      x: at.x,
-      y: at.y
-    })
+    // Releases arrive through the document; see heldButtons.
+    if (down) pressButton(event, at)
   }
 
   return (
@@ -1026,7 +1077,7 @@ export default function RemoteScreen({
         containerRef.current?.focus()
         onMouse(e, true)
       }}
-      onMouseUp={(e) => onMouse(e, false)}
+      onMouseUp={(e) => e.preventDefault()}
       onMouseMove={(e) => onMouse(e, null)}
       onFocus={() => tell({ a: 'focus', flags: 0 })}
       // The far side's own menu, not this machine's.

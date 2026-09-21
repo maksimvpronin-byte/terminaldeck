@@ -323,6 +323,88 @@ describe('background desktops', () => {
   })
 })
 
+/**
+ * A press on the desktop may end anywhere. Listened for on the pane alone, a
+ * release over the toolbar or outside the window never reached the far end,
+ * which went on holding the button down.
+ */
+describe('a mouse button pressed on the desktop', () => {
+  const props = {
+    sessionId: 'host',
+    look: null,
+    onPhase: vi.fn(),
+    onNotice: vi.fn(),
+    onMeasured: vi.fn()
+  }
+
+  async function desktop(): Promise<{ screen: Element; unmount: () => void }> {
+    const view = render(<RemoteScreen {...props} visible />)
+    await act(async () => {})
+    const canvas = view.container.querySelector('canvas')!
+    canvas.width = 1000
+    canvas.height = 800
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 1000,
+      height: 800,
+      right: 1000,
+      bottom: 800,
+      x: 0,
+      y: 0,
+      toJSON: () => undefined
+    })
+    desktopSend.mockClear()
+    return { screen: view.container.querySelector('.graphical-screen')!, unmount: view.unmount }
+  }
+  const buttons = (): unknown[] =>
+    desktopSend.mock.calls
+      .map(([, fields]) => fields)
+      .filter((fields) => fields.a === 'mouse' && fields.flags !== PTR.move)
+
+  it('is let go of there when the release happens outside the pane', async () => {
+    const { screen, unmount } = await desktop()
+
+    fireEvent.mouseDown(screen, { button: 0, clientX: 100, clientY: 100 })
+    fireEvent.mouseUp(document.body, { button: 0, clientX: 1200, clientY: 100 })
+
+    expect(buttons()).toEqual([
+      { a: 'mouse', flags: PTR.left | PTR.down, x: 100, y: 100 },
+      // Where it was let go of, held to the edge of the desktop.
+      { a: 'mouse', flags: PTR.left, x: 999, y: 100 }
+    ])
+    unmount()
+  })
+
+  it('is let go of once, when the release happens on the pane', async () => {
+    const { screen, unmount } = await desktop()
+
+    fireEvent.mouseDown(screen, { button: 2, clientX: 10, clientY: 20 })
+    fireEvent.mouseUp(screen, { button: 2, clientX: 10, clientY: 20 })
+
+    expect(buttons()).toEqual([
+      { a: 'mouse', flags: PTR.right | PTR.down, x: 10, y: 20 },
+      { a: 'mouse', flags: PTR.right, x: 10, y: 20 }
+    ])
+    unmount()
+  })
+
+  it('is let go of when the window loses focus with the button still down', async () => {
+    const { screen, unmount } = await desktop()
+
+    fireEvent.mouseDown(screen, { button: 0, clientX: 30, clientY: 40 })
+    fireEvent.blur(window)
+    // A release the window never saw arrives after it comes back; nothing more goes.
+    fireEvent.mouseUp(document.body, { button: 0, clientX: 30, clientY: 40 })
+
+    expect(buttons()).toEqual([
+      { a: 'mouse', flags: PTR.left | PTR.down, x: 30, y: 40 },
+      { a: 'mouse', flags: PTR.left, x: 30, y: 40 }
+    ])
+    unmount()
+  })
+})
+
 describe('a file copy that failed', () => {
   /**
    * The reason is translated and the path is not, and both have to survive:
