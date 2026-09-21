@@ -4,6 +4,8 @@ import { desktopSizeFor, type DesktopSize } from '../../../shared/desktopSize'
 import { buttonEvent, PTR, wheelFlags, wheelTurns } from '../../../shared/rdpInput'
 import { rdpKeyFor, substituteCommand, unicodeKey } from '../../../shared/rdpScancodes'
 import { modifierFixes } from '../../../shared/modifierSync'
+import { isLockKey, lockFlags } from '../../../shared/lockSync'
+import { IS_MAC } from '../state/keys'
 import type { ForwardedKey, RdpView } from '../../../shared/types'
 import { isRefusal } from '../../../shared/rdpLogon'
 import { endedBySignOut } from '../../../shared/rdpLogoff'
@@ -143,6 +145,12 @@ export default function RemoteScreen({
    * because the mouse needs it too — see `syncModifiers`.
    */
   const heldRef = useRef<Set<string>>(new Set())
+  /**
+   * The lock states the far end was last told, or null while that is not
+   * known — a new session, or just after a lock key went through as a key.
+   * See `syncLocks`.
+   */
+  const locksRef = useRef<number | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   /** The live session, once the main process has given it a name. */
   const idRef = useRef<string | null>(null)
@@ -234,6 +242,38 @@ export default function RemoteScreen({
       if (fix.down) heldRef.current.add(fix.code)
       else heldRef.current.delete(fix.code)
     }
+  }
+
+  /**
+   * Makes the far end's Num, Caps and Scroll Lock agree with this keyboard's.
+   *
+   * The same shape as `syncModifiers`, and for the same reason: the event knows
+   * the truth, so whatever the far end was last told is corrected from it. A
+   * lock key's own press is let through as a key — it toggles both ends alike —
+   * and leaves the far end's state unknown until an event reports it settled.
+   */
+  function syncLocks(event: { getModifierState(state: string): boolean }, code?: string): void {
+    if (code !== undefined && isLockKey(code)) {
+      locksRef.current = null
+      return
+    }
+    const flags = lockFlags((state) => event.getModifierState(state), IS_MAC)
+    if (flags === locksRef.current) return
+    diag('rdp', `lock sync ${flags}`)
+    locksRef.current = flags
+    tell({ a: 'sync', flags })
+  }
+
+  /**
+   * FreeRDP's focus-in: a Tab release either side of a Synchronize event, as
+   * mstsc sends. The Synchronize carries lock states, so it is sent with the
+   * ones the far end already has — never with nothing, which turns them all
+   * off. Until they are known it is left out; the first key or mouse move
+   * sends them.
+   */
+  function focusIn(): void {
+    const flags = locksRef.current
+    if (flags !== null) tell({ a: 'focus', flags })
   }
 
   /** A forwarded key's modifiers, shaped like the events' own `getModifierState`. */
@@ -538,6 +578,7 @@ export default function RemoteScreen({
           return
         }
         idRef.current = id
+        locksRef.current = null
         onSessionRef.current?.(id)
         tell({ a: 'visible', value: visibleRef.current })
         askedRef.current = size ? `${size.width}×${size.height}` : ''
@@ -781,6 +822,7 @@ export default function RemoteScreen({
       // Every key carries the truth about every modifier, so the one this event
       // is about is left alone and the rest are made to agree.
       syncModifiers(event, { ignore: code })
+      syncLocks(event, event.code)
 
       // Full screen belongs to the pane, and the toolbar button means the same
       // thing; see `.pane:fullscreen` in styles.css.
@@ -856,6 +898,8 @@ export default function RemoteScreen({
        * has not left.
        */
       syncModifiers(event, { ignore: code })
+      // After the release a lock key's state has settled, so it is read here.
+      syncLocks(event)
     }
 
     /** Everything still down goes up, because nothing else will report it. */
@@ -864,7 +908,7 @@ export default function RemoteScreen({
       for (const code of held) sendKey(code, false)
       held.clear()
       releaseButtonsRef.current()
-      tell({ a: 'focus', flags: 0 })
+      focusIn()
     }
 
     // Menu accelerators must belong to the focused desktop in windowed mode
@@ -1067,6 +1111,7 @@ export default function RemoteScreen({
      * come at all.
      */
     syncModifiers(event)
+    syncLocks(event)
 
     lastPoint.current = at
     if (down === null) {
@@ -1092,7 +1137,7 @@ export default function RemoteScreen({
       }}
       onMouseUp={(e) => e.preventDefault()}
       onMouseMove={(e) => onMouse(e, null)}
-      onFocus={() => tell({ a: 'focus', flags: 0 })}
+      onFocus={focusIn}
       // The far side's own menu, not this machine's.
       onContextMenu={(e) => e.preventDefault()}
       onWheel={(e) => {
