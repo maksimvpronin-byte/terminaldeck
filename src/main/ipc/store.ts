@@ -55,7 +55,7 @@ export function registerStoreHandlers(): void {
     sessionStore.deleteSessions(ids)
     forgetSecretsAt(sessions, ['secretRef', 'gatewaySecretRef'])
   })
-  ipcMain.handle(IPC.storeReorderSessions,(_e, orderedIds: string[]) => {
+  ipcMain.handle(IPC.storeReorderSessions, (_e, orderedIds: string[]) => {
     sessionStore.reorderSessions(orderedIds)
   })
   ipcMain.handle(

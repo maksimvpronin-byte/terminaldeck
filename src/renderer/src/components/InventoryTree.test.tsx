@@ -44,7 +44,12 @@ describe('the inventory tree', () => {
     show(
       {
         sourceId: 'src',
-        groups: [group(root, ''), group('outer', root), group('inner', 'outer'), group('other', root)],
+        groups: [
+          group(root, ''),
+          group('outer', root),
+          group('inner', 'outer'),
+          group('other', root)
+        ],
         sessions: [host('deep-db', 'inner'), host('web', 'other')],
         memberships: {}
       },

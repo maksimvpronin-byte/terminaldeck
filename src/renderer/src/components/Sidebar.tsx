@@ -286,7 +286,7 @@ export default function Sidebar({
     const index = (list: SessionProfile[]): Map<string, SessionProfile[]> => {
       const byGroup = new Map<string, SessionProfile[]>()
       for (const s of list) {
-        const placed = isGitNode(s.id) ? mirroredIn.get(s.id) ?? [] : s.groupId ? [s.groupId] : []
+        const placed = isGitNode(s.id) ? (mirroredIn.get(s.id) ?? []) : s.groupId ? [s.groupId] : []
         for (const groupId of placed) {
           const hosts = byGroup.get(groupId)
           if (hosts) hosts.push(s)
@@ -304,7 +304,8 @@ export default function Sidebar({
   )
 
   function hostsIn(groupId: string, list: SessionProfile[]): SessionProfile[] {
-    const index = list === visible ? visibleByGroup : list === sessions ? allByGroup : byGroupOf(list)
+    const index =
+      list === visible ? visibleByGroup : list === sessions ? allByGroup : byGroupOf(list)
     return index.get(groupId) ?? []
   }
 
@@ -792,90 +793,85 @@ export default function Sidebar({
   }
 
   function renderGroups(parentId: string | null, depth: number): JSX.Element[] {
-    return (
-      (childrenOf.get(parentId) ?? [])
-        .filter((g) => !needle || groupHasMatch(g.id))
-        .map((g) => {
-          // While filtering, stay expanded — matches must not hide inside a closed group.
-          const isCollapsed = needle === '' && collapsed.has(g.id)
-          const childCount =
-            hostsIn(g.id, visible).length + (childrenOf.get(g.id)?.length ?? 0)
-          const isSyncing = gitSyncing.includes(g.id)
+    return (childrenOf.get(parentId) ?? [])
+      .filter((g) => !needle || groupHasMatch(g.id))
+      .map((g) => {
+        // While filtering, stay expanded — matches must not hide inside a closed group.
+        const isCollapsed = needle === '' && collapsed.has(g.id)
+        const childCount = hostsIn(g.id, visible).length + (childrenOf.get(g.id)?.length ?? 0)
+        const isSyncing = gitSyncing.includes(g.id)
 
-          return (
-            <div className="tree-group" key={g.id}>
-              <div
-                className={`tree-item ${dropTarget === g.id ? 'drop-target' : ''}${
-                  dropEdge?.id === g.id ? ` drop-${dropEdge.place}` : ''
-                }`}
-                style={{ paddingLeft: groupIndent(depth) }}
-                draggable={!isGitNode(g.id)}
-                onDragStart={(e) => startDrag(e, { kind: 'group', id: g.id }, g.name)}
-                onDragEnd={endDrag}
-                onDragOver={(e) => allowGroupDrop(e, g)}
-                onDragLeave={() => {
-                  setDropTarget(null)
-                  setDropEdge((cur) => (cur?.id === g.id ? null : cur))
-                }}
-                onDrop={(e) => handleGroupDrop(e, g)}
-                onClick={() => toggleCollapsed(g.id)}
-                onContextMenu={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  setMenu({ x: e.clientX, y: e.clientY, items: groupMenu(g.id) })
-                }}
-                /* A folder tied to a repository is still a folder, and keeps the
+        return (
+          <div className="tree-group" key={g.id}>
+            <div
+              className={`tree-item ${dropTarget === g.id ? 'drop-target' : ''}${
+                dropEdge?.id === g.id ? ` drop-${dropEdge.place}` : ''
+              }`}
+              style={{ paddingLeft: groupIndent(depth) }}
+              draggable={!isGitNode(g.id)}
+              onDragStart={(e) => startDrag(e, { kind: 'group', id: g.id }, g.name)}
+              onDragEnd={endDrag}
+              onDragOver={(e) => allowGroupDrop(e, g)}
+              onDragLeave={() => {
+                setDropTarget(null)
+                setDropEdge((cur) => (cur?.id === g.id ? null : cur))
+              }}
+              onDrop={(e) => handleGroupDrop(e, g)}
+              onClick={() => toggleCollapsed(g.id)}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                setMenu({ x: e.clientX, y: e.clientY, items: groupMenu(g.id) })
+              }}
+              /* A folder tied to a repository is still a folder, and keeps the
                  folder's own icon; the link beside it is the difference. What a
                  sync last did is here rather than on a line of its own under
                  every such folder — three lines of grey text per folder is what
                  the tree looked like, and it is a thing you go and look at, not
                  a thing you read past. */
-                title={
-                  g.git
-                    ? `${isSyncing ? t('Reading the repository…') : ago(t, g.git.lastSyncedAt)}` +
-                      (g.git.lastRevision ? ` · ${g.git.lastRevision}` : '') +
-                      ` · ${g.git.branch || t('default branch')}` +
-                      ` · ${g.git.repoUrl}`
-                    : isGitNode(g.id)
-                      ? t('Settings kept here, over what the repository says')
-                      : t('Drag by the edge of a row to sort · drop onto a folder to put it inside')
-                }
-              >
-                <span className="tree-group-title name">
-                  <span className={`chevron ${isCollapsed ? '' : 'open'}`}>▸</span> 📁
-                  {g.git && <span className="git-mark">🔗</span>} {g.name}
-                  {isCollapsed && childCount > 0 && (
-                    <span className="child-count">{childCount}</span>
-                  )}
-                  {/* The one thing the button that stood here carried by
+              title={
+                g.git
+                  ? `${isSyncing ? t('Reading the repository…') : ago(t, g.git.lastSyncedAt)}` +
+                    (g.git.lastRevision ? ` · ${g.git.lastRevision}` : '') +
+                    ` · ${g.git.branch || t('default branch')}` +
+                    ` · ${g.git.repoUrl}`
+                  : isGitNode(g.id)
+                    ? t('Settings kept here, over what the repository says')
+                    : t('Drag by the edge of a row to sort · drop onto a folder to put it inside')
+              }
+            >
+              <span className="tree-group-title name">
+                <span className={`chevron ${isCollapsed ? '' : 'open'}`}>▸</span> 📁
+                {g.git && <span className="git-mark">🔗</span>} {g.name}
+                {isCollapsed && childCount > 0 && <span className="child-count">{childCount}</span>}
+                {/* The one thing the button that stood here carried by
                       itself: it turned into an ellipsis while a sync ran, and
                       nothing else on screen said a folder was busy. */}
-                  {isSyncing && <span className="settings-note"> …</span>}
-                </span>
-                {/* The same two buttons went for the same reason: reserved
+                {isSyncing && <span className="settings-note"> …</span>}
+              </span>
+              {/* The same two buttons went for the same reason: reserved
                     width on every folder row, sixty pixels of it, for Sync with
                     git and New subgroup — both of which the context menu has
                     had all along. A sync in progress says so in the line under
                     the folder, which is where the branch and revision are. */}
-              </div>
-              {/* Only when a sync went wrong. That is not a caption to read past:
+            </div>
+            {/* Only when a sync went wrong. That is not a caption to read past:
                 the folder goes on showing what it already had, and without this
                 a failed sync looks exactly like one that changed nothing. */}
-              {g.git && !isSyncing && (gitErrors[g.id] ?? g.git.lastError) && (
-                <div className="inventory-error" style={{ paddingLeft: hostIndent(depth) }}>
-                  {gitErrors[g.id] ?? g.git.lastError}
-                </div>
-              )}
-              {!isCollapsed && (
-                <>
-                  {hostsIn(g.id, visible).map((s) => renderSession(s, hostIndent(depth)))}
-                  {renderGroups(g.id, depth + 1)}
-                </>
-              )}
-            </div>
-          )
-        })
-    )
+            {g.git && !isSyncing && (gitErrors[g.id] ?? g.git.lastError) && (
+              <div className="inventory-error" style={{ paddingLeft: hostIndent(depth) }}>
+                {gitErrors[g.id] ?? g.git.lastError}
+              </div>
+            )}
+            {!isCollapsed && (
+              <>
+                {hostsIn(g.id, visible).map((s) => renderSession(s, hostIndent(depth)))}
+                {renderGroups(g.id, depth + 1)}
+              </>
+            )}
+          </div>
+        )
+      })
   }
 
   return (

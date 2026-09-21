@@ -191,7 +191,11 @@ const windowsHelper = new ClipboardHelper('powershell.exe', [
   windowsServer
 ])
 
-async function native(action: 'read' | 'write', paths?: string[], version?: string): Promise<string> {
+async function native(
+  action: 'read' | 'write',
+  paths?: string[],
+  version?: string
+): Promise<string> {
   if (process.platform === 'win32') {
     try {
       return await windowsHelper.request(JSON.stringify({ action, paths, version }))

@@ -45,16 +45,19 @@ describe('the file list handed to the RDP client', () => {
  * to the clipboard of the machine running the tests.
  */
 // Not on CI: a runner's session may have no clipboard to read at all.
-describe.runIf(process.platform === 'win32' && !process.env.CI)('the Windows clipboard helper', () => {
-  it('answers reads after the first without starting PowerShell again', async () => {
-    const first = await readFileClipboard()
-    expect(Array.isArray(first.paths)).toBe(true)
-    expect(first.version).toMatch(/^\d+$/)
+describe.runIf(process.platform === 'win32' && !process.env.CI)(
+  'the Windows clipboard helper',
+  () => {
+    it('answers reads after the first without starting PowerShell again', async () => {
+      const first = await readFileClipboard()
+      expect(Array.isArray(first.paths)).toBe(true)
+      expect(first.version).toMatch(/^\d+$/)
 
-    const started = performance.now()
-    for (let i = 0; i < 5; i++) await readFileClipboard()
-    const each = (performance.now() - started) / 5
+      const started = performance.now()
+      for (let i = 0; i < 5; i++) await readFileClipboard()
+      const each = (performance.now() - started) / 5
 
-    expect(each).toBeLessThan(100)
-  }, 20_000)
-})
+      expect(each).toBeLessThan(100)
+    }, 20_000)
+  }
+)

@@ -141,7 +141,9 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
 
   function hostsOf(groupId: string): SessionProfile[] {
     const hosts = hostsByGroup.get(groupId) ?? []
-    return needle ? hosts.filter((h) => `${h.name} ${h.host}`.toLowerCase().includes(needle)) : hosts
+    return needle
+      ? hosts.filter((h) => `${h.name} ${h.host}`.toLowerCase().includes(needle))
+      : hosts
   }
 
   /** How many groups name this host, so the tree can point out the duplicates. */

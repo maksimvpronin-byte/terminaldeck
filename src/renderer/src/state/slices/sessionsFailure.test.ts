@@ -32,9 +32,7 @@ describe('a drag whose save fails', () => {
   it('puts the hosts back as the disk holds them', async () => {
     window.td.store.saveSession = () => Promise.reject(new Error('disk full'))
 
-    await expect(useStore.getState().reorderSession('a', 'b', 'after')).rejects.toThrow(
-      'disk full'
-    )
+    await expect(useStore.getState().reorderSession('a', 'b', 'after')).rejects.toThrow('disk full')
 
     expect(useStore.getState().sessions).toEqual(onDisk.sessions)
   })
