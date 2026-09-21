@@ -318,21 +318,6 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   host is not changed. To make it the default, tick it under Desktop for a host or a group
 - Panels that ride on an SSH connection — the file browser, port forwarding, monitoring,
   broadcast — are hidden for a desktop rather than greyed out, since none of them is coming
-- Opening a host asks what you want: a **new session** in the pane, or one of the sessions
-  already logged on to that machine — watched, or with the keyboard and mouse taken. The list
-  comes from the host itself and is read positionally rather than by column heading, so a
-  translated Windows is read as well as an English one. Joining an existing session opens a
-  window Windows draws, not this app: the mechanism runs over RPC and SMB rather than RDP, and
-  no client that could be embedded here speaks it. Windows only, for the same reason
-- **Listing sessions asks as whoever runs this app**, not as the login saved for the host —
-  `qwinsta` authenticates its own RPC and no stored credential can change that. Against a
-  machine outside your domain the practical answer is to run TerminalDeck as an account that
-  host knows; failing that it tries PowerShell remoting with the saved login, which needs
-  WinRM on the host and that host named in this machine's `TrustedHosts`. None of this touches
-  ordinary RDP sessions, which need none of it
-- Joining without the prompt is a **checkbox, off by default**. The host's policy decides
-  whether it is permitted at all; where it is not, asking for it is refused outright rather
-  than quietly falling back to asking
 - **A connection that fails says why.** FreeRDP's own summary names the step and only the step
   — "the connection failed at negotiating security settings" covers a host that refused every
   security level offered and a connection that broke before the answer came back — so the pane
