@@ -6,7 +6,7 @@ vi.mock('electron', () => ({
   clipboard: { readBuffer: () => Buffer.alloc(0), readText: () => '' }
 }))
 
-const { withEmptyAuthority, pathsToUris } = await import('./clipboardFiles')
+const { withEmptyAuthority, pathsToUris, readFileClipboard } = await import('./clipboardFiles')
 
 describe('the file list handed to the RDP client', () => {
   /**
@@ -36,4 +36,25 @@ describe('the file list handed to the RDP client', () => {
     expect(lines[0].startsWith('file:///') && lines[0].endsWith('/a%20b.txt')).toBe(true)
     expect(lines[1].endsWith('/c.txt')).toBe(true)
   })
+})
+
+/**
+ * Each read used to start PowerShell afresh and compile its P/Invoke — close to
+ * 300 ms, once a second and on every text copy. The helper now stays running,
+ * so only the first read pays for starting it. Read only: nothing here writes
+ * to the clipboard of the machine running the tests.
+ */
+// Not on CI: a runner's session may have no clipboard to read at all.
+describe.runIf(process.platform === 'win32' && !process.env.CI)('the Windows clipboard helper', () => {
+  it('answers reads after the first without starting PowerShell again', async () => {
+    const first = await readFileClipboard()
+    expect(Array.isArray(first.paths)).toBe(true)
+    expect(first.version).toMatch(/^\d+$/)
+
+    const started = performance.now()
+    for (let i = 0; i < 5; i++) await readFileClipboard()
+    const each = (performance.now() - started) / 5
+
+    expect(each).toBeLessThan(100)
+  }, 20_000)
 })
