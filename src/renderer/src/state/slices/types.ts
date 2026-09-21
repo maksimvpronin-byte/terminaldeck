@@ -230,6 +230,11 @@ export interface WorkspaceSlice {
   markActivity: (tabId: string) => void
 
   setActivePane: (tabId: string, paneId: string) => void
+  /**
+   * Brings forward a pane where this saved host is open, switching workspace
+   * and tab as needed. False when it is open nowhere, and nothing changes.
+   */
+  revealSession: (sessionId: string) => boolean
   setPaneConnection: (tabId: string, paneId: string, connectionId: string) => void
   /** A live desktop, or undefined once it has ended. See `desktopId` on a leaf. */
   setPaneDesktop: (tabId: string, paneId: string, desktopId: string | undefined) => void

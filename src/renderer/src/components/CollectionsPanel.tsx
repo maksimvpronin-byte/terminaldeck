@@ -28,6 +28,7 @@ export default function CollectionsPanel({ query }: { query: string }): JSX.Elem
   const removeFromCollection = useStore((s) => s.removeFromCollection)
   const openCollection = useStore((s) => s.openCollection)
   const openTab = useStore((s) => s.openTab)
+  const revealSession = useStore((s) => s.revealSession)
   const openMany = useStore((s) => s.openMany)
   const workspaces = useStore((s) => s.workspaces)
   // Subscribed to purely so the list redraws when a member is renamed, deleted
@@ -220,6 +221,7 @@ export default function CollectionsPanel({ query }: { query: string }): JSX.Elem
                     className="tree-item"
                     style={{ paddingLeft: 28 }}
                     title={m.missing ? undefined : t('Double-click to connect')}
+                    onClick={() => revealSession(m.id)}
                     onDoubleClick={() => {
                       if (!m.missing) {
                         // Opened from here, so this set lends its look.

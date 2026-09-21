@@ -12,7 +12,7 @@ import {
   collectBroadcastTargets,
   type PaneTarget
 } from '../paneTree'
-import { activeTab, allTabs, mapTab, workspaceOfTab } from '../workspaces'
+import { activeTab, allTabs, mapTab, nextOpenPaneOf, workspaceOfTab } from '../workspaces'
 import { loadLayout } from '../layout'
 import type { AppState, OpenRequest, Workspace, WorkspaceSlice, WorkspaceTab } from './types'
 
@@ -315,6 +315,14 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
     set((s) => ({
       workspaces: mapTab(s.workspaces, tabId, (t) => ({ ...t, activePaneId: paneId }))
     }))
+  },
+
+  revealSession: (sessionId) => {
+    const place = nextOpenPaneOf(get(), sessionId)
+    if (!place) return false
+    get().setActiveTab(place.tabId)
+    get().setActivePane(place.tabId, place.paneId)
+    return true
   },
 
   setPaneConnection: (tabId, paneId, connectionId) => {

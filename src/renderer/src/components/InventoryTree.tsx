@@ -53,6 +53,7 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
   const selectedHostIds = useStore((s) => s.selectedHostIds)
   const toggleHostSelection = useStore((s) => s.toggleHostSelection)
   const selectOnlyHost = useStore((s) => s.selectOnlyHost)
+  const revealSession = useStore((s) => s.revealSession)
   const selectHostRange = useStore((s) => s.selectHostRange)
   const openMany = useStore((s) => s.openMany)
   const credentials = useStore((s) => s.credentials)
@@ -414,9 +415,10 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
       selectHostRange(order, host.id)
       return
     }
-    // Matches the saved-sessions tree: a plain click only selects, connecting
-    // is a double-click.
+    // Matches the saved-sessions tree: a plain click selects, and shows the host
+    // if it is already open; connecting is a double-click.
     selectOnlyHost(host.id)
+    revealSession(host.id)
   }
 
   function renderHost(host: SessionProfile, paddingLeft: number, colour?: string): JSX.Element {

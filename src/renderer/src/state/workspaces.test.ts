@@ -7,6 +7,7 @@ import {
   allTabs,
   findTab,
   mapTab,
+  nextOpenPaneOf,
   workspaceHasActivity,
   workspaceOfTab
 } from './workspaces'
@@ -104,5 +105,50 @@ describe('migrateV1', () => {
     expect(migrateV1({ version: 1, tabs: [], activeTabId: null }).workspaces).toEqual([])
     const broken = { version: 1, activeTabId: null } as unknown as Parameters<typeof migrateV1>[0]
     expect(migrateV1(broken).workspaces).toEqual([])
+  })
+})
+
+describe('nextOpenPaneOf', () => {
+  function live(id: string, sessionId: string, connected = true): WorkspaceTab {
+    const leaf = {
+      ...makeLeaf(id, { kind: 'session', sessionId }),
+      id: `p-${id}`,
+      connectionId: connected ? `c-${id}` : undefined
+    }
+    return { id, title: id, root: leaf, activePaneId: leaf.id }
+  }
+
+  function state(activeWorkspaceId: string, activeTabId: string) {
+    return {
+      workspaces: [
+        {
+          id: 'w1',
+          title: 'one',
+          tabs: [live('a', 'web'), live('b', 'db')],
+          activeTabId: activeWorkspaceId === 'w1' ? activeTabId : 'a'
+        },
+        {
+          id: 'w2',
+          title: 'two',
+          tabs: [live('c', 'web'), live('d', 'idle', false)],
+          activeTabId: activeWorkspaceId === 'w2' ? activeTabId : 'c'
+        }
+      ],
+      activeWorkspaceId
+    }
+  }
+
+  it('finds a host open in another workspace', () => {
+    expect(nextOpenPaneOf(state('w2', 'c'), 'db')).toEqual({ tabId: 'b', paneId: 'p-b' })
+  })
+
+  it('steps to the next copy when the current one is already shown', () => {
+    expect(nextOpenPaneOf(state('w1', 'a'), 'web')).toEqual({ tabId: 'c', paneId: 'p-c' })
+    expect(nextOpenPaneOf(state('w2', 'c'), 'web')).toEqual({ tabId: 'a', paneId: 'p-a' })
+  })
+
+  it('ignores a pane that is not connected, and hosts open nowhere', () => {
+    expect(nextOpenPaneOf(state('w1', 'a'), 'idle')).toBeUndefined()
+    expect(nextOpenPaneOf(state('w1', 'a'), 'nowhere')).toBeUndefined()
   })
 })

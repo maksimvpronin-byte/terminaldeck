@@ -108,6 +108,7 @@ export default function Sidebar({
   const selectedHostIds = useStore((s) => s.selectedHostIds)
   const toggleHostSelection = useStore((s) => s.toggleHostSelection)
   const selectOnlyHost = useStore((s) => s.selectOnlyHost)
+  const revealSession = useStore((s) => s.revealSession)
   const selectHostRange = useStore((s) => s.selectHostRange)
   const clearHostSelection = useStore((s) => s.clearHostSelection)
   const openSelectedHosts = useStore((s) => s.openSelectedHosts)
@@ -354,8 +355,10 @@ export default function Sidebar({
       return
     }
     // Selects, never connects: opening a host is a double-click, so that a
-    // stray click on the tree cannot start a session by itself.
+    // stray click on the tree cannot start a session by itself. A host that is
+    // already open is shown, though — that starts nothing.
     selectOnlyHost(s.id)
+    revealSession(s.id)
   }
 
   /**

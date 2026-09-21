@@ -73,6 +73,40 @@ export function sessionIdsOf(workspace: Workspace): string[] {
   return [...new Set(ids)]
 }
 
+/**
+ * Where a saved host is open, as the pane to bring forward — or undefined when
+ * it is open nowhere.
+ *
+ * Only live panes count, the same test the tree's "open now" mark uses: an idle
+ * pane left from a restored layout is not the host being open, and jumping to
+ * it would show a dead terminal instead of doing nothing.
+ *
+ * Open in several places, it steps through them in order, starting after the
+ * pane being looked at — so clicking the host again finds the next copy rather
+ * than staying put.
+ */
+export function nextOpenPaneOf(
+  state: HasWorkspaces,
+  sessionId: string
+): { tabId: string; paneId: string } | undefined {
+  const places = allTabs(state).flatMap((tab) =>
+    collectLeaves(tab.root)
+      .filter(
+        (leaf) =>
+          (leaf.connectionId ?? leaf.desktopId) &&
+          leaf.target.kind === 'session' &&
+          leaf.target.sessionId === sessionId
+      )
+      .map((leaf) => ({ tabId: tab.id, paneId: leaf.id }))
+  )
+  if (places.length === 0) return undefined
+  const current = activeTab(state)
+  const here = places.findIndex((p) => p.tabId === current?.id && p.paneId === current.activePaneId)
+  if (here >= 0) return places[(here + 1) % places.length]
+  // Not looking at it yet: one in the current tab beats one elsewhere.
+  return places.find((p) => p.tabId === current?.id) ?? places[0]
+}
+
 /** A background workspace is flagged when any of its tabs has unread output. */
 export function workspaceHasActivity(workspace: Workspace): boolean {
   return workspace.tabs.some((t) => t.hasActivity)
