@@ -6,6 +6,32 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.18.4
+
+### Fixed
+
+- **A desktop resized while it was connecting kept its first size.** A pane
+  that changed size in the second or two before the server opened Display
+  Control had the new size dropped, and a repeat of it was taken for a size
+  already asked for. It is now sent as soon as the channel opens. A new fixed
+  size saved for an open desktop, or a change of density alone, is sent too.
+- **Signing a workspace out reported desktops as signed out that were not.**
+  Every desktop pane closed once the keys had been sent — a locked session, or
+  one without a Run dialog, included — and those sessions went on running on
+  their hosts. A pane now closes when its host confirms the sign-out; what has
+  not confirmed within twenty seconds stays open, and you are asked whether to
+  close it anyway.
+
+### Changed
+
+- **Copying and pasting with a desktop open is quicker on Windows.** Reading
+  the file clipboard started PowerShell afresh each time — about 0.3 s, once a
+  second, and on every text copy. One helper now stays running while it is used.
+- **Uploading a folder of small files over SFTP** asks the server about each
+  destination directory once for the whole transfer, instead of once per file.
+- The README no longer lists joining another person's Windows session, which was
+  removed in 0.13.2.
+
 ## 0.18.3
 
 ### Fixed
