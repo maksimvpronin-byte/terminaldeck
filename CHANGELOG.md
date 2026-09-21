@@ -6,6 +6,17 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.18.5
+
+### Fixed
+
+- **Num Lock turned itself off on a desktop.** Every click into a desktop pane,
+  and every switch away from the window, told the host that Num Lock, Caps Lock
+  and Scroll Lock were all off, so the keypad typed arrows instead of digits.
+  The host is now told the states this keyboard actually has, and they are
+  put right whenever the two ends disagree. On a Mac, whose keypad always types
+  digits, Num Lock is kept on.
+
 ## 0.18.4
 
 ### Fixed
