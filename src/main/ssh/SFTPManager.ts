@@ -546,13 +546,28 @@ class SFTPManager {
    * transfer into a destination that does not exist yet needs the whole chain
    * walked. Errors are swallowed — a directory that cannot be made will be
    * reported by the write that follows, in terms of the file it was for.
+   *
+   * `known` holds the directories one transfer has already found or made, so
+   * a folder of a thousand files asks the server about its parent once rather
+   * than a thousand times — each a round trip before the file could start.
    */
-  private async ensureRemoteDir(connectionId: string, dir: string): Promise<void> {
-    if (!dir || dir === '/' || dir === '.') return
+  private async ensureRemoteDir(
+    connectionId: string,
+    dir: string,
+    known: Set<string> = new Set()
+  ): Promise<void> {
+    if (!dir || dir === '/' || dir === '.' || known.has(dir)) return
     const existing = await this.statPath(connectionId, dir).catch(() => null)
-    if (existing) return
-    await this.ensureRemoteDir(connectionId, parentOf(dir))
-    await this.mkdir(connectionId, dir).catch(() => undefined)
+    if (existing) {
+      known.add(dir)
+      return
+    }
+    await this.ensureRemoteDir(connectionId, parentOf(dir), known)
+    const made = await this.mkdir(connectionId, dir).then(
+      () => true,
+      () => false
+    )
+    if (made) known.add(dir)
   }
 
   // --- Planning: what a transfer would trample, worked out before it starts ---
@@ -790,6 +805,8 @@ class SFTPManager {
     /* What the plan found already occupied. A conflict with no answer is left
        alone rather than overwritten; see shouldWrite. */
     const conflicted = conflictedPaths(plan)
+    /** Remote directories this transfer has found or made; see ensureRemoteDir. */
+    const madeDirs = new Set<string>()
     for (const item of plan.items) {
       if (!shouldWrite(item.destPath, decisions, conflicted)) {
         skipped++
@@ -819,7 +836,7 @@ class SFTPManager {
         if (plan.direction === 'download') await mkdir(item.destPath, { recursive: true })
         else {
           const host = plan.direction === 'relay' ? destConnectionId! : connectionId
-          await this.ensureRemoteDir(host, item.destPath)
+          await this.ensureRemoteDir(host, item.destPath, madeDirs)
           // ensureRemoteDir swallows its errors for the file that follows; here
           // there is no file to report one, so the folder is checked for.
           if (!(await this.statPath(host, item.destPath))?.isDirectory) {
@@ -835,10 +852,10 @@ class SFTPManager {
         onProgress?.(transferred, total, item.sourcePath)
       }
       if (plan.direction === 'relay') {
-        await this.ensureRemoteDir(destConnectionId!, parentOf(item.destPath))
+        await this.ensureRemoteDir(destConnectionId!, parentOf(item.destPath), madeDirs)
         await this.relay(connectionId, item.sourcePath, destConnectionId!, item.destPath, report)
       } else if (plan.direction === 'upload') {
-        await this.ensureRemoteDir(connectionId, parentOf(item.destPath))
+        await this.ensureRemoteDir(connectionId, parentOf(item.destPath), madeDirs)
         await this.upload(connectionId, item.sourcePath, item.destPath, report)
       } else {
         // dirname, not a hand-rolled search for the last '/'. This is a local

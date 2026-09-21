@@ -305,6 +305,30 @@ describe('running a transfer plan', () => {
     ])
   })
 
+  /**
+   * Each file used to ask the server about every directory above it before it
+   * could start: a round trip per level per file, which on a distant host is
+   * most of the time a folder of small files takes.
+   */
+  it('asks about a destination directory once for all the files going into it', async () => {
+    const calls: Call[] = []
+    attach('conn', stubSession(calls, { '/srv': { dir: true } }))
+    const stat = vi.spyOn(sftpManager, 'statPath')
+    const files = Array.from({ length: 10 }, (_, i) =>
+      item(`/local/f${i}.txt`, `/srv/one/two/f${i}.txt`)
+    )
+
+    await sftpManager.runPlan('conn', plan('upload', files))
+
+    expect(calls.filter((c) => c.op === 'mkdir').map((c) => c.path)).toEqual([
+      '/srv/one',
+      '/srv/one/two'
+    ])
+    expect(stat.mock.calls.filter(([, path]) => path === '/srv/one/two')).toHaveLength(1)
+    expect(calls.filter((c) => c.op === 'fastPut' || c.op === 'posixRename')).not.toHaveLength(0)
+    stat.mockRestore()
+  })
+
   it('does not create a directory that is already there', async () => {
     const calls: Call[] = []
     attach('conn', stubSession(calls, { '/srv': { dir: true }, '/srv/one': { dir: true } }))
