@@ -140,6 +140,15 @@ typedef struct
 	wClipboard* clip_system;
 	/** What this side last copied, as a `text/uri-list`. */
 	char* clip_uris;
+	/*
+	 * Which copy the file table was built from. WinPR keeps the table it made
+	 * for a file list until it is asked to make another, and serves bytes from
+	 * it by index — so without this, emptying `clip_uris` (the vault locked,
+	 * the window lost focus) or copying something else left the far end free
+	 * to go on reading the files of a copy that had been withdrawn. Bumped
+	 * whenever the list changes; bytes are served only while the two agree.
+	 */
+	unsigned clip_uris_gen, clip_table_gen;
 	/* Channel-thread state: responses carry no format id. Keep our outgoing
 	 * request separate from FreeRDP's lastRequestedFormatId (incoming requests). */
 	UINT32 clip_requested, clip_next;
@@ -802,6 +811,7 @@ static UINT td_clip_answer_files(CliprdrClientContext* ctx, tdContext* td)
 	BYTE* wire = NULL;
 	UINT32 wire_size = 0;
 	char* uris = NULL;
+	unsigned gen;
 	char why[192] = "Nothing is copied on this computer";
 	char where[200] = "";
 	UINT rc;
@@ -809,6 +819,7 @@ static UINT td_clip_answer_files(CliprdrClientContext* ctx, tdContext* td)
 	EnterCriticalSection(&td->clip);
 	if (td->clip_uris)
 		uris = _strdup(td->clip_uris);
+	gen = td->clip_uris_gen;
 	LeaveCriticalSection(&td->clip);
 
 	response.common.msgType = CB_FORMAT_DATA_RESPONSE;
@@ -832,6 +843,10 @@ static UINT td_clip_answer_files(CliprdrClientContext* ctx, tdContext* td)
 				(void)snprintf(why, sizeof(why), "Cannot open the copied files on this computer");
 			else
 			{
+				/* The table now holds this copy's files, and only this copy's. */
+				EnterCriticalSection(&td->clip);
+				td->clip_table_gen = gen;
+				LeaveCriticalSection(&td->clip);
 				const UINT32 flags = td_clip_send_flags(td);
 				const UINT error = cliprdr_serialize_file_list_ex(
 				    flags, descriptors, count / sizeof(FILEDESCRIPTORW), &wire, &wire_size);
@@ -970,7 +985,19 @@ static UINT td_clip_local_request(CliprdrClientContext* ctx, const CLIPRDR_FILE_
 	tdContext* td = td_of(ctx);
 	wClipboardDelegate* delegate = ClipboardGetDelegate(td->clip_system);
 	UINT rc = ERROR_INVALID_DATA;
+	int current;
 	ClipboardLock(td->clip_system);
+	/* Under the table's own lock, so the list cannot be withdrawn between the
+	 * check and the read. Refused, not served, once it has been. */
+	EnterCriticalSection(&td->clip);
+	current = td->clip_uris != NULL && td->clip_table_gen == td->clip_uris_gen;
+	LeaveCriticalSection(&td->clip);
+	if (!current)
+	{
+		ClipboardUnlock(td->clip_system);
+		WLog_INFO(TAG, "clipboard: refused bytes of a copy that has been withdrawn");
+		return td_clip_local_reply(td, request->streamId, NULL, 0, CB_RESPONSE_FAIL);
+	}
 	delegate->custom = td;
 	delegate->ClipboardFileSizeSuccess = td_clip_size_ok;
 	delegate->ClipboardFileSizeFailure = td_clip_size_fail;
@@ -1292,13 +1319,28 @@ static void td_clip_set_local(tdContext* td, const char* text)
  * Held rather than read: turning them into descriptors means stat'ing every
  * one, and most of what anybody copies is never pasted into a session.
  */
+/**
+ * Replaces the copied paths; the caller holds `td->clip`. The same list again
+ * is not a new copy — text copied after the files re-sends both, and a paste
+ * already reading them must not be cut off by it.
+ */
+static void td_clip_hold_uris(tdContext* td, const char* uris)
+{
+	const char* next = uris && *uris ? uris : NULL;
+
+	if (next == NULL && td->clip_uris == NULL)
+		return;
+	if (next && td->clip_uris && strcmp(next, td->clip_uris) == 0)
+		return;
+	free(td->clip_uris);
+	td->clip_uris = next ? _strdup(next) : NULL;
+	td->clip_uris_gen++;
+}
+
 static void td_clip_set_files(tdContext* td, const char* uris)
 {
-	char* copy = uris && *uris ? _strdup(uris) : NULL;
-
 	EnterCriticalSection(&td->clip);
-	free(td->clip_uris);
-	td->clip_uris = copy;
+	td_clip_hold_uris(td, uris);
 	LeaveCriticalSection(&td->clip);
 
 	(void)td_clip_offer(td);
@@ -1316,10 +1358,8 @@ static void apply_command(tdContext* td, const td_cmd* cmd)
 		{
 			EnterCriticalSection(&td->clip);
 			free(td->clip_local);
-			free(td->clip_uris);
 			td->clip_local = _strdup(td_cmd_str(cmd, "text", ""));
-			const char* uris = td_cmd_str(cmd, "uris", "");
-			td->clip_uris = *uris ? _strdup(uris) : NULL;
+			td_clip_hold_uris(td, td_cmd_str(cmd, "uris", ""));
 			LeaveCriticalSection(&td->clip);
 			(void)td_clip_offer(td);
 		}

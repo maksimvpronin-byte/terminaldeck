@@ -104,6 +104,21 @@ static UINT file_list_response(CliprdrClientContext* ctx, const CLIPRDR_FORMAT_D
 	free(descriptors);
 	return CHANNEL_RC_OK;
 }
+static unsigned refusals;
+static UINT refused_bytes(CliprdrClientContext* ctx, const CLIPRDR_FILE_CONTENTS_RESPONSE* response)
+{
+	(void)ctx;
+	assert(response->common.msgFlags == CB_RESPONSE_FAIL);
+	assert(response->streamId == 17);
+	refusals++;
+	return CHANNEL_RC_OK;
+}
+static void hold_uris(tdContext* td, const char* uris)
+{
+	EnterCriticalSection(&td->clip);
+	td_clip_hold_uris(td, uris);
+	LeaveCriticalSection(&td->clip);
+}
 static UINT local_file_bytes(CliprdrClientContext* ctx, const CLIPRDR_FILE_CONTENTS_RESPONSE* response)
 {
 	(void)ctx;
@@ -145,7 +160,7 @@ static void file_transfers(tdContext* td, CliprdrClientContext* ctx)
 		else { uri[used++] = *ch; }
 	}
 	uri[used] = 0;
-	td->clip_uris = _strdup(uri);
+	hold_uris(td, uri);
 	ctx->ClientFormatDataResponse = file_list_response;
 	assert(td_clip_answer_files(ctx, td) == CHANNEL_RC_OK);
 	ctx->ClientFileContentsResponse = local_file_bytes;
@@ -190,8 +205,42 @@ static void file_transfers(tdContext* td, CliprdrClientContext* ctx)
 	                                             CB_STREAM_FILECLIP_ENABLED |
 	                                                 CB_FILECLIP_NO_FILE_PATHS));
 
-	free(td->clip_uris);
-	td->clip_uris = NULL;
+	/*
+	 * Withdrawn — the vault locked, or the window lost focus — with the very
+	 * command the main process sends. WinPR still holds the table it built,
+	 * and a far end that kept the index must get nothing more out of it.
+	 */
+	td_cmd withdraw = { 0 };
+	withdraw.fields[0] = (td_field){ "a", "clipset" };
+	withdraw.fields[1] = (td_field){ "text", "" };
+	withdraw.fields[2] = (td_field){ "uris", "" };
+	withdraw.count = 3;
+	td->clipboard = 1;
+	apply_command(td, &withdraw);
+	assert(td->clip_uris == NULL);
+	ctx->ClientFileContentsResponse = refused_bytes;
+	assert(td_clip_local_request(ctx, &request) == CHANNEL_RC_OK);
+	assert(refusals == 1);
+
+	/* Copied again, the same file is offered afresh, but the old table is not
+	 * this copy's until the far end asks for the list again. */
+	hold_uris(td, uri);
+	assert(td_clip_local_request(ctx, &request) == CHANNEL_RC_OK);
+	assert(refusals == 2);
+	ctx->ClientFormatDataResponse = file_list_response;
+	assert(td_clip_answer_files(ctx, td) == CHANNEL_RC_OK);
+	ctx->ClientFileContentsResponse = local_file_bytes;
+	assert(td_clip_local_request(ctx, &request) == CHANNEL_RC_OK);
+
+	/* Text copied after the files re-sends the same list. That is not a new
+	 * copy, and a paste already reading the files carries on. */
+	hold_uris(td, uri);
+	assert(td_clip_local_request(ctx, &request) == CHANNEL_RC_OK);
+	assert(refusals == 2);
+
+	hold_uris(td, NULL);
+	free(td->clip_local);
+	td->clip_local = NULL;
 	assert(remove(path) == 0);
 
 	CLIPRDR_FORMAT formats[] = { { CF_UNICODETEXT, NULL }, { 49201, "FileGroupDescriptorW" } };
