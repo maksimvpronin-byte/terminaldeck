@@ -101,14 +101,14 @@ export default function GroupDialog({
   const effective = auth.effective
   const from = (key: keyof AuthDefaults): string => {
     const source = auth.inheritedFrom(key)
-    return source ? `inherited from ${source.name}` : ''
+    return source ? t('inherited from {name}', { name: source.name }) : ''
   }
   const ownSecret = auth.ownSecret
 
   const desktop = resolveRdp(pending, pending.parentId, groups)
   const rdpNote = (key: keyof RdpDefaults): string => {
     const source = rdpInheritedFrom(pending, pending.parentId, groups, key)
-    return source ? `inherited from ${source.name}` : ''
+    return source ? t('inherited from {name}', { name: source.name }) : ''
   }
   const ownGatewaySecret = isSet(group.gatewaySecretRef)
 
@@ -130,11 +130,11 @@ export default function GroupDialog({
 
   async function submit(): Promise<void> {
     if (!group.name.trim()) {
-      setError('Name is required')
+      setError(t('Name is required'))
       return
     }
     if (linked && !link?.repoUrl.trim()) {
-      setError('A repository address is required')
+      setError(t('A repository address is required'))
       return
     }
     const paths = pathsInput
@@ -148,21 +148,27 @@ export default function GroupDialog({
       linked && link ? { ...link, paths, includedGroups: link.includedGroups ?? [] } : undefined
     const wasLinked = Boolean(initial?.git)
 
-    await upsertGroup(
-      { ...group, git },
-      secretToSave(auth.shownMethod, forgetSecret, secret),
-      gatewaySecret || (forgetGatewaySecret ? null : undefined)
-    )
+    // Said here when refused, rather than leaving Save doing nothing.
+    try {
+      await upsertGroup(
+        { ...group, git },
+        secretToSave(auth.shownMethod, forgetSecret, secret),
+        gatewaySecret || (forgetGatewaySecret ? null : undefined)
+      )
+    } catch (err) {
+      setError((err as Error).message)
+      return
+    }
     onClose()
     if (git && !wasLinked) onLinked?.(group.id)
   }
 
   const secretHint =
     ownSecret && !forgetSecret
-      ? '(saved on this group)'
+      ? t('(saved on this group)')
       : from('secretRef')
-        ? `(blank keeps the one ${from('secretRef')})`
-        : '(leave blank to keep or inherit)'
+        ? t('(blank keeps the one {source})', { source: from('secretRef') })
+        : t('(leave blank to keep or inherit)')
 
   /** Lets a group hand the credential back to its parent, or drop a wrong one. */
   const authWords: AuthWords = {

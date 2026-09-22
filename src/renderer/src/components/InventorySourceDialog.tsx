@@ -47,7 +47,7 @@ export default function InventorySourceDialog({
 
   async function submit(): Promise<void> {
     if (!source.name.trim() || !source.repoUrl.trim()) {
-      setError('Name and repository URL are required')
+      setError(t('Name and repository URL are required'))
       return
     }
     setBusy(true)
@@ -56,8 +56,16 @@ export default function InventorySourceDialog({
       .split(',')
       .map((p) => p.trim())
       .filter(Boolean)
-    await saveInventorySource({ ...source, paths })
-    setBusy(false)
+    // A refused save used to leave the dialog busy for good, its button
+    // disabled and nothing said about why.
+    try {
+      await saveInventorySource({ ...source, paths })
+    } catch (err) {
+      setError((err as Error).message)
+      return
+    } finally {
+      setBusy(false)
+    }
     onClose()
   }
 

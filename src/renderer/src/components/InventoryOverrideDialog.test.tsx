@@ -58,3 +58,22 @@ describe('the protocol of a host from a repository', () => {
     expect(save.mock.calls[0][0].protocol).toBeUndefined()
   })
 })
+
+/**
+ * A save the main process refused rejected into nothing: the dialog stayed
+ * open, Save did nothing, and nobody was told why.
+ */
+describe('a save that is refused', () => {
+  it('says why, and stays open to try again', async () => {
+    const save = vi.fn().mockRejectedValue(new Error('ENOSPC: no space left on device'))
+    const onClose = vi.fn()
+    useStore.setState({ saveInventoryOverride: save, inventoryOverrides: [] })
+
+    render(<InventoryOverrideDialog node={host} groups={[]} scope="inventory" onClose={onClose} />)
+    await userEvent.selectOptions(screen.getByLabelText('Protocol'), 'rdp')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByText(/no space left on device/)).toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+})

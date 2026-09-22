@@ -1210,5 +1210,16 @@ export const ru: Record<string, string> = {
   'Hosts mirrored from git go with it, along with the local settings and passwords kept for them: {count}.':
     'Хосты из git удаляются вместе с ней, как и сохранённые для них локальные настройки и пароли: {count}.',
   'Close “{title}”? Its terminals will disconnect: {count}.':
-    'Закрыть «{title}»? Терминалы будут отключены: {count}.'
+    'Закрыть «{title}»? Терминалы будут отключены: {count}.',
+  // Where an inherited value comes from. It is put into other sentences as
+  // {source}, so it was English in the middle of a Russian one.
+  'inherited from {name}': 'унаследованный от «{name}»',
+  '(blank keeps the one {source})': '(если оставить пустым, останется {source})',
+  'Name is required': 'Нужно указать имя',
+  'A repository address is required': 'Нужно указать адрес репозитория',
+  'Name and repository URL are required': 'Нужно указать имя и адрес репозитория',
+  '(saved on this group)': '(сохранён на этой группе)',
+  '(leave blank to keep or inherit)': '(оставьте пустым, чтобы сохранить или унаследовать)',
+  '(saved here, and it overrides the inventory)': '(сохранён здесь и перебивает inventory)',
+  '(leave blank to keep the current one)': '(оставьте пустым, чтобы сохранить текущий)'
 }

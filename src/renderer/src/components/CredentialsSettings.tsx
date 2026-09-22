@@ -92,7 +92,13 @@ export default function CredentialsSettings(): JSX.Element {
     // Something typed beats the forget tick — it is the later answer. The agent
     // carries neither, and the main process drops any secret for it anyway.
     const toSave = secret || (forget ? null : undefined)
-    await upsertCredential({ ...draft, name, username }, toSave)
+    try {
+      await upsertCredential({ ...draft, name, username }, toSave)
+    } catch (err) {
+      // Said, and the account left open to try again, rather than lost.
+      setError((err as Error).message)
+      return
+    }
     setDraft(null)
     setSecret('')
     setForget(false)

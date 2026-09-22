@@ -157,8 +157,8 @@ export default function InventoryOverrideDialog({
     inherit: t('From the inventory'),
     secretHint:
       auth.ownSecret && !forgetSecret
-        ? '(saved here, and it overrides the inventory)'
-        : '(leave blank to keep the current one)',
+        ? t('(saved here, and it overrides the inventory)')
+        : t('(leave blank to keep the current one)'),
     self: 'this host',
     held: 'This password is kept locally for this host alone, so nothing set on a group above it is used.',
     forget: 'On save this password is forgotten, and the host is asked for one on connect.',
@@ -183,21 +183,31 @@ export default function InventoryOverrideDialog({
       )
     // An override with nothing in it would still mark the host as customised.
     // Clearing it drops the credential too, so forgetting one is not lost here.
-    if (!hasContent) {
-      if (existing) await clearOverride(node.id)
-      onClose()
+    // Said here when refused, rather than leaving Save doing nothing.
+    try {
+      if (!hasContent) {
+        if (existing) await clearOverride(node.id)
+      } else {
+        await saveOverride(
+          toSave,
+          secretToSave(auth.shownMethod, forgetSecret, secret),
+          gatewaySecret || (forgetGatewaySecret ? null : undefined)
+        )
+      }
+    } catch (err) {
+      setError((err as Error).message)
       return
     }
-    await saveOverride(
-      toSave,
-      secretToSave(auth.shownMethod, forgetSecret, secret),
-      gatewaySecret || (forgetGatewaySecret ? null : undefined)
-    )
     onClose()
   }
 
   async function reset(): Promise<void> {
-    await clearOverride(node.id)
+    try {
+      await clearOverride(node.id)
+    } catch (err) {
+      setError((err as Error).message)
+      return
+    }
     onClose()
   }
 

@@ -104,7 +104,7 @@ export default function SessionDialog({
   const effective = auth.effective
   const inheritNote = (key: keyof AuthDefaults): string => {
     const source = auth.inheritedFrom(key)
-    return source ? `inherited from ${source.name}` : ''
+    return source ? t('inherited from {name}', { name: source.name }) : ''
   }
 
   const desktop = resolveRdp(pending, pending.groupId, groups)
@@ -118,7 +118,7 @@ export default function SessionDialog({
   const traits = traitsOf(protocolOf(profile))
   const rdpNote = (key: keyof RdpDefaults): string => {
     const source = rdpInheritedFrom(pending, pending.groupId, groups, key)
-    return source ? `inherited from ${source.name}` : ''
+    return source ? t('inherited from {name}', { name: source.name }) : ''
   }
   const ownGatewaySecret = isSet(profile.gatewaySecretRef)
   const ownSecret = auth.ownSecret
@@ -180,7 +180,15 @@ export default function SessionDialog({
     const toSave: SessionProfile = { ...profile, tags, updatedAt: Date.now() }
     const secretToStore = secretToSave(auth.shownMethod, forgetSecret, secret)
     const gatewayToStore = gatewaySecret || (forgetGatewaySecret ? null : undefined)
-    await upsertSession(toSave, secretToStore, gatewayToStore)
+    // A save the main process refuses — a full disk, a vault locked while the
+    // dialog was open — is said here. It used to reject into nothing, and the
+    // dialog simply stayed open with Save doing nothing.
+    try {
+      await upsertSession(toSave, secretToStore, gatewayToStore)
+    } catch (err) {
+      setError((err as Error).message)
+      return
+    }
     onClose()
   }
 
@@ -190,7 +198,7 @@ export default function SessionDialog({
     ownSecret && !forgetSecret
       ? t('(saved on this host — it overrides the group)')
       : inheritNote('secretRef')
-        ? `(blank keeps the one ${inheritNote('secretRef')})`
+        ? t('(blank keeps the one {source})', { source: inheritNote('secretRef') })
         : t('(leave blank to keep existing)')
 
   /**
