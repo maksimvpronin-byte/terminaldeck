@@ -89,6 +89,8 @@ interface Session {
    */
   hidden?: boolean
   download?: ClipboardDownload
+  /** Files this desktop copied, fetched while it was not in use; see publishFiles. */
+  filesWaiting?: { paths: string[]; epoch: number }
   clipboardManifestTimer?: NodeJS.Timeout
   /** The client's last complaint, which is usually the reason it stopped. */
   complaint?: string
@@ -346,8 +348,9 @@ class FreeRdpBridge {
   private cancelClipboardDownloads(): void {
     this.clipboardEpoch++
     for (const [id, session] of this.sessions) {
-      if (session.download?.active)
+      if (session.download?.active || session.filesWaiting)
         this.say(session, id, { e: 'clipboard-transfer', state: 'cancelled' })
+      session.filesWaiting = undefined
       clearTimeout(session.clipboardManifestTimer)
       session.download?.cancel()
     }
@@ -455,6 +458,16 @@ class FreeRdpBridge {
     }
     if (this.clipboardPolling || this.clipboardPublishing) return
     this.clipboardWithdrawn = false
+    // Files that finished arriving while their desktop was out of use go out
+    // now that it is back — before the read below, which would otherwise see
+    // them as a change of its own.
+    for (const [id, session] of this.sessions) {
+      const waiting = session.filesWaiting
+      if (waiting && this.mayGiveClipboard(session)) {
+        void this.publishFiles(id, session, waiting.paths, waiting.epoch)
+        return
+      }
+    }
     if (![...this.sessions.values()].some((s) => this.mayReceiveClipboard(s))) return
     this.clipboardPolling = true
     const epoch = this.clipboardEpoch
@@ -504,51 +517,7 @@ class FreeRdpBridge {
     let lastReport = 0
     session.download = new ClipboardDownload(
       (fields) => this.write(id, fields),
-      (paths) => {
-        void (async () => {
-          if (epoch !== this.clipboardEpoch || session.stopping) return
-          if (!isUnlocked()) {
-            this.say(session, id, { e: 'clipboard-transfer', state: 'cancelled' })
-            return
-          }
-          this.clipboardPublishing = true
-          try {
-            // Do not overwrite a newer local copy with a transfer that took seconds.
-            const snapshot = await readFileClipboard()
-            const files = pathsToUris(snapshot.paths)
-            // Asked again after the wait, not only before it: the vault may
-            // have locked while the local clipboard was being read.
-            if (
-              epoch !== this.clipboardEpoch ||
-              session.stopping ||
-              !isUnlocked() ||
-              clipboard.readText() !== this.lastClipboardText ||
-              files !== this.lastClipboardFiles ||
-              (this.lastClipboardVersion !== '' && snapshot.version !== this.lastClipboardVersion)
-            ) {
-              this.say(session, id, { e: 'clipboard-transfer', state: 'cancelled' })
-              return
-            }
-            const version = await writeClipboardFiles(paths, snapshot.version)
-            if (version === undefined) {
-              this.say(session, id, { e: 'clipboard-transfer', state: 'cancelled' })
-              return
-            }
-            this.lastClipboardVersion = version
-            this.lastClipboardFiles = pathsToUris(paths)
-            this.lastClipboardText = clipboard.readText()
-            this.say(session, id, { e: 'clipboard-transfer', state: 'ready' })
-          } catch (error) {
-            this.say(session, id, {
-              e: 'clipboard-transfer',
-              state: 'error',
-              detail: String(error)
-            })
-          } finally {
-            this.clipboardPublishing = false
-          }
-        })()
-      },
+      (paths) => void this.publishFiles(id, session, paths, epoch),
       (received, total, error) => {
         if (!error && received < total && Date.now() - lastReport < 100) return
         lastReport = Date.now()
@@ -562,6 +531,78 @@ class FreeRdpBridge {
       }
     )
     session.download.start(manifest)
+  }
+
+  /**
+   * Puts the files a desktop copied onto this machine's clipboard — now, if
+   * the desktop is still the one being used, or else once it is again.
+   *
+   * A transfer can take a while, and the person who started it may have gone
+   * to another tab or application meanwhile. Publishing then broke the rule
+   * the transfer began under — a desktop's copy arrives while its window is
+   * the one in use — and a paste somewhere else could bring in its files. The
+   * files wait instead, and the poll puts them out when the pane is on screen
+   * and focused again. Anything copied locally in between, or a lock, drops
+   * them, as it would a transfer still running.
+   */
+  private async publishFiles(
+    id: string,
+    session: Session,
+    paths: string[],
+    epoch: number
+  ): Promise<void> {
+    session.filesWaiting = undefined
+    if (epoch !== this.clipboardEpoch || session.stopping) return
+    if (!isUnlocked()) {
+      this.say(session, id, { e: 'clipboard-transfer', state: 'cancelled' })
+      return
+    }
+    if (!this.mayGiveClipboard(session)) {
+      session.filesWaiting = { paths, epoch }
+      return
+    }
+    this.clipboardPublishing = true
+    try {
+      // Do not overwrite a newer local copy with a transfer that took seconds.
+      const snapshot = await readFileClipboard()
+      const files = pathsToUris(snapshot.paths)
+      // Asked again after the wait, not only before it: the vault may
+      // have locked while the local clipboard was being read.
+      if (
+        epoch !== this.clipboardEpoch ||
+        session.stopping ||
+        !isUnlocked() ||
+        clipboard.readText() !== this.lastClipboardText ||
+        files !== this.lastClipboardFiles ||
+        (this.lastClipboardVersion !== '' && snapshot.version !== this.lastClipboardVersion)
+      ) {
+        this.say(session, id, { e: 'clipboard-transfer', state: 'cancelled' })
+        return
+      }
+      // And whether it is still the desktop in use: that can change during
+      // the read too, and then the files wait rather than go out.
+      if (!this.mayGiveClipboard(session)) {
+        session.filesWaiting = { paths, epoch }
+        return
+      }
+      const version = await writeClipboardFiles(paths, snapshot.version)
+      if (version === undefined) {
+        this.say(session, id, { e: 'clipboard-transfer', state: 'cancelled' })
+        return
+      }
+      this.lastClipboardVersion = version
+      this.lastClipboardFiles = pathsToUris(paths)
+      this.lastClipboardText = clipboard.readText()
+      this.say(session, id, { e: 'clipboard-transfer', state: 'ready' })
+    } catch (error) {
+      this.say(session, id, {
+        e: 'clipboard-transfer',
+        state: 'error',
+        detail: String(error)
+      })
+    } finally {
+      this.clipboardPublishing = false
+    }
   }
 
   private write(id: string, fields: Record<string, string | number | boolean | undefined>): void {

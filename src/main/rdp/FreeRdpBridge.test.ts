@@ -309,6 +309,59 @@ describe('clipboard while nobody is here', () => {
   })
 
   /**
+   * A transfer takes a while, and whoever started it may be in another tab by
+   * the time it ends. The files were put on this machine's clipboard anyway;
+   * they now wait until the desktop is the one in use again — and are not
+   * thrown away, since they were copied on purpose.
+   */
+  it('holds files fetched while the desktop was hidden until it is shown again', async () => {
+    const { session } = liveSession()
+    innards().sessions.set('hidden-files', session)
+    reset('')
+    vi.mocked(readFileClipboard).mockResolvedValue({ paths: [], version: '1' })
+    innards().lastClipboardVersion = '1'
+    const bridge = freeRdpBridge as unknown as {
+      beginClipboardDownload: (id: string, session: unknown, manifest: Buffer) => void
+    }
+    bridge.beginClipboardDownload('hidden-files', session, Buffer.alloc(4))
+    const download = session.download as unknown as { complete: (paths: string[]) => void }
+
+    freeRdpBridge.send('hidden-files', { a: 'visible', value: false })
+    download.complete(['/staged/report.pdf'])
+    await new Promise((resolve) => setImmediate(resolve))
+    await innards().pollClipboard()
+    expect(writeClipboardFiles).not.toHaveBeenCalled()
+
+    freeRdpBridge.send('hidden-files', { a: 'visible', value: true })
+    await innards().pollClipboard()
+    await new Promise((resolve) => setImmediate(resolve))
+    expect(writeClipboardFiles).toHaveBeenCalledWith(['/staged/report.pdf'], '1')
+  })
+
+  it('drops files held for a hidden desktop when something is copied here meanwhile', async () => {
+    const { session } = liveSession()
+    innards().sessions.set('held-then-copied', session)
+    reset('')
+    vi.mocked(readFileClipboard).mockResolvedValue({ paths: [], version: '1' })
+    innards().lastClipboardVersion = '1'
+    const bridge = freeRdpBridge as unknown as {
+      beginClipboardDownload: (id: string, session: unknown, manifest: Buffer) => void
+    }
+    bridge.beginClipboardDownload('held-then-copied', session, Buffer.alloc(4))
+    const download = session.download as unknown as { complete: (paths: string[]) => void }
+
+    freeRdpBridge.send('held-then-copied', { a: 'visible', value: false })
+    download.complete(['/staged/report.pdf'])
+    await new Promise((resolve) => setImmediate(resolve))
+
+    vi.mocked(clipboard.readText).mockReturnValue('copied here in the meantime')
+    freeRdpBridge.send('held-then-copied', { a: 'visible', value: true })
+    await innards().pollClipboard()
+    await new Promise((resolve) => setImmediate(resolve))
+    expect(writeClipboardFiles).not.toHaveBeenCalled()
+  })
+
+  /**
    * A desktop in a background pane, or behind another application, went on
    * replacing this machine's clipboard with whatever it copied.
    */
