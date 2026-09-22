@@ -177,13 +177,13 @@ export function useShortcuts(actions: {
 
       switch (key) {
         case 't': {
-          // Duplicate the active pane's target into a fresh tab.
+          // Duplicate the active pane into a fresh tab, looking as it does.
           if (!current) return
           const leaf = findLeaf(current.root, current.activePaneId)
           if (!leaf) return
           e.preventDefault()
           e.stopPropagation()
-          state.openTab(leaf.title, leaf.target)
+          state.openTab(leaf.title, leaf.target, leaf.color, leaf.viaCollectionId)
           break
         }
         case 'w': {

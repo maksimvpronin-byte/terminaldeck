@@ -240,7 +240,10 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
         'after',
         item.title,
         item.target,
-        item.color
+        item.color,
+        // Every pane of a collection opened as a grid wears its look, not the
+        // first alone.
+        item.viaCollectionId
       )
     })
   },
@@ -348,13 +351,22 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
     const tab = allTabs(get()).find((t) => t.id === tabId)
     const source = findPane(tab?.root ?? null, paneId)
     if (!source || source.type !== 'leaf') return
-    get().splitPaneWith(tabId, paneId, dir, 'after', source.title, source.target, source.color)
+    get().splitPaneWith(
+      tabId,
+      paneId,
+      dir,
+      'after',
+      source.title,
+      source.target,
+      source.color,
+      source.viaCollectionId
+    )
   },
 
-  splitPaneWith: (tabId, paneId, dir, position, title, target, color) => {
+  splitPaneWith: (tabId, paneId, dir, position, title, target, color, viaCollectionId) => {
     set((s) => ({
       workspaces: mapTab(s.workspaces, tabId, (t) => {
-        const newLeaf = makeLeaf(title, target, color)
+        const newLeaf = makeLeaf(title, target, color, viaCollectionId)
         const root = splitLeaf(t.root, paneId, dir, position, newLeaf)
         return root ? { ...t, root, activePaneId: newLeaf.id } : t
       })

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest'
 import { useStore } from '../store'
-import { makeLeaf } from '../paneTree'
+import { collectLeaves, makeLeaf } from '../paneTree'
 
 describe('reorderTab', () => {
   function seed(): void {
@@ -143,5 +143,39 @@ describe('dropping a split tab onto a pane', () => {
     const before = useStore.getState().workspaces
     useStore.getState().mergeTabInto('source', 'target', 'missing', 'col', 'after')
     expect(useStore.getState().workspaces).toBe(before)
+  })
+})
+
+/**
+ * A collection lends its look to the panes opened from it. Opened as a grid,
+ * only the first pane wore it: the rest were split in without it.
+ */
+describe('a collection opened as a grid', () => {
+  it('gives every pane the collection it came from', () => {
+    useStore.setState({ workspaces: [], activeWorkspaceId: null })
+    useStore.getState().openMany(
+      ['a', 'b', 'c'].map((id) => ({
+        title: id,
+        target: { kind: 'session' as const, sessionId: id },
+        viaCollectionId: 'col1'
+      })),
+      'grid'
+    )
+    const [tab] = useStore.getState().workspaces[0].tabs
+    expect(collectLeaves(tab.root).map((l) => l.viaCollectionId)).toEqual(['col1', 'col1', 'col1'])
+  })
+
+  it('keeps the look when a pane of it is split again', () => {
+    useStore.setState({ workspaces: [], activeWorkspaceId: null })
+    const paneId = useStore
+      .getState()
+      .openTab('a', { kind: 'session', sessionId: 'a' }, '#abcdef', 'col1')
+    const tabId = useStore.getState().workspaces[0].tabs[0].id
+    useStore.getState().splitPane(tabId, paneId, 'row')
+    const [tab] = useStore.getState().workspaces[0].tabs
+    expect(collectLeaves(tab.root).map((l) => [l.color, l.viaCollectionId])).toEqual([
+      ['#abcdef', 'col1'],
+      ['#abcdef', 'col1']
+    ])
   })
 })
