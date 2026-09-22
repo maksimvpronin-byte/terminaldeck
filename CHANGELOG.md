@@ -6,6 +6,17 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.19.1
+
+### Changed
+
+- **Updating no longer reinstalls the app.** "Update and restart" downloads
+  the new version, installs it silently into the same folder and starts the
+  app again — no setup wizard. If connections are open it asks first, since
+  the restart closes them. An install for all users may still ask Windows
+  for permission once. This release itself still arrives the old way: the
+  update is run by the version being replaced.
+
 ## 0.19.0
 
 ### Added
