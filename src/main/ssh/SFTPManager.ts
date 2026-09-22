@@ -794,9 +794,18 @@ class SFTPManager {
   }
 
   /**
-   * `localTarget` is a directory to mirror into, or — with `exactFile` — the
-   * precise filename the user chose in the save dialog. Saving one file under a
-   * new name must be checked against that name, not against the original.
+   * `localTarget` is the folder the item lands in — a remote folder as a folder
+   * of its own name inside it, the rule uploads and relays follow — or, with
+   * `exactFile`, the precise filename the user chose in the save dialog. Saving
+   * one file under a new name must be checked against that name, not against
+   * the original.
+   *
+   * The folder's own name is joined here, through `localChild`, and not by the
+   * window. The window used to join it with a slash, and a remote folder name
+   * is the server's to choose: on a Unix host `..\..\Startup` is one ordinary
+   * name, and on Windows it walked the whole download out of the folder that
+   * had been picked for it. Every name below it was already checked; the top
+   * one was not.
    */
   async planDownload(
     connectionId: string,
@@ -804,9 +813,12 @@ class SFTPManager {
     localTarget: string,
     exactFile = false
   ): Promise<TransferPlan> {
+    const root = exactFile ? undefined : await this.statPath(connectionId, remotePath)
     const items = exactFile
       ? await this.singleRemoteItem(connectionId, remotePath, localTarget)
-      : await this.remoteTree(connectionId, remotePath, localTarget)
+      : root?.isDirectory
+        ? await this.remoteTree(connectionId, remotePath, localChild(localTarget, root.name))
+        : await this.remoteTree(connectionId, remotePath, localTarget)
     const found = new Map<string, DestInfo | null>()
     const unique = [...new Map(items.map((item) => [item.destPath, item])).values()]
     await forEachConcurrent(unique, async (item) => {

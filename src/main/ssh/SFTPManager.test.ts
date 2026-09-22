@@ -903,3 +903,48 @@ describe('parallel transfer planning', () => {
     ).toBe(false)
   })
 })
+
+/**
+ * A folder downloaded lands under its own name in the directory picked for it.
+ * The window used to join that name on with a slash, and the name is the
+ * server's: on a Unix host `..\..\Startup` is one ordinary folder name, and on
+ * Windows it took the download out of the directory that had been chosen.
+ */
+describe('downloading a folder', () => {
+  function withListing(
+    session: SFTPWrapper,
+    listing: Record<string, { name: string; size: number }[]>
+  ): SFTPWrapper {
+    return Object.assign(session, {
+      readdir(path: string, cb: (err: Error | null, list?: unknown[]) => void): void {
+        cb(
+          null,
+          (listing[path] ?? []).map((e) => ({
+            filename: e.name,
+            longname: '',
+            attrs: { mode: 0o100644, size: e.size, mtime: 0 }
+          }))
+        )
+      }
+    })
+  }
+
+  it('puts it under its own name in the directory chosen', async () => {
+    const entries: Record<string, Entry> = { '/srv/logs': { dir: true } }
+    attach(
+      'conn',
+      withListing(stubSession([], entries), { '/srv/logs': [{ name: 'a.log', size: 3 }] })
+    )
+
+    const planned = await sftpManager.planDownload('conn', '/srv/logs', localDir)
+
+    expect(planned.items.map((i) => i.destPath)).toEqual([join(localDir, 'logs', 'a.log')])
+  })
+
+  it('refuses a folder name that would leave the directory chosen', async () => {
+    const entries: Record<string, Entry> = { '/srv/..': { dir: true } }
+    attach('conn', withListing(stubSession([], entries), {}))
+
+    await expect(sftpManager.planDownload('conn', '/srv/..', localDir)).rejects.toThrow(/unsafe/i)
+  })
+})
