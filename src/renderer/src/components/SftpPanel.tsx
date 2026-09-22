@@ -437,6 +437,7 @@ export default function SftpPanel({
   async function planAndUpload(localPaths: string[], destination = path): Promise<void> {
     if (!connectionId) return
     setError(null)
+    transfers.startBatch()
     try {
       // Sequential on purpose: fastPut on one SFTP channel dislikes concurrent
       // writers, and one dialog per dropped item is clearer than one merged.
@@ -462,6 +463,7 @@ export default function SftpPanel({
   async function planAndRelay(payload: SftpDragPayload, destination: string): Promise<void> {
     if (!connectionId || payload.connectionId === connectionId) return
     setError(null)
+    transfers.startBatch()
     try {
       // One plan per dropped item, for the same reason uploads are sequential:
       // a single merged dialog would hide which item each clash belongs to.
@@ -490,16 +492,14 @@ export default function SftpPanel({
       : await window.td.dialogs.pickSavePath(entry.name)
     if (!localPath) return
     setError(null)
+    transfers.startBatch()
     try {
-      // A folder mirrors into a directory; a single file goes to the exact name
-      // the save dialog returned, and is checked against that name.
+      // A folder lands under its own name in the directory chosen — joined by
+      // the main process, which checks the name; a single file goes to the
+      // exact name the save dialog returned, and is checked against that name.
       await transfers.run(
         entry.isDirectory
-          ? await window.td.sftp.planDownload(
-              connectionId,
-              entry.path,
-              `${localPath}/${entry.name}`
-            )
+          ? await window.td.sftp.planDownload(connectionId, entry.path, localPath)
           : await window.td.sftp.planDownload(connectionId, entry.path, localPath, true),
         undefined,
         connectionId
@@ -957,7 +957,11 @@ export default function SftpPanel({
         </div>
       )}
       {transfers.outcome && (
-        <div className="error-text" style={{ padding: 6 }} onClick={transfers.dismissOutcome}>
+        <div
+          className="error-text"
+          style={{ padding: 6, whiteSpace: 'pre-line' }}
+          onClick={transfers.dismissOutcome}
+        >
           {transfers.outcome}
         </div>
       )}

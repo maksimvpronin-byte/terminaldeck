@@ -41,6 +41,8 @@ export function useTransfers({
    */
   outcome: string | null
   dismissOutcome: () => void
+  /** Clears what the last batch came to, as a new one begins. */
+  startBatch: () => void
   /**
    * Runs a plan once the ones before it are done, asking first about anything
    * it would overwrite. Resolves when it has run, or been cancelled or dropped
@@ -86,6 +88,22 @@ export function useTransfers({
     settle()
   }, [connectionId])
 
+  /*
+   * Added to, not replaced. A batch is one plan per dropped item, run in turn,
+   * and each used to clear the message as it started — so the first file's
+   * failure was gone by the time the second had begun, and a batch whose last
+   * item went through read as if all of it had. A new batch starts clean; see
+   * `startBatch`.
+   */
+  function report(message: string): void {
+    setOutcome((previous) =>
+      previous
+        ? `${previous}
+${message}`
+        : message
+    )
+  }
+
   /**
    * `source` is the host a relayed batch comes from. It leads the call because
    * `runPlan` reads from the first connection and writes to the second, and for
@@ -99,7 +117,6 @@ export function useTransfers({
     const connectionId = connectionRef.current
     if (!connectionId) return
     setPending(null)
-    setOutcome(null)
     try {
       const result = await window.td.sftp.runPlan(
         source ?? connectionId,
@@ -111,14 +128,14 @@ export function useTransfers({
       // was not overwritten. Said, because a file that was not copied is a file
       // somebody will go looking for.
       if (result?.changed?.length) {
-        setOutcome(
+        report(
           t('Left alone, because something appeared there after the check: {paths}', {
             paths: result.changed.join(', ')
           })
         )
       }
     } catch (err) {
-      setOutcome((err as Error).message)
+      report((err as Error).message)
     }
     setTransferring(false)
     setProgressKey((key) => key + 1)
@@ -176,6 +193,7 @@ export function useTransfers({
     progressKey,
     outcome,
     dismissOutcome: () => setOutcome(null),
+    startBatch: () => setOutcome(null),
     run,
     confirm,
     cancel: () => {
