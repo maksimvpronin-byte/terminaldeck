@@ -124,3 +124,41 @@ describe('the editor used when none is configured', () => {
     expect(spawned).toEqual([{ program: 'code', args: ['-w', '/tmp/a.txt'] }])
   })
 })
+
+describe('opening one file twice at once', () => {
+  /**
+   * Two clicks before the first download finished made two copies, and the
+   * second session replaced the first: saves in the first editor went to a
+   * session watching the other copy, and never reached the server.
+   */
+  it('makes one copy, and opens it for both', async () => {
+    const [first, second] = await Promise.all([
+      remoteEdit.open(win, 'connection-twice', '/etc/hosts', 'true'),
+      remoteEdit.open(win, 'connection-twice', '/etc/hosts', 'true')
+    ])
+    expect(second).toBe(first)
+    expect(remoteEdit.list('connection-twice')).toEqual(['/etc/hosts'])
+    remoteEdit.cleanUp()
+  })
+})
+
+describe('a watched copy whose folder goes away', () => {
+  it('stops watching instead of raising an error nobody handles', async () => {
+    await remoteEdit.open(win, 'connection-gone', '/etc/motd', 'true')
+    const session = (
+      remoteEdit as unknown as { sessions: Map<string, { watcher: import('fs').FSWatcher }> }
+    ).sessions.get('connection-gone:/etc/motd')!
+    // What Windows emits when the watched directory is deleted.
+    expect(() => session.watcher.emit('error', new Error('EPERM'))).not.toThrow()
+    expect(remoteEdit.list('connection-gone')).toEqual([])
+    remoteEdit.cleanUp()
+  })
+})
+
+describe('a path with a dollar sign in it', () => {
+  it('reaches the editor as it is', async () => {
+    spawned.length = 0
+    await openInEditor("/tmp/cost$&$'.txt", 'myeditor --file={file}')
+    expect(spawned.at(-1)?.args).toEqual(["--file=/tmp/cost$&$'.txt"])
+  })
+})

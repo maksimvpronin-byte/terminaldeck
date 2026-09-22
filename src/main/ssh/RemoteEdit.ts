@@ -75,8 +75,11 @@ export async function openInEditor(
   const { program, args } = fallback ?? parseCommand(configured!)
   if (!program) throw new Error('The external editor setting is empty')
 
+  // A function, not the path itself, as the replacement: in a replacement
+  // string `$&` and `$'` are patterns, and a remote file may well have a
+  // dollar sign in its name.
   const finalArgs = args.some((a) => a.includes('{file}'))
-    ? args.map((a) => a.replace('{file}', localPath))
+    ? args.map((a) => a.replace('{file}', () => localPath))
     : [...args, localPath]
 
   await new Promise<void>((resolve, reject) => {
@@ -118,6 +121,14 @@ class RemoteEditManager {
    */
   private dirs = new Set<string>()
 
+  /**
+   * Opens still downloading, by key. A second "Edit locally" on the same file
+   * before the first had finished made a second copy and a second session over
+   * the first — and the first copy's editor then saved into a session watching
+   * the other one, so its edits never reached the server.
+   */
+  private opening = new Map<string, Promise<string>>()
+
   private key(connectionId: string, remotePath: string): string {
     return `${connectionId}:${remotePath}`
   }
@@ -129,6 +140,28 @@ class RemoteEditManager {
     editorCommand?: string
   ): Promise<string> {
     const key = this.key(connectionId, remotePath)
+    const inFlight = this.opening.get(key)
+    if (inFlight) {
+      const localPath = await inFlight
+      await openInEditor(localPath, editorCommand)
+      return localPath
+    }
+    const opening = this.begin(win, key, connectionId, remotePath, editorCommand)
+    this.opening.set(key, opening)
+    try {
+      return await opening
+    } finally {
+      if (this.opening.get(key) === opening) this.opening.delete(key)
+    }
+  }
+
+  private async begin(
+    win: BrowserWindow,
+    key: string,
+    connectionId: string,
+    remotePath: string,
+    editorCommand?: string
+  ): Promise<string> {
     const existing = this.sessions.get(key)
     if (existing) {
       await openInEditor(existing.localPath, editorCommand)
@@ -158,6 +191,13 @@ class RemoteEditManager {
       lastMtimeMs: statSync(localPath).mtimeMs,
       watcher: watch(dir, () => this.onChanged(win, key))
     }
+    /*
+     * A watcher reports trouble as an event, and one nobody listens for is an
+     * uncaught exception in the main process. Windows raises one when the
+     * watched directory is deleted — a disk clean-up emptying the temporary
+     * folder is enough — and the whole application went down with it.
+     */
+    session.watcher.on('error', () => this.stop(connectionId, remotePath))
     this.sessions.set(key, session)
 
     try {
