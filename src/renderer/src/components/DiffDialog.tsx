@@ -93,6 +93,13 @@ export default function DiffDialog({
               })}
               {diff.coarse && t(' — too large to align precisely, so it is shown as replaced')}
             </p>
+            {diff.finalNewline && (
+              <p className="settings-note">
+                {diff.finalNewline === 'added'
+                  ? t('The replacement ends with a line break; the file on the host does not.')
+                  : t('The file on the host ends with a line break; the replacement does not.')}
+              </p>
+            )}
             <div className="diff-view">
               {shown.map((row, i) =>
                 row.kind === 'gap' ? (
@@ -123,9 +130,13 @@ export default function DiffDialog({
           </>
         )}
 
-        {diff && diff.added === 0 && diff.removed === 0 && !diff.onlyLineEndings && (
-          <p className="settings-note">{t('The two files are identical.')}</p>
-        )}
+        {diff &&
+          diff.added === 0 &&
+          diff.removed === 0 &&
+          !diff.onlyLineEndings &&
+          !diff.finalNewline && (
+            <p className="settings-note">{t('The two files are identical.')}</p>
+          )}
 
         <div className="modal-actions">
           <button className="primary" onClick={onClose}>

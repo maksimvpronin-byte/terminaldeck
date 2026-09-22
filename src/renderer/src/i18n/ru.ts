@@ -913,6 +913,10 @@ export const ru: Record<string, string> = {
   'unchanged lines: {count}': 'неизменённых строк: {count}',
   '{count} more rows not drawn': 'ещё строк не отрисовано: {count}',
   'The two files are identical.': 'Файлы одинаковы.',
+  'The replacement ends with a line break; the file on the host does not.':
+    'Новая версия заканчивается переводом строки, а файл на хосте — нет.',
+  'The file on the host ends with a line break; the replacement does not.':
+    'Файл на хосте заканчивается переводом строки, а новая версия — нет.',
 
   // Transfers that would overwrite something
   'This transfer would overwrite itself': 'Эта передача перезаписала бы саму себя',

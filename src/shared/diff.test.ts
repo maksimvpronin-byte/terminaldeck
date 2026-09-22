@@ -68,6 +68,17 @@ describe('diffLines', () => {
     expect(result.removed).toBe(0)
   })
 
+  /** `text` against `text\n` used to come out as no change, and the dialog said "identical". */
+  it('reports a line break added or removed at the very end', () => {
+    expect(diffLines('text', 'text\n').finalNewline).toBe('added')
+    expect(diffLines('text\n', 'text').finalNewline).toBe('removed')
+    expect(diffLines('a\r\n', 'a').finalNewline).toBe('removed')
+    expect(diffLines('', '\n').finalNewline).toBe('added')
+    expect(diffLines('a\nb', 'a\nB').finalNewline).toBeUndefined()
+    // CRLF against LF is still only that: both sides end with a break.
+    expect(diffLines('a\r\n', 'a\n').finalNewline).toBeUndefined()
+  })
+
   it('does not claim a line-ending difference when the text really differs', () => {
     expect(diffLines('a\r\nb\r\n', 'a\nB\n').onlyLineEndings).toBe(false)
   })

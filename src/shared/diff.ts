@@ -11,6 +11,12 @@ export interface DiffResult {
   onlyLineEndings: boolean
   /** Too big to diff precisely, so the difference is reported as one block. */
   coarse: boolean
+  /**
+   * Set when only one side ends with a line break: `added` if the right side
+   * gained it, `removed` if it lost it. The lines cannot show this — the break
+   * is not a line — so it is said separately, and it counts as a difference.
+   */
+  finalNewline?: 'added' | 'removed'
 }
 
 /**
@@ -39,6 +45,11 @@ export function diffLines(left: string, right: string): DiffResult {
   const sameIgnoringEndings = left.replace(/\r\n/g, '\n') === right.replace(/\r\n/g, '\n')
   const a = splitLines(left)
   const b = splitLines(right)
+  // Dropped by splitLines along with the phantom last line, so read here: `text`
+  // against `text\n` otherwise came out as no change at all.
+  const leftEnds = left.endsWith('\n')
+  const rightEnds = right.endsWith('\n')
+  const finalNewline = leftEnds === rightEnds ? undefined : rightEnds ? 'added' : 'removed'
 
   if (sameIgnoringEndings) {
     return {
@@ -134,7 +145,7 @@ export function diffLines(left: string, right: string): DiffResult {
     })
   }
 
-  return { lines, added, removed, onlyLineEndings: false, coarse }
+  return { lines, added, removed, onlyLineEndings: false, coarse, finalNewline }
 }
 
 /**
