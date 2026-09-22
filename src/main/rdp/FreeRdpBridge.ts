@@ -21,8 +21,8 @@ import { pathsToUris, readFileClipboard, writeClipboardFiles } from './clipboard
  * window at all. The client it replaced authenticated in the renderer, which
  * forced the one exception this app made to that rule.
  *
- * See resources/freerdp/shim/ for the other end, and PLAN-freerdp.md for why
- * any of this exists.
+ * See resources/freerdp/shim/ for the other end, and
+ * docs/history/PLAN-freerdp.md for why any of this exists.
  */
 
 /** Everything needed to open one desktop, resolved before this is called. */

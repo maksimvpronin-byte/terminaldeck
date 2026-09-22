@@ -2060,7 +2060,7 @@ accumulated since 0.4.0.
   the desktop path: FreeRDP speaks to an RD Gateway itself. They are left in
   place, tests and all, rather than deleted as a side effect of changing the
   client. Whether to retire them is a decision of its own; see
-  `PLAN-freerdp.md`.
+  `docs/history/PLAN-freerdp.md`.
 
 ## 0.4.0
 

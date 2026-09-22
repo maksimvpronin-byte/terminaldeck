@@ -301,7 +301,7 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   H.264 in both AVC420 and AVC444, progressive RemoteFX under that, and RemoteFX below it. The
   WebAssembly client this replaced had none of it — not disabled, absent — so a host that could
   have sent video sent run-length-encoded bitmaps instead, which on a 27" screen is what
-  "blurry and slow" meant. See `PLAN-freerdp.md` for the evidence and the decision
+  "blurry and slow" meant. See `docs/history/PLAN-freerdp.md` for the evidence and the decision
 - **A separate process, deliberately.** A fault in a decoder ends one pane rather than the
   window, nothing is tied to Electron's ABI, and the client signs in where it runs — so a
   stored password now goes from the vault straight down a pipe and never enters the renderer at
