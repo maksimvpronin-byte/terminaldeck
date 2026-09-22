@@ -52,6 +52,10 @@ function flush(): void {
   }
 }
 
+function oneLine(text: string): string {
+  return text.replace(/[\r\n]+/g, ' ')
+}
+
 /** One line in the journal: when, which side, and what happened. */
 export function diag(source: string, message: string): void {
   queue.push(`${new Date().toISOString()} [${source}] ${message}\n`)
@@ -64,7 +68,9 @@ export function diag(source: string, message: string): void {
 export function registerDiagnostics(): void {
   ipcMain.on(IPC.diagLog, (_e, source: unknown, message: unknown) => {
     if (typeof source !== 'string' || typeof message !== 'string') return
-    diag(`ui:${source.slice(0, 40)}`, message.slice(0, MAX_LINE))
+    // One line each: a line break in what the window sends would otherwise
+    // start a line of its own, dated and attributed as if this side wrote it.
+    diag(`ui:${oneLine(source).slice(0, 40)}`, oneLine(message).slice(0, MAX_LINE))
   })
   // Whatever is still queued when the application goes is the end of the story.
   app.on('will-quit', flush)

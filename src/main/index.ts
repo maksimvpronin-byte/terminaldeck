@@ -30,8 +30,13 @@ function buildApplicationMenu(): void {
     {
       label: 'View',
       submenu: [
-        { role: 'reload' },
-        { role: 'forceReload' },
+        /*
+         * Reloading is for development. In a build it looks like a harmless
+         * refresh and closes every session and desktop in the window, without
+         * asking — the keys for it are already taken away in a build, and the
+         * menu was the way left to do it by accident.
+         */
+        ...(is.dev ? [{ role: 'reload' as const }, { role: 'forceReload' as const }] : []),
         { role: 'toggleDevTools' },
         { type: 'separator' },
         { role: 'togglefullscreen' }

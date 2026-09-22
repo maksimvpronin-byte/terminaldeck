@@ -27,8 +27,8 @@ export function registerAppHandlers(): void {
   ipcMain.on(IPC.clipboardRead, (event) => {
     event.returnValue = clipboard.readText()
   })
-  ipcMain.on(IPC.clipboardWrite, (_event, text: string) => {
-    clipboard.writeText(text)
+  ipcMain.on(IPC.clipboardWrite, (_event, text: unknown) => {
+    if (typeof text === 'string') clipboard.writeText(text)
   })
 
   // --- Session logs ---
