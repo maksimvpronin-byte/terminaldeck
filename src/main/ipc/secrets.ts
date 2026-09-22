@@ -10,6 +10,9 @@ import { vault } from '../vault/Vault'
  * here rather than three times over.
  */
 
+/** Every field an item keeps a vault reference in: its own login, and its gateway's. */
+export const SECRET_FIELDS = ['secretRef', 'gatewaySecretRef'] as const
+
 /**
  * Drops an item's own credential so it inherits again. Without this a host that
  * once had a password of its own keeps using it forever: the nearest value wins,

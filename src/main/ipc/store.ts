@@ -14,6 +14,7 @@ import { sessionStore } from '../store/SessionStore'
 import { snippetStore } from '../store/SnippetStore'
 import { forgetGitFolder } from './gitFolders'
 import {
+  SECRET_FIELDS,
   forgetSecret,
   forgetSecretsAt,
   refsHeldBy,
@@ -26,8 +27,6 @@ import { focusedWin } from './win'
  * Saved hosts, groups, snippets, collections, stored logins, and moving the lot
  * to another machine.
  */
-
-const SECRET_FIELDS = ['secretRef', 'gatewaySecretRef'] as const
 
 /**
  * The vault references held by saved hosts and groups, but for one of them.
