@@ -378,3 +378,42 @@ describe('clipboard while nobody is here', () => {
     expect(clipboard.writeText).toHaveBeenCalledWith('from the far end')
   })
 })
+
+/**
+ * A desktop announces files on its clipboard, and the list of them follows.
+ * If the pane was no longer in use when the list came, the wait for it went on
+ * running, and 30 s later the pane said the server had never sent one.
+ */
+describe('a file list that arrives while the desktop is not in use', () => {
+  it('ends the wait for it, and says the copy is not going ahead', () => {
+    vi.useFakeTimers()
+    try {
+      const { session } = stubSession()
+      const said: unknown[] = []
+      ;(session.window as { webContents: { send: unknown } }).webContents.send = (
+        _channel: string,
+        payload: unknown
+      ) => said.push(payload)
+      innards().sessions.set('d-files', session)
+
+      innards().receive('d-files', session, RECORD.clipboardReset, Buffer.from([1]))
+      session.hidden = true
+      innards().receive('d-files', session, RECORD.clipboardFiles, Buffer.alloc(4))
+      vi.advanceTimersByTime(31_000)
+
+      const states = said.map((p) => (p as { state?: string }).state)
+      expect(states).toEqual(['receiving', 'cancelled'])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+describe('a desktop client that is not there', () => {
+  it('names the build for the machine it is on', async () => {
+    const { missingClient } = await import('./FreeRdpBridge')
+    expect(missingClient('win32')).toContain('build:freerdp:win')
+    expect(missingClient('darwin')).toContain('build:freerdp:mac')
+    expect(missingClient('linux')).not.toContain('npm run')
+  })
+})

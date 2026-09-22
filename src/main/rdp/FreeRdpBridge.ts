@@ -141,6 +141,26 @@ function executable(): string {
   )
 }
 
+/**
+ * What to say when there is no client to start — which in a checkout means it
+ * was never built, and the command that builds it depends on the machine. It
+ * named the Mac's everywhere, so on Windows it sent people to a script that
+ * needs bash and Xcode.
+ */
+export function missingClient(platform: NodeJS.Platform = process.platform): string {
+  if (app.isPackaged)
+    return 'The desktop client is missing from this installation. Reinstall TerminalDeck.'
+  const command =
+    platform === 'win32'
+      ? 'npm run build:freerdp:win'
+      : platform === 'darwin'
+        ? 'npm run build:freerdp:mac'
+        : undefined
+  return command
+    ? `The desktop client is missing. Build it with: ${command}`
+    : 'The desktop client is missing, and there is no build of it for this platform yet.'
+}
+
 class FreeRdpBridge {
   private sessions = new Map<string, Session>()
   private nextId = 1
@@ -255,9 +275,7 @@ class FreeRdpBridge {
         e: 'failed',
         // The common case by far, and worth naming: a checkout without the
         // client built says nothing useful otherwise.
-        detail: /ENOENT/.test(err.message)
-          ? 'The desktop client is missing. Build it with: npm run build:freerdp:mac'
-          : err.message
+        detail: /ENOENT/.test(err.message) ? missingClient() : err.message
       })
     })
 
@@ -352,6 +370,7 @@ class FreeRdpBridge {
         this.say(session, id, { e: 'clipboard-transfer', state: 'cancelled' })
       session.filesWaiting = undefined
       clearTimeout(session.clipboardManifestTimer)
+      session.clipboardManifestTimer = undefined
       session.download?.cancel()
     }
   }
@@ -676,6 +695,8 @@ class FreeRdpBridge {
     if (type === RECORD.clipboardReset) {
       if (session.clipboard) {
         this.cancelClipboardDownloads()
+        // Set again below only if this copy is announced as on its way.
+        session.clipboardManifestTimer = undefined
         if (payload[0] === 1 && this.mayGiveClipboard(session)) {
           this.say(session, id, {
             e: 'clipboard-transfer',
@@ -695,7 +716,15 @@ class FreeRdpBridge {
       return
     }
     if (type === RECORD.clipboardFiles) {
+      // The list has come, whether or not it is taken: the wait for it is over.
+      // Left running, it reported 30 s later that the server never sent one.
+      const announced = session.clipboardManifestTimer !== undefined
+      clearTimeout(session.clipboardManifestTimer)
+      session.clipboardManifestTimer = undefined
       if (this.mayGiveClipboard(session)) this.beginClipboardDownload(id, session, payload)
+      // Announced while the desktop was in use, and it no longer is: the
+      // pane is told, rather than left showing a copy that never starts.
+      else if (announced) this.say(session, id, { e: 'clipboard-transfer', state: 'cancelled' })
       return
     }
     if (type === RECORD.clipboardChunk) {
