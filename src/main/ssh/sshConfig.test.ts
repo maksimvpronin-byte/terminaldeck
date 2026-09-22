@@ -82,3 +82,28 @@ Host a
     expect(hosts).toEqual([{ alias: 'a', hostname: 'h', port: 22 }])
   })
 })
+
+/** Three rules of ssh_config(5) the parser used to break. */
+describe('parseSshConfig, as OpenSSH reads a config', () => {
+  it('takes a keyword joined to its value by =', () => {
+    const hosts = parseSshConfig('Host a\n  HostName=h.example\n  Port = 2222\n  User=deploy\n')
+    expect(hosts[0]).toMatchObject({ hostname: 'h.example', port: 2222, user: 'deploy' })
+  })
+
+  it('does not give a host what follows a Match line', () => {
+    const hosts = parseSshConfig(
+      'Host web\n  HostName web.example\nMatch host *.internal\n  User admin\n'
+    )
+    expect(hosts).toEqual([{ alias: 'web', hostname: 'web.example', port: 22 }])
+  })
+
+  it('does not take a negated pattern for a host', () => {
+    const hosts = parseSshConfig('Host !bastion prod\n  HostName p\n')
+    expect(hosts.map((h) => h.alias)).toEqual(['prod'])
+  })
+
+  it('uses the first value given for a keyword', () => {
+    const hosts = parseSshConfig('Host a\n  User first\n  User second\n  Port 2200\n  Port 2300\n')
+    expect(hosts[0]).toMatchObject({ user: 'first', port: 2200 })
+  })
+})
