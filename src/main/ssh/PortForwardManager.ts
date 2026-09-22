@@ -1,5 +1,6 @@
 import net, { type Server, type Socket } from 'net'
 import type { Client } from 'ssh2'
+import type { Duplex } from 'stream'
 import { sshManager } from './SSHManager'
 import {
   HANDSHAKE_LIMIT,
@@ -27,23 +28,57 @@ interface ActiveForward {
   sockets: Set<Socket>
 }
 
+/** A remote forward the server has agreed to, as incoming connections are matched against. */
+interface RemoteRoute {
+  entry: ActiveForward
+  bindHost: string
+  /** The port the server listens on: the rule's, or the one it chose for port 0. */
+  port: number
+}
+
 function targetClient(connectionId: string): Client {
   const chain = sshManager.getClientChain(connectionId)
   if (!chain || chain.length === 0) throw new Error('No active SSH connection')
   return chain[chain.length - 1]
 }
 
-function pipeStreams(a: NodeJS.ReadWriteStream, b: NodeJS.ReadWriteStream): void {
+/**
+ * Joins a local socket and an SSH channel, and ends them together.
+ *
+ * Closing one side used only to unpipe it from the other, which stayed open:
+ * a tunnel stopped, or a local program that went away, left its SSH channel
+ * open on the server until something else happened to close it.
+ *
+ * A side that ends properly is left to the pipe, which ends the other once
+ * everything it had to say has been written — destroying it then would drop
+ * the last of a reply still on its way. A side that closes without ending —
+ * destroyed by Stop, reset, or failed — takes the other down with it.
+ */
+export function pipeStreams(a: Duplex, b: Duplex): void {
   a.pipe(b)
   b.pipe(a)
-  const cleanup = (): void => {
+  let done = false
+  const tearDown = (): void => {
+    if (done) return
+    done = true
     a.unpipe(b)
     b.unpipe(a)
+    a.destroy()
+    b.destroy()
   }
-  a.on('close', cleanup)
-  b.on('close', cleanup)
-  a.on('error', cleanup)
-  b.on('error', cleanup)
+  a.on('close', () => {
+    if (!b.writableEnded) tearDown()
+  })
+  b.on('close', () => {
+    if (!a.writableEnded) tearDown()
+  })
+  a.on('error', tearDown)
+  b.on('error', tearDown)
+}
+
+/** A channel that opened for a socket already gone: nothing is left to carry. */
+function discard(stream: Duplex): void {
+  stream.destroy()
 }
 
 /**
@@ -115,12 +150,17 @@ function handleSocks5(socket: Socket, client: Client): void {
 
     client.forwardOut('127.0.0.1', 0, request.address, request.port, (err, stream) => {
       if (err) {
+        if (socket.destroyed) return
         socket.write(reply(SOCKS5_FAILED))
         socket.destroy()
         return
       }
+      if (socket.destroyed) {
+        discard(stream as unknown as Duplex)
+        return
+      }
       socket.write(reply(SOCKS5_GRANTED))
-      const tunnel = stream as unknown as NodeJS.ReadWriteStream
+      const tunnel = stream as unknown as Duplex
       if (leftover.length > 0) tunnel.write(leftover)
       pipeStreams(socket, tunnel)
       socket.resume()
@@ -136,6 +176,26 @@ class PortForwardManager {
   private active = new Map<string, ActiveForward>()
   /** A start still in progress, shared by anyone who asks for the same rule. */
   private opening = new Map<string, Promise<void>>()
+  /**
+   * The remote forwards on each connection, and the one listener that sends
+   * each incoming connection to its own.
+   *
+   * `tcp connection` is emitted on the client, not on a forward. Each forward
+   * used to listen for itself and pick out its port, so two forwards on one
+   * port but different addresses both took the same connection — each opened a
+   * socket to its own destination and both called `accept`.
+   */
+  private remote = new Map<
+    Client,
+    {
+      routes: Set<RemoteRoute>
+      listener: (
+        info: { destIP: string; destPort: number },
+        accept: () => NodeJS.ReadWriteStream,
+        reject: () => void
+      ) => void
+    }
+  >()
 
   /**
    * Opens a forward, unless it is stopped first.
@@ -198,7 +258,11 @@ class PortForwardManager {
               socket.destroy()
               return
             }
-            pipeStreams(socket, stream as unknown as NodeJS.ReadWriteStream)
+            if (socket.destroyed) {
+              discard(stream as unknown as Duplex)
+              return
+            }
+            pipeStreams(socket, stream as unknown as Duplex)
           }
         )
       })
@@ -211,41 +275,83 @@ class PortForwardManager {
     }
 
     // remote forward: ask the SSH server to listen and forward back to us
-    await new Promise<void>((resolve, reject) => {
-      client.forwardIn(rule.srcHost, rule.srcPort, (err) => (err ? reject(err) : resolve()))
+    /*
+     * The port the server really listens on. For port 0 it chooses one, and
+     * that is the port connections then arrive on and the one to stop: the
+     * rule's 0 matched nothing, and stopping asked the server to close port 0.
+     */
+    const port = await new Promise<number>((resolve, reject) => {
+      client.forwardIn(rule.srcHost, rule.srcPort, (err, bound) =>
+        err ? reject(err) : resolve(bound || rule.srcPort)
+      )
     })
-    const onTcpConnection = (
-      info: { destIP: string; destPort: number },
-      accept: () => NodeJS.ReadWriteStream,
-      reject: () => void
-    ): void => {
-      /**
-       * Only connections for this rule's port.
-       *
-       * `tcp connection` is emitted on the connection, not on the forward, so
-       * every rule's handler hears about every rule's traffic. Ignoring which
-       * port it arrived on meant two remote forwards over one host each
-       * accepted the other's connections — both handlers ran, both called
-       * `accept`, and whichever won sent the caller to the wrong place. With
-       * one rule it looked perfectly correct, which is why it survived.
-       */
-      if (info.destPort !== rule.srcPort) return
-
-      const socket = net.connect(rule.dstPort ?? 0, rule.dstHost ?? '127.0.0.1')
-      this.track(entry, socket)
-      socket.on('error', () => reject())
-      socket.on('connect', () => {
-        const stream = accept()
-        pipeStreams(socket, stream)
-      })
-    }
-    client.on('tcp connection', onTcpConnection)
+    const route: RemoteRoute = { entry, bindHost: rule.srcHost, port }
+    this.addRoute(client, route)
     entry.cleanupRemote = () => {
-      client.unforwardIn(rule.srcHost, rule.srcPort, () => undefined)
-      client.removeListener('tcp connection', onTcpConnection)
+      client.unforwardIn(rule.srcHost, port, () => undefined)
+      this.removeRoute(client, route)
     }
     // Stopped while the server was still agreeing: undo it now it has.
     if (entry.stopped) this.release(entry)
+  }
+
+  private addRoute(client: Client, route: RemoteRoute): void {
+    let forwards = this.remote.get(client)
+    if (!forwards) {
+      const routes = new Set<RemoteRoute>()
+      const listener = (
+        info: { destIP: string; destPort: number },
+        accept: () => NodeJS.ReadWriteStream,
+        reject: () => void
+      ): void => {
+        // ssh2 announces only connections for an address and port it was asked
+        // to forward, in the same words — so the match is exact.
+        const match = [...routes].find(
+          (r) => r.port === info.destPort && r.bindHost === info.destIP
+        )
+        if (!match) return reject()
+        this.carryIncoming(match.entry, accept, reject)
+      }
+      forwards = { routes, listener }
+      this.remote.set(client, forwards)
+      client.on('tcp connection', listener)
+    }
+    forwards.routes.add(route)
+  }
+
+  private removeRoute(client: Client, route: RemoteRoute): void {
+    const forwards = this.remote.get(client)
+    if (!forwards) return
+    forwards.routes.delete(route)
+    if (forwards.routes.size > 0) return
+    client.removeListener('tcp connection', forwards.listener)
+    this.remote.delete(client)
+  }
+
+  /** One connection that arrived through a remote forward, taken to its destination. */
+  private carryIncoming(
+    entry: ActiveForward,
+    accept: () => NodeJS.ReadWriteStream,
+    reject: () => void
+  ): void {
+    const { rule } = entry
+    let answered = false
+    const refuse = (): void => {
+      if (answered) return
+      answered = true
+      reject()
+    }
+    const socket = net.connect(rule.dstPort ?? 0, rule.dstHost ?? '127.0.0.1')
+    this.track(entry, socket)
+    socket.on('error', refuse)
+    // Destroyed before it connected — the forward stopped — says only 'close'.
+    // The server is still waiting for an answer, and is given one.
+    socket.on('close', refuse)
+    socket.on('connect', () => {
+      if (answered || socket.destroyed) return
+      answered = true
+      pipeStreams(socket, accept() as Duplex)
+    })
   }
 
   /**
