@@ -131,22 +131,36 @@ export function parseAnsibleInventory(
     depth: number
     name: string
     vars: AnsibleVars
-    /** The group's own vars, kept for the one setting a host cannot inherit. */
-    groupVars: AnsibleVars
   }
   const seen = new Map<string, { name: string; claims: Claim[] }>()
+  /*
+   * The vars each group has been given so far, by id. A group can be written
+   * down more than once at the same place — listed under `all.children`, and
+   * again at the top of the file with its vars, which lands on the same path —
+   * and Ansible reads that as one group with both halves merged. It used to
+   * become two groups with one id, and inheritance found the first, so the
+   * vars in the second never reached a host.
+   */
+  const groupVars = new Map<string, AnsibleVars>()
 
   const walk = (name: string, raw: RawGroup | null, parentPath: string | null): void => {
     const path = parentPath ? `${parentPath}/${name}` : name
     const id = groupId(sourceId, path, prefix)
-    const vars = { ...lookupVars('group', name), ...(raw?.vars ?? {}) }
+    const vars = {
+      ...(groupVars.get(id) ?? lookupVars('group', name)),
+      ...(raw?.vars ?? {})
+    }
+    groupVars.set(id, vars)
 
-    groups.push({
+    const group: SessionGroup = {
       id,
       name,
       parentId: parentPath ? groupId(sourceId, parentPath, prefix) : null,
       ...varsToAuth(vars)
-    })
+    }
+    const again = groups.findIndex((g) => g.id === id)
+    if (again >= 0) groups[again] = group
+    else groups.push(group)
 
     for (const [hostName, inlineVars] of Object.entries(raw?.hosts ?? {})) {
       const key = hostId(sourceId, hostName, prefix)
@@ -155,8 +169,7 @@ export function parseAnsibleInventory(
         id,
         depth: path.split('/').length,
         name,
-        vars: inlineVars ?? {},
-        groupVars: vars
+        vars: inlineVars ?? {}
       })
       seen.set(key, entry)
     }
@@ -216,7 +229,12 @@ export function parseAnsibleInventory(
      * So the group chain is read at parse time and the answer written onto the
      * host, along the same order that decides which group's settings it takes.
      */
-    const fromGroups = ordered.reduce<AnsibleVars>((acc, c) => ({ ...acc, ...c.groupVars }), {})
+    // Read once every mention of every group is in: a group's vars can arrive
+    // in a later definition of it than the one that named this host.
+    const fromGroups = ordered.reduce<AnsibleVars>(
+      (acc, c) => ({ ...acc, ...groupVars.get(c.id) }),
+      {}
+    )
     const protocol = protocolFromVars(hostVars) ?? protocolFromVars(fromGroups)
 
     hosts.push({

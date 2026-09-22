@@ -299,6 +299,41 @@ workers:
     })
   })
 
+  /**
+   * Listed under `all.children`, and written again at the top of the file with
+   * its vars: both land on `all/web`, and Ansible takes them as one group.
+   */
+  describe('a group written down twice', () => {
+    const twice = parse(`
+all:
+  children:
+    web:
+      hosts:
+        w1:
+web:
+  vars:
+    ansible_user: deploy
+    terminaldeck_protocol: rdp
+  hosts:
+    w2:
+`)
+
+    it('is one group, not two with one id', () => {
+      const { groups } = parseAnsibleInventory(twice, SRC)
+      expect(groups.filter((g) => g.id === groupId(SRC, 'all/web'))).toHaveLength(1)
+    })
+
+    it('carries the vars of both halves to every host in it', () => {
+      const { groups, hosts } = parseAnsibleInventory(twice, SRC)
+      expect(groups.find((g) => g.id === groupId(SRC, 'all/web'))!.username).toBe('deploy')
+      // The vars arrive after w1 was named; w1 still gets them.
+      expect(hosts.map((h) => [h.name, h.protocol])).toEqual([
+        ['w1', 'rdp'],
+        ['w2', 'rdp']
+      ])
+    })
+  })
+
   it('handles top-level groups without an "all" wrapper', () => {
     const flat = parse('web:\n  hosts:\n    w1: {}\n')
     const { groups, hosts } = parseAnsibleInventory(flat, SRC)
