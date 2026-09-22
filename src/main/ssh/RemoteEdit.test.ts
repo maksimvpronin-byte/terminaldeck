@@ -14,8 +14,11 @@ import type { BrowserWindow } from 'electron'
  * files happens long before the application exits.
  */
 
+const openPath = vi.fn(async (): Promise<string> => '')
+const spawned: { program: string; args: string[] }[] = []
+
 vi.mock('electron', () => ({
-  shell: { openPath: async (): Promise<string> => '' },
+  shell: { openPath: (path: string) => openPath(path) },
   type: {}
 }))
 /*
@@ -24,7 +27,8 @@ vi.mock('electron', () => ({
  * lets go of the handle.
  */
 vi.mock('child_process', () => ({
-  spawn: () => {
+  spawn: (program: string, args: string[]) => {
+    spawned.push({ program, args })
     const handlers = new Map<string, () => void>()
     setTimeout(() => handlers.get('spawn')?.(), 0)
     return {
@@ -43,7 +47,7 @@ vi.mock('./SFTPManager', () => ({
   }
 }))
 
-const { remoteEdit } = await import('./RemoteEdit')
+const { remoteEdit, openInEditor } = await import('./RemoteEdit')
 
 /** The window is only ever sent events; none of them matter here. */
 const win = {
@@ -84,5 +88,39 @@ describe('remote editing', () => {
     remoteEdit.cleanUp()
 
     expect(existsSync(local)).toBe(false)
+  })
+})
+
+/**
+ * With no editor configured, the copy used to go to whatever the system opens
+ * it with — and on Windows that runs a `.cmd`, a `.js` or a `.py` rather than
+ * opening it. "Edit locally" must end in an editor whatever the file is called.
+ */
+describe('the editor used when none is configured', () => {
+  it('opens a script in Notepad on Windows, never through the system handler', async () => {
+    openPath.mockClear()
+    spawned.length = 0
+    await openInEditor('C:\\edit\\deploy.cmd', '  ', 'win32')
+
+    expect(openPath).not.toHaveBeenCalled()
+    expect(spawned).toHaveLength(1)
+    expect(spawned[0].program).toMatch(/System32[\\/]notepad\.exe$/i)
+    expect(spawned[0].args).toEqual(['C:\\edit\\deploy.cmd'])
+  })
+
+  it('asks macOS for its text editor, not for the app that would run the file', async () => {
+    openPath.mockClear()
+    spawned.length = 0
+    await openInEditor('/tmp/run.command', undefined, 'darwin')
+
+    expect(openPath).not.toHaveBeenCalled()
+    expect(spawned).toEqual([{ program: '/usr/bin/open', args: ['-t', '/tmp/run.command'] }])
+  })
+
+  it('still runs the editor that was configured', async () => {
+    spawned.length = 0
+    await openInEditor('/tmp/a.txt', 'code -w {file}', 'win32')
+
+    expect(spawned).toEqual([{ program: 'code', args: ['-w', '/tmp/a.txt'] }])
   })
 })

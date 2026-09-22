@@ -28,18 +28,51 @@ function parseCommand(input: string): { program: string; args: string[] } {
 }
 
 /**
- * Launches the configured editor, or hands the file to the OS when none is set.
+ * The editor used when none is configured: a text editor, by name.
+ *
+ * This used to be whatever the system opens the file with, and that is not an
+ * editor. A remote file called `deploy.cmd`, `setup.js` or `tool.py` handed to
+ * Windows that way is run, not opened — by the shell, by Windows Script Host,
+ * by the Python launcher — and a download carries no mark that would make
+ * Windows ask first. "Edit locally" on a hostile server was one click from
+ * running its code here. So the default names a text editor instead: Notepad
+ * on Windows, and on macOS `open -t`, the text editor the user chose there,
+ * which a `.command` file cannot talk its way past either.
+ *
+ * Linux keeps the desktop's own handler. The copy is written without the
+ * execute bit, so a script found there is opened, not run.
+ */
+export function defaultEditor(
+  platform: NodeJS.Platform
+): { program: string; args: string[] } | undefined {
+  if (platform === 'win32') {
+    // A full path: a bare name is looked for in the working directory first.
+    const windows = process.env.SystemRoot ?? process.env.windir ?? 'C:\\Windows'
+    return { program: join(windows, 'System32', 'notepad.exe'), args: [] }
+  }
+  if (platform === 'darwin') return { program: '/usr/bin/open', args: ['-t'] }
+  return undefined
+}
+
+/**
+ * Launches the configured editor, or the default one when none is set.
  * The command is split and run directly rather than through a shell, so a path
  * with spaces or shell characters cannot turn into something executable.
  */
-async function openInEditor(localPath: string, editorCommand?: string): Promise<void> {
-  if (!editorCommand?.trim()) {
+export async function openInEditor(
+  localPath: string,
+  editorCommand?: string,
+  platform: NodeJS.Platform = process.platform
+): Promise<void> {
+  const configured = editorCommand?.trim()
+  const fallback = configured ? undefined : defaultEditor(platform)
+  if (!configured && !fallback) {
     const failure = await shell.openPath(localPath)
     if (failure) throw new Error(failure)
     return
   }
 
-  const { program, args } = parseCommand(editorCommand.trim())
+  const { program, args } = fallback ?? parseCommand(configured!)
   if (!program) throw new Error('The external editor setting is empty')
 
   const finalArgs = args.some((a) => a.includes('{file}'))

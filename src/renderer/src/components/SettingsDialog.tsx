@@ -66,7 +66,7 @@ export default function SettingsDialog({
               <label style={{ flex: 1 }}>
                 <Hint label={t('Command')}>
                   {t(
-                    'Used by “Edit locally” in the SFTP panel. Leave empty to hand the file to whatever the system opens it with — on Windows that is often Notepad, or nothing at all.'
+                    'Used by “Edit locally” in the SFTP panel. Left empty, the file opens in Notepad on Windows and in your default text editor on macOS — never in whatever program would run it.'
                   )}{' '}
                   <code>{'{file}'}</code>{' '}
                   {t(

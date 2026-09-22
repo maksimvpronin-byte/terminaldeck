@@ -232,8 +232,8 @@ export const ru: Record<string, string> = {
     'Правый клик — скачать, переименовать, удалить или создать папку',
   '"Edit locally" opens a file in your editor and uploads it on every save':
     '«Править локально» открывает файл в вашем редакторе и загружает при каждом сохранении',
-  'Pick that editor in Settings → Files; otherwise the system default is used':
-    'Редактор выбирается в «Настройки → Файлы», иначе берётся системный',
+  'Pick that editor in Settings → Files; otherwise a plain text editor is used':
+    'Редактор выбирается в «Настройки → Файлы», иначе берётся простой текстовый',
   'Drag files or folders in from Finder to upload them':
     'Перетащите файлы или папки из Finder, чтобы загрузить их',
   'Anything that would overwrite is listed first, both ways, and asked about':
@@ -298,8 +298,8 @@ export const ru: Record<string, string> = {
   Security: 'Безопасность',
   Backup: 'Резервная копия',
   'External editor': 'Внешний редактор',
-  'Used by “Edit locally” in the SFTP panel. Leave empty to hand the file to whatever the system opens it with — on Windows that is often Notepad, or nothing at all.':
-    'Используется пунктом «Править локально» в панели SFTP. Оставьте пустым, чтобы файл открывался тем, чем его открывает система — в Windows это часто «Блокнот», а иногда ничто.',
+  'Used by “Edit locally” in the SFTP panel. Left empty, the file opens in Notepad on Windows and in your default text editor on macOS — never in whatever program would run it.':
+    'Используется пунктом «Править локально» в панели SFTP. Если пусто, файл откроется в «Блокноте» в Windows и в текстовом редакторе по умолчанию в macOS — и никогда в программе, которая бы его запустила.',
   Command: 'Команда',
   'Browse…': 'Обзор…',
   'is replaced by the path; without it the path is appended. Give the full path to the program — a windowed app does not inherit the PATH from your shell, so a bare code or subl may not be found.':

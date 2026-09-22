@@ -270,7 +270,7 @@ const SECTIONS: Section[] = [
       { what: 'Double-click opens a folder or downloads a file' },
       { what: 'Right-click to download, rename, delete, or make a folder' },
       { what: '"Edit locally" opens a file in your editor and uploads it on every save' },
-      { what: 'Pick that editor in Settings → Files; otherwise the system default is used' },
+      { what: 'Pick that editor in Settings → Files; otherwise a plain text editor is used' },
       { what: 'Drag files or folders in from Finder to upload them' },
       { what: 'Anything that would overwrite is listed first, both ways, and asked about' },
       { what: 'Every clash starts on Skip; nothing is remembered between transfers' },
