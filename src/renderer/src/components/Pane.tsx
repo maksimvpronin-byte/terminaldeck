@@ -1,13 +1,7 @@
 import { memo, useRef, useState } from 'react'
 import type { DragEvent as ReactDragEvent } from 'react'
 import type { PaneNode, PaneTarget } from '../state/store'
-import {
-  useStore,
-  collectBroadcastTargets,
-  activeTab,
-  allTabs,
-  findTab
-} from '../state/store'
+import { useStore, collectBroadcastTargets, activeTab, allTabs, findTab } from '../state/store'
 import { DRAG_MIME, edgeFromPoint, edgeToSplit, type DragItem, type DropEdge } from '../state/dnd'
 import { findHost } from '../state/hosts'
 import TerminalHost from './TerminalHost'
