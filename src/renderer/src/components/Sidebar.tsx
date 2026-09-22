@@ -10,6 +10,7 @@ import { resolveAuth } from '../../../shared/authResolution'
 import { applyOverride } from '../../../shared/overrides'
 import { isGitNode, gitFolderLayout } from '../../../shared/gitFolders'
 import { protocolOf } from '../../../shared/protocols'
+import { duplicateProfile } from '../../../shared/duplicate'
 import { DesktopIcon, TerminalIcon } from './icons'
 import { groupIndent, hostIndent } from './treeIndent'
 import {
@@ -594,17 +595,7 @@ export default function Sidebar({
               label: t('Duplicate'),
               separated: true,
               onSelect: () => {
-                const now = Date.now()
-                // The clone gets its own id; the secret stays with the original, so the
-                // copy has to be given credentials of its own.
-                upsertSession({
-                  ...s,
-                  id: nanoid(),
-                  name: `${s.name} copy`,
-                  secretRef: undefined,
-                  createdAt: now,
-                  updatedAt: now
-                })
+                upsertSession(duplicateProfile(s, nanoid(), `${s.name} copy`, Date.now()))
               }
             },
             { label: 'Edit…', onSelect: () => setEditingSession(s) },

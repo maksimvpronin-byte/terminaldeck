@@ -29,10 +29,12 @@ export function forgetSecret(item: { secretRef?: string }): void {
  */
 export function forgetSecretAt<K extends string>(
   item: Partial<Record<K, string | undefined>>,
-  field: K
+  field: K,
+  /** References something else still holds: dropped from the item, kept in the vault. */
+  keep?: Set<string>
 ): void {
   const ref = item[field]
-  if (ref && vault.status().unlocked) vault.deleteSecret(ref)
+  if (ref && !keep?.has(ref) && vault.status().unlocked) vault.deleteSecret(ref)
   item[field] = undefined
 }
 
@@ -43,12 +45,51 @@ export function forgetSecretAt<K extends string>(
  */
 export function forgetSecretsAt<K extends string>(
   items: Array<Partial<Record<K, string | undefined>>>,
-  fields: K[]
+  fields: K[],
+  keep?: Set<string>
 ): void {
-  const refs = items.flatMap((item) =>
-    fields.map((field) => item[field]).filter((ref): ref is string => Boolean(ref))
-  )
+  const refs = [...refsHeldBy(items, fields)].filter((ref) => !keep?.has(ref))
   if (refs.length > 0 && vault.status().unlocked) vault.changeSecrets({}, refs)
+}
+
+/** Every vault reference the items hold in the named fields. */
+export function refsHeldBy<K extends string>(
+  items: Array<Partial<Record<K, string | undefined>>>,
+  fields: readonly K[]
+): Set<string> {
+  const refs = new Set<string>()
+  for (const item of items) {
+    for (const field of fields) {
+      const ref = item[field]
+      if (ref) refs.add(ref)
+    }
+  }
+  return refs
+}
+
+/**
+ * Takes an item off a reference it shares with another, where this save is
+ * about to change what is stored there.
+ *
+ * Two items should never hold one reference, but they could: a duplicated
+ * desktop kept the original's gateway password reference. Deleting either
+ * then deleted the other's password, and typing a new one into the copy
+ * changed the original's. A new secret for a shared reference is stored under
+ * a new one; dropping a shared one only unties this item. The secrets are
+ * returned as saveWithSecrets should be given them.
+ */
+export function unshareSecrets(
+  item: object,
+  secrets: Array<[field: string, secret: string | null | undefined]>,
+  heldElsewhere: Set<string>
+): Array<[field: string, secret: string | null | undefined]> {
+  const refs = item as Record<string, string | undefined>
+  return secrets.map(([field, secret]) => {
+    const ref = refs[field]
+    if (secret === undefined || !ref || !heldElsewhere.has(ref)) return [field, secret]
+    refs[field] = undefined
+    return [field, secret === null ? undefined : secret]
+  })
 }
 
 /**

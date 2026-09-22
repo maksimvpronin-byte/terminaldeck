@@ -13,13 +13,34 @@ import { credentialStore } from '../store/CredentialStore'
 import { sessionStore } from '../store/SessionStore'
 import { snippetStore } from '../store/SnippetStore'
 import { forgetGitFolder } from './gitFolders'
-import { forgetSecret, forgetSecretAt, forgetSecretsAt, saveWithSecrets } from './secrets'
+import {
+  forgetSecret,
+  forgetSecretsAt,
+  refsHeldBy,
+  saveWithSecrets,
+  unshareSecrets
+} from './secrets'
 import { focusedWin } from './win'
 
 /**
  * Saved hosts, groups, snippets, collections, stored logins, and moving the lot
  * to another machine.
  */
+
+const SECRET_FIELDS = ['secretRef', 'gatewaySecretRef'] as const
+
+/**
+ * The vault references held by saved hosts and groups, but for one of them.
+ * A password is deleted only when nothing else still points at it; see
+ * unshareSecrets for how two came to.
+ */
+function heldByOthers(exceptId?: string): Set<string> {
+  const { sessions, groups } = sessionStore.getAll()
+  return refsHeldBy(
+    [...sessions, ...groups].filter((item) => item.id !== exceptId),
+    SECRET_FIELDS
+  )
+}
 
 export function registerStoreHandlers(): void {
   // --- Session store ---
@@ -29,10 +50,14 @@ export function registerStoreHandlers(): void {
     (_e, session: SessionProfile, secret?: string | null, gatewaySecret?: string | null) =>
       saveWithSecrets(
         session,
-        [
-          ['secretRef', secret],
-          ['gatewaySecretRef', gatewaySecret]
-        ],
+        unshareSecrets(
+          session,
+          [
+            ['secretRef', secret],
+            ['gatewaySecretRef', gatewaySecret]
+          ],
+          heldByOthers(session.id)
+        ),
         (s) => sessionStore.saveSession(s)
       )
   )
@@ -43,17 +68,14 @@ export function registerStoreHandlers(): void {
     // save leaves the host in place, and it must still have its password.
     const session = sessionStore.getAll().sessions.find((s) => s.id === id)
     sessionStore.deleteSession(id)
-    if (session) {
-      forgetSecret({ ...session })
-      forgetSecretAt({ ...session }, 'gatewaySecretRef')
-    }
+    if (session) forgetSecretsAt([session], [...SECRET_FIELDS], heldByOthers())
   })
   ipcMain.handle(IPC.storeDeleteSessions, (_e, ids: string[]) => {
     // Many at once, for a selection: the file and the vault are each written once.
     const doomed = new Set(ids)
     const sessions = sessionStore.getAll().sessions.filter((s) => doomed.has(s.id))
     sessionStore.deleteSessions(ids)
-    forgetSecretsAt(sessions, ['secretRef', 'gatewaySecretRef'])
+    forgetSecretsAt(sessions, [...SECRET_FIELDS], heldByOthers())
   })
   ipcMain.handle(IPC.storeReorderSessions, (_e, orderedIds: string[]) => {
     sessionStore.reorderSessions(orderedIds)
@@ -64,10 +86,14 @@ export function registerStoreHandlers(): void {
       const had = sessionStore.getAll().groups.find((g) => g.id === group.id)?.git
       const saved = saveWithSecrets(
         group,
-        [
-          ['secretRef', secret],
-          ['gatewaySecretRef', gatewaySecret]
-        ],
+        unshareSecrets(
+          group,
+          [
+            ['secretRef', secret],
+            ['gatewaySecretRef', gatewaySecret]
+          ],
+          heldByOthers(group.id)
+        ),
         (g) => sessionStore.saveGroup(g)
       )
       // Untying a folder from its repository empties it: the hosts it showed
@@ -90,10 +116,7 @@ export function registerStoreHandlers(): void {
     // settings and passwords kept for the hosts in it: nothing else can address
     // those nodes once the folder is gone.
     if (group?.git) forgetGitFolder(id, group.git)
-    if (group) {
-      forgetSecret({ ...group })
-      forgetSecretAt({ ...group }, 'gatewaySecretRef')
-    }
+    if (group) forgetSecretsAt([group], [...SECRET_FIELDS], heldByOthers())
   })
 
   // --- Backup ---

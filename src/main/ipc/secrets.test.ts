@@ -14,7 +14,7 @@ vi.mock('electron', () => ({ app: { getPath: (): string => userData } }))
 userData = mkdtempSync(join(tmpdir(), 'terminaldeck-secrets-'))
 
 const { vault } = await import('../vault/Vault')
-const { forgetSecretsAt, saveWithSecrets } = await import('./secrets')
+const { forgetSecretsAt, saveWithSecrets, unshareSecrets } = await import('./secrets')
 
 const MASTER = 'correct horse battery staple'
 const failingSave = (): never => {
@@ -88,5 +88,58 @@ describe('forgetting the passwords of several hosts', () => {
   it('leaves the vault alone while it is locked', () => {
     vault.lock()
     expect(() => forgetSecretsAt([{ secretRef: 'host-ref' }], ['secretRef'])).not.toThrow()
+  })
+})
+
+/**
+ * A duplicated desktop kept the original's gateway password reference, so the
+ * two shared one entry in the vault: deleting either deleted it for both, and
+ * a new password typed into one replaced the other's.
+ */
+describe('a password two hosts point at', () => {
+  it('is kept when one of them is deleted', () => {
+    forgetSecretsAt(
+      [{ gatewaySecretRef: 'gateway-ref' }],
+      ['secretRef', 'gatewaySecretRef'],
+      new Set(['gateway-ref'])
+    )
+    expect(vault.getSecret('gateway-ref')).toBe('old gateway password')
+  })
+
+  it('is left alone when one of them is given a new one, which goes under a new reference', () => {
+    const copy = { id: 'copy', gatewaySecretRef: 'gateway-ref' as string | undefined }
+    const saved = saveWithSecrets(
+      copy,
+      unshareSecrets(copy, [['gatewaySecretRef', 'the copy’s own']], new Set(['gateway-ref'])),
+      (h) => h
+    )
+
+    expect(saved.gatewaySecretRef).toBeDefined()
+    expect(saved.gatewaySecretRef).not.toBe('gateway-ref')
+    expect(vault.getSecret(saved.gatewaySecretRef!)).toBe('the copy’s own')
+    expect(vault.getSecret('gateway-ref')).toBe('old gateway password')
+  })
+
+  it('is left alone when one of them drops it, which only unties that one', () => {
+    const copy = { id: 'copy', gatewaySecretRef: 'gateway-ref' as string | undefined }
+    const saved = saveWithSecrets(
+      copy,
+      unshareSecrets(copy, [['gatewaySecretRef', null]], new Set(['gateway-ref'])),
+      (h) => h
+    )
+
+    expect(saved.gatewaySecretRef).toBeUndefined()
+    expect(vault.getSecret('gateway-ref')).toBe('old gateway password')
+  })
+
+  it('is changed in place when nothing else points at it', () => {
+    const host = { id: 'h', gatewaySecretRef: 'gateway-ref' as string | undefined }
+    saveWithSecrets(
+      host,
+      unshareSecrets(host, [['gatewaySecretRef', 'replacement']], new Set()),
+      (h) => h
+    )
+    expect(host.gatewaySecretRef).toBe('gateway-ref')
+    expect(vault.getSecret('gateway-ref')).toBe('replacement')
   })
 })
