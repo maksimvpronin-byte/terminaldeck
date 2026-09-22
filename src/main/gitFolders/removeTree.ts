@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, readdirSync, rmSync, statSync } from 'fs'
+import { chmodSync, existsSync, lstatSync, readdirSync, rmSync } from 'fs'
 import { join } from 'path'
 
 /**
@@ -32,12 +32,23 @@ export function removeTree(dir: string): void {
   }
 }
 
-/** Makes every file writable, so Windows will let go of it. */
-function clearReadOnly(dir: string): void {
+/**
+ * Makes every file in the tree writable, so Windows will let go of it.
+ *
+ * Only the tree's own files. A link is neither followed nor changed: this used
+ * to stat through it, so a symlink or junction in a checkout walked into
+ * whatever it pointed at and cleared the read-only attribute there too — on
+ * files that were never the checkout's — and one pointing back up the tree
+ * went round until the path grew too long. `rmSync` removes the link itself,
+ * never what it points at.
+ */
+export function clearReadOnly(dir: string): void {
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry)
     try {
-      if (statSync(full).isDirectory()) clearReadOnly(full)
+      const info = lstatSync(full)
+      if (info.isSymbolicLink()) continue
+      if (info.isDirectory()) clearReadOnly(full)
       else chmodSync(full, 0o666)
     } catch {
       // A file that cannot even be stat'd is one the removal will report on.
