@@ -88,8 +88,12 @@ export function registerUpdater(win: BrowserWindow): void {
   })
 
   ipcMain.handle(IPC.updateInstall, () => {
-    // Quits the app and relaunches into the new version.
-    autoUpdater.quitAndInstall()
+    // Quits the app and relaunches into the new version. Silent, because the
+    // installer is not one-click: run visibly it walks through its whole wizard
+    // again — folder, options, Finish — for what is an update, not an install.
+    // Silently it reuses the folder it was installed to, and the second flag
+    // starts the app again once it is done.
+    autoUpdater.quitAndInstall(true, true)
   })
 
   // In dev there is no packaged app to replace, and electron-updater throws.

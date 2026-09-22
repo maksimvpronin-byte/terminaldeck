@@ -634,6 +634,9 @@ export const ru: Record<string, string> = {
   'Downloading update… {percent}%': 'Загрузка обновления… {percent}%',
   'Version {version} is ready to install.': 'Версия {version} готова к установке.',
   'Restart now': 'Перезапустить сейчас',
+  'Update and restart': 'Обновить и перезапустить',
+  'Open connections will close: {count}. Update and restart?':
+    'Открытые подключения закроются: {count}. Обновить и перезапустить?',
   'On next quit': 'При следующем выходе',
 
   // Credential prompts and quick connect

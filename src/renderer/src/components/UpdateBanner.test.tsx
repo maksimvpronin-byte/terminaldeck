@@ -21,7 +21,7 @@ it('sends an ad-hoc build to the downloads instead of installing', async () => {
   render(<UpdateBanner />)
 
   await screen.findByText('Version 0.13.2 is out. This build cannot install it over itself.')
-  expect(screen.queryByRole('button', { name: 'Download' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Update and restart' })).not.toBeInTheDocument()
 
   await userEvent.click(screen.getByRole('button', { name: 'Open the downloads' }))
   expect(openPage).toHaveBeenCalledTimes(1)
@@ -34,6 +34,37 @@ it('still offers the install where it works', async () => {
 
   render(<UpdateBanner />)
 
-  await screen.findByRole('button', { name: 'Download' })
+  await screen.findByRole('button', { name: 'Update and restart' })
   expect(screen.queryByRole('button', { name: 'Open the downloads' })).not.toBeInTheDocument()
+})
+
+it('downloads and then restarts into the update, from one button', async () => {
+  const order: string[] = []
+  window.td.updates.getState = () => Promise.resolve({ status: 'available', version: '0.19.1' })
+  window.td.updates.onState = () => () => undefined
+  window.td.updates.download = vi.fn(async () => {
+    order.push('download')
+  })
+  window.td.updates.install = vi.fn(async () => {
+    order.push('install')
+  })
+
+  render(<UpdateBanner />)
+  await userEvent.click(await screen.findByRole('button', { name: 'Update and restart' }))
+
+  await vi.waitFor(() => expect(order).toEqual(['download', 'install']))
+})
+
+it('does not restart when the download fails', async () => {
+  const install = vi.fn()
+  window.td.updates.getState = () => Promise.resolve({ status: 'available', version: '0.19.1' })
+  window.td.updates.onState = () => () => undefined
+  window.td.updates.download = vi.fn().mockRejectedValue(new Error('offline'))
+  window.td.updates.install = install
+
+  render(<UpdateBanner />)
+  await userEvent.click(await screen.findByRole('button', { name: 'Update and restart' }))
+
+  await new Promise((r) => setTimeout(r, 0))
+  expect(install).not.toHaveBeenCalled()
 })
