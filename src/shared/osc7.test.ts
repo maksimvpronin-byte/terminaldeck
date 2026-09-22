@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { scanOsc7 } from './osc7'
+import { MAX_OSC7, scanOsc7 } from './osc7'
 
 const ESC = '\u001b'
 const BEL = '\u0007'
@@ -65,5 +65,36 @@ describe('scanOsc7', () => {
   it('ignores a malformed url without a path', () => {
     expect(scanOsc7(seq('file://box')).path).toBeUndefined()
     expect(scanOsc7(seq('http://box/var')).path).toBeUndefined()
+  })
+
+  /**
+   * A start that never ended kept everything after it: each read was appended
+   * and scanned again, and the buffer grew with the session.
+   */
+  it('gives up on a sequence that runs longer than any real one', () => {
+    let pending = ''
+    pending = scanOsc7(pending + `${ESC}]7;file://box/`).rest
+    for (let i = 0; i < 1000; i++) {
+      pending = scanOsc7(pending + 'x'.repeat(8192)).rest
+      expect(pending.length).toBeLessThanOrEqual(MAX_OSC7)
+    }
+    expect(pending).toBe('')
+  })
+
+  it('still finds a real sequence after one it gave up on', () => {
+    const junk = `${ESC}]7;${'x'.repeat(MAX_OSC7 + 1)}`
+    expect(scanOsc7(`${junk}${seq('file://box/home')}`).path).toBe('/home')
+
+    // And across reads: nothing of the abandoned one is carried into the next.
+    const pending = scanOsc7(junk).rest
+    expect(pending).toBe('')
+    expect(scanOsc7(pending + `more${seq('file://box/srv')}`).path).toBe('/srv')
+  })
+
+  it('waits for a long real path', () => {
+    const long = '/d'.repeat(2000)
+    const first = scanOsc7(`${ESC}]7;file://box${long}`)
+    expect(first.rest.length).toBeGreaterThan(4000)
+    expect(scanOsc7(`${first.rest}${BEL}`).path).toBe(long)
   })
 })

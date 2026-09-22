@@ -11,6 +11,18 @@
 
 const START = '\u001b]7;'
 
+/**
+ * The longest sequence waited for. A real one is a URL-encoded path — 4096
+ * bytes at most on Linux, three characters to a byte encoded — and a host name.
+ *
+ * Without a limit, a start that never ended kept everything after it: every
+ * later read was appended and scanned again from the top, so a host printing
+ * one stray `ESC ] 7 ;` — a binary file sent to the terminal will do — grew
+ * this buffer by all the output that followed, in the main process, for as
+ * long as the session lasted.
+ */
+export const MAX_OSC7 = 16 * 1024
+
 export interface Osc7Scan {
   /** The last complete path seen in this chunk, if any. */
   path?: string
@@ -57,12 +69,31 @@ export function scanOsc7(chunk: string): Osc7Scan {
 
     const body = start + START.length
     const bel = chunk.indexOf('\u0007', body)
-    const st = chunk.indexOf('\u001b\\', body)
-    const end = bel < 0 ? st : st < 0 ? bel : Math.min(bel, st)
+    const esc = chunk.indexOf('\u001b', body)
+    /*
+     * An ESC inside the sequence ends it, as it does in a terminal: followed by
+     * a backslash it is the proper terminator; followed by anything else the
+     * sequence was abandoned, and that ESC begins whatever comes next. Only
+     * BEL and ESC-backslash were looked for, so an unfinished start swallowed
+     * the next real sequence, up to its BEL, and the path in it was lost.
+     */
+    if (esc >= 0 && (bel < 0 || esc < bel) && esc + 1 < chunk.length) {
+      if (chunk[esc + 1] !== '\\') {
+        cursor = esc
+        continue
+      }
+    }
+    const st = esc >= 0 && chunk[esc + 1] === '\\' ? esc : -1
+    const end = esc >= 0 && (bel < 0 || esc < bel) ? (st >= 0 ? st : -1) : bel
 
     if (end < 0) {
-      // Started but not finished — keep it for the next chunk.
-      return { path, rest: chunk.slice(start) }
+      // Started but not finished — kept for the next chunk, unless it is
+      // already longer than any real one. Then it is given up on, and the
+      // search goes on after its start marker, so a sequence that follows it
+      // is still found.
+      if (chunk.length - start <= MAX_OSC7) return { path, rest: chunk.slice(start) }
+      cursor = body
+      continue
     }
     const found = pathFromUrl(chunk.slice(body, end))
     if (found) path = found
