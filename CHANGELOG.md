@@ -6,6 +6,39 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.19.3
+
+### Fixed
+
+- **Deleting a duplicated desktop deleted the original's gateway password.**
+  Duplicate kept the gateway password shared between the two hosts, so
+  deleting either removed it from both, and changing it on the copy changed
+  the original's. A copy now takes no passwords, and a password another host
+  still uses is never deleted — which also protects copies made before this.
+- **Importing from `~/.ssh/config` could drop a jump host.** A host whose
+  `ProxyJump` was neither selected nor saved, or went through a chain, was
+  imported as a direct connection. The route is now checked first, and
+  anything that cannot be followed is listed and nothing is imported. The
+  import is also saved all at once, so a failure no longer leaves some hosts
+  behind for a retry to add twice.
+- **Removing a git folder's checkout on Windows could reach outside it.**
+  Clearing read-only files followed links in the checkout and changed files
+  they pointed at. Links are now left alone.
+- **Two remote tunnels on the same port both took each connection.** Each
+  connection now goes to the tunnel for its address and port only, and a
+  remote tunnel on port 0 uses the port the server chose.
+- **Stopping a tunnel left its SSH channels open.** Closing either end of a
+  tunnelled connection now closes the other.
+- **A stray escape sequence could make a terminal use ever more memory.**
+  With directory tracking on, an unfinished `ESC ] 7 ;` held on to all output
+  that followed. It is now given up after 16 KB.
+- **Dropping a split tab onto a pane lost all but its first pane.** The whole
+  tab now moves, with its layout; its panes reconnect in their new place.
+- **Uploading several files with conflicts copied only the last.** Each
+  conflict is now asked about in turn, and every confirmed file is copied.
+- **A slow answer could send the file panel back to an older folder.** The
+  panel now stays where it was last sent.
+
 ## 0.19.2
 
 ### Fixed
