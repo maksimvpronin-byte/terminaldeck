@@ -1,5 +1,5 @@
 import { app, dialog, type BrowserWindow } from 'electron'
-import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, readFileSync, renameSync, rmSync } from 'fs'
 import { join } from 'path'
 import { deriveKey, newSalt, encrypt, decrypt, wipe, type EncryptedPayload } from '../vault/crypto'
 import { vault, type SealedSecrets } from '../vault/Vault'
@@ -463,9 +463,7 @@ export async function exportToFile(
 
   // Through a temporary name, like every other file this application writes:
   // saving over last week's export must not leave half of this week's.
-  const tmp = `${res.filePath}.tmp`
-  writeFileSync(tmp, JSON.stringify(backup, null, 2), 'utf8')
-  renameSync(tmp, res.filePath)
+  writeJson(res.filePath, backup)
   return res.filePath
 }
 

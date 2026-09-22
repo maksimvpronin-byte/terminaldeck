@@ -1,8 +1,9 @@
 import { app } from 'electron'
 import { join } from 'path'
-import { readFileSync, writeFileSync, renameSync, existsSync, mkdirSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { deriveKey, newSalt, encrypt, decrypt, wipe, type EncryptedPayload } from './crypto'
 import { MIN_MASTER_PASSWORD_LENGTH, type VaultStatus } from '../../shared/types'
+import { writeJson } from '../store/jsonFile'
 
 const VERIFIER_PLAINTEXT = 'terminaldeck-vault-v1'
 
@@ -17,16 +18,47 @@ function vaultPath(): string {
 }
 
 /**
- * Writes via a temp file and rename. A crash partway through a direct write would
- * leave a truncated vault, losing every stored credential.
+ * Written the way every other file here is — see `writeJson`. A crash partway
+ * through a direct write would leave a truncated vault, losing every stored
+ * credential, and this file least of all can afford a copy of that rule of its
+ * own that falls behind.
  */
 function writeVaultFile(file: VaultFile): void {
-  const dir = app.getPath('userData')
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-  const target = vaultPath()
-  const tmp = `${target}.tmp`
-  writeFileSync(tmp, JSON.stringify(file, null, 2), 'utf8')
-  renameSync(tmp, target)
+  writeJson(vaultPath(), file)
+}
+
+/**
+ * The vault as it is on disk, or a plain account of why it cannot be used.
+ *
+ * Parsed bare, a file that was empty or cut short answered the master password
+ * with "Unexpected end of JSON input" — which says nothing about what is wrong
+ * or that the password was never the problem. The file is left exactly where
+ * it is: it is the only copy of every stored credential.
+ */
+function readVaultFile(): VaultFile {
+  let file: Partial<VaultFile>
+  try {
+    file = JSON.parse(readFileSync(vaultPath(), 'utf8')) as Partial<VaultFile>
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code) throw err
+    throw new Error(damaged())
+  }
+  if (
+    typeof file !== 'object' ||
+    file === null ||
+    typeof file.salt !== 'string' ||
+    typeof file.verifier !== 'object' ||
+    file.verifier === null ||
+    typeof file.secrets !== 'object' ||
+    file.secrets === null
+  ) {
+    throw new Error(damaged())
+  }
+  return file as VaultFile
+}
+
+function damaged(): string {
+  return `The vault file ${vaultPath()} is damaged and cannot be opened. It was left untouched; restore it from a backup of that folder, or move it away to start a new, empty vault.`
 }
 
 /** Secrets as they are stored — encrypted — and the salt of the vault they came from. */
@@ -109,8 +141,7 @@ class Vault {
    */
   async unlock(password: string): Promise<void> {
     return this.serially(async (started) => {
-      const raw = readFileSync(vaultPath(), 'utf8')
-      const file = JSON.parse(raw) as VaultFile
+      const file = readVaultFile()
       const key = await deriveKey(password, file.salt)
       if (this.generation !== started) {
         wipe(key)
@@ -329,7 +360,7 @@ class Vault {
       return true
     }
     if (!existsSync(vaultPath())) return false
-    const onDisk = JSON.parse(readFileSync(vaultPath(), 'utf8')) as VaultFile
+    const onDisk = readVaultFile()
     if (onDisk.salt !== sealed.salt) return false
     writeVaultFile({ ...onDisk, secrets: sealed.secrets })
     return true

@@ -1,12 +1,23 @@
-import { copyFileSync, readFileSync, writeFileSync, renameSync, existsSync, mkdirSync } from 'fs'
+import {
+  closeSync,
+  copyFileSync,
+  existsSync,
+  fsyncSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync
+} from 'fs'
 import { dirname } from 'path'
 
 /**
  * Reading and writing the small JSON files this application keeps.
  *
- * There are six of them — sessions, groups, collections, snippets, inventory,
- * known host keys, trusted certificates — and they were each doing this their
- * own way. Three went through a temporary file and a rename; three wrote in
+ * There are a handful of them — hosts and groups, collections, snippets,
+ * inventory, stored logins, known host keys, trusted certificates, the vault
+ * and an export — and they were each doing this their own way. Three went through a temporary file and a rename; three wrote in
  * place, which leaves a truncated file the moment anything interrupts the
  * write. The three that were careful are the three written least, and the host
  * tree, rewritten on every edit and every drag, was among the careless.
@@ -23,13 +34,63 @@ import { dirname } from 'path'
  * name points at the old file or the new one, never at part of either. The
  * write that can fail — out of space, killed process, a full disk quota — is
  * the one to the temporary name, where failing costs nothing.
+ *
+ * Two things the rename alone does not give:
+ *
+ * - The bytes are flushed to the disk before the rename. Without that the
+ *   system may put the new name down before the contents, and a power cut in
+ *   between left an empty file where the vault or the host tree had been.
+ * - A rename refused for a moment is tried again. On Windows an antivirus scan
+ *   or the search indexer opens a file that has just been written, and a
+ *   rename onto it fails with EPERM or EBUSY until it lets go — which it does
+ *   within moments. Reads already waited for that; writes reported it as a
+ *   failure to save.
  */
 export function writeJson(path: string, data: unknown): void {
   const dir = dirname(path)
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
   const tmp = `${path}.tmp`
-  writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf8')
-  renameSync(tmp, path)
+  try {
+    const fd = openSync(tmp, 'w')
+    try {
+      writeFileSync(fd, JSON.stringify(data, null, 2), 'utf8')
+      fsyncSync(fd)
+    } finally {
+      closeSync(fd)
+    }
+    renameWithRetry(tmp, path)
+  } catch (err) {
+    // Nothing half-written is left beside the file it failed to replace — and
+    // a tidy-up that fails too says nothing over the reason that matters.
+    try {
+      rmSync(tmp, { force: true })
+    } catch {
+      /* not a file, or not ours to remove */
+    }
+    throw err
+  }
+}
+
+/** Codes a Windows scanner holding a file open answers with, briefly. */
+const TRANSIENT = new Set(['EPERM', 'EBUSY', 'EACCES'])
+
+function renameWithRetry(from: string, to: string): void {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      renameSync(from, to)
+      return
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code
+      if (attempt >= 8 || !code || !TRANSIENT.has(code)) throw err
+      // Under a second in all: long enough for a scan, short enough for a UI.
+      pause(25 * (attempt + 1))
+    }
+  }
+}
+
+/** Waits without returning to the event loop; the callers are synchronous. */
+function pause(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
 }
 
 /**
@@ -138,7 +199,7 @@ function readWithRetry(path: string): string {
       last = err
       const code = (err as NodeJS.ErrnoException).code
       if (code !== 'EBUSY' && code !== 'EPERM' && code !== 'EACCES') break
-      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100)
+      pause(100)
     }
   }
   throw new Error(

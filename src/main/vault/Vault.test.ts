@@ -84,6 +84,21 @@ describe('vault', () => {
     expect(vault.getSecret('host-1')).toBe('hunter2')
   })
 
+  /**
+   * An empty or cut-short file answered the password with a JSON parser's
+   * "Unexpected end of JSON input", which reads as a wrong password or a bug.
+   */
+  it('says the file is damaged, not the password wrong, and leaves it alone', async () => {
+    for (const contents of ['', '{"salt": "abc", "verif', '{"salt": 1}']) {
+      writeFileSync(FILE, contents, 'utf8')
+      const error = await vault.unlock(OLD).catch((err: Error) => err)
+      expect(error).not.toBeInstanceOf(WrongPasswordError)
+      expect((error as Error).message).toMatch(/vault file .* is damaged/)
+      expect(readFileSync(FILE, 'utf8')).toBe(contents)
+      expect(vault.status().unlocked).toBe(false)
+    }
+  })
+
   it('forgets a secret on request, and keeps the others', async () => {
     await vault.create(OLD)
     vault.setSecret('host-1', 'one')
