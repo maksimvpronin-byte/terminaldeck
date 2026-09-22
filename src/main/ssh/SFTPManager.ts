@@ -3,7 +3,7 @@ import { ScpShell } from './ScpShell'
 import type { Writable } from 'stream'
 import type { SFTPWrapper, Stats } from 'ssh2'
 import { readdir, mkdir, stat, lstat, readFile } from 'fs/promises'
-import { renameSync, rmSync } from 'fs'
+import { constants, copyFileSync, linkSync, renameSync, rmSync } from 'fs'
 import { randomBytes } from 'crypto'
 import { basename, dirname, join } from 'path'
 import { sshManager } from './SSHManager'
@@ -66,6 +66,39 @@ export function partialNameFor(path: string): string {
     parentOf(path),
     `.${baseNameOf(path)}.td-partial-${randomBytes(8).toString('hex')}`
   )
+}
+
+/** A download's destination was taken while the download was on its way. */
+export class DestinationAppeared extends Error {
+  constructor(readonly path: string) {
+    super(`${path} appeared during the download and was left alone`)
+  }
+}
+
+/**
+ * Puts a finished download at `dest` only if nothing is there.
+ *
+ * A rename would do it in one step, but a rename replaces, and a file that
+ * turned up at `dest` while the download ran — never seen by the plan, never
+ * asked about — went with it. A hard link is refused if the name is taken, and
+ * is as atomic as the rename; a copy made with COPYFILE_EXCL stands in on the
+ * drives that have no hard links (FAT, exFAT, some network shares).
+ */
+function placeWithoutReplacing(partial: string, dest: string): void {
+  try {
+    linkSync(partial, dest)
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'EEXIST') throw new DestinationAppeared(dest)
+    try {
+      copyFileSync(partial, dest, constants.COPYFILE_EXCL)
+    } catch (copyErr) {
+      if ((copyErr as NodeJS.ErrnoException).code === 'EEXIST') {
+        throw new DestinationAppeared(dest)
+      }
+      throw copyErr
+    }
+  }
+  rmSync(partial, { force: true })
 }
 
 /** The mode a copy on its way is kept at, whatever the file it becomes. */
@@ -299,7 +332,13 @@ class SFTPManager {
     connectionId: string,
     remotePath: string,
     localPath: string,
-    onProgress?: (transferred: number, total: number) => void
+    onProgress?: (transferred: number, total: number) => void,
+    /**
+     * Whether a file already at `localPath` may be replaced. False for one
+     * that was not there when the transfer was planned: if something takes
+     * the name meanwhile, it is kept and DestinationAppeared is thrown.
+     */
+    replace = true
   ): Promise<void> {
     const shell = this.getShell(connectionId)
     const sftp = shell ? undefined : await this.getSftp(connectionId)
@@ -328,7 +367,8 @@ class SFTPManager {
             (err) => (err ? reject(err) : resolve())
           )
         })
-      renameSync(partial, localPath)
+      if (replace) renameSync(partial, localPath)
+      else placeWithoutReplacing(partial, localPath)
     } catch (err) {
       // Nothing half-finished is left lying beside the file it failed to become.
       try {
@@ -921,7 +961,22 @@ class SFTPManager {
         // called C:\...\a.tx. It went unnoticed because that same call, being
         // recursive, made the real parent on the way past.
         await mkdir(dirname(item.destPath), { recursive: true })
-        await this.download(connectionId, item.sourcePath, item.destPath, report)
+        try {
+          // Replaced only where the plan found a file and was told to overwrite
+          // it; anything else is kept, and reported like any other change.
+          await this.download(
+            connectionId,
+            item.sourcePath,
+            item.destPath,
+            report,
+            conflicted.has(item.destPath)
+          )
+        } catch (err) {
+          if (!(err instanceof DestinationAppeared)) throw err
+          skipped++
+          changed.push(item.destPath)
+          continue
+        }
       }
       report(totalBytes, totalBytes)
       written++

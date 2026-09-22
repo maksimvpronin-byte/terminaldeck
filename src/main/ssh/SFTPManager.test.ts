@@ -83,6 +83,8 @@ function stubSession(
     newFileMode?: number
     /** Filled in: the mode each written file had when its first byte went in. */
     modeAtWrite?: Record<string, number>
+    /** Runs while a download is on its way, before it finishes. */
+    duringGet?: () => void
   } = {}
 ): SFTPWrapper {
   const move = (from: string, to: string): void => {
@@ -174,6 +176,7 @@ function stubSession(
       // The real one creates the file. The stub has to as well, or it cannot
       // say anything about what happens to it afterwards.
       writeFileSync(local, 'fetched', 'utf8')
+      opts.duringGet?.()
       cb(null)
     },
     mkdir(path: string, cb: (err?: Error | null) => void): void {
@@ -414,6 +417,52 @@ describe('running a transfer plan', () => {
     expect(result).toEqual({ written: 0, skipped: 1, changed: [] })
     expect(readFileSync(dest, 'utf8')).toBe('mine')
     expect(calls).toEqual([])
+  })
+
+  /**
+   * The destination is looked at just before the download starts, but the
+   * download takes a while — and the rename at the end replaced whatever had
+   * appeared at that name meanwhile, without a question ever having been put.
+   */
+  it('keeps a file that appeared at the destination while the download ran', async () => {
+    mkdirSync(localDir, { recursive: true })
+    const dest = join(localDir, 'report.pdf')
+    attach(
+      'conn',
+      stubSession(
+        [],
+        { '/srv/report.pdf': { size: 1024 } },
+        {
+          duringGet: () => writeFileSync(dest, 'saved by another program', 'utf8')
+        }
+      )
+    )
+
+    const result = await sftpManager.runPlan(
+      'conn',
+      plan('download', [item('/srv/report.pdf', dest)])
+    )
+
+    expect(result).toEqual({ written: 0, skipped: 1, changed: [dest] })
+    expect(readFileSync(dest, 'utf8')).toBe('saved by another program')
+    expect(readdirSync(localDir)).toEqual(['report.pdf'])
+  })
+
+  it('still replaces a file it was told to overwrite', async () => {
+    mkdirSync(localDir, { recursive: true })
+    const dest = join(localDir, 'a.txt')
+    writeFileSync(dest, 'mine', 'utf8')
+    attach('conn', stubSession([], { '/srv/a.txt': { size: 1024 } }))
+    const withConflict = plan('download', [item('/srv/a.txt', dest)])
+    withConflict.conflicts = [
+      { ...item('/srv/a.txt', dest), destSize: 4, destMtime: 0, reason: 'file' }
+    ]
+
+    const result = await sftpManager.runPlan('conn', withConflict, { [dest]: 'overwrite' })
+
+    expect(result).toEqual({ written: 1, skipped: 0, changed: [] })
+    expect(readFileSync(dest, 'utf8')).toBe('fetched')
+    expect(readdirSync(localDir)).toEqual(['a.txt'])
   })
 
   it('reports progress against the file it is moving', async () => {
