@@ -61,6 +61,16 @@ export function registerStoreHandlers(): void {
         (s) => sessionStore.saveSession(s)
       )
   )
+  /*
+   * Several new hosts at once, for an import — without passwords, which an
+   * import never has. They carry no vault references of their own, and any
+   * they arrive with are dropped: one would be another host's.
+   */
+  ipcMain.handle(IPC.storeSaveSessions, (_e, sessions: SessionProfile[]) =>
+    sessionStore.saveSessions(
+      sessions.map((s) => ({ ...s, secretRef: undefined, gatewaySecretRef: undefined }))
+    )
+  )
   ipcMain.handle(IPC.storeDeleteSession, (_e, id: string) => {
     // The credential goes with the host. Left behind it would sit in the vault
     // for good, since nothing points at it any more.

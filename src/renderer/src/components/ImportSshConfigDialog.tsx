@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { nanoid } from 'nanoid'
-import type { SessionProfile, SshConfigHost } from '../../../shared/types'
+import type { SshConfigHost } from '../../../shared/types'
+import { planSshImport, type SshImportProblem } from '../../../shared/sshImport'
 import { useStore } from '../state/store'
 import ModalBackdrop from './ModalBackdrop'
 import { useT } from '../i18n'
@@ -8,12 +9,14 @@ import { useT } from '../i18n'
 export default function ImportSshConfigDialog({ onClose }: { onClose: () => void }): JSX.Element {
   const t = useT()
   const sessions = useStore((s) => s.sessions)
-  const upsertSession = useStore((s) => s.upsertSession)
+  const groups = useStore((s) => s.groups)
+  const upsertSessions = useStore((s) => s.upsertSessions)
 
   const [hosts, setHosts] = useState<SshConfigHost[] | null>(null)
   const [picked, setPicked] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [problems, setProblems] = useState<SshImportProblem[]>([])
 
   useEffect(() => {
     window.td.importer
@@ -44,38 +47,19 @@ export default function ImportSshConfigDialog({ onClose }: { onClose: () => void
     if (!hosts) return
     setBusy(true)
     setError(null)
+    setProblems([])
     try {
       const chosen = hosts.filter((h) => picked.has(h.alias))
-      const now = Date.now()
-      // First pass: create every profile so ProxyJump can be linked afterwards.
-      const created = new Map<string, SessionProfile>()
-      for (const h of chosen) {
-        const profile: SessionProfile = {
-          id: nanoid(),
-          name: h.alias,
-          host: h.hostname,
-          // Only what the config actually stated; the rest is left to inherit.
-          port: h.port === 22 ? undefined : h.port,
-          username: h.user,
-          authMethod: h.identityFile ? 'privateKey' : 'agent',
-          privateKeyPath: h.identityFile,
-          groupId: null,
-          tags: ['ssh-config'],
-          logToFile: false,
-          portForwards: [],
-          createdAt: now,
-          updatedAt: now
-        }
-        created.set(h.alias, profile)
+      // Every route is checked before anything is written, and then everything
+      // is written at once: a failure halfway used to leave the first hosts
+      // saved — one of them pointing at a jump host that never was — and trying
+      // again added them a second time under new ids.
+      const plan = planSshImport(chosen, sessions, groups, nanoid, Date.now())
+      if (!plan.ok) {
+        setProblems(plan.problems)
+        return
       }
-      // Second pass: resolve ProxyJump against imported or already-saved profiles.
-      for (const h of chosen) {
-        if (!h.proxyJump) continue
-        const jumpAlias = h.proxyJump.replace(/^.*@/, '').split(':')[0]
-        const jump = created.get(jumpAlias) ?? sessions.find((s) => s.name === jumpAlias)
-        if (jump) created.get(h.alias)!.jumpHostId = jump.id
-      }
-      for (const profile of created.values()) await upsertSession(profile)
+      await upsertSessions(plan.profiles)
       onClose()
     } catch (err) {
       setError((err as Error).message)
@@ -122,6 +106,30 @@ export default function ImportSshConfigDialog({ onClose }: { onClose: () => void
           </>
         )}
 
+        {problems.length > 0 && (
+          <div className="error-text">
+            <p>
+              {t(
+                'Nothing was imported. These hosts go through jump hosts that are not here — tick them too, or untick these:'
+              )}
+            </p>
+            <ul>
+              {problems.map((p) => (
+                <li key={`${p.alias}-${p.hop}`}>
+                  {p.reason === 'missing'
+                    ? t('{alias}: its jump host {hop} is neither selected nor saved', {
+                        alias: p.alias,
+                        hop: p.hop
+                      })
+                    : t('{alias}: {hop} is not reached through the jump host before it', {
+                        alias: p.alias,
+                        hop: p.hop
+                      })}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {error && <span className="error-text">{error}</span>}
 
         <div className="modal-actions">

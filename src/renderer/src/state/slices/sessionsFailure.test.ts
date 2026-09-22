@@ -83,3 +83,32 @@ describe('deleting a selection', () => {
     expect(useStore.getState().sessions.map((s) => s.id)).toEqual(['b'])
   })
 })
+
+/**
+ * An import used to save its hosts one call at a time: a failure on the second
+ * left the first saved, and trying again added it a second time.
+ */
+describe('saving several new hosts at once', () => {
+  it('asks main once, and shows them all when it succeeds', async () => {
+    const calls: SessionProfile[][] = []
+    window.td.store.saveSessions = (sessions) => {
+      calls.push(sessions)
+      return Promise.resolve(sessions)
+    }
+
+    await useStore.getState().upsertSessions([host('c', 'one'), host('d', 'one')])
+
+    expect(calls).toHaveLength(1)
+    expect(useStore.getState().sessions.map((s) => s.id)).toEqual(['a', 'b', 'c', 'd'])
+  })
+
+  it('shows none of them when the save fails', async () => {
+    window.td.store.saveSessions = () => Promise.reject(new Error('disk full'))
+
+    await expect(
+      useStore.getState().upsertSessions([host('c', 'one'), host('d', 'one')])
+    ).rejects.toThrow('disk full')
+
+    expect(useStore.getState().sessions).toEqual(onDisk.sessions)
+  })
+})

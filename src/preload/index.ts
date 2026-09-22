@@ -74,6 +74,9 @@ const api = {
       gatewaySecret?: string | null
     ): Promise<SessionProfile> =>
       ipcRenderer.invoke(IPC.storeSaveSession, session, secret, gatewaySecret),
+    /** Several new hosts in one write, without passwords: all are kept, or none. */
+    saveSessions: (sessions: SessionProfile[]): Promise<SessionProfile[]> =>
+      ipcRenderer.invoke(IPC.storeSaveSessions, sessions),
     deleteSession: (id: string): Promise<void> => ipcRenderer.invoke(IPC.storeDeleteSession, id),
     /** Several hosts in one write, for a selection. */
     deleteSessions: (ids: string[]): Promise<void> =>

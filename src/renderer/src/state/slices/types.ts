@@ -76,6 +76,8 @@ export interface SessionsSlice {
     secret?: string | null,
     gatewaySecret?: string | null
   ) => Promise<void>
+  /** Several new hosts in one write, without passwords: all are kept, or none. */
+  upsertSessions: (sessions: SessionProfile[]) => Promise<void>
   removeSession: (id: string) => Promise<void>
   /** Several hosts in one write, for a selection. */
   removeSessions: (ids: string[]) => Promise<void>

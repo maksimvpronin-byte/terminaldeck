@@ -48,6 +48,14 @@ class SessionStore {
     return session
   }
 
+  /** Several hosts in one write: all of them are kept, or none. */
+  saveSessions(sessions: SessionProfile[]): SessionProfile[] {
+    this.doc.change((d) => {
+      for (const session of sessions) upsert(d.sessions, session)
+    })
+    return sessions
+  }
+
   /** The order the sidebar shows hosts in, saved as the array's own order. */
   reorderSessions(orderedIds: string[]): void {
     this.doc.change((d) => {

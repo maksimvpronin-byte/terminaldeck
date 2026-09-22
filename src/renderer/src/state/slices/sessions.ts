@@ -42,6 +42,18 @@ export const createSessionsSlice: StateCreator<AppState, [], [], SessionsSlice> 
     }))
   },
 
+  upsertSessions: async (sessions) => {
+    if (sessions.length === 0) return
+    const saved = await window.td.store.saveSessions(sessions)
+    const byId = new Map(saved.map((s) => [s.id, s]))
+    set((s) => ({
+      sessions: [
+        ...s.sessions.map((x) => byId.get(x.id) ?? x),
+        ...saved.filter((x) => !s.sessions.some((y) => y.id === x.id))
+      ]
+    }))
+  },
+
   removeSession: async (id) => {
     await window.td.store.deleteSession(id)
     set((s) => ({ sessions: s.sessions.filter((x) => x.id !== id) }))

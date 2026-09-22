@@ -913,6 +913,12 @@ export const ru: Record<string, string> = {
   'unchanged lines: {count}': 'неизменённых строк: {count}',
   '{count} more rows not drawn': 'ещё строк не отрисовано: {count}',
   'The two files are identical.': 'Файлы одинаковы.',
+  'Nothing was imported. These hosts go through jump hosts that are not here — tick them too, or untick these:':
+    'Ничего не импортировано. Эти хосты подключаются через jump-хосты, которых здесь нет — отметьте и их или снимите отметку с этих:',
+  '{alias}: its jump host {hop} is neither selected nor saved':
+    '{alias}: jump-хост {hop} не выбран и не сохранён',
+  '{alias}: {hop} is not reached through the jump host before it':
+    '{alias}: к {hop} нет пути через предыдущий jump-хост в цепочке',
   'The replacement ends with a line break; the file on the host does not.':
     'Новая версия заканчивается переводом строки, а файл на хосте — нет.',
   'The file on the host ends with a line break; the replacement does not.':

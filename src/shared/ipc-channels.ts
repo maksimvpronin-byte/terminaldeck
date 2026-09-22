@@ -16,6 +16,7 @@ export const IPC = {
   // Session store (groups + saved connections, metadata only)
   storeLoad: 'store:load',
   storeSaveSession: 'store:saveSession',
+  storeSaveSessions: 'store:saveSessions',
   storeDeleteSession: 'store:deleteSession',
   storeDeleteSessions: 'store:deleteSessions',
   storeReorderSessions: 'store:reorderSessions',
