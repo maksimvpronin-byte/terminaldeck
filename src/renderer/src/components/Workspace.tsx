@@ -73,7 +73,9 @@ export default function Workspace(): JSX.Element {
   function requestCloseWorkspace(id: string, title: string, tabCount: number): void {
     if (
       tabCount > 1 &&
-      confirmAction(`Close “${title}” and disconnect its ${tabCount} terminals?`) === false
+      confirmAction(
+        t('Close “{title}”? Its terminals will disconnect: {count}.', { title, count: tabCount })
+      ) === false
     ) {
       return
     }

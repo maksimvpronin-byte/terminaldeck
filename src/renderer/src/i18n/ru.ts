@@ -1199,5 +1199,16 @@ export const ru: Record<string, string> = {
   'A locked app opens nothing new: no session, no desktop, no remote file listing':
     'Заблокированное приложение ничего не открывает: ни сессию, ни рабочий стол, ни список удалённых файлов',
   'Open sessions stay connected behind the lock, and the keyboard cannot reach them':
-    'Открытые сессии остаются подключёнными за блокировкой, и клавиатура до них не достаёт'
+    'Открытые сессии остаются подключёнными за блокировкой, и клавиатура до них не достаёт',
+  // Confirmations for deleting hosts and groups, and closing a workspace.
+  'Delete “{name}”?': 'Удалить «{name}»?',
+  'Delete these hosts: {count}?': 'Удалить эти хосты: {count}?',
+  'This cannot be undone.': 'Это действие нельзя отменить.',
+  'Delete the group “{name}”?': 'Удалить группу «{name}»?',
+  'Its hosts move up a level and are kept: {count}.':
+    'Её хосты переместятся на уровень выше и сохранятся: {count}.',
+  'Hosts mirrored from git go with it, along with the local settings and passwords kept for them: {count}.':
+    'Хосты из git удаляются вместе с ней, как и сохранённые для них локальные настройки и пароли: {count}.',
+  'Close “{title}”? Its terminals will disconnect: {count}.':
+    'Закрыть «{title}»? Терминалы будут отключены: {count}.'
 }

@@ -374,9 +374,11 @@ export default function Sidebar({
       .map((id) => sessions.find((s) => s.id === id)?.name)
       .filter((n): n is string => Boolean(n))
     if (names.length === 0) return
-    const what =
-      names.length === 1 ? `“${names[0]}”` : `${names.length} hosts:\n\n${names.join('\n')}`
-    if (!confirmAction(`Delete ${what}?\n\nThis cannot be undone.`)) return
+    const question =
+      names.length === 1
+        ? t('Delete “{name}”?', { name: names[0] })
+        : `${t('Delete these hosts: {count}?', { count: names.length })}\n\n${names.join('\n')}`
+    if (!confirmAction(`${question}\n\n${t('This cannot be undone.')}`)) return
     await removeSessions(doomed)
     clearHostSelection()
   }
@@ -691,15 +693,19 @@ export default function Sidebar({
           // says so. Mirrored ones do not: they exist because this folder
           // mirrors a repository, and go with it.
           const moved = savedSessions.filter((s) => s.groupId === groupId).length
-          const note = moved > 0 ? `\n\nIts ${moved} host(s) move up a level; nothing is lost.` : ''
+          const note =
+            moved > 0
+              ? `\n\n${t('Its hosts move up a level and are kept: {count}.', { count: moved })}`
+              : ''
           const mirroredCount = group?.git
             ? (gitTrees.find((tree) => tree.groupId === groupId)?.sessions.length ?? 0)
             : 0
           const gitNote =
             mirroredCount > 0
-              ? `\n\nThe ${mirroredCount} host(s) mirrored from git go with it, along with the local settings and passwords kept for them.`
+              ? `\n\n${t('Hosts mirrored from git go with it, along with the local settings and passwords kept for them: {count}.', { count: mirroredCount })}`
               : ''
-          if (confirmAction(`Delete the group “${group?.name ?? ''}”?${note}${gitNote}`)) {
+          const question = t('Delete the group “{name}”?', { name: group?.name ?? '' })
+          if (confirmAction(`${question}${note}${gitNote}`)) {
             removeGroup(groupId)
           }
         }
