@@ -5,6 +5,7 @@ import { existsSync } from 'fs'
 import { join } from 'path'
 import { ADHOC_MARKER, canReplaceItself } from '../shared/adhocSigned'
 import { IPC } from '../shared/ipc-channels'
+import { stateForRelease } from '../shared/updateState'
 import type { UpdateState } from '../shared/types'
 
 /**
@@ -105,12 +106,13 @@ export function registerUpdater(win: BrowserWindow): void {
 
   autoUpdater.on('update-available', (info) => {
     // A build that cannot replace itself still says a version is out; it just
-    // offers the downloads rather than an install that cannot finish.
-    if (selfUpdating()) publish({ status: 'available', version: info.version })
-    else publish({ status: 'manual', version: info.version })
+    // offers the downloads rather than an install that cannot finish. And a
+    // release already being fetched, or fetched, stays where it has got to.
+    const next = stateForRelease(state, info.version, selfUpdating())
+    if (next !== state) publish(next)
   })
   autoUpdater.on('update-not-available', () => {
-    publish({ status: 'idle' })
+    if (state.status !== 'ready') publish({ status: 'idle' })
   })
   autoUpdater.on('download-progress', (p) => {
     publish({ status: 'downloading', percent: Math.round(p.percent) })
@@ -118,14 +120,18 @@ export function registerUpdater(win: BrowserWindow): void {
   autoUpdater.on('update-downloaded', (info) => {
     publish({ status: 'ready', version: info.version })
   })
-  autoUpdater.on('error', (err) => {
-    publish({ status: 'error', message: err.message })
-  })
+  /*
+   * A check that fails says nothing about an update already downloaded: it is
+   * on disk, and installing it needs no network. Reported over it, the error
+   * took away the only button that installs it.
+   */
+  const failed = (err: Error): void => {
+    if (state.status !== 'ready') publish({ status: 'error', message: err.message })
+  }
+  autoUpdater.on('error', failed)
 
   const ask = (): void => {
-    autoUpdater.checkForUpdates().catch((err: Error) => {
-      publish({ status: 'error', message: err.message })
-    })
+    autoUpdater.checkForUpdates().catch(failed)
   }
 
   ask()
