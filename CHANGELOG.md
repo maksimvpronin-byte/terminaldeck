@@ -6,6 +6,36 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.19.2
+
+### Fixed
+
+- **"Edit locally" could run the file instead of opening it.** With no editor
+  set, the copy went to whatever the system opens that kind of file with, and
+  on Windows that runs a `.cmd`, `.js` or `.py` fetched from the server. It now
+  opens in Notepad on Windows and in the default text editor on macOS.
+- **An upload's new contents were briefly readable by others.** The copy that
+  goes up beside a file before replacing it took the server's default
+  permissions and was given the file's own only once complete, so the new
+  contents of a private file could be read by others for the length of the
+  transfer. The copy is now private from its first byte, under a name nobody
+  can guess in advance. A new file copied from one host to another no longer
+  comes out writable by everyone.
+- **A download could replace a file that appeared while it ran.** A file saved
+  at the destination by another program during the download was overwritten
+  without a question. It is now kept, and the download reports it as changed.
+- **Compare called two files identical when one lacked the final line
+  break.** The difference is now reported.
+- **Files copied from a desktop could land on the clipboard after you had
+  left it.** A transfer that ends while its pane is hidden, or the window is in
+  the background, now waits and is put on the clipboard when you come back.
+
+### Changed
+
+- **Copying files out of a desktop is faster on a distant server.** Several
+  pieces of a file are requested at once rather than one per round trip,
+  which had capped a transfer at about 1.25 MB/s on a 50 ms link.
+
 ## 0.19.1
 
 ### Changed
