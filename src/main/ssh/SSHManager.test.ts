@@ -343,6 +343,27 @@ describe('what is said before the window is listening', () => {
     ])
   })
 
+  /**
+   * The tunnels are brought up by the connect handler after the shell opens and
+   * before the id goes back. It wrote to the window itself, past this queue, so
+   * the message was lost every time.
+   */
+  it('holds a failed tunnel reported from outside until the window speaks', () => {
+    const sent: Sent[] = []
+    const win = stubWindow(sent)
+    const { conn } = stubConnection('c-tunnel')
+    conn.ready = false
+    attach('c-tunnel', conn)
+
+    sshManager.reportError(win as never, 'c-tunnel', 'tunnel 8080 failed: address in use')
+    expect(sent).toEqual([])
+
+    sshManager.markReady(win as never, 'c-tunnel')
+    expect(sent).toEqual([
+      { channel: 'ssh:error:c-tunnel', payload: 'tunnel 8080 failed: address in use' }
+    ])
+  })
+
   it('says nothing twice when the window speaks again', () => {
     const sent: Sent[] = []
     const win = stubWindow(sent)
@@ -355,6 +376,45 @@ describe('what is said before the window is listening', () => {
     sshManager.markReady(win as never, 'c-twice')
 
     expect(sent).toHaveLength(1)
+  })
+})
+
+/**
+ * The shell reports its directory as raw UTF-8, and SSH delivers it in reads of
+ * whatever size — a read can end in the middle of a character.
+ */
+describe('following the shell into a folder with a non-ASCII name', () => {
+  it('keeps a character split between two reads whole', async () => {
+    const { EventEmitter } = await import('events')
+    const sent: Sent[] = []
+    const win = stubWindow(sent)
+    const stream = Object.assign(new EventEmitter(), {
+      stderr: new EventEmitter(),
+      write: (): boolean => true,
+      close: (): void => undefined
+    })
+    const target = Object.assign(new EventEmitter(), {
+      shell: (_opts: unknown, cb: (err: undefined, s: unknown) => void): void =>
+        cb(undefined, stream)
+    })
+    const opened = (
+      sshManager as unknown as {
+        openShell: (...args: unknown[]) => Promise<void>
+      }
+    ).openShell(win, 'c-cyr', target, [target], 80, 24)
+    await opened
+    sshManager.setFollowCwd('c-cyr', true)
+    sshManager.markReady(win as never, 'c-cyr')
+
+    const sequence = Buffer.from('\u001b]7;file://host/home/отчёты\u001b\\', 'utf8')
+    // Inside the two bytes of "ч".
+    const cut = sequence.indexOf(Buffer.from('ч', 'utf8')) + 1
+    stream.emit('data', sequence.subarray(0, cut))
+    stream.emit('data', sequence.subarray(cut))
+
+    const cwd = sent.filter((s) => s.channel === 'ssh:cwd:c-cyr').map((s) => s.payload)
+    expect(cwd).toEqual(['/home/отчёты'])
+    sshManager.disconnect('c-cyr')
   })
 })
 

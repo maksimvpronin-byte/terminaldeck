@@ -4,6 +4,7 @@ import { createWriteStream, existsSync, mkdirSync, type WriteStream } from 'fs'
 import { readFileSync } from 'fs'
 import { userInfo } from 'os'
 import { join } from 'path'
+import { StringDecoder } from 'string_decoder'
 import type { Readable } from 'stream'
 import { app, BrowserWindow } from 'electron'
 import type {
@@ -72,14 +73,6 @@ interface LiveConnection {
 const OPENSSH_PIPE = '\\\\.\\pipe\\openssh-ssh-agent'
 
 /**
- * How long output is allowed to sit before it is handed to the renderer.
- *
- * A busy shell emits dozens of small chunks a second, and one IPC message each
- * costs more than the bytes do. Eight milliseconds is under half a frame, so a
- * keystroke echo still arrives on the next paint, while `cat` on a large file
- * becomes a handful of large writes instead of thousands of small ones.
- */
-/**
  * How long a connection holds its first words for a window that has not spoken.
  *
  * Generous on purpose: the cost of waiting is a greeting that arrives late, and
@@ -87,6 +80,14 @@ const OPENSSH_PIPE = '\\\\.\\pipe\\openssh-ssh-agent'
  */
 const READY_GRACE_MS = 5000
 
+/**
+ * How long output is allowed to sit before it is handed to the renderer.
+ *
+ * A busy shell emits dozens of small chunks a second, and one IPC message each
+ * costs more than the bytes do. Eight milliseconds is under half a frame, so a
+ * keystroke echo still arrives on the next paint, while `cat` on a large file
+ * becomes a handful of large writes instead of thousands of small ones.
+ */
 const FLUSH_INTERVAL_MS = 8
 
 /** Enough held up already: send it now rather than waiting out the interval. */
@@ -656,6 +657,18 @@ class SSHManager {
   }
 
   /**
+   * Tells a session's pane about a failure beside the shell — a tunnel that
+   * would not come up, say.
+   *
+   * Through the same queue as everything else the session says. Those tunnels
+   * are started before `connect` has handed the id back, so a message sent
+   * straight to the window went to a channel nobody could be listening on yet.
+   */
+  reportError(win: BrowserWindow, connectionId: string, message: string): void {
+    this.send(win, connectionId, IPC.sshError, message)
+  }
+
+  /**
    * The window has subscribed; everything held for it goes now, in order.
    *
    * Called again for a connection already running is a no-op, and called for
@@ -671,11 +684,11 @@ class SSHManager {
     conn.ready = true
     const held = conn.pending
     conn.pending = []
+    this.closing.delete(connectionId)
     if (win.isDestroyed()) return
     for (const { channel, payload } of held) {
       win.webContents.send(`${channel}:${connectionId}`, payload)
     }
-    this.closing.delete(connectionId)
   }
 
   /**
@@ -924,6 +937,14 @@ class SSHManager {
 
       let pending = ''
       let lastCwd: string | undefined
+      /*
+       * One decoder for the life of the channel, not `toString` per chunk. The
+       * setup line prints $PWD as raw UTF-8, and a read that ended inside a
+       * character — any Cyrillic or accented folder name, sooner or later —
+       * gave the panel a path with U+FFFD in it and a folder that does not
+       * exist.
+       */
+      const utf8 = new StringDecoder('utf8')
 
       diag(
         'ssh',
@@ -944,7 +965,7 @@ class SSHManager {
           this.writeLog(win, connection, data)
         }
         if (!connection.followCwd) return
-        const scan = scanOsc7(pending + raw.toString('utf8'))
+        const scan = scanOsc7(pending + utf8.write(raw))
         pending = scan.rest
         if (scan.path && scan.path !== lastCwd) {
           lastCwd = scan.path

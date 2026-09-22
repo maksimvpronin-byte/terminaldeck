@@ -73,12 +73,11 @@ export function registerSshHandlers(): void {
         try {
           await portForwardManager.start(connectionId, rule)
         } catch (err) {
-          if (!win.isDestroyed()) {
-            win.webContents.send(
-              `${IPC.sshError}:${connectionId}`,
-              `tunnel ${describeRule(rule)} failed: ${(err as Error).message}`
-            )
-          }
+          sshManager.reportError(
+            win,
+            connectionId,
+            `tunnel ${describeRule(rule)} failed: ${(err as Error).message}`
+          )
         }
       }
       return { connectionId }
