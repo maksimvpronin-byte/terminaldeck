@@ -4,6 +4,7 @@ import type { Writable } from 'stream'
 import type { SFTPWrapper, Stats } from 'ssh2'
 import { readdir, mkdir, stat, lstat, readFile } from 'fs/promises'
 import { renameSync, rmSync } from 'fs'
+import { randomBytes } from 'crypto'
 import { basename, dirname, join } from 'path'
 import { sshManager } from './SSHManager'
 import { localChild } from '../localName'
@@ -55,9 +56,48 @@ function lstatRaw(sftp: SFTPWrapper, path: string): Promise<Stats | null> {
 /**
  * A hidden name beside `path` for a copy still on its way there. Beside it and
  * not in /tmp, because a rename only replaces a file within one filesystem.
+ *
+ * Random rather than counted. The name used to be the process id and a
+ * counter, which anyone else who can write to the directory could guess and
+ * put a link at before the upload arrived.
  */
-export function partialNameFor(path: string, n: number): string {
-  return joinRemote(parentOf(path), `.${baseNameOf(path)}.td-partial-${process.pid}-${n}`)
+export function partialNameFor(path: string): string {
+  return joinRemote(
+    parentOf(path),
+    `.${baseNameOf(path)}.td-partial-${randomBytes(8).toString('hex')}`
+  )
+}
+
+/** The mode a copy on its way is kept at, whatever the file it becomes. */
+const PARTIAL_MODE = 0o600
+
+/**
+ * Creates `path` for this upload alone and closes it to everyone else.
+ *
+ * Exclusively, so a name somebody else put down first is refused rather than
+ * written through. The server's own mode for a new file is read before the
+ * copy is narrowed to its owner, and returned: that is the mode a file that
+ * did not exist before is given at the end, as it always was. Undefined where
+ * the server would not say.
+ *
+ * The copy used to be created with whatever the server's umask allowed, and
+ * given the protected file's mode only once every byte was in — so for the
+ * length of the transfer, the new contents of a 0600 file were readable by
+ * anyone who could read the directory.
+ */
+function createPrivately(sftp: SFTPWrapper, path: string): Promise<number | undefined> {
+  return new Promise((resolve, reject) => {
+    sftp.open(path, 'wx', (err, handle) => {
+      if (err) return reject(err)
+      const close = (mode: number | undefined): void => sftp.close(handle, () => resolve(mode))
+      sftp.fstat(handle, (statErr, stats) => {
+        const mode = statErr ? undefined : stats.mode & 0o7777
+        // Nothing has been written yet, so a server that refuses is no worse
+        // off than before; the transfer still sets the mode itself.
+        sftp.fchmod(handle, PARTIAL_MODE, () => close(mode))
+      })
+    })
+  })
 }
 
 /**
@@ -321,7 +361,10 @@ class SFTPManager {
           sftp.fastPut(
             localPath,
             target,
-            { step: (transferred, _chunk, total) => onProgress?.(transferred, total) },
+            {
+              mode: PARTIAL_MODE,
+              step: (transferred, _chunk, total) => onProgress?.(transferred, total)
+            },
             (err) => (err ? reject(err) : resolve())
           )
         })
@@ -375,11 +418,18 @@ class SFTPManager {
     if (existing?.isDirectory()) throw new Error(`Refusing to write over the directory ${target}`)
 
     const n = this.nextTransfer++
-    const partial = partialNameFor(target, n)
+    const partial = partialNameFor(target)
+    let created = false
     let moved = false
     try {
+      const newFileMode = await createPrivately(sftp, partial)
+      created = true
       await write(partial)
       if (!existing) {
+        // What a new file here has always been given, not the copy's 0600.
+        if (newFileMode !== undefined) {
+          await sftpCall((cb) => sftp.chmod(partial, newFileMode, cb))
+        }
         await sftpCall((cb) => sftp.rename(partial, target, cb)).catch((err: Error) => {
           throw new Error(
             `${target} could not be put in place (${err.message}). If something appeared there during the transfer, it was left alone.`
@@ -416,7 +466,10 @@ class SFTPManager {
       // The new file is in place; the old one is a hidden leftover at worst.
       await sftpCall((cb) => sftp.unlink(aside, cb)).catch(() => undefined)
     } finally {
-      if (!moved) await sftpCall((cb) => sftp.unlink(partial, cb)).catch(() => undefined)
+      // Only a copy this upload made: a name that was refused is someone else's.
+      if (created && !moved) {
+        await sftpCall((cb) => sftp.unlink(partial, cb)).catch(() => undefined)
+      }
     }
   }
 
@@ -514,7 +567,10 @@ class SFTPManager {
           write =
             dstSftp instanceof ScpShell
               ? dstSftp.createWriteStream(target, total, destinationMode)
-              : dstSftp.createWriteStream(target)
+              : // Kept to its owner until it is in place. The default here is
+                // 0666, applied with fchmod and so past the umask: a new file
+                // relayed to a host came out writable by everyone on it.
+                dstSftp.createWriteStream(target, { mode: PARTIAL_MODE })
           write.on('error', fail)
           // 'close', not 'finish': ssh2 emits it once the remote handle is really
           // closed, and resolving earlier races whatever reads the file next.

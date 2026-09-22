@@ -59,7 +59,7 @@ interface Entry {
 }
 
 /** Where a partial name put down for `path` would be, by its prefix. */
-const PARTIAL = /\/\.[^/]+\.td-partial-\d+-\d+$/
+const PARTIAL = /\/\.[^/]+\.td-partial-[0-9a-f]+$/
 
 /**
  * A stand-in for one host's SFTP session. `entries` is what it claims to
@@ -79,6 +79,10 @@ function stubSession(
     failChown?: boolean
     /** A server that does not offer posix-rename@openssh.com. */
     noPosixRename?: boolean
+    /** The mode a new file is created with, which is the server's umask speaking. */
+    newFileMode?: number
+    /** Filled in: the mode each written file had when its first byte went in. */
+    modeAtWrite?: Record<string, number>
   } = {}
 ): SFTPWrapper {
   const move = (from: string, to: string): void => {
@@ -94,20 +98,43 @@ function stubSession(
     realpath(path: string, cb: (err: Error | null, resolved?: string) => void): void {
       cb(null, entries[path]?.link ?? path)
     },
+    /*
+     * Opening creates the file with the server's mode for a new one; an
+     * exclusive open of a name that is taken fails, as SSH_FX_FAILURE does.
+     */
+    open(path: string, flags: string, cb: (err: Error | null, handle?: Buffer) => void): void {
+      if (flags.includes('x') && entries[path]) return cb(new Error('Failure'))
+      entries[path] = { size: 0, mode: opts.newFileMode ?? 0o644, uid: 0 }
+      cb(null, Buffer.from(path))
+    },
+    fstat(handle: Buffer, cb: (err: Error | null, stats?: { mode: number }) => void): void {
+      cb(null, { mode: 0o100000 | (entries[handle.toString()]?.mode ?? 0) })
+    },
+    fchmod(handle: Buffer, mode: number, cb: (err?: Error | null) => void): void {
+      const entry = entries[handle.toString()]
+      if (entry) entry.mode = mode
+      cb(null)
+    },
+    close(_handle: Buffer, cb: (err?: Error | null) => void): void {
+      cb(null)
+    },
     fastPut(
       local: string,
       remote: string,
-      transfer: { step?: (t: number, chunk: number, total: number) => void },
+      transfer: { mode?: number; step?: (t: number, chunk: number, total: number) => void },
       cb: (err?: Error | null) => void
     ): void {
       calls.push({ op: 'fastPut', path: local, to: remote })
+      // ssh2 opens the destination and applies `mode` before the first byte.
+      const mode = transfer.mode ?? entries[remote]?.mode ?? opts.newFileMode ?? 0o644
+      if (opts.modeAtWrite) opts.modeAtWrite[remote] = mode
       transfer.step?.(512, 512, 1024)
       if (opts.failWrite) {
-        entries[remote] = { size: 512, mode: 0o600, uid: 0 }
+        entries[remote] = { size: 512, mode, uid: 0 }
         cb(new Error('Connection lost'))
         return
       }
-      entries[remote] = { size: 1024, mode: 0o600, uid: 0 }
+      entries[remote] = { size: 1024, mode, uid: 0 }
       cb(null)
     },
     rename(from: string, to: string, cb: (err?: Error | null) => void): void {
@@ -195,8 +222,11 @@ function stubSession(
      * its sides are done. Nothing reads the far side of a PassThrough here, so
      * one would finish, never close, and hang the transfer.
      */
-    createWriteStream(path: string): Writable {
+    createWriteStream(path: string, options?: { mode?: number }): Writable {
       calls.push({ op: 'write', path })
+      // Opened, then fchmod to `mode`: 0666 when none is given, as in ssh2.
+      const mode = options?.mode ?? 0o666
+      if (opts.modeAtWrite) opts.modeAtWrite[path] = mode
       const chunks: Buffer[] = []
       return new Writable({
         write(chunk: Buffer, _encoding, cb: (err?: Error | null) => void): void {
@@ -205,7 +235,7 @@ function stubSession(
         },
         final(cb: (err?: Error | null) => void): void {
           if (opts.received) opts.received[path] = Buffer.concat(chunks).toString('utf8')
-          entries[path] = { size: Buffer.concat(chunks).length }
+          entries[path] = { size: Buffer.concat(chunks).length, mode }
           cb()
         }
       })
@@ -502,6 +532,84 @@ describe('replacing a remote file', () => {
     expect(entries['/srv/app.conf']).toEqual({ size: 4096, mode: 0o640, uid: 33 })
     expect(calls.some((c) => c.op === 'fastPut' && c.to === '/srv/app.conf')).toBe(false)
     expect(Object.keys(entries).filter((k) => PARTIAL.test(k))).toEqual([])
+  })
+
+  /**
+   * The copy used to take whatever the server's umask allowed and be given the
+   * protected file's mode only after its last byte: for the whole transfer, the
+   * new contents of a 0600 file sat beside it readable by everyone.
+   */
+  it('keeps the new contents of a protected file to its owner while they go up', async () => {
+    const calls: Call[] = []
+    const modeAtWrite: Record<string, number> = {}
+    const entries: Record<string, Entry> = {
+      '/srv': { dir: true },
+      '/srv/secret.env': { size: 4096, mode: 0o600, uid: 0 }
+    }
+    attach('conn', stubSession(calls, entries, { newFileMode: 0o644, modeAtWrite }))
+
+    await sftpManager.runPlan('conn', overwriting('/srv/secret.env'), {
+      '/srv/secret.env': 'overwrite'
+    })
+
+    const [partial] = Object.keys(modeAtWrite)
+    expect(partial).toMatch(PARTIAL)
+    expect(modeAtWrite[partial]).toBe(0o600)
+    expect(entries['/srv/secret.env'].mode).toBe(0o600)
+  })
+
+  it('gives a new file the mode the server gives new files, not the copy’s', async () => {
+    const calls: Call[] = []
+    const modeAtWrite: Record<string, number> = {}
+    const entries: Record<string, Entry> = { '/srv': { dir: true } }
+    attach('conn', stubSession(calls, entries, { newFileMode: 0o664, modeAtWrite }))
+
+    await sftpManager.runPlan('conn', plan('upload', [item('/local/site.css', '/srv/site.css')]))
+
+    expect(Object.values(modeAtWrite)).toEqual([0o600])
+    expect(entries['/srv/site.css'].mode).toBe(0o664)
+  })
+
+  /** A name somebody else put down first is theirs: not written through, not removed. */
+  it('refuses a partial name that is already taken and leaves it alone', async () => {
+    const entries: Record<string, Entry> = { '/srv': { dir: true } }
+    const session = stubSession([], entries)
+    type Open = (path: string, flags: string, cb: (err: Error | null) => void) => void
+    const stub = session as unknown as { open: Open }
+    const open = stub.open
+    // Somebody else gets to the name between choosing it and opening it.
+    stub.open = (path, flags, cb) => {
+      entries[path] = { size: 7, mode: 0o666, uid: 1000 }
+      open(path, flags, cb)
+    }
+    attach('conn', session)
+
+    await expect(
+      sftpManager.runPlan('conn', plan('upload', [item('/local/a', '/srv/a')]))
+    ).rejects.toThrow(/failure/i)
+
+    const leftovers = Object.keys(entries).filter((k) => PARTIAL.test(k))
+    expect(leftovers).toHaveLength(1)
+    expect(entries[leftovers[0]]).toEqual({ size: 7, mode: 0o666, uid: 1000 })
+    expect(entries['/srv/a']).toBeUndefined()
+  })
+
+  /** ssh2's write stream sets 0666 with fchmod, past the umask, unless told otherwise. */
+  it('does not leave a new relayed file writable by everyone', async () => {
+    const calls: Call[] = []
+    const entries: Record<string, Entry> = { '/dst': { dir: true } }
+    attach('src', stubSession(calls, { '/src/a': { size: 8 } }))
+    attach('dst', stubSession(calls, entries, { newFileMode: 0o644 }))
+
+    await sftpManager.runPlan(
+      'src',
+      plan('relay', [item('/src/a', '/dst/a')]),
+      {},
+      undefined,
+      'dst'
+    )
+
+    expect(entries['/dst/a'].mode).toBe(0o644)
   })
 
   it('replaces a file on a server without posix-rename by moving the original aside', async () => {

@@ -14,7 +14,7 @@ import type { BrowserWindow } from 'electron'
  * files happens long before the application exits.
  */
 
-const openPath = vi.fn(async (): Promise<string> => '')
+const openPath = vi.fn(async (_path: string): Promise<string> => '')
 const spawned: { program: string; args: string[] }[] = []
 
 vi.mock('electron', () => ({

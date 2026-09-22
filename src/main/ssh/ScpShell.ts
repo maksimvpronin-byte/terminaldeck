@@ -4,6 +4,7 @@ import { pipeline } from 'stream/promises'
 import { createWriteStream } from 'fs'
 import { open } from 'fs/promises'
 import { posix } from 'path'
+import { randomBytes } from 'crypto'
 import type { SftpEntry } from '../../shared/types'
 
 /** Shell paths are data, including quotes, newlines and leading dashes. */
@@ -395,7 +396,9 @@ export class ScpShell {
 
     const partial = posix.join(
       posix.dirname(target),
-      `.${posix.basename(target)}.td-partial-${process.pid}-${ScpShell.nextPartial++}`
+      // Random, as in SFTPManager.partialNameFor: a counted name could be guessed
+      // and a link put there first, which `scp -t` would then write through.
+      `.${posix.basename(target)}.td-partial-${randomBytes(8).toString('hex')}`
     )
     const [p, d] = [pathArg(partial), pathArg(target)]
     let moved = false
@@ -422,7 +425,6 @@ export class ScpShell {
     }
   }
 
-  private static nextPartial = 0
   close(): void {
     this.closed = true
     for (const channel of this.channels) channel.destroy()
