@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { TransferDecisions, TransferPlan } from '../../../shared/types'
 import { useT } from '../i18n'
 
@@ -41,7 +41,14 @@ export function useTransfers({
    */
   outcome: string | null
   dismissOutcome: () => void
-  run: (plan: TransferPlan, source?: string) => Promise<void>
+  /**
+   * Runs a plan once the ones before it are done, asking first about anything
+   * it would overwrite. Resolves when it has run, or been cancelled or dropped
+   * — so a loop over several plans runs each in turn. `madeOn` is the
+   * connection the plan was made on; a plan whose turn comes after the panel
+   * moved to another connection is dropped.
+   */
+  run: (plan: TransferPlan, source?: string, madeOn?: string) => Promise<void>
   confirm: (decisions: TransferDecisions) => Promise<void>
   cancel: () => void
 } {
@@ -50,6 +57,22 @@ export function useTransfers({
   const [transferring, setTransferring] = useState(false)
   const [progressKey, setProgressKey] = useState(0)
   const [outcome, setOutcome] = useState<string | null>(null)
+  /*
+   * Read when a plan's turn comes, not when it was queued: the panel may have
+   * moved to another connection in between, and the closure would not know.
+   */
+  const connectionRef = useRef(connectionId)
+  connectionRef.current = connectionId
+  /** Ends the wait of the plan the conflict dialog is asking about. */
+  const settleRef = useRef<(() => void) | null>(null)
+  /** Plans run one after another, in the order they were asked for. */
+  const queueRef = useRef<Promise<void>>(Promise.resolve())
+
+  function settle(): void {
+    const done = settleRef.current
+    settleRef.current = null
+    done?.()
+  }
 
   /*
    * A plan belongs to the connection it was made on. The panel can be pointed
@@ -60,6 +83,7 @@ export function useTransfers({
   useEffect(() => {
     setPending(null)
     setOutcome(null)
+    settle()
   }, [connectionId])
 
   /**
@@ -72,6 +96,7 @@ export function useTransfers({
     decisions: TransferDecisions,
     source?: string
   ): Promise<void> {
+    const connectionId = connectionRef.current
     if (!connectionId) return
     setPending(null)
     setOutcome(null)
@@ -105,22 +130,43 @@ export function useTransfers({
    * afresh — no answer is remembered between transfers, so a decision made once
    * in a hurry never governs a later copy.
    */
-  async function run(plan: TransferPlan, source?: string): Promise<void> {
+  function run(plan: TransferPlan, source?: string, madeOn?: string): Promise<void> {
+    const turn = queueRef.current.then(() => runOne(plan, source, madeOn))
+    queueRef.current = turn.catch(() => undefined)
+    return turn
+  }
+
+  /*
+   * This used to return as soon as the conflict dialog opened. A batch looping
+   * over its items then went straight on to the next, whose plan replaced the
+   * one being asked about: of two files with conflicts only the second was ever
+   * copied, and the first was skipped without a word.
+   */
+  async function runOne(plan: TransferPlan, source?: string, madeOn?: string): Promise<void> {
+    const connectionId = connectionRef.current
     if (plan.items.length === 0 || !connectionId) return
+    if (madeOn && madeOn !== connectionId) return
     if (plan.conflicts.length === 0 && plan.collisions.length === 0) {
       await execute(plan, {}, source)
       return
     }
-    setPending({ plan, source, connectionId })
+    await new Promise<void>((resolve) => {
+      settleRef.current = resolve
+      setPending({ plan, source, connectionId })
+    })
   }
 
   async function confirm(decisions: TransferDecisions): Promise<void> {
     if (!pending) return
-    if (pending.connectionId !== connectionId) {
-      setPending(null)
-      return
+    try {
+      if (pending.connectionId !== connectionRef.current) {
+        setPending(null)
+        return
+      }
+      await execute(pending.plan, decisions, pending.source)
+    } finally {
+      settle()
     }
-    await execute(pending.plan, decisions, pending.source)
   }
 
   return {
@@ -132,6 +178,9 @@ export function useTransfers({
     dismissOutcome: () => setOutcome(null),
     run,
     confirm,
-    cancel: () => setPending(null)
+    cancel: () => {
+      setPending(null)
+      settle()
+    }
   }
 }

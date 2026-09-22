@@ -424,7 +424,11 @@ export default function SftpPanel({
       // Sequential on purpose: fastPut on one SFTP channel dislikes concurrent
       // writers, and one dialog per dropped item is clearer than one merged.
       for (const localPath of localPaths.filter(Boolean)) {
-        await transfers.run(await window.td.sftp.planUpload(connectionId, localPath, destination))
+        await transfers.run(
+          await window.td.sftp.planUpload(connectionId, localPath, destination),
+          undefined,
+          connectionId
+        )
       }
     } catch (err) {
       setError((err as Error).message)
@@ -452,7 +456,8 @@ export default function SftpPanel({
             connectionId,
             destination
           ),
-          payload.connectionId
+          payload.connectionId,
+          connectionId
         )
       }
     } catch (err) {
@@ -478,7 +483,9 @@ export default function SftpPanel({
               entry.path,
               `${localPath}/${entry.name}`
             )
-          : await window.td.sftp.planDownload(connectionId, entry.path, localPath, true)
+          : await window.td.sftp.planDownload(connectionId, entry.path, localPath, true),
+        undefined,
+        connectionId
       )
     } catch (err) {
       setError((err as Error).message)
