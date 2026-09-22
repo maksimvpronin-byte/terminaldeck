@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, beforeEach } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { SftpEntry } from '../../../shared/types'
 import { SFTP_DRAG, endDrag } from '../state/sftpDrag'
@@ -118,5 +118,40 @@ describe('dragging rows out of the file panel', () => {
     fireEvent.dragStart(await row('.profile'), { dataTransfer: transfer })
 
     expect(JSON.parse(transfer.data[SFTP_DRAG]).paths).toEqual(['/home/u/.profile'])
+  })
+})
+
+/**
+ * A typed path is resolved by the server before the panel goes there, and a
+ * slow answer used to win: /a typed, then /b, with /a answered last, and the
+ * panel went back to /a.
+ */
+describe('going to a typed path', () => {
+  it('stays with the latest path when an earlier one is answered late', async () => {
+    const answers = new Map<string, (value: string) => void>()
+    window.td.sftp.realpath = (_c: string, p: string) =>
+      p === '.' ? Promise.resolve('/home/u') : new Promise((resolve) => answers.set(p, resolve))
+    window.td.sftp.stat = (_c: string, p: string) =>
+      Promise.resolve({ ...entry(p.slice(1), true), path: p })
+    const listed: string[] = []
+    window.td.sftp.list = (_c: string, p: string) => {
+      listed.push(p)
+      return Promise.resolve(listing)
+    }
+    const { container } = render(<SftpPanel connectionId="c1" />)
+    await row('.bashrc')
+    const input = container.querySelector('.sftp-path-input') as HTMLInputElement
+
+    for (const typed of ['/a', '/b']) {
+      fireEvent.change(input, { target: { value: typed } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+    }
+    answers.get('/b')!('/b')
+    await waitFor(() => expect(input.title).toBe('/b'))
+    answers.get('/a')!('/a')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(input.title).toBe('/b')
+    expect(listed).not.toContain('/a')
   })
 })

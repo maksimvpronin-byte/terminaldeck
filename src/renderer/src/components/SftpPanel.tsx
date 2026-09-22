@@ -113,6 +113,13 @@ export default function SftpPanel({
   const connectionRef = useRef(connectionId)
   connectionRef.current = connectionId
   const revealPath = useRef<string | null>(null)
+  /**
+   * Counts the times the panel was asked to go somewhere. A move that has to
+   * ask the server first — resolving a typed path, or where '.' is — checks,
+   * after each answer, that it is still the latest: a slow answer for /a used
+   * to arrive after the panel had gone on to /b, and took it back to /a.
+   */
+  const navigationRef = useRef(0)
   const pinnedPath = renaming?.entry.path ?? draggedPath
   const rows = useVirtualRows(
     entries.length,
@@ -256,6 +263,7 @@ export default function SftpPanel({
 
   /** Navigate to a directory. */
   async function load(p: string): Promise<SftpEntry[] | null> {
+    navigationRef.current++
     if (pathRef.current !== p) setEntries([])
     pathRef.current = p
     setPath(p)
@@ -276,12 +284,18 @@ export default function SftpPanel({
     if (!connectionId) return
     const wanted = typed.trim()
     if (!wanted) return
+    const ticket = ++navigationRef.current
+    const current = (): boolean => navigationRef.current === ticket
     try {
       const resolved = await window.td.sftp.realpath(connectionId, wanted)
+      if (!current()) return
       const info = await window.td.sftp.stat(connectionId, resolved)
+      if (!current()) return
       if (info && !info.isDirectory) {
-        const list = await load(parentOf(resolved))
-        if (!list) return
+        const listing = load(parentOf(resolved))
+        const mine = navigationRef.current
+        const list = await listing
+        if (!list || navigationRef.current !== mine) return
         revealPath.current = resolved
         setSelected(new Set([resolved]))
         return
@@ -289,8 +303,9 @@ export default function SftpPanel({
       await load(resolved)
     } catch (err) {
       // The typed text is deliberately left alone: a typo should be fixable,
-      // not snapped back to the old path for retyping.
-      setError((err as Error).message)
+      // not snapped back to the old path for retyping. Not said at all if the
+      // panel has gone somewhere else since.
+      if (current()) setError((err as Error).message)
     }
   }
 
@@ -339,13 +354,15 @@ export default function SftpPanel({
     // SFTP opens on '.', which is usually the home directory but need not be.
     // Resolving it once means the panel can say where it actually is.
     let alive = true
+    // Where '.' is can take a moment to learn; a folder opened meanwhile wins.
+    const ticket = ++navigationRef.current
     window.td.sftp
       .realpath(connectionId, '.')
       .then((resolved) => {
-        if (alive) void load(resolved)
+        if (alive && navigationRef.current === ticket) void load(resolved)
       })
       .catch(() => {
-        if (alive) void load('.')
+        if (alive && navigationRef.current === ticket) void load('.')
       })
     return () => {
       alive = false
