@@ -55,7 +55,9 @@ function sanitiseTabs(tabs: WorkspaceTab[]): WorkspaceTab[] {
     const activePaneId = leaves.some((l) => l.id === tab.activePaneId)
       ? tab.activePaneId
       : leaves[0].id
-    saved.push({ ...tab, root, activePaneId })
+    // Nothing has happened in a restored pane yet, whatever the tab had seen
+    // before the restart; a dot on it would point at output that is gone.
+    saved.push({ ...tab, root, activePaneId, hasActivity: undefined })
   }
   return saved
 }
