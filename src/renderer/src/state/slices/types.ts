@@ -237,7 +237,8 @@ export interface WorkspaceSlice {
    * and tab as needed. False when it is open nowhere, and nothing changes.
    */
   revealSession: (sessionId: string) => boolean
-  setPaneConnection: (tabId: string, paneId: string, connectionId: string) => void
+  /** A live shell, or undefined once it has closed. See `connectionId` on a leaf. */
+  setPaneConnection: (tabId: string, paneId: string, connectionId: string | undefined) => void
   /** A live desktop, or undefined once it has ended. See `desktopId` on a leaf. */
   setPaneDesktop: (tabId: string, paneId: string, desktopId: string | undefined) => void
   splitPane: (tabId: string, paneId: string, dir: 'row' | 'col') => void
@@ -248,7 +249,9 @@ export interface WorkspaceSlice {
     position: 'before' | 'after',
     title: string,
     target: PaneTarget,
-    color?: string
+    color?: string,
+    /** The collection the new pane takes its look from, as `openTab` has it. */
+    viaCollectionId?: string
   ) => void
   /**
    * Moves every pane of one tab into another, beside `paneId`, and closes the

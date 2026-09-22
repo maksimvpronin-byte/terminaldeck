@@ -21,7 +21,13 @@ interface Props {
   active: boolean
   /** Restored from a saved layout, so it starts idle rather than connecting. */
   restored?: boolean
-  onConnected: (connectionId: string) => void
+  /**
+   * The live session, and undefined once it has closed — the same as a desktop
+   * pane says it. The host tree marks a host as open, broadcast types into it,
+   * and the file panel talks to it on the strength of this id, and a session
+   * that had ended went on counting as all three.
+   */
+  onConnected: (connectionId: string | undefined) => void
   onFocus: () => void
   /** Called when output arrives, so a background tab can be flagged. */
   onOutput?: () => void
@@ -121,6 +127,7 @@ export default function TerminalHost({
         if (status === 'closed') {
           term.writeln('\r\n\x1b[31m[connection closed]\x1b[0m')
           setClosed(true)
+          onConnectedRef.current(undefined)
         }
       }),
       window.td.ssh.onError(cid, (message) => {
