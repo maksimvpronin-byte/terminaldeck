@@ -77,3 +77,71 @@ describe('terminal activity', () => {
     off()
   })
 })
+
+/**
+ * Dropping a tab onto a pane took the first pane of it and closed the rest:
+ * every other pane of a split tab vanished, and its session was closed.
+ */
+describe('dropping a split tab onto a pane', () => {
+  function seed(): void {
+    const leaf = (id: string): ReturnType<typeof makeLeaf> => ({
+      ...makeLeaf(id, { kind: 'session', sessionId: id }),
+      id,
+      connectionId: `conn-${id}`
+    })
+    useStore.setState({
+      activeWorkspaceId: 'w',
+      workspaces: [
+        {
+          id: 'w',
+          title: 'work',
+          activeTabId: 'target',
+          tabs: [
+            { id: 'target', title: 'target', root: leaf('t'), activePaneId: 't' },
+            {
+              id: 'source',
+              title: 'source',
+              root: {
+                type: 'split',
+                id: 'split',
+                dir: 'row',
+                sizes: [30, 70],
+                children: [leaf('first'), leaf('second')]
+              },
+              // Not the first pane: the one in use must stay the one in use.
+              activePaneId: 'second'
+            }
+          ]
+        }
+      ]
+    })
+  }
+
+  it('brings every pane, in its layout, and keeps the one in use active', () => {
+    seed()
+    useStore.getState().mergeTabInto('source', 'target', 't', 'col', 'after')
+
+    const tabs = useStore.getState().workspaces[0].tabs
+    expect(tabs.map((t) => t.id)).toEqual(['target'])
+    const [target] = tabs
+    expect(target.root.type).toBe('split')
+    if (target.root.type !== 'split') return
+    const moved = target.root.children[1]
+    expect(moved.type).toBe('split')
+    if (moved.type !== 'split') return
+    expect(moved.sizes).toEqual([30, 70])
+    const [first, second] = moved.children
+    expect([first, second].map((p) => p.type === 'leaf' && p.title)).toEqual(['first', 'second'])
+    expect(target.activePaneId).toBe(second.id)
+    // New panes, not the old ones still closing: new ids, no borrowed session.
+    expect(second.id).not.toBe('second')
+    expect(second.type === 'leaf' && second.connectionId).toBeUndefined()
+  })
+
+  it('leaves both tabs alone when the pane dropped on is not there', () => {
+    seed()
+    const before = useStore.getState().workspaces
+    useStore.getState().mergeTabInto('source', 'target', 'missing', 'col', 'after')
+    expect(useStore.getState().workspaces).toBe(before)
+  })
+})

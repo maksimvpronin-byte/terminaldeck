@@ -136,7 +136,8 @@ export function splitLeaf(
   paneId: string,
   dir: 'row' | 'col',
   position: 'before' | 'after',
-  newLeaf: LeafNode
+  /** A new leaf, or a whole tree of panes brought in from another tab. */
+  newLeaf: PaneNode
 ): PaneNode | null {
   const source = findPane(root, paneId)
   if (!source || source.type !== 'leaf') return null
@@ -144,6 +145,29 @@ export function splitLeaf(
     position === 'before' ? [newLeaf, source] : [source, newLeaf]
   const splitNode: PaneNode = { type: 'split', id: nanoid(), dir, children, sizes: [50, 50] }
   return replacePane(root, paneId, splitNode)
+}
+
+/**
+ * A tree of panes as it will be when opened somewhere else: the same layout,
+ * hosts and settings, under new ids and with no live session attached. Every
+ * old id is written into `ids` against its new one.
+ *
+ * New ids because the panes it came from are still mounted until their tab
+ * closes, and anything keyed by pane id would find two of each. No session,
+ * because a pane that moves to another tree is remounted, and a remounted pane
+ * connects afresh; the old id would name a connection that is closing.
+ */
+export function copyTree(node: PaneNode, ids: Map<string, string>): PaneNode {
+  const id = nanoid()
+  ids.set(node.id, id)
+  if (node.type === 'split') {
+    return {
+      ...node,
+      id,
+      children: [copyTree(node.children[0], ids), copyTree(node.children[1], ids)]
+    }
+  }
+  return { ...node, id, connectionId: undefined, desktopId: undefined, restored: undefined }
 }
 
 /** Connection ids of every connected pane in a tab. */

@@ -250,6 +250,17 @@ export interface WorkspaceSlice {
     target: PaneTarget,
     color?: string
   ) => void
+  /**
+   * Moves every pane of one tab into another, beside `paneId`, and closes the
+   * tab it came from. The panes reconnect, as any pane moved between tabs does.
+   */
+  mergeTabInto: (
+    sourceTabId: string,
+    targetTabId: string,
+    paneId: string,
+    dir: 'row' | 'col',
+    position: 'before' | 'after'
+  ) => void
   closePane: (tabId: string, paneId: string) => void
   /** Pulls a pane out of its split and gives it a tab of its own. */
   detachPane: (tabId: string, paneId: string) => void

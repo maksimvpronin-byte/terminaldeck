@@ -7,6 +7,7 @@ import {
   removePane,
   setSizes,
   splitLeaf,
+  copyTree,
   setAllBroadcast,
   collectLeaves,
   collectBroadcastTargets,
@@ -358,6 +359,28 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
         return root ? { ...t, root, activePaneId: newLeaf.id } : t
       })
     }))
+  },
+
+  mergeTabInto: (sourceTabId, targetTabId, paneId, dir, position) => {
+    if (sourceTabId === targetTabId) return
+    const tabs = allTabs(get())
+    const source = tabs.find((t) => t.id === sourceTabId)
+    const target = tabs.find((t) => t.id === targetTabId)
+    if (!source || !target) return
+    /*
+     * The whole tree, not its first pane. Only the first was copied here and
+     * then the tab it came from was closed, so every other pane in a split tab
+     * vanished with it, and its session was closed.
+     */
+    const ids = new Map<string, string>()
+    const moved = copyTree(source.root, ids)
+    const root = splitLeaf(target.root, paneId, dir, position, moved)
+    if (!root) return
+    const activePaneId = ids.get(source.activePaneId) ?? collectLeaves(moved)[0].id
+    set((s) => ({
+      workspaces: mapTab(s.workspaces, targetTabId, (t) => ({ ...t, root, activePaneId }))
+    }))
+    get().closeTab(sourceTabId)
   },
 
   closePane: (tabId, paneId) => {

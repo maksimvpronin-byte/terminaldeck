@@ -4,7 +4,6 @@ import type { PaneNode, PaneTarget } from '../state/store'
 import {
   useStore,
   collectBroadcastTargets,
-  collectLeaves,
   activeTab,
   allTabs,
   findTab
@@ -50,7 +49,7 @@ function Pane({
   const togglePaneBroadcast = useStore((s) => s.togglePaneBroadcast)
 
   const splitPaneWith = useStore((s) => s.splitPaneWith)
-  const closeTab = useStore((s) => s.closeTab)
+  const mergeTabInto = useStore((s) => s.mergeTabInto)
 
   // Read from the profile rather than copied onto the leaf: changing a host's
   // protocol should take effect in its open panes, not only in the next one.
@@ -121,20 +120,16 @@ function Pane({
       title = session.name
       target = { kind: 'session', sessionId: session.id }
     } else if (item.kind === 'tab') {
-      const sourceTab = findTab(useStore.getState(), item.id)
-      if (!sourceTab || sourceTab.id === tabId) return
-      const leaf = collectLeaves(sourceTab.root)[0]
-      if (!leaf) return
-      title = leaf.title
-      target = leaf.target
+      // A dragged tab moves here, every pane of it, and the original goes.
+      const { dir, position } = edgeToSplit(edge)
+      mergeTabInto(item.id, tabId, node.id, dir, position)
+      return
     } else {
       return // groups have no terminal to open
     }
 
     const { dir, position } = edgeToSplit(edge)
     splitPaneWith(tabId, node.id, dir, position, title, target)
-    // A dragged tab moves here, so retire the original.
-    if (item.kind === 'tab') closeTab(item.id)
   }
 
   return (
