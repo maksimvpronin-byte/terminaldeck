@@ -86,6 +86,41 @@ function desktopGateway(
   }
 }
 
+/**
+ * What the window may tell a desktop client: input, a size, an
+ * acknowledgement, whether it is on screen.
+ *
+ * The client takes other instructions on the same pipe — trust this
+ * certificate, offer these local files to the far end, start, stop — and those
+ * are this process's to give, after its own checks: the certificate dialog,
+ * the vault lock, the focus rules for the clipboard. Everything the window sent
+ * used to go down the pipe as it was, so any of them could be sent from there
+ * past every one of those checks.
+ */
+const WINDOW_COMMANDS = new Set([
+  'ack',
+  'focus',
+  'key',
+  'mouse',
+  'xmouse',
+  'resize',
+  'sync',
+  'unicode',
+  'visible'
+])
+
+export function isWindowCommand(
+  fields: unknown
+): fields is Record<string, string | number | boolean | undefined> {
+  if (typeof fields !== 'object' || fields === null || Array.isArray(fields)) return false
+  const record = fields as Record<string, unknown>
+  if (typeof record.a !== 'string' || !WINDOW_COMMANDS.has(record.a)) return false
+  return Object.values(record).every(
+    (v) =>
+      v === undefined || typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean'
+  )
+}
+
 export function registerRdpHandlers(): void {
   /**
    * Opens a desktop, drawn by td-rdp in a process of its own.
@@ -158,11 +193,10 @@ export function registerRdpHandlers(): void {
   // Input, a new size, and the acknowledgement of a frame. `on` rather than
   // `handle`: a mouse moving is sixty of these a second, and none of them has
   // an answer worth waiting for.
-  ipcMain.on(
-    IPC.desktopSend,
-    (_e, id: string, fields: Record<string, string | number | boolean | undefined>) =>
-      freeRdpBridge.send(id, fields)
-  )
+  ipcMain.on(IPC.desktopSend, (_e, id: unknown, fields: unknown) => {
+    if (typeof id !== 'string' || !isWindowCommand(fields)) return
+    freeRdpBridge.send(id, fields)
+  })
   ipcMain.handle(IPC.desktopStop, (_e, id: string) => freeRdpBridge.stop(id))
 
   /**
