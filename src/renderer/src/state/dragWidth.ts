@@ -68,7 +68,7 @@ export function startWidthDrag(
  */
 export const SIDEBAR_MIN = 200
 export const SIDEBAR_MAX = 640
-export const SIDEBAR_DEFAULT = 260
+export const SIDEBAR_DEFAULT = 360
 
 const SIDEBAR_KEY = 'terminaldeck.sidebarWidth'
 

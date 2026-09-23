@@ -1,25 +1,16 @@
 /**
  * How far a row in a host tree sits from the edge of the panel.
  *
- * Written down once because both trees draw it and they must agree, and because
- * the old numbers — a base of 8, a step of 12 and a whole extra step for a host
- * — compounded faster than they looked. Three levels down, a name started
- * 58px into a 260px panel and there was nothing left to read it in: the
- * screenshot that prompted this had every host truncated to `k8s2-mstr…`.
- *
- * A host is nudged inside its group rather than given a level of its own. It
- * has no chevron to make room for, so the icon in front of its name lands under
- * the folder above it, which is what says "inside" — a full step said it twice.
- * The nudge is just enough to clear the guide line an open folder draws under
- * its arrow: at eight pixels the line ran through every host's icon.
+ * Shared by saved hosts and inventory. A full 22px step makes nested groups
+ * distinct, with room for a horizontal branch before each child's icon.
  */
 export const TREE_BASE = 4
-export const TREE_STEP = 10
+export const TREE_STEP = 22
 /**
- * What a host adds to its group's indent. Its icon then starts where a
- * subfolder's arrow starts, so the contents of a folder line up in one column.
+ * Hosts have no chevron or title padding. Align their icon with the centre
+ * of a subgroup's chevron, leaving the same gap after the branch.
  */
-export const TREE_HOST_NUDGE = 16
+export const TREE_HOST_NUDGE = 34
 /**
  * From a folder row's left padding to the middle of its arrow: the title's own
  * six pixels of padding and half of the twelve-pixel chevron. Where the guide

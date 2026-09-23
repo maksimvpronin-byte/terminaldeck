@@ -845,12 +845,12 @@ export default function Sidebar({
               <span className={`tree-group-title name ${isCollapsed ? '' : 'open'}`}>
                 <Chevron open={!isCollapsed} /> <FolderIcon open={!isCollapsed} />
                 {g.git && <span className="git-mark">🔗</span>} {g.name}
-                {isCollapsed && childCount > 0 && <span className="child-count">{childCount}</span>}
                 {/* The one thing the button that stood here carried by
                       itself: it turned into an ellipsis while a sync ran, and
                       nothing else on screen said a folder was busy. */}
                 {isSyncing && <span className="settings-note"> …</span>}
               </span>
+              {childCount > 0 && <span className="child-count">{childCount}</span>}
               {/* The same two buttons went for the same reason: reserved
                     width on every folder row, sixty pixels of it, for Sync with
                     git and New subgroup — both of which the context menu has

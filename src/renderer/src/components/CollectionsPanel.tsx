@@ -8,8 +8,11 @@ import ContextMenu, { type MenuItem } from './ContextMenu'
 import { useT } from '../i18n'
 import CollectionDialog from './CollectionDialog'
 import { Chevron, TreeChildren } from './TreeToggle'
+import { TREE_HOST_NUDGE } from './treeIndent'
 
 const COLLAPSED_KEY = 'terminaldeck.collapsedCollections'
+/** A set's own row sits here; its hosts hang from a branch below its arrow. */
+const COLLECTION_INDENT = 8
 
 function loadCollapsed(): Set<string> {
   try {
@@ -178,7 +181,7 @@ export default function CollectionsPanel({ query }: { query: string }): JSX.Elem
             <div className="tree-group" key={collection.id}>
               <div
                 className="tree-item"
-                style={{ paddingLeft: 8 }}
+                style={{ paddingLeft: COLLECTION_INDENT }}
                 onClick={() => toggleCollapsed(collection.id)}
                 onDoubleClick={() => openCollection(collection.id)}
                 onContextMenu={(e) => {
@@ -216,12 +219,13 @@ export default function CollectionsPanel({ query }: { query: string }): JSX.Elem
               </div>
 
               {!isCollapsed && (
-                <TreeChildren indent={8}>
+                <TreeChildren indent={COLLECTION_INDENT}>
                   {members.map((m) => (
                     <div
                       key={m.id}
                       className="tree-item"
-                      style={{ paddingLeft: 28 }}
+                      // Past the branch drawn to it, like a host in the Sessions tree.
+                      style={{ paddingLeft: COLLECTION_INDENT + TREE_HOST_NUDGE }}
                       title={m.missing ? undefined : t('Double-click to connect')}
                       onClick={() => revealSession(m.id)}
                       onDoubleClick={() => {

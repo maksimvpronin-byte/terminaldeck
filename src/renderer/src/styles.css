@@ -366,10 +366,11 @@ label {
   padding: 6px;
 }
 .tree-group {
-  margin-bottom: 4px;
+  margin-bottom: 0;
 }
 .tree-group-title {
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-dim);
@@ -395,6 +396,12 @@ label {
 }
 .tree-item.selected {
   background: var(--accent-dim);
+}
+.sidebar-tree .tree-item {
+  min-height: 32px;
+}
+.sidebar-tree .tree-item.selected:not(.tinted) {
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 /* A host's colour, as the ground it stands on rather than a dot beside it.
  *
@@ -546,22 +553,42 @@ label {
 .tree-group-title.open {
   color: var(--text);
 }
-/* The contents of an open folder hang from a line under its arrow — where a
-   group ends is then something to see rather than to work out from indents.
-   Positioned, so it is drawn over the hover and selection of the rows it runs
-   past. A hairline of the dim text colour at a third: the border colour, tried
-   first, all but vanished against the panel under every dark theme. */
+/* Each immediate child draws its own piece of the parent branch. The last
+   piece ends at the row centre, even when that child is an expanded group. */
 .tree-children {
   position: relative;
+  --tree-line: color-mix(in srgb, var(--text-dim) 55%, transparent);
 }
-.tree-children::before {
+.tree-children > .tree-item,
+.tree-children > .tree-group,
+.tree-children > .tree-group > .tree-item {
+  position: relative;
+}
+.tree-children > .tree-item::after,
+.tree-children > .tree-group::after {
   content: '';
   position: absolute;
   top: 0;
-  bottom: 2px;
+  bottom: 0;
   left: calc(var(--guide-x) - 0.5px);
   width: 1px;
-  background: color-mix(in srgb, var(--text-dim) 35%, transparent);
+  background: var(--tree-line);
+  pointer-events: none;
+}
+.tree-children > .tree-item:last-child::after,
+.tree-children > .tree-group:last-child::after {
+  bottom: auto;
+  height: 16px;
+}
+.tree-children > .tree-item::before,
+.tree-children > .tree-group > .tree-item::before {
+  content: '';
+  position: absolute;
+  top: 15.5px;
+  left: var(--guide-x);
+  width: 16px;
+  height: 1px;
+  background: var(--tree-line);
   pointer-events: none;
 }
 .child-count {
@@ -571,6 +598,8 @@ label {
   background: var(--bg-3);
   color: var(--text-dim);
   font-size: 10px;
+  font-weight: 400;
+  flex-shrink: 0;
 }
 .tree-item .actions {
   display: flex;
