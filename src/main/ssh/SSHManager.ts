@@ -187,8 +187,17 @@ function credentialSource(profile: SessionProfile, auth: ResolvedAuth): string {
  * So the channel is read, for the length of the handshake only. It carries
  * every packet otherwise, which is not a thing to leave running on a live
  * session.
+ *
+ * The sign-in itself goes into the diagnostics journal on the way past: the
+ * server's version, each method tried and each answer, partial successes
+ * included. A key PuTTY gets in with and this refuses is otherwise a guess —
+ * the failure says only that nothing worked. These lines name methods and
+ * message types, never a password, a key or anything typed.
  */
-export function methodWatcher(): {
+const SIGN_IN_TRACE =
+  /^(Remote ident|Inbound: Received USERAUTH|Outbound: Sending USERAUTH|Client: |Handshake completed)/
+
+export function methodWatcher(label = ''): {
   debug: (message: string) => void
   stop: () => void
   seen: () => string | undefined
@@ -198,6 +207,7 @@ export function methodWatcher(): {
   return {
     debug: (message) => {
       if (!watching) return
+      if (label && SIGN_IN_TRACE.test(message)) diag('ssh', `${label} ${message}`)
       const match = /USERAUTH_FAILURE \(([^)]*)\)/.exec(message)
       if (match?.[1]) methods = match[1].split(',').join(', ')
     },
@@ -568,7 +578,7 @@ async function connectChain(
       const authConfig = await buildAuthConfig(win, hop, auth, signal)
       if (signal?.aborted) throw new ConnectCancelledError()
       wireKeyboardInteractive(win, client, `${auth.username}@${hop.host}`, signal)
-      const methods = methodWatcher()
+      const methods = methodWatcher(`sign-in ${auth.username}@${hop.host}:`)
       await signIn(
         client,
         {
@@ -824,10 +834,12 @@ class SSHManager {
             : { agent: agentSockForPlatform() }
 
       wireKeyboardInteractive(win, client, `${params.username}@${params.host}`, signal)
+      const methods = methodWatcher(`sign-in ${params.username}@${params.host}:`)
       await signIn(
         client,
         {
           ...COMMON_CONNECT,
+          debug: methods.debug,
           host: params.host,
           port: params.port,
           username: params.username,
@@ -835,7 +847,8 @@ class SSHManager {
           ...auth
         },
         signal,
-        (err) => err
+        (err) => err,
+        methods.stop
       )
 
       await this.openShell(win, connectionId, client, [client], cols, rows, signal)
