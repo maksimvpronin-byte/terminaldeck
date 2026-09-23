@@ -6,6 +6,25 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.19.7
+
+### Fixed
+
+- **A refused sign-in says what the server would have taken.** The message
+  was meant to name the methods the server accepts, and never did: it looked
+  for a wording ssh2 does not use, so every refusal ended in advice about
+  inherited passwords — even when a key had been offered. It now lists them,
+  and a key turned down by a server that takes keys is called what it is: a
+  key that machine does not know for that login.
+
+### Added
+
+- **The sign-in is written into the diagnostics journal.** The server's
+  version, each method tried and each answer, partial successes included, go
+  into `diagnostics.log` in the logs folder — for saved hosts and quick connect
+  alike. Method names and message types only: nothing typed, no key material.
+  It is what to look at when a key works in PuTTY and is refused here.
+
 ## 0.19.6
 
 ### Added
