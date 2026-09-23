@@ -343,6 +343,8 @@ export const ru: Record<string, string> = {
   'All tiled in one tab': 'Всё плиткой в одной вкладке',
   Clear: 'Очистить',
   'Clear filter': 'Очистить фильтр',
+  'Leave empty to type it when the desktop opens':
+    'Можно оставить пустым и ввести при открытии рабочего стола',
   'Does not inherit settings from its group': 'Не наследует настройки группы',
   'Double-click to connect · drag to sort or to move between groups':
     'Двойной клик — подключиться · перетаскивание — порядок или перенос между группами',

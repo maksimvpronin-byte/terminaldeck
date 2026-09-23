@@ -26,6 +26,7 @@ const {
   checkTransferPlan,
   checkForwardRule,
   checkQuickConnect,
+  checkQuickDesktop,
   isTerminalSize
 } = await import('./guard')
 installSenderCheck((url) => url === 'file:///app/renderer/index.html')
@@ -109,5 +110,22 @@ describe('values a channel takes', () => {
     expect(() => checkQuickConnect(params)).not.toThrow()
     expect(() => checkQuickConnect({ ...params, host: '-oProxyCommand=x' })).toThrow(/host/)
     expect(() => checkQuickConnect({ ...params, port: 0 })).toThrow(/port/)
+  })
+})
+
+describe('a desktop typed into Quick connect', () => {
+  const desktop = { host: 'win.example', port: 3389, username: 'CORP\\admin' }
+
+  it('takes an address, a port and a login', () => {
+    expect(() => checkQuickDesktop(desktop)).not.toThrow()
+  })
+
+  it('refuses what is not a host, or not a port', () => {
+    expect(() => checkQuickDesktop({ ...desktop, host: '' })).toThrow(/host/)
+    expect(() => checkQuickDesktop({ ...desktop, host: '-v' })).toThrow(/host/)
+    expect(() => checkQuickDesktop({ ...desktop, host: 'a b' })).toThrow(/host/)
+    expect(() => checkQuickDesktop({ ...desktop, port: 70000 })).toThrow(/port/)
+    expect(() => checkQuickDesktop({ ...desktop, username: 1 })).toThrow(/username/)
+    expect(() => checkQuickDesktop(null)).toThrow()
   })
 })

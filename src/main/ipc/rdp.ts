@@ -3,13 +3,14 @@ import { IPC } from '../../shared/ipc-channels'
 import { resolveAuth } from '../../shared/authResolution'
 import { applyCredential } from '../../shared/credentials'
 import { protocolOf } from '../../shared/protocols'
-import { resolveRdp } from '../../shared/rdpResolution'
+import { RDP_FALLBACK, resolveRdp } from '../../shared/rdpResolution'
 import type { ResolvedAuth, RdpView, SessionGroup, SessionProfile } from '../../shared/types'
 import { splitLogin } from '../../shared/rdpLogin'
 import { type DesktopGateway, type DesktopRequest, freeRdpBridge } from '../rdp/FreeRdpBridge'
 import { credentialStore } from '../store/CredentialStore'
 import { everyGroup, findProfile } from '../store/hosts'
 import { vault } from '../vault/Vault'
+import { checkQuickDesktop } from './guard'
 import { focusedWin } from './win'
 
 /** Desktop sessions: the gateway and the credentials they resolve. */
@@ -140,7 +141,10 @@ export function registerRdpHandlers(): void {
     (
       _e,
       request: {
-        sessionId: string
+        /** A saved host; or, instead, `quick`. */
+        sessionId?: string
+        /** A desktop typed into Quick connect, which no saved host stands behind. */
+        quick?: unknown
         width: number
         height: number
         scale?: number
@@ -154,6 +158,38 @@ export function registerRdpHandlers(): void {
       const win = focusedWin()
       if (!win) throw new Error('No window to draw into')
 
+      /*
+       * Quick connect: where and as whom are what was typed, and everything
+       * else is what a new host would start with — no gateway, the ordinary
+       * session, sound and clipboard on. Nothing is looked up in the vault:
+       * there is no saved host for a password to belong to, so the only one is
+       * the one typed, the same as for a quick SSH connection.
+       */
+      if (request.quick !== undefined) {
+        checkQuickDesktop(request.quick)
+        const quick = request.quick
+        const login = splitLogin(quick.username)
+        return freeRdpBridge.start(
+          win,
+          {
+            host: quick.host.trim(),
+            port: quick.port,
+            width: request.width,
+            height: request.height,
+            scale: RDP_FALLBACK.sendDensity ? request.scale : undefined,
+            sound: RDP_FALLBACK.sound,
+            clipboard: RDP_FALLBACK.clipboard,
+            admin: request.admin || RDP_FALLBACK.consoleSession
+          },
+          {
+            username: login.username,
+            domain: login.domain,
+            password: typeof request.password === 'string' ? request.password : ''
+          }
+        )
+      }
+
+      if (typeof request.sessionId !== 'string') throw new Error('Unknown session')
       const found = findHost(request.sessionId)
       if (!found) throw new Error('Unknown session')
       if (protocolOf(found.profile) !== 'rdp') throw new Error('That host is not an RDP host')

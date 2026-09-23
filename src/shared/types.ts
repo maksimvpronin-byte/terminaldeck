@@ -553,6 +553,12 @@ export interface ForwardedKey {
 }
 
 export interface QuickConnectParams {
+  /**
+   * A shell or a desktop; SSH when unstated, which is every quick connection
+   * made before a desktop could be one. A desktop takes a login and, if it was
+   * typed, a password — the key and agent fields are SSH's alone.
+   */
+  protocol?: Protocol
   host: string
   port: number
   username: string

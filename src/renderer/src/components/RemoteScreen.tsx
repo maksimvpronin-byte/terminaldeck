@@ -45,7 +45,12 @@ interface PointerImage {
 interface Props {
   visible: boolean
   /** The saved host. Where it is reached, and as whom, is settled in main. */
-  sessionId: string
+  sessionId?: string
+  /**
+   * Or a desktop typed into Quick connect, which has no saved host behind it:
+   * where it is and who to sign in as, and nothing else.
+   */
+  quick?: { host: string; port: number; username: string }
   /**
    * A stored account to sign in as instead of the host's own login. Named, not
    * resolved: the password stays in the main process either way.
@@ -124,6 +129,7 @@ function asPixels(bytes: Uint8Array): Uint8ClampedArray<ArrayBuffer> {
 export default function RemoteScreen({
   visible,
   sessionId,
+  quick,
   credentialId,
   admin,
   look,
@@ -566,6 +572,7 @@ export default function RemoteScreen({
       try {
         const id = await window.td.rdp.desktopStart({
           sessionId,
+          quick,
           width: size?.width ?? 1280,
           height: size?.height ?? 800,
           scale: size ? Math.min(500, Math.max(100, Math.round(size.factor * 100))) : undefined,

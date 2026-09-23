@@ -276,7 +276,9 @@ const api = {
      * stored password ever crossed into the renderer.
      */
     desktopStart: (request: {
-      sessionId: string
+      /** A saved host — or, for a desktop typed into Quick connect, `quick`. */
+      sessionId?: string
+      quick?: { host: string; port: number; username: string }
       width: number
       height: number
       /** 100–500, when the host asked for its density to be sent. */

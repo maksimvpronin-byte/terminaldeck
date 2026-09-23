@@ -69,11 +69,15 @@ function Pane({
    * a selector returning one of those would re-render this pane on every store
    * change there is.
    */
-  const protocol = useStore((s) => (sessionId ? protocolOf(findHost(s, sessionId)?.host) : 'ssh'))
-  const host = useStore((s) => (sessionId ? findHost(s, sessionId)?.host.host : undefined))
+  /** A connection typed into Quick connect carries all of this itself. */
+  const quick = node.target.kind === 'quick' ? node.target.params : undefined
+  const protocol = useStore((s) =>
+    sessionId ? protocolOf(findHost(s, sessionId)?.host) : (quick?.protocol ?? 'ssh')
+  )
+  const host = useStore((s) => (sessionId ? findHost(s, sessionId)?.host.host : quick?.host))
   // Unset means the protocol's own default, which GraphicalHost fills in. The
   // SSH inheritance chain is not consulted: it resolves to 22.
-  const port = useStore((s) => (sessionId ? findHost(s, sessionId)?.host.port : undefined))
+  const port = useStore((s) => (sessionId ? findHost(s, sessionId)?.host.port : quick?.port))
   const traits = traitsOf(protocol)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const [dropEdge, setDropEdge] = useState<DropEdge | null>(null)
@@ -259,6 +263,7 @@ function Pane({
             host={host}
             port={port}
             sessionId={sessionId ?? undefined}
+            quick={quick ? { username: quick.username, password: quick.password } : undefined}
             credentialId={credentialId}
             admin={admin}
             onMeasured={setMeasured}

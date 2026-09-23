@@ -283,6 +283,33 @@ label {
   padding-top: 0;
   padding-bottom: 0;
 }
+/* SSH or RDP, side by side as one control, in Quick connect. */
+.protocol-switch {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  overflow: hidden;
+  align-self: flex-start;
+}
+.protocol-switch button {
+  border: none;
+  border-radius: 0;
+  background: var(--bg-1);
+  color: var(--text-dim);
+  padding: 5px 18px;
+}
+.protocol-switch button + button {
+  border-left: 1px solid var(--border);
+}
+.protocol-switch button:hover {
+  color: var(--text);
+  background: var(--bg-3);
+}
+.protocol-switch button.active {
+  color: var(--text);
+  background: var(--accent-dim, var(--bg-3));
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
 /* The host filter, with a cross inside it on the right once it holds text. */
 .filter-field {
   position: relative;

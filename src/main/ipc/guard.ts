@@ -125,6 +125,26 @@ export function checkQuickConnect(params: unknown): void {
   isOptionalString(p.passphrase, 'passphrase')
 }
 
+/** Where a desktop typed in by hand is, checked before the client dials it. */
+export interface QuickDesktop {
+  host: string
+  port: number
+  username: string
+}
+
+export function checkQuickDesktop(value: unknown): asserts value is QuickDesktop {
+  if (typeof value !== 'object' || value === null) refuse('desktop details must be an object')
+  const d = value as Record<string, unknown>
+  isString(d.host, 'host')
+  // The client is handed the host as a value, never as an argument — but a
+  // name that starts with a dash is not a host name either way.
+  if (!d.host.trim() || d.host.startsWith('-') || /[\s\0]/.test(d.host.trim())) {
+    refuse('host is not a host name')
+  }
+  isInt(d.port, 1, 65535, 'port')
+  isString(d.username, 'username')
+}
+
 /** A port forwarding rule, checked before a port is bound or a remote asked to listen. */
 export function checkForwardRule(rule: unknown): void {
   if (typeof rule !== 'object' || rule === null) refuse('the rule must be an object')

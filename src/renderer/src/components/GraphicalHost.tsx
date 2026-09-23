@@ -26,6 +26,7 @@ export default function GraphicalHost({
   host,
   port,
   sessionId,
+  quick,
   credentialId,
   admin,
   onMeasured,
@@ -38,6 +39,12 @@ export default function GraphicalHost({
   host?: string
   port?: number
   sessionId?: string
+  /**
+   * A desktop typed into Quick connect instead of a saved host: who to sign in
+   * as, and the password if one was typed there. There is nothing to look up —
+   * no saved settings, no vault — so the pane starts from what it is given.
+   */
+  quick?: { username: string; password?: string }
   /**
    * A stored account this pane signs in as, in place of the host's own login.
    * Only ever an id: what it stands for is resolved in the main process, and no
@@ -127,6 +134,9 @@ export default function GraphicalHost({
   const t = useT()
 
   const traits = traitsOf(protocol)
+  /** Plain values, so the effects below follow them rather than an object rebuilt each render. */
+  const isQuick = quick !== undefined
+  const quickUser = quick?.username ?? ''
   const target = `${host ?? ''}:${port ?? traits.port}`
 
   /**
@@ -157,6 +167,12 @@ export default function GraphicalHost({
   const inventoryOverrides = useStore((s) => s.inventoryOverrides)
 
   useEffect(() => {
+    // Nothing is saved for a quick desktop, so its look is the defaults.
+    if (isQuick) {
+      setLook(null)
+      setLookSettled(true)
+      return
+    }
     if (protocol !== 'rdp' || !sessionId) return
     let alive = true
 
@@ -180,6 +196,7 @@ export default function GraphicalHost({
        read for happens in the main process, and listing them is how this learns
        that a save, or a sync, happened. */
   }, [
+    isQuick,
     protocol,
     sessionId,
     profile,
@@ -198,6 +215,13 @@ export default function GraphicalHost({
    * had long since moved its authentication into the main process.
    */
   useEffect(() => {
+    // The login was typed with the address; nothing is saved to ask about.
+    if (isQuick) {
+      setUsername(quickUser)
+      setHasStoredPassword(false)
+      setPhase({ at: 'choosing' })
+      return
+    }
     if (protocol !== 'rdp' || !sessionId || !host) return
     let alive = true
 
@@ -216,11 +240,14 @@ export default function GraphicalHost({
     return () => {
       alive = false
     }
-  }, [protocol, sessionId, credentialId, host, target])
+  }, [protocol, sessionId, credentialId, host, target, isQuick, quickUser])
 
   /** A new desktop of our own, in this pane. */
   function connectFresh(): void {
     if (hasStoredPassword) start(undefined)
+    // A password typed into Quick connect is used as typed; one left blank
+    // there is asked for here, as for a saved host with none.
+    else if (quick?.password) start(quick.password)
     else setPhase({ at: 'password' })
   }
 
@@ -263,11 +290,16 @@ export default function GraphicalHost({
 
   return (
     <div className="graphical-host">
-      {running && sessionId && (
+      {running && (sessionId || (quick && host)) && (
         <RemoteScreen
           visible={paneVisible}
           key={attempt}
           sessionId={sessionId}
+          quick={
+            quick && host
+              ? { host, port: port ?? traits.port, username: quick.username }
+              : undefined
+          }
           credentialId={credentialId}
           admin={admin}
           look={look}
@@ -309,11 +341,14 @@ export default function GraphicalHost({
                 <strong>
                   {t('Password for')} {username || t('this host')}
                 </strong>
-                <p className="settings-note">
-                  {t(
-                    'No password is saved for this host. Save one in its dialog to stop being asked.'
-                  )}
-                </p>
+                {/* A quick desktop has no dialog to save one in. */}
+                {!isQuick && (
+                  <p className="settings-note">
+                    {t(
+                      'No password is saved for this host. Save one in its dialog to stop being asked.'
+                    )}
+                  </p>
+                )}
                 <input
                   autoFocus
                   type="password"
