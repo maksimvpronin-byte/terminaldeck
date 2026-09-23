@@ -1,7 +1,6 @@
 import { Client, type ConnectConfig, type ClientChannel } from 'ssh2'
 import { randomUUID } from 'crypto'
 import { createWriteStream, existsSync, mkdirSync, type WriteStream } from 'fs'
-import { readFileSync } from 'fs'
 import { userInfo } from 'os'
 import { join } from 'path'
 import { StringDecoder } from 'string_decoder'
@@ -23,6 +22,7 @@ import { vault } from '../vault/Vault'
 import { makeHostVerifier } from './hostVerifier'
 import { requireUnlocked } from '../vault/locked'
 import { requestAuth } from './authPrompt'
+import { readPrivateKey } from './ppk'
 import { diag } from '../diagnostics'
 import { describeInput } from '../../shared/diagnostics'
 
@@ -264,9 +264,8 @@ async function buildAuthConfig(
   }
   if (auth.authMethod === 'privateKey') {
     if (!auth.privateKeyPath) throw new Error('No private key path configured')
-    const privateKey = readFileSync(auth.privateKeyPath)
     const passphrase = auth.secretRef ? vault.getSecret(auth.secretRef) : undefined
-    return { privateKey, passphrase, ...forwarding(auth) }
+    return { ...(await readPrivateKey(auth.privateKeyPath, passphrase)), ...forwarding(auth) }
   }
   // agent
   return { agent: agentSockForPlatform(), agentForward: auth.agentForward }
@@ -806,10 +805,9 @@ class SSHManager {
         params.authMethod === 'password'
           ? { password: params.password }
           : params.authMethod === 'privateKey'
-            ? {
-                privateKey: params.privateKeyPath ? readFileSync(params.privateKeyPath) : undefined,
-                passphrase: params.passphrase
-              }
+            ? params.privateKeyPath
+              ? await readPrivateKey(params.privateKeyPath, params.passphrase)
+              : { passphrase: params.passphrase }
             : { agent: agentSockForPlatform() }
 
       wireKeyboardInteractive(win, client, `${params.username}@${params.host}`, signal)
