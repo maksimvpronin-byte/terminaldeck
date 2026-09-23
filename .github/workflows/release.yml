@@ -45,9 +45,9 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -93,7 +93,7 @@ jobs:
       # would hand the run a library built to instructions we no longer give.
       - name: Cache vcpkg
         if: matrix.freerdp == 'win'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: resources/freerdp/vcpkg
           key: vcpkg-${{ matrix.os }}-${{ hashFiles(matrix.recipe) }}
@@ -102,7 +102,7 @@ jobs:
       - name: Cache the desktop client
         if: matrix.freerdp != ''
         id: freerdp
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: resources/freerdp/build
           key: freerdp-3.31.0-${{ matrix.os }}-${{ hashFiles(matrix.recipe, 'resources/freerdp/shim/CMakeLists.txt') }}
@@ -189,7 +189,7 @@ jobs:
         run: node scripts/verify-release.cjs --app dist/mac-arm64/TerminalDeck.app
 
       - name: Keep what was built
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: packages-${{ matrix.os }}
           # The packages and the update metadata, and none of the directories
@@ -233,13 +233,13 @@ jobs:
     steps:
       # Checked out for the verifier below; the packages themselves arrive from
       # the build jobs rather than from the repository.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: packages
           merge-multiple: true
