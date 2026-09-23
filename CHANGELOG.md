@@ -6,6 +6,18 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.19.9
+
+### Changed
+
+- **Midnight Commander's panels are classic dark blue.** ANSI blue is now
+  navy, as in Far and the DOS-era mc, and white file names on it read at
+  eleven to one instead of four.
+- **Text is kept readable against its background.** A colour that would
+  nearly vanish — navy writing on the dark terminal, for one — is lightened
+  until it stands out; backgrounds are left as they are, so mc's panels stay
+  dark blue while a blue prompt or git branch stays legible.
+
 ## 0.19.8
 
 0.19.7 was tagged, and its build stopped before it finished so that the new
