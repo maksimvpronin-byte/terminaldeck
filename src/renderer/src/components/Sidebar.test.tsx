@@ -174,11 +174,10 @@ describe('what the tree holds', () => {
 
     fireEvent.change(screen.getByPlaceholderText('Filter hosts…'), { target: { value: 'deep' } })
 
-    // A folder row reads "📁 outer", so the name is matched at its end.
-    expect(screen.getByText(/ outer$/)).toBeTruthy()
-    expect(screen.getByText(/ inner$/)).toBeTruthy()
+    expect(screen.getByText('outer')).toBeTruthy()
+    expect(screen.getByText('inner')).toBeTruthy()
     expect(screen.getByText('deep-db')).toBeTruthy()
-    expect(screen.queryByText(/ empty$/)).toBeNull()
+    expect(screen.queryByText('empty')).toBeNull()
     expect(screen.queryByText('web')).toBeNull()
   })
 

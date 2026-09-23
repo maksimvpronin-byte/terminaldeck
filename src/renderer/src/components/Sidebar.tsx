@@ -13,6 +13,7 @@ import { protocolOf } from '../../../shared/protocols'
 import { duplicateProfile } from '../../../shared/duplicate'
 import { CloseIcon, DesktopIcon, TerminalIcon } from './icons'
 import { groupIndent, hostIndent } from './treeIndent'
+import { Chevron, FolderIcon, TreeChildren } from './TreeToggle'
 import {
   useStore,
   collectConnectedSessionIds,
@@ -841,8 +842,8 @@ export default function Sidebar({
                     : t('Drag by the edge of a row to sort · drop onto a folder to put it inside')
               }
             >
-              <span className="tree-group-title name">
-                <span className={`chevron ${isCollapsed ? '' : 'open'}`}>▸</span> 📁
+              <span className={`tree-group-title name ${isCollapsed ? '' : 'open'}`}>
+                <Chevron open={!isCollapsed} /> <FolderIcon open={!isCollapsed} />
                 {g.git && <span className="git-mark">🔗</span>} {g.name}
                 {isCollapsed && childCount > 0 && <span className="child-count">{childCount}</span>}
                 {/* The one thing the button that stood here carried by
@@ -865,10 +866,10 @@ export default function Sidebar({
               </div>
             )}
             {!isCollapsed && (
-              <>
+              <TreeChildren indent={groupIndent(depth)}>
                 {hostsIn(g.id, visible).map((s) => renderSession(s, hostIndent(depth)))}
                 {renderGroups(g.id, depth + 1)}
-              </>
+              </TreeChildren>
             )}
           </div>
         )

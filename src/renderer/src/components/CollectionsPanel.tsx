@@ -7,6 +7,7 @@ import { DesktopIcon, TerminalIcon } from './icons'
 import ContextMenu, { type MenuItem } from './ContextMenu'
 import { useT } from '../i18n'
 import CollectionDialog from './CollectionDialog'
+import { Chevron, TreeChildren } from './TreeToggle'
 
 const COLLAPSED_KEY = 'terminaldeck.collapsedCollections'
 
@@ -187,8 +188,8 @@ export default function CollectionsPanel({ query }: { query: string }): JSX.Elem
                 }}
                 title={t('Double-click to open the whole set in a new workspace')}
               >
-                <span className="tree-group-title name">
-                  <span className={`chevron ${isCollapsed ? '' : 'open'}`}>▸</span>
+                <span className={`tree-group-title name ${isCollapsed ? '' : 'open'}`}>
+                  <Chevron open={!isCollapsed} />
                   <span
                     className="session-dot"
                     style={collection.color ? { background: collection.color } : undefined}
@@ -214,64 +215,67 @@ export default function CollectionsPanel({ query }: { query: string }): JSX.Elem
                 {missing > 0 ? t(' · {count} missing', { count: missing }) : ''}
               </div>
 
-              {!isCollapsed &&
-                members.map((m) => (
-                  <div
-                    key={m.id}
-                    className="tree-item"
-                    style={{ paddingLeft: 28 }}
-                    title={m.missing ? undefined : t('Double-click to connect')}
-                    onClick={() => revealSession(m.id)}
-                    onDoubleClick={() => {
-                      if (!m.missing) {
-                        // Opened from here, so this set lends its look.
-                        openTab(
-                          m.name,
-                          { kind: 'session', sessionId: m.id },
-                          m.color,
-                          collection.id
-                        )
-                      }
-                    }}
-                    onContextMenu={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      setMenu({
-                        x: e.clientX,
-                        y: e.clientY,
-                        items: [
-                          {
-                            label: t('Remove from collection'),
-                            danger: true,
-                            onSelect: () => removeFromCollection(collection.id, m.id)
-                          }
-                        ]
-                      })
-                    }}
-                  >
-                    <span className="name">
-                      <span
-                        className={`session-kind ${connected.has(m.id) ? 'live' : ''}`}
-                        title={
-                          connected.has(m.id)
-                            ? t('Open now')
-                            : m.protocol === 'rdp'
-                              ? t('Opens a desktop')
-                              : t('Opens a terminal')
+              {!isCollapsed && (
+                <TreeChildren indent={8}>
+                  {members.map((m) => (
+                    <div
+                      key={m.id}
+                      className="tree-item"
+                      style={{ paddingLeft: 28 }}
+                      title={m.missing ? undefined : t('Double-click to connect')}
+                      onClick={() => revealSession(m.id)}
+                      onDoubleClick={() => {
+                        if (!m.missing) {
+                          // Opened from here, so this set lends its look.
+                          openTab(
+                            m.name,
+                            { kind: 'session', sessionId: m.id },
+                            m.color,
+                            collection.id
+                          )
                         }
-                      >
-                        {m.protocol === 'rdp' ? <DesktopIcon /> : <TerminalIcon />}
-                      </span>
-                      {m.missing ? (
-                        <span style={{ color: 'var(--text-dim)' }}>
-                          {t('{name} — no longer exists', { name: m.name })}
+                      }}
+                      onContextMenu={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        setMenu({
+                          x: e.clientX,
+                          y: e.clientY,
+                          items: [
+                            {
+                              label: t('Remove from collection'),
+                              danger: true,
+                              onSelect: () => removeFromCollection(collection.id, m.id)
+                            }
+                          ]
+                        })
+                      }}
+                    >
+                      <span className="name">
+                        <span
+                          className={`session-kind ${connected.has(m.id) ? 'live' : ''}`}
+                          title={
+                            connected.has(m.id)
+                              ? t('Open now')
+                              : m.protocol === 'rdp'
+                                ? t('Opens a desktop')
+                                : t('Opens a terminal')
+                          }
+                        >
+                          {m.protocol === 'rdp' ? <DesktopIcon /> : <TerminalIcon />}
                         </span>
-                      ) : (
-                        m.name
-                      )}
-                    </span>
-                  </div>
-                ))}
+                        {m.missing ? (
+                          <span style={{ color: 'var(--text-dim)' }}>
+                            {t('{name} — no longer exists', { name: m.name })}
+                          </span>
+                        ) : (
+                          m.name
+                        )}
+                      </span>
+                    </div>
+                  ))}
+                </TreeChildren>
+              )}
             </div>
           )
         })}

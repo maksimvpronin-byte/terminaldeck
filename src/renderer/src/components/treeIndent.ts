@@ -10,11 +10,22 @@
  * A host is nudged inside its group rather than given a level of its own. It
  * has no chevron to make room for, so the icon in front of its name lands under
  * the folder above it, which is what says "inside" — a full step said it twice.
+ * The nudge is just enough to clear the guide line an open folder draws under
+ * its arrow: at eight pixels the line ran through every host's icon.
  */
 export const TREE_BASE = 4
 export const TREE_STEP = 10
-/** What a host adds to its group's indent. Less than a step, on purpose. */
-export const TREE_HOST_NUDGE = 8
+/**
+ * What a host adds to its group's indent. Its icon then starts where a
+ * subfolder's arrow starts, so the contents of a folder line up in one column.
+ */
+export const TREE_HOST_NUDGE = 16
+/**
+ * From a folder row's left padding to the middle of its arrow: the title's own
+ * six pixels of padding and half of the twelve-pixel chevron. Where the guide
+ * line under an open folder falls.
+ */
+export const GUIDE_OFFSET = 12
 
 export function groupIndent(depth: number): number {
   return TREE_BASE + depth * TREE_STEP

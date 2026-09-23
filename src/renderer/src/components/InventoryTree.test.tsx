@@ -56,11 +56,10 @@ describe('the inventory tree', () => {
       'deep'
     )
 
-    // A group row reads "📁 outer", so the name is matched at its end.
-    expect(screen.getByText(/ outer$/)).toBeTruthy()
-    expect(screen.getByText(/ inner$/)).toBeTruthy()
+    expect(screen.getByText('outer')).toBeTruthy()
+    expect(screen.getByText('inner')).toBeTruthy()
     expect(screen.getByText('deep-db')).toBeTruthy()
-    expect(screen.queryByText(/ other$/)).toBeNull()
+    expect(screen.queryByText('other')).toBeNull()
     expect(screen.queryByText('web')).toBeNull()
   })
 

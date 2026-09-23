@@ -23,6 +23,7 @@ import { useT } from '../i18n'
 import { ago } from '../state/syncStatus'
 import { DesktopIcon, RefreshIcon, TerminalIcon } from './icons'
 import { groupIndent, hostIndent } from './treeIndent'
+import { Chevron, FolderIcon, TreeChildren } from './TreeToggle'
 import Hint from './Hint'
 
 const COLLAPSED_KEY = 'terminaldeck.collapsedInventory'
@@ -373,8 +374,8 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
                 setMenu({ x: e.clientX, y: e.clientY, items: groupMenu(g) })
               }}
             >
-              <span className="tree-group-title name">
-                <span className={`chevron ${isCollapsed ? '' : 'open'}`}>▸</span> 📁 {g.name}
+              <span className={`tree-group-title name ${isCollapsed ? '' : 'open'}`}>
+                <Chevron open={!isCollapsed} /> <FolderIcon open={!isCollapsed} /> {g.name}
                 {overrides.some((o) => o.nodeId === g.id) && (
                   <span className="no-inherit" title={t('Has local settings')}>
                     ✎
@@ -383,10 +384,10 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
               </span>
             </div>
             {!isCollapsed && (
-              <>
+              <TreeChildren indent={groupIndent(depth)}>
                 {hostsOf(g.id).map((h) => renderHost(h, hostIndent(depth), colour))}
                 {renderGroups(g.id, depth + 1, colour)}
-              </>
+              </TreeChildren>
             )}
           </div>
         )
@@ -532,6 +533,7 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
             <div className="tree-group" key={source.id}>
               <div
                 className="tree-item"
+                style={{ paddingLeft: groupIndent(0) }}
                 onClick={() => toggleCollapsed(rootId)}
                 onContextMenu={(e) => {
                   e.preventDefault()
@@ -539,8 +541,8 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
                   setMenu({ x: e.clientX, y: e.clientY, items: sourceMenu(source) })
                 }}
               >
-                <span className="tree-group-title name">
-                  <span className={`chevron ${isCollapsed ? '' : 'open'}`}>▸</span>
+                <span className={`tree-group-title name ${isCollapsed ? '' : 'open'}`}>
+                  <Chevron open={!isCollapsed} />
                   <span
                     className="session-dot"
                     style={source.color ? { background: source.color } : undefined}
@@ -598,10 +600,10 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
               )}
 
               {!isCollapsed && (
-                <>
+                <TreeChildren indent={groupIndent(0)}>
                   {hostsOf(rootId).map((h) => renderHost(h, hostIndent(0), source.color))}
                   {renderGroups(rootId, 1, source.color)}
-                </>
+                </TreeChildren>
               )}
             </div>
           )

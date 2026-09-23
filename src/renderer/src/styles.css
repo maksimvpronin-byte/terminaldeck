@@ -526,11 +526,43 @@ label {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* A folder's arrow: an outline chevron twelve pixels across, where a nine-pixel
+   ▸ used to sit and was easy to miss. It takes its row's colour, so an open
+   folder's arrow is as bright as its name and a closed one's stays dim. */
 .chevron {
+  display: inline-flex;
+  width: 12px;
+  height: 12px;
+  vertical-align: -2px;
+  color: inherit;
+}
+.folder-icon {
   display: inline-block;
-  width: 10px;
-  color: var(--text-dim);
-  font-size: 9px;
+  width: 1.25em;
+  text-align: center;
+}
+/* An open folder's name in full colour; a closed one keeps the quiet grey of a
+   heading, so the two read apart from across the room. */
+.tree-group-title.open {
+  color: var(--text);
+}
+/* The contents of an open folder hang from a line under its arrow — where a
+   group ends is then something to see rather than to work out from indents.
+   Positioned, so it is drawn over the hover and selection of the rows it runs
+   past. A hairline of the dim text colour at a third: the border colour, tried
+   first, all but vanished against the panel under every dark theme. */
+.tree-children {
+  position: relative;
+}
+.tree-children::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 2px;
+  left: calc(var(--guide-x) - 0.5px);
+  width: 1px;
+  background: color-mix(in srgb, var(--text-dim) 35%, transparent);
+  pointer-events: none;
 }
 .child-count {
   margin-left: 6px;
