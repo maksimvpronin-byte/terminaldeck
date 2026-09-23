@@ -6,7 +6,10 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
-## 0.19.7
+## 0.19.8
+
+0.19.7 was tagged, and its build stopped before it finished so that the new
+host tree could go out with it; everything in it arrives with this release.
 
 ### Fixed
 
@@ -24,6 +27,15 @@ the other produces a version nobody can install, which is how 0.1.10 through
   into `diagnostics.log` in the logs folder — for saved hosts and quick connect
   alike. Method names and message types only: nothing typed, no key material.
   It is what to look at when a key works in PuTTY and is refused here.
+
+### Changed
+
+- **The host tree is drawn with branches.** Every host and folder inside an
+  open folder hangs from its own branch, and the last one ends in a corner,
+  so where a group ends is plain at a glance. Levels sit further apart, rows
+  are a little taller, folder names larger, and every folder shows how much
+  it holds on the right, open or closed. The selected host is marked with an
+  accent edge, and the panel starts 360px wide instead of 260.
 
 ## 0.19.6
 
