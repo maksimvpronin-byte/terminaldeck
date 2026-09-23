@@ -53,7 +53,8 @@ export interface UiPalette {
 }
 
 /**
- * The sixteen ANSI colours, the same under every theme: xterm's own defaults.
+ * The sixteen ANSI colours, the same under every theme. Based on xterm's
+ * defaults, with classic dark blue for full-screen application panels.
  *
  * Themes used to bring palettes of their own, and full-screen programs paid for
  * it. Midnight Commander paints its panels in ANSI blue and its menu in cyan,
@@ -67,7 +68,7 @@ export const ANSI_PALETTE = {
   red: '#cc0000',
   green: '#4e9a06',
   yellow: '#c4a000',
-  blue: '#3465a4',
+  blue: '#000080',
   magenta: '#75507b',
   cyan: '#06989a',
   white: '#d3d7cf',
@@ -80,6 +81,17 @@ export const ANSI_PALETTE = {
   brightCyan: '#34e2e2',
   brightWhite: '#eeeeec'
 } as const satisfies ITheme
+
+/**
+ * How far text must stand out from what is behind it, as a WCAG contrast ratio.
+ *
+ * The navy blue above is right for the ground of a panel and wrong for a line
+ * of text: blue on the dark terminal background came out at 1.1 to 1 — a
+ * prompt, a git branch or a vim keyword all but gone. xterm lightens text that
+ * falls short of this ratio and leaves backgrounds alone, so mc keeps its dark
+ * blue panels and blue writing stays readable. 4.5 is WCAG's AA threshold.
+ */
+export const MIN_CONTRAST_RATIO = 4.5
 
 export interface ThemeDef {
   /** No ANSI colours here, deliberately — see ANSI_PALETTE. */

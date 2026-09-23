@@ -6,7 +6,7 @@ import { WebglAddon } from '@xterm/addon-webgl'
 import '@xterm/xterm/css/xterm.css'
 import type { PaneTarget } from '../state/store'
 import { useStore } from '../state/store'
-import { themeOf } from '../state/settings'
+import { MIN_CONTRAST_RATIO, themeOf } from '../state/settings'
 import { useAppearance } from '../hooks/useAppearance'
 import ContextMenu, { type MenuItem } from './ContextMenu'
 import { IS_MAC } from '../state/keys'
@@ -195,6 +195,7 @@ export default function TerminalHost({
       fontFamily: a.fontFamily,
       fontSize: a.fontSize,
       theme: themeOf(a),
+      minimumContrastRatio: MIN_CONTRAST_RATIO,
       cursorBlink: a.cursorBlink,
       cursorStyle: a.cursorStyle,
       scrollback: a.scrollback
