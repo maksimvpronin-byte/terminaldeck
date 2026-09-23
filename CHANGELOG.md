@@ -6,6 +6,60 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.19.4
+
+### Security
+
+- **Downloading a remote folder could write outside the folder you picked.**
+  The folder's own name comes from the server, and on a Unix host
+  `..\..\Startup` is one ordinary name; on Windows it took the download out of
+  the chosen directory. The name is now checked like every name below it, and
+  one that would leave is refused.
+- **The window could give a desktop client instructions that are not its to
+  give.** Trusting a certificate or offering local files to the far end went
+  past the certificate dialog, the lock and the clipboard rules if the window
+  asked. It can now send input, sizes and acknowledgements, and nothing else.
+
+### Fixed
+
+- **A tunnel that failed on connect said nothing.** The message went out
+  before the pane was listening; it now arrives.
+- **The file panel lost its way in folders with non-ASCII names.** A
+  Cyrillic folder name could reach it with a broken character in the middle.
+- **A power cut or a busy virus scanner could cost a save.** Stored files are
+  now flushed to disk before they replace the old ones, and a save waits out a
+  scanner holding the file for a moment instead of failing. A damaged vault
+  file is reported as damaged rather than as a JSON error.
+- **A closed SSH session still counted as open.** The host stayed marked as
+  connected, and broadcast kept typing into it.
+- **"Edit locally" could lose edits, or close the app.** Opening the same file
+  twice quickly left the first editor's saves unsent; a temporary folder
+  removed from under a watched file brought the whole application down; a `$`
+  in a file name garbled the path given to the editor.
+- **Importing `~/.ssh/config` misread some files.** `HostName=x` without
+  spaces was dropped, settings after a `Match` line went to the host above it,
+  `Host !name` became a host, and a repeated keyword took its last value
+  instead of its first.
+- **An Ansible group written in two places lost the vars of one.** Both are
+  now merged, as Ansible does.
+- **Removing an inventory repository left its gateway passwords in the
+  vault.**
+- **A downloaded update could fall back to "Download".** Checking again, or a
+  check that failed, took an update in progress or ready to install back a
+  step.
+- **Copying files out of a desktop could fail after they had arrived,** with
+  a message that the server never sent the file list.
+- **The first failure in a batch of transfers disappeared** once the next file
+  started.
+- **Saving a host, group or account could fail without a word.** The dialog
+  now says why and stays open.
+- **A collection opened as a grid wore its look in the first pane only,** and
+  a restored tab showed an activity dot for output it never had.
+- **View → Reload is gone from built copies:** it closed every session
+  without asking.
+- **Several questions, buttons and hints were English in the Russian
+  interface.**
+
 ## 0.19.3
 
 ### Fixed
