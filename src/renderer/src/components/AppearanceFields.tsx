@@ -1,5 +1,5 @@
 import type { AppearanceDefaults, CursorStyle, ResolvedAppearance } from '../../../shared/types'
-import { FONT_CHOICES, THEME_GROUPS, themeByName } from '../state/settings'
+import { FONT_CHOICES, THEME_GROUPS, themeOf } from '../state/settings'
 import { useT, type Translate } from '../i18n'
 
 interface Props {
@@ -45,7 +45,7 @@ export default function AppearanceFields({
   inheritToggle
 }: Props): JSX.Element {
   const t = useT()
-  const preview = themeByName(effective.themeName).terminal
+  const preview = themeOf(effective)
   /**
    * Names the value an "Inherit" option would actually give, and where from.
    *

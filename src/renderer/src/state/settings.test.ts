@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_SETTINGS, OTHER_KEYS, TERMINAL_KEYS, terminalDefaults } from './settings'
+import {
+  ANSI_PALETTE,
+  DEFAULT_SETTINGS,
+  OTHER_KEYS,
+  TERMINAL_KEYS,
+  THEMES,
+  terminalDefaults,
+  themeOf
+} from './settings'
 
 /**
  * Which settings the Terminal tab's reset is allowed to touch.
@@ -23,5 +31,24 @@ describe('the terminal defaults', () => {
     // rather than quietly inheriting whichever behaviour it happens to get.
     const listed = [...TERMINAL_KEYS, ...OTHER_KEYS].sort()
     expect(listed).toEqual(Object.keys(DEFAULT_SETTINGS).sort())
+  })
+})
+
+/**
+ * Full-screen programs such as Midnight Commander pick ANSI blue and cyan for
+ * their panels and trust them to carry white text. A theme that repainted them
+ * pastel left the file names unreadable.
+ */
+describe('the ANSI colours', () => {
+  it('are the same under every theme', () => {
+    for (const themeName of Object.keys(THEMES)) {
+      expect(themeOf({ themeName }), themeName).toMatchObject(ANSI_PALETTE)
+    }
+  })
+
+  it('leave the theme its background and text', () => {
+    const theme = themeOf({ themeName: 'Nord' })
+    expect(theme.background).toBe(THEMES.Nord.terminal.background)
+    expect(theme.foreground).toBe(THEMES.Nord.terminal.foreground)
   })
 })

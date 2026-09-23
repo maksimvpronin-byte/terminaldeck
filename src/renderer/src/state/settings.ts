@@ -52,8 +52,38 @@ export interface UiPalette {
   success: string
 }
 
+/**
+ * The sixteen ANSI colours, the same under every theme: xterm's own defaults.
+ *
+ * Themes used to bring palettes of their own, and full-screen programs paid for
+ * it. Midnight Commander paints its panels in ANSI blue and its menu in cyan,
+ * trusting both to be dark enough for white text — under Nord they came out
+ * pastel, with the file names all but gone. A theme now decides the background,
+ * the text, the cursor and the selection; what a program asked to be blue stays
+ * blue.
+ */
+export const ANSI_PALETTE = {
+  black: '#2e3436',
+  red: '#cc0000',
+  green: '#4e9a06',
+  yellow: '#c4a000',
+  blue: '#3465a4',
+  magenta: '#75507b',
+  cyan: '#06989a',
+  white: '#d3d7cf',
+  brightBlack: '#555753',
+  brightRed: '#ef2929',
+  brightGreen: '#8ae234',
+  brightYellow: '#fce94f',
+  brightBlue: '#729fcf',
+  brightMagenta: '#ad7fa8',
+  brightCyan: '#34e2e2',
+  brightWhite: '#eeeeec'
+} as const satisfies ITheme
+
 export interface ThemeDef {
-  terminal: ITheme
+  /** No ANSI colours here, deliberately — see ANSI_PALETTE. */
+  terminal: Pick<ITheme, 'background' | 'foreground' | 'cursor' | 'selectionBackground'>
   ui: UiPalette
   /**
    * Light themes have to say so rather than be guessed at from their name:
@@ -90,15 +120,7 @@ export const THEMES: Record<string, ThemeDef> = {
       background: '#002b36',
       foreground: '#93a1a1',
       cursor: '#93a1a1',
-      selectionBackground: '#073642',
-      black: '#073642',
-      red: '#dc322f',
-      green: '#859900',
-      yellow: '#b58900',
-      blue: '#268bd2',
-      magenta: '#d33682',
-      cyan: '#2aa198',
-      white: '#eee8d5'
+      selectionBackground: '#073642'
     },
     ui: {
       bg0: '#002b36',
@@ -119,15 +141,7 @@ export const THEMES: Record<string, ThemeDef> = {
       background: '#282a36',
       foreground: '#f8f8f2',
       cursor: '#f8f8f0',
-      selectionBackground: '#44475a',
-      black: '#21222c',
-      red: '#ff5555',
-      green: '#50fa7b',
-      yellow: '#f1fa8c',
-      blue: '#bd93f9',
-      magenta: '#ff79c6',
-      cyan: '#8be9fd',
-      white: '#f8f8f2'
+      selectionBackground: '#44475a'
     },
     ui: {
       bg0: '#282a36',
@@ -148,15 +162,7 @@ export const THEMES: Record<string, ThemeDef> = {
       background: '#fafafa',
       foreground: '#2e3138',
       cursor: '#2e3138',
-      selectionBackground: '#c8d8f0',
-      black: '#2e3138',
-      red: '#c7254e',
-      green: '#3f7f3f',
-      yellow: '#8a6d00',
-      blue: '#1f5fbf',
-      magenta: '#a03fa0',
-      cyan: '#2a8f8f',
-      white: '#d9d9d9'
+      selectionBackground: '#c8d8f0'
     },
     ui: {
       bg0: '#ffffff',
@@ -178,15 +184,7 @@ export const THEMES: Record<string, ThemeDef> = {
       background: '#2e3440',
       foreground: '#d8dee9',
       cursor: '#88c0d0',
-      selectionBackground: '#434c5e',
-      black: '#3b4252',
-      red: '#bf616a',
-      green: '#a3be8c',
-      yellow: '#ebcb8b',
-      blue: '#81a1c1',
-      magenta: '#b48ead',
-      cyan: '#88c0d0',
-      white: '#e5e9f0'
+      selectionBackground: '#434c5e'
     },
     ui: {
       bg0: '#2e3440',
@@ -207,15 +205,7 @@ export const THEMES: Record<string, ThemeDef> = {
       background: '#282828',
       foreground: '#ebdbb2',
       cursor: '#fabd2f',
-      selectionBackground: '#504945',
-      black: '#282828',
-      red: '#fb4934',
-      green: '#b8bb26',
-      yellow: '#fabd2f',
-      blue: '#83a598',
-      magenta: '#d3869b',
-      cyan: '#8ec07c',
-      white: '#ebdbb2'
+      selectionBackground: '#504945'
     },
     ui: {
       bg0: '#282828',
@@ -236,15 +226,7 @@ export const THEMES: Record<string, ThemeDef> = {
       background: '#282c34',
       foreground: '#abb2bf',
       cursor: '#61afef',
-      selectionBackground: '#3e4451',
-      black: '#282c34',
-      red: '#e06c75',
-      green: '#98c379',
-      yellow: '#e5c07b',
-      blue: '#61afef',
-      magenta: '#c678dd',
-      cyan: '#56b6c2',
-      white: '#abb2bf'
+      selectionBackground: '#3e4451'
     },
     ui: {
       bg0: '#282c34',
@@ -265,15 +247,7 @@ export const THEMES: Record<string, ThemeDef> = {
       background: '#1a1b26',
       foreground: '#c0caf5',
       cursor: '#7aa2f7',
-      selectionBackground: '#2f334d',
-      black: '#15161e',
-      red: '#f7768e',
-      green: '#9ece6a',
-      yellow: '#e0af68',
-      blue: '#7aa2f7',
-      magenta: '#bb9af7',
-      cyan: '#7dcfff',
-      white: '#a9b1d6'
+      selectionBackground: '#2f334d'
     },
     ui: {
       bg0: '#1a1b26',
@@ -294,15 +268,7 @@ export const THEMES: Record<string, ThemeDef> = {
       background: '#1e1e2e',
       foreground: '#cdd6f4',
       cursor: '#89b4fa',
-      selectionBackground: '#45475a',
-      black: '#45475a',
-      red: '#f38ba8',
-      green: '#a6e3a1',
-      yellow: '#f9e2af',
-      blue: '#89b4fa',
-      magenta: '#cba6f7',
-      cyan: '#89dceb',
-      white: '#bac2de'
+      selectionBackground: '#45475a'
     },
     ui: {
       bg0: '#1e1e2e',
@@ -323,15 +289,7 @@ export const THEMES: Record<string, ThemeDef> = {
       background: '#272822',
       foreground: '#f8f8f2',
       cursor: '#f8f8f0',
-      selectionBackground: '#49483e',
-      black: '#272822',
-      red: '#f92672',
-      green: '#a6e22e',
-      yellow: '#e6db74',
-      blue: '#66d9ef',
-      magenta: '#ae81ff',
-      cyan: '#a1efe4',
-      white: '#f8f8f2'
+      selectionBackground: '#49483e'
     },
     ui: {
       bg0: '#272822',
@@ -352,15 +310,7 @@ export const THEMES: Record<string, ThemeDef> = {
       background: '#011627',
       foreground: '#d6deeb',
       cursor: '#82aaff',
-      selectionBackground: '#1d3b53',
-      black: '#011627',
-      red: '#ef5350',
-      green: '#22da6e',
-      yellow: '#c5e478',
-      blue: '#82aaff',
-      magenta: '#c792ea',
-      cyan: '#21c7a8',
-      white: '#d6deeb'
+      selectionBackground: '#1d3b53'
     },
     ui: {
       bg0: '#011627',
@@ -381,15 +331,7 @@ export const THEMES: Record<string, ThemeDef> = {
       background: '#fdf6e3',
       foreground: '#657b83',
       cursor: '#586e75',
-      selectionBackground: '#eee8d5',
-      black: '#073642',
-      red: '#dc322f',
-      green: '#859900',
-      yellow: '#b58900',
-      blue: '#268bd2',
-      magenta: '#d33682',
-      cyan: '#2aa198',
-      white: '#eee8d5'
+      selectionBackground: '#eee8d5'
     },
     ui: {
       bg0: '#fdf6e3',
@@ -411,15 +353,7 @@ export const THEMES: Record<string, ThemeDef> = {
       background: '#ffffff',
       foreground: '#1f2328',
       cursor: '#0969da',
-      selectionBackground: '#b6d8ff',
-      black: '#24292f',
-      red: '#cf222e',
-      green: '#116329',
-      yellow: '#7d4e00',
-      blue: '#0969da',
-      magenta: '#8250df',
-      cyan: '#1b7c83',
-      white: '#6e7781'
+      selectionBackground: '#b6d8ff'
     },
     ui: {
       bg0: '#ffffff',
@@ -532,7 +466,7 @@ export function themeDefOf(settings: { themeName: string }): ThemeDef {
 }
 
 export function themeOf(settings: { themeName: string }): ITheme {
-  return themeDefOf(settings).terminal
+  return { ...ANSI_PALETTE, ...themeDefOf(settings).terminal }
 }
 
 /**
