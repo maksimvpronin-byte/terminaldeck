@@ -20,7 +20,7 @@ vi.mock('electron', () => ({
 }))
 
 userData = mkdtempSync(join(tmpdir(), 'terminaldeck-ssh-'))
-const { sshManager, forwarding } = await import('./SSHManager')
+const { sshManager, forwarding, methodWatcher } = await import('./SSHManager')
 
 interface Sent {
   channel: string
@@ -483,5 +483,25 @@ describe('a session log that fails', () => {
 
     expect(conn.logStream).toBeUndefined()
     expect(sent.map((s) => s.payload)).toContainEqual(expect.stringMatching(/ENOSPC/))
+  })
+})
+
+/**
+ * What the server will take, read off the line ssh2 writes when it refuses.
+ * The line is worded as ssh2's own handler words it, so a change there shows
+ * up here rather than as a hint that quietly stops appearing.
+ */
+describe('the sign-in methods a server offers', () => {
+  it('are read from the refusal ssh2 reports', () => {
+    const watcher = methodWatcher()
+    watcher.debug('Inbound: Received USERAUTH_FAILURE (publickey,password)')
+    expect(watcher.seen()).toBe('publickey, password')
+  })
+
+  it('are not read once the handshake is over', () => {
+    const watcher = methodWatcher()
+    watcher.stop()
+    watcher.debug('Inbound: Received USERAUTH_FAILURE (password)')
+    expect(watcher.seen()).toBeUndefined()
   })
 })

@@ -178,13 +178,17 @@ function credentialSource(profile: SessionProfile, auth: ResolvedAuth): string {
  * password was wrong, or the server never wanted a password at all — and only
  * the second is worth changing settings over. The server states this on every
  * rejection, in a line ssh2 writes to its debug channel and nowhere else:
- * "Received USERAUTH_FAILURE, continue with: publickey,keyboard-interactive".
+ * "Inbound: Received USERAUTH_FAILURE (publickey,keyboard-interactive)".
+ *
+ * It was looked for as "continue with: …", which is not how ssh2 words it, so
+ * the hint never appeared and every refusal ended in advice about inherited
+ * passwords — given to someone who had offered a key and no password at all.
  *
  * So the channel is read, for the length of the handshake only. It carries
  * every packet otherwise, which is not a thing to leave running on a live
  * session.
  */
-function methodWatcher(): {
+export function methodWatcher(): {
   debug: (message: string) => void
   stop: () => void
   seen: () => string | undefined
@@ -194,8 +198,8 @@ function methodWatcher(): {
   return {
     debug: (message) => {
       if (!watching) return
-      const match = /continue with:?\s*(.+)/i.exec(message)
-      if (match) methods = match[1].trim()
+      const match = /USERAUTH_FAILURE \(([^)]*)\)/.exec(message)
+      if (match?.[1]) methods = match[1].split(',').join(', ')
     },
     stop: () => {
       watching = false
@@ -231,7 +235,16 @@ function hopFailure(
   const accepts = offered
     ? `, while the server accepts: ${offered}.`
     : `. If that is not what this machine wants, set the login and password on the host itself rather than inheriting them.`
-  return new Error(`${profile.name} refused to sign in as ${who}. ${tried}${accepts}`)
+  /*
+   * A key turned down by a server that takes keys is not a question of method:
+   * this key is simply not one the server knows for that login. Saying so saves
+   * a round of changing settings that were never the problem.
+   */
+  const unknownKey =
+    auth.authMethod === 'privateKey' && offered && /\bpublickey\b/.test(offered)
+      ? ` The key itself was refused: its public half is not in ~/.ssh/authorized_keys for ${auth.username} on that machine, or the key belongs to another login.`
+      : ''
+  return new Error(`${profile.name} refused to sign in as ${who}. ${tried}${accepts}${unknownKey}`)
 }
 
 async function buildAuthConfig(
