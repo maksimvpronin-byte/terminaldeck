@@ -1,6 +1,6 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>TerminalDeck 0.15.5 — руководство</title>
+<title>TerminalDeck 0.19 — руководство</title>
 
 <style>
   :root {
@@ -562,12 +562,808 @@
       color: #000;
     }
   }
+
+  /* ---------- рисунки ----------
+   *
+   * Схемы окна, нарисованные прямо здесь, а не снимки экрана: они не устаревают
+   * от смены шрифта, не показывают ничьих настоящих хостов и остаются резкими
+   * при любом масштабе. Цвета — те же, что у самого приложения
+   * (src/renderer/src/styles.css), поэтому схема выглядит как окно.
+   */
+  figure.fig {
+    margin: 22px 0 28px;
+    max-width: 940px;
+  }
+  .fig .shot {
+    position: relative;
+    background: var(--plate);
+    border: 1px solid var(--rule-soft);
+    border-radius: 12px;
+    padding: 24px;
+    overflow-x: auto;
+  }
+  .fig figcaption {
+    color: var(--ink-faint);
+    font-size: 13.5px;
+    margin-top: 10px;
+    max-width: 82ch;
+  }
+  .fig figcaption b {
+    color: var(--ink-soft);
+  }
+  .fig .row {
+    display: flex;
+    gap: 22px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .fig .arrow {
+    align-self: center;
+    color: var(--ink-faint);
+    font-size: 22px;
+  }
+
+  /* выноски: цифра на схеме и та же цифра в подписи под ней */
+  .co {
+    display: inline-grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #f2b84b;
+    color: #1a1406;
+    font: 700 11px/1 var(--sans);
+    box-shadow: 0 0 0 3px var(--plate);
+    z-index: 2;
+    flex: none;
+  }
+  .m .co {
+    position: absolute;
+  }
+  ol.legend {
+    list-style: none;
+    padding: 0;
+    margin: 14px 0 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+    gap: 6px 22px;
+    max-width: none;
+    font-size: 14px;
+  }
+  /* A block, not a flex row: a caption may hold a key or a word in a frame,
+     and a flex row would turn each of them into a column of its own. */
+  ol.legend li {
+    position: relative;
+    padding-left: 30px;
+    margin: 0;
+  }
+  ol.legend li > .co:first-child {
+    position: absolute;
+    left: 0;
+    top: 2px;
+    box-shadow: none;
+  }
+
+  /* макет окна приложения */
+  .m {
+    --m-bg0: #17181c;
+    --m-bg1: #1e2025;
+    --m-bg2: #26282e;
+    --m-bg3: #303339;
+    --m-bd: #383b42;
+    --m-tx: #e4e6eb;
+    --m-dim: #9aa0ab;
+    --m-acc: #5b9dff;
+    --m-accd: #2e4a75;
+    --m-ok: #3fb950;
+    --m-bad: #e5534b;
+    font-family: var(--sans);
+    font-size: 12px;
+    line-height: 1.35;
+    color: var(--m-tx);
+  }
+  .m * {
+    box-sizing: border-box;
+  }
+  .m .rel {
+    position: relative;
+  }
+  .m-win {
+    display: grid;
+    grid-template-columns: 196px minmax(0, 1fr);
+    min-width: 760px;
+    background: var(--m-bg0);
+    border: 1px solid var(--m-bd);
+    border-radius: 9px;
+    overflow: visible;
+    box-shadow: var(--shadow);
+  }
+  .m-side {
+    position: relative;
+    background: var(--m-bg1);
+    border-right: 1px solid var(--m-bd);
+    display: flex;
+    flex-direction: column;
+    border-radius: 9px 0 0 9px;
+  }
+  .m-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--m-bd);
+  }
+  .m-tabs span {
+    flex: 1;
+    text-align: center;
+    padding: 7px 0 6px;
+    color: var(--m-dim);
+    border-bottom: 2px solid transparent;
+  }
+  .m-tabs span.on {
+    color: var(--m-tx);
+    border-bottom-color: var(--m-acc);
+  }
+  .m-bar {
+    position: relative;
+    display: flex;
+    gap: 5px;
+    padding: 7px;
+    border-bottom: 1px solid var(--m-bd);
+  }
+  .m-input {
+    position: relative;
+    flex: 1;
+    min-height: 25px;
+    background: var(--m-bg1);
+    border: 1px solid var(--m-bd);
+    border-radius: 5px;
+    padding: 5px 24px 5px 8px;
+    color: var(--m-dim);
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .m-input.val {
+    color: var(--m-tx);
+  }
+  .m-input.focus {
+    outline: 1px solid var(--m-acc);
+  }
+  .m-input .x {
+    position: absolute;
+    right: 5px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--m-dim);
+    font-size: 13px;
+    line-height: 1;
+  }
+  .m-btn {
+    display: inline-block;
+    background: var(--m-bg3);
+    border: 1px solid var(--m-bd);
+    border-radius: 5px;
+    padding: 4px 10px;
+    color: var(--m-tx);
+    white-space: nowrap;
+    text-align: center;
+  }
+  .m-btn.pri {
+    background: var(--m-accd);
+    border-color: var(--m-acc);
+  }
+  .m-btn.wide {
+    flex: 1;
+  }
+  .m-tree {
+    padding: 5px 0;
+    flex: 1;
+  }
+  .m-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    white-space: nowrap;
+    color: var(--m-tx);
+  }
+  .m-item.l1 {
+    padding-left: 20px;
+  }
+  .m-item.l2 {
+    padding-left: 32px;
+  }
+  .m-item .tw {
+    color: var(--m-dim);
+    width: 9px;
+    font-size: 9px;
+  }
+  .m-item .n {
+    color: var(--m-dim);
+    font-size: 11px;
+  }
+  .m-item.sel {
+    background: var(--m-accd);
+  }
+  .m-item.tint {
+    box-shadow: inset 3px 0 0 var(--c);
+    background: color-mix(in srgb, var(--c) 16%, transparent);
+  }
+  /* Selection paints the row; the colour stays as the stripe on its left. */
+  .m-item.sel.tint {
+    background: var(--m-accd);
+  }
+  .m-item.gone {
+    color: var(--m-dim);
+    text-decoration: line-through;
+  }
+  .m-ic {
+    display: inline-grid;
+    place-items: center;
+    width: 16px;
+    height: 16px;
+    color: var(--m-dim);
+    border-radius: 3px;
+    flex: none;
+  }
+  .m-ic svg {
+    width: 13px;
+    height: 13px;
+  }
+  .m-item.open .m-ic {
+    color: var(--m-ok);
+    background: rgba(63, 185, 80, 0.16);
+  }
+  .m-sub {
+    padding: 4px 8px 2px;
+    color: var(--m-dim);
+    font-size: 10.5px;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+  }
+  .m-foot {
+    display: flex;
+    gap: 5px;
+    padding: 7px;
+    border-top: 1px solid var(--m-bd);
+  }
+  .m-foot .m-btn {
+    flex: 1;
+    padding: 4px 4px;
+  }
+  .m-main {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    border-radius: 0 9px 9px 0;
+  }
+  .m-ws {
+    position: relative;
+    display: flex;
+    gap: 4px;
+    padding: 6px 8px;
+    background: var(--m-bg1);
+    border-bottom: 1px solid var(--m-bd);
+  }
+  .m-chip {
+    position: relative;
+    padding: 3px 11px;
+    border-radius: 5px;
+    background: var(--m-bg2);
+    color: var(--m-dim);
+    white-space: nowrap;
+  }
+  .m-chip.on {
+    background: var(--m-bg3);
+    color: var(--m-tx);
+    box-shadow: inset 0 -2px 0 var(--m-acc);
+  }
+  .m-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--m-acc);
+    margin-left: 6px;
+    vertical-align: 1px;
+  }
+  .m-tabrow {
+    position: relative;
+    display: flex;
+    gap: 3px;
+    padding: 5px 8px 0;
+    border-bottom: 1px solid var(--m-bd);
+  }
+  .m-tab {
+    position: relative;
+    padding: 4px 13px;
+    border: 1px solid var(--m-bd);
+    border-bottom: 0;
+    border-radius: 6px 6px 0 0;
+    color: var(--m-dim);
+    background: var(--m-bg1);
+    white-space: nowrap;
+  }
+  .m-tab.on {
+    color: var(--m-tx);
+    background: var(--m-bg2);
+    box-shadow: inset 0 2px 0 var(--m-acc);
+  }
+  .m-panes {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--m-bd);
+    border-radius: 0 0 9px 0;
+    overflow: visible;
+  }
+  .m-panes.one {
+    grid-template-columns: 1fr;
+  }
+  .m-pane {
+    position: relative;
+    background: var(--m-bg0);
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .m-pane.act {
+    box-shadow: inset 0 0 0 1px var(--m-acc);
+  }
+  .m-ptool {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 4px 8px;
+    background: var(--m-bg1);
+    border-bottom: 1px solid var(--m-bd);
+    color: var(--m-dim);
+    white-space: nowrap;
+  }
+  .m-ptool b {
+    color: var(--m-tx);
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .m-ptool .sp {
+    flex: 1;
+  }
+  .m-ptool .t {
+    font-size: 11px;
+    padding: 1px 5px;
+    border-radius: 4px;
+    border: 1px solid var(--m-bd);
+  }
+  .m-ptool .t.on {
+    color: var(--m-tx);
+    border-color: var(--m-acc);
+  }
+  .m-term {
+    flex: 1;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    line-height: 1.45;
+    padding: 8px 10px;
+    color: #c9d1d9;
+    white-space: pre;
+    min-height: 140px;
+    overflow: hidden;
+  }
+  pre.m-term {
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    max-width: none;
+    overflow: hidden;
+  }
+  .m-term .p {
+    color: var(--m-ok);
+  }
+  .m-term .d {
+    color: var(--m-dim);
+  }
+  .m-term .e {
+    color: var(--m-bad);
+  }
+  .m-term .c {
+    display: inline-block;
+    width: 7px;
+    height: 13px;
+    background: #c9d1d9;
+    vertical-align: -2px;
+  }
+
+  /* рабочий стол Windows внутри панели */
+  .m-desk {
+    position: relative;
+    flex: 1;
+    min-height: 160px;
+    background: radial-gradient(120% 90% at 30% 20%, #2b5c9a 0%, #173a6a 45%, #0e2344 100%);
+    overflow: hidden;
+  }
+  .m-desk .task {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 20px;
+    background: rgba(18, 22, 30, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .m-desk .task i {
+    width: 11px;
+    height: 11px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.55);
+  }
+  .m-desk .task i:first-child {
+    background: #4aa3ff;
+  }
+  .m-desk .appw {
+    position: absolute;
+    left: 14%;
+    top: 16%;
+    width: 52%;
+    height: 50%;
+    background: #f3f3f3;
+    border-radius: 5px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  }
+  .m-desk .appw::before {
+    content: '';
+    display: block;
+    height: 14px;
+    border-radius: 5px 5px 0 0;
+    background: #e3e3e3;
+  }
+  .m-overlay {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: rgba(12, 13, 16, 0.72);
+  }
+  .m-notice {
+    background: var(--m-bg1);
+    border: 1px solid var(--m-bd);
+    border-radius: 8px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    max-width: 92%;
+    text-align: center;
+  }
+  .m-notice small {
+    color: var(--m-dim);
+  }
+
+  /* диалоги */
+  .m-dialog {
+    position: relative;
+    width: 340px;
+    background: var(--m-bg1);
+    border: 1px solid var(--m-bd);
+    border-radius: 10px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    box-shadow: var(--shadow);
+  }
+  .m-dialog.wide {
+    width: 440px;
+  }
+  .m-dialog h5 {
+    margin: 0 0 2px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--m-tx);
+  }
+  .m-field {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    color: var(--m-dim);
+    font-size: 11.5px;
+  }
+  .m-field .m-input {
+    padding-right: 8px;
+  }
+  .m-row {
+    display: flex;
+    gap: 8px;
+  }
+  .m-row > * {
+    flex: 1;
+  }
+  .m-row > .narrow {
+    flex: 0 0 72px;
+  }
+  .m-select::after {
+    content: '▾';
+    position: absolute;
+    right: 8px;
+    color: var(--m-dim);
+  }
+  .m-seg {
+    position: relative;
+    display: inline-flex;
+    align-self: flex-start;
+    border: 1px solid var(--m-bd);
+    border-radius: 5px;
+    overflow: visible;
+  }
+  /* Two segments, and perhaps a numbered mark beside them that is not one. */
+  .m-seg > span:not(.co) {
+    padding: 4px 16px;
+    color: var(--m-dim);
+    background: var(--m-bg1);
+    border-radius: 5px 0 0 5px;
+  }
+  .m-seg > span:not(.co) + span:not(.co) {
+    border-radius: 0 5px 5px 0;
+    border-left: 1px solid var(--m-bd);
+  }
+  .m-seg > span.on {
+    color: var(--m-tx);
+    background: var(--m-accd);
+    box-shadow: inset 0 -2px 0 var(--m-acc);
+  }
+  .m-check {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--m-tx);
+  }
+  .m-check::before {
+    content: '';
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    border: 1px solid var(--m-bd);
+    background: var(--m-bg0);
+    flex: none;
+  }
+  .m-check.on::before {
+    content: '✓';
+    display: grid;
+    place-items: center;
+    font-size: 9px;
+    color: #fff;
+    background: var(--m-acc);
+    border-color: var(--m-acc);
+  }
+  .m-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+    margin-top: 4px;
+  }
+  .m-hint {
+    color: var(--m-dim);
+    font-size: 11px;
+  }
+  .m-err {
+    color: var(--m-bad);
+    font-size: 11.5px;
+  }
+  .m-badge {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: #2b5c33;
+    color: #c9f3d0;
+  }
+  .m-badge.warn {
+    background: #5a3a12;
+    color: #f0d19a;
+  }
+
+  /* файловая панель */
+  .m-files {
+    min-width: 560px;
+    background: var(--m-bg0);
+    border: 1px solid var(--m-bd);
+    border-radius: 9px;
+    overflow: visible;
+    box-shadow: var(--shadow);
+  }
+  .m-path {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    background: var(--m-bg1);
+    border-bottom: 1px solid var(--m-bd);
+    border-radius: 9px 9px 0 0;
+  }
+  .m-crumbs {
+    display: flex;
+    gap: 3px;
+    color: var(--m-dim);
+    white-space: nowrap;
+  }
+  .m-crumbs span {
+    color: var(--m-tx);
+  }
+  .m-fbody {
+    display: grid;
+    grid-template-columns: 130px 1fr;
+  }
+  .m-ftree {
+    position: relative;
+    border-right: 1px solid var(--m-bd);
+    padding: 5px 0;
+    color: var(--m-dim);
+  }
+  .m-ftree div {
+    padding: 2px 8px;
+    white-space: nowrap;
+  }
+  .m-ftree .here {
+    color: var(--m-tx);
+    background: var(--m-accd);
+  }
+  .m-flist {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(120px, 1fr) 62px 82px 72px;
+    align-content: start;
+  }
+  .m-flist > div {
+    padding: 3px 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .m-flist .h {
+    color: var(--m-dim);
+    font-size: 10.5px;
+    border-bottom: 1px solid var(--m-bd);
+    background: var(--m-bg1);
+  }
+  .m-flist .dir {
+    color: #5b9dff;
+  }
+  .m-flist .lnk {
+    color: #4dd0d8;
+  }
+  .m-flist .exe {
+    color: #e5534b;
+  }
+  .m-flist .num {
+    color: var(--m-dim);
+    font-variant-numeric: tabular-nums;
+  }
+  .m-flist .selrow {
+    background: var(--m-accd);
+  }
+  .m-progress {
+    height: 4px;
+    background: var(--m-bg2);
+    border-radius: 0 0 9px 9px;
+    overflow: hidden;
+  }
+  .m-progress i {
+    display: block;
+    height: 100%;
+    width: 62%;
+    background: var(--m-acc);
+  }
+
+  /* небольшие полосы: мониторинг, обновление, выделение */
+  .m-strip {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 7px 12px;
+    background: var(--m-bg1);
+    border: 1px solid var(--m-bd);
+    border-radius: 7px;
+    white-space: nowrap;
+    min-width: 560px;
+  }
+  .m-strip .k {
+    color: var(--m-dim);
+    margin-right: 5px;
+  }
+  .m-meter {
+    display: inline-block;
+    width: 56px;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--m-bg3);
+    vertical-align: 1px;
+    overflow: hidden;
+  }
+  .m-meter i {
+    display: block;
+    height: 100%;
+    background: var(--m-ok);
+  }
+  .m-meter i.w {
+    background: #d9a441;
+  }
+  .m-meter i.r {
+    background: var(--m-bad);
+  }
+  .m-banner {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: #1c2b44;
+    border: 1px solid var(--m-acc);
+    border-radius: 7px;
+    min-width: 520px;
+  }
+  .m-banner .sp {
+    flex: 1;
+  }
+
+  /* git → дерево */
+  .m-flow {
+    display: flex;
+    align-items: stretch;
+    gap: 14px;
+    min-width: 640px;
+  }
+  .m-card {
+    position: relative;
+    flex: 1;
+    background: var(--m-bg1);
+    border: 1px solid var(--m-bd);
+    border-radius: 9px;
+    padding: 10px 12px;
+  }
+  .m-card h6 {
+    margin: 0 0 7px;
+    font-size: 11px;
+    color: var(--m-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+  }
+  .m-card pre {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-size: 11px;
+    line-height: 1.5;
+    color: #c9d1d9;
+    max-width: none;
+  }
+  .m-card pre .k {
+    color: #8fbcff;
+  }
+  .m-card pre .v {
+    color: #f0d19a;
+  }
+
+  @media print {
+    .fig .shot {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+      break-inside: avoid;
+    }
+  }
 </style>
 
 <div id="wrap">
   <nav id="toc">
     <p class="brand"><b>TerminalDeck</b></p>
-    <p class="ver">Руководство пользователя · 0.15.5</p>
+    <p class="ver">Руководство пользователя · 0.19</p>
     <ol>
       <li><a href="#about">Что это такое</a></li>
       <li><a href="#install">Установка и первый запуск</a></li>
@@ -603,9 +1399,10 @@
         <button type="button" data-os="win">Windows · Linux</button>
       </div>
       <div class="badges">
-        <span class="badge">версия 0.15.5</span>
+        <span class="badge">версия 0.19.5</span>
         <span class="badge">macOS · Windows · Linux</span>
-        <span class="badge b-new">новое: SCP/Shell и папки групп</span>
+        <span class="badge b-new">новое: RDP в быстром подключении</span>
+        <span class="badge b-new">новое: обновление одной кнопкой</span>
         <span class="badge">интерфейс: русский и английский</span>
       </div>
     </header>
@@ -649,9 +1446,7 @@
           </tr>
           <tr>
             <td>Файлы</td>
-            <td>
-              Панель рядом с терминалом: SFTP или, с 0.13.1, SCP/Shell от другого пользователя
-            </td>
+            <td>Панель рядом с терминалом: SFTP или SCP/Shell от имени другого пользователя</td>
           </tr>
           <tr>
             <td>Рабочий стол</td>
@@ -677,6 +1472,13 @@
           Голый <kbd>Ctrl</kbd> всегда принадлежит оболочке: <kbd>Ctrl+C</kbd> прерывает команду,
           <kbd>Ctrl+D</kbd> завершает сессию, <kbd>Ctrl+K</kbd>, <kbd>Ctrl+W</kbd> и
           <kbd>Ctrl+L</kbd> делают то, что положено readline. Приложение их не перехватывает.
+        </p>
+      </div>
+      <div class="note">
+        <p>
+          <b>Про рисунки.</b> Схемы в этом руководстве нарисованы в цветах приложения, но это схемы,
+          а не снимки экрана: на них нет ничьих настоящих хостов, и мелкие детали упрощены. Жёлтые
+          цифры на схеме совпадают с цифрами в подписи под ней.
         </p>
       </div>
     </section>
@@ -705,18 +1507,50 @@
 
       <h3>Windows</h3>
       <p>
-        Установщик <code>TerminalDeck-Setup-0.15.x.exe</code> ставит программу обычным образом. Есть
-        и портативная сборка одним файлом — она ничего не пишет в реестр и подходит, когда ставить
-        нельзя. Неподписанную сборку SmartScreen может предупредить:
-        <span class="ui">Подробнее → Выполнить в любом случае</span>.
+        Установщик <code>TerminalDeck-Setup-0.19.x.exe</code> ставит программу обычным образом. Есть
+        и портативная сборка одним файлом (<code>TerminalDeck-0.19.x.exe</code>) — она ничего не
+        пишет в реестр и подходит, когда ставить нельзя. Неподписанную сборку SmartScreen может
+        предупредить: <span class="ui">Подробнее → Выполнить в любом случае</span>.
+      </p>
+      <p>
+        Дальнейшие обновления ставятся <b>из самого приложения, одной кнопкой</b>, без мастера
+        установки — см. <a href="#backup">раздел 14</a>.
       </p>
 
       <h3>Linux</h3>
       <p>
         Есть <code>.AppImage</code> (сделайте файл исполняемым и запустите) и <code>.deb</code>.
+        Клиента рабочего стола под Linux пока нет: RDP-хост откроется панелью с сообщением, что
+        клиента нет, а SSH, файлы и туннели работают полностью.
       </p>
 
       <h3>Первый запуск: мастер-пароль</h3>
+      <figure class="fig">
+        <div class="shot">
+          <div class="m">
+            <div class="m-dialog">
+              <h5>Добро пожаловать в TerminalDeck</h5>
+              <span class="m-hint"
+                >Придумайте мастер-пароль. Им шифруется всё, что вы сохраните.</span
+              >
+              <div class="m-field">
+                Мастер-пароль
+                <div class="m-input val focus">••••••••••••</div>
+                <span class="co" style="right: -10px; top: 18px">1</span>
+              </div>
+              <div class="m-field">
+                Повторите
+                <div class="m-input val">••••••••••••</div>
+              </div>
+              <div class="m-actions"><span class="m-btn pri">Создать хранилище</span></div>
+            </div>
+          </div>
+        </div>
+        <figcaption>
+          <b>Рис. 1.</b> Первый экран. <span class="co">1</span> Не короче 8 символов; пароль не
+          пишется на диск и никуда не отправляется.
+        </figcaption>
+      </figure>
       <p>
         При первом старте появится экран <span class="ui">Добро пожаловать в TerminalDeck</span>
         с просьбой придумать мастер-пароль. Им шифруется всё, что вы сохраните: пароли хостов,
@@ -736,19 +1570,211 @@
           Хранилище можно и не наполнять: вход по ключу или через агент SSH его вообще не
           спрашивает.
         </li>
+        <li>
+          Запущено может быть <b>одно окно приложения</b>: второй запуск просто выводит вперёд уже
+          открытое — две копии перезаписывали бы сохранения друг друга.
+        </li>
       </ul>
 
       <h3>Язык интерфейса</h3>
       <p>
         <span class="ui">Настройки → Язык</span> — русский или английский, применяется сразу, без
-        перезапуска, и только к этому окну. Никуда ничего не отправляется. Непереведённые места
-        показываются по-английски, а не заглушкой.
+        перезапуска, и только к этому окну. Никуда ничего не отправляется.
       </p>
     </section>
 
     <section id="window">
       <h2><span class="num">03</span>Устройство окна</h2>
       <p class="lede">Слева дерево, сверху рабочие области и вкладки, в середине панели.</p>
+
+      <figure class="fig">
+        <div class="shot">
+          <div class="m">
+            <div class="m-win">
+              <div class="m-side">
+                <div class="m-tabs rel">
+                  <span class="on">Сессии</span><span>Инвентарь</span>
+                  <span class="co" style="left: -9px; top: 4px">1</span>
+                </div>
+                <div class="m-bar">
+                  <div class="m-input val">prod<span class="x">✕</span></div>
+                  <span class="co" style="right: -9px; top: 9px">2</span>
+                </div>
+                <div class="m-bar">
+                  <span class="m-btn pri wide">+ Сессия</span><span class="m-btn">+ Группа</span>
+                </div>
+                <div class="m-tree rel">
+                  <div class="m-item"><span class="tw">▼</span>📁 Продакшн</div>
+                  <div class="m-item l1 open tint" style="--c: #e5534b">
+                    <span class="m-ic"
+                      ><svg viewBox="0 0 16 16">
+                        <rect
+                          x="1.5"
+                          y="2.5"
+                          width="13"
+                          height="11"
+                          rx="1.5"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="1.2"
+                        />
+                        <polyline
+                          points="4.3,6 6.6,8 4.3,10"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="1.2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
+                        <line
+                          x1="8"
+                          y1="10.5"
+                          x2="11.5"
+                          y2="10.5"
+                          stroke="currentColor"
+                          stroke-width="1.2"
+                          stroke-linecap="round"
+                        /></svg
+                    ></span>
+                    prod-db-01
+                  </div>
+                  <div class="m-item l1 sel tint" style="--c: #e5534b">
+                    <span class="m-ic"
+                      ><svg viewBox="0 0 16 16">
+                        <rect
+                          x="1.5"
+                          y="2.5"
+                          width="13"
+                          height="11"
+                          rx="1.5"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="1.2"
+                        />
+                        <polyline
+                          points="4.3,6 6.6,8 4.3,10"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="1.2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
+                        <line
+                          x1="8"
+                          y1="10.5"
+                          x2="11.5"
+                          y2="10.5"
+                          stroke="currentColor"
+                          stroke-width="1.2"
+                          stroke-linecap="round"
+                        /></svg
+                    ></span>
+                    prod-web-02
+                  </div>
+                  <div class="m-item l1 open">
+                    <span class="m-ic"
+                      ><svg viewBox="0 0 16 16">
+                        <rect
+                          x="1.5"
+                          y="2.5"
+                          width="13"
+                          height="9"
+                          rx="1.5"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="1.2"
+                        />
+                        <line
+                          x1="6"
+                          y1="14"
+                          x2="10"
+                          y2="14"
+                          stroke="currentColor"
+                          stroke-width="1.2"
+                          stroke-linecap="round"
+                        />
+                        <line
+                          x1="8"
+                          y1="11.5"
+                          x2="8"
+                          y2="14"
+                          stroke="currentColor"
+                          stroke-width="1.2"
+                        /></svg
+                    ></span>
+                    prod-term-srv
+                  </div>
+                  <span class="co" style="right: 6px; top: 26px">3</span>
+                  <div class="m-sub">Наборы</div>
+                  <div class="m-item">🗂 Дежурство</div>
+                </div>
+                <div class="m-foot rel">
+                  <span class="m-btn">🔒</span><span class="m-btn">Сниппеты</span
+                  ><span class="m-btn">⚙</span><span class="m-btn">?</span>
+                  <span class="co" style="right: -9px; top: -10px">4</span>
+                </div>
+              </div>
+              <div class="m-main">
+                <div class="m-ws">
+                  <span class="m-chip on">Продакшн</span
+                  ><span class="m-chip">Стенд<span class="m-dot"></span></span
+                  ><span class="m-chip">+</span>
+                  <span class="co" style="left: 230px; top: 5px">5</span>
+                </div>
+                <div class="m-tabrow">
+                  <span class="m-tab on">prod-db-01</span><span class="m-tab">prod-term-srv</span>
+                  <span class="co" style="left: 230px; top: 4px">6</span>
+                </div>
+                <div class="m-panes">
+                  <div class="m-pane act">
+                    <div class="m-ptool">
+                      <b>deploy@prod-db-01</b><span class="sp"></span><span class="t on">SFTP</span
+                      ><span class="t">Туннели</span><span class="t">Монитор</span><span>⇱</span
+                      ><span>✕</span>
+                      <span class="co" style="right: 90px; top: -10px">7</span>
+                    </div>
+                    <pre
+                      class="m-term"
+                    ><span class="p">deploy@prod-db-01</span>:<span class="d">~</span>$ systemctl status postgresql
+<span class="d">● postgresql.service - PostgreSQL</span>
+     Active: <span class="p">active (running)</span>
+<span class="p">deploy@prod-db-01</span>:<span class="d">~</span>$ <span class="c"></span></pre>
+                  </div>
+                  <div class="m-pane">
+                    <div class="m-ptool"><b>deploy@prod-db-01 · файлы</b></div>
+                    <div class="m-term" style="font-family: var(--sans); white-space: normal">
+                      <div style="color: #5b9dff">📁 backups</div>
+                      <div style="color: #5b9dff">📁 conf.d</div>
+                      <div>postgresql.conf</div>
+                      <div style="color: #e5534b">rotate.sh</div>
+                    </div>
+                    <span class="co" style="right: 10px; top: 40px">8</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <ol class="legend">
+            <li><span class="co">1</span>Вкладки дерева: ваши «Сессии» и «Инвентарь» из git</li>
+            <li>
+              <span class="co">2</span>Фильтр хостов; <span class="ui">✕</span> или
+              <kbd>Esc</kbd> очищают его
+            </li>
+            <li>
+              <span class="co">3</span>Дерево: значок — терминал или рабочий стол, зелёный — уже
+              открыт, цвет строки — цвет группы
+            </li>
+            <li><span class="co">4</span>Блокировка хранилища, сниппеты, настройки, справка</li>
+            <li><span class="co">5</span>Рабочие области; точка — новый вывод в фоне</li>
+            <li><span class="co">6</span>Вкладки текущей области; тянутся мышью</li>
+            <li>
+              <span class="co">7</span>Кнопки панели: файлы, туннели, монитор, вынести, закрыть
+            </li>
+            <li><span class="co">8</span>Вторая панель той же вкладки — здесь файловый браузер</li>
+          </ol>
+        </div>
+        <figcaption><b>Рис. 2.</b> Окно целиком.</figcaption>
+      </figure>
 
       <h3>Боковая панель</h3>
       <ul>
@@ -757,7 +1783,9 @@
         <li>
           Сверху — <span class="ui">Быстрое подключение…</span>, кнопки
           <span class="ui">+ Сессия</span> и <span class="ui">+ Группа</span>, поле
-          <span class="ui">Фильтр хостов…</span>.
+          <span class="ui">Фильтр хостов…</span>. Пока в фильтре есть текст, справа в нём стоит
+          <span class="ui">✕</span> — он очищает поле и оставляет курсор в нём;
+          <kbd data-fixed>Esc</kbd> делает то же с клавиатуры.
         </li>
         <li>
           Внизу — <span class="ui">Заблокировать хранилище (⌘L)</span>,
@@ -771,7 +1799,7 @@
       <p>
         Верхняя полоса — рабочие области; у каждой свой ряд вкладок под ней. Вкладка — это один
         экран, внутри которого может быть одна панель или несколько, разделённых по вертикали и
-        горизонтали.
+        горизонтали. Подробно — <a href="#layout">раздел 8</a>.
       </p>
 
       <h3>Панель инструментов панели</h3>
@@ -799,8 +1827,12 @@
             <td>Вынести панель в отдельную вкладку</td>
           </tr>
           <tr>
-            <td>⌘D / ⌘⇧D</td>
+            <td><kbd>⌘D</kbd> / <kbd>⌘⇧D</kbd></td>
             <td>Разделить панель вправо и вниз</td>
+          </tr>
+          <tr>
+            <td>⛶</td>
+            <td>У рабочего стола — полный экран (<kbd data-fixed>F11</kbd>)</td>
           </tr>
         </tbody>
       </table>
@@ -808,16 +1840,126 @@
         У сессии рабочего стола файлового браузера, туннелей, мониторинга и трансляции нет — они не
         выключены, а просто не показываются: по RDP их взять неоткуда.
       </p>
+      <div class="note">
+        <p>
+          Интерфейс не дёргается, а плавно переходит: подсветка, меню, диалоги и вкладки появляются
+          за 120–160 мс. Хост, открытый двойным кликом, «вырастает» из своей строки в панель, а при
+          закрытии складывается обратно. Если в системе включено «уменьшить движение», анимаций нет.
+        </p>
+        <p>
+          В меню <span class="ui">View</span> установленной сборки нет пункта перезагрузки окна: она
+          закрывала бы все сессии без вопроса. Пункт остался только в режиме разработки.
+        </p>
+      </div>
     </section>
 
     <section id="first">
       <h2><span class="num">04</span>Первое подключение</h2>
 
-      <h3>Быстрое подключение</h3>
+      <h3>Быстрое подключение: SSH или рабочий стол</h3>
       <p>
-        Самый короткий путь: <span class="ui">Быстрое подключение…</span> над деревом. Нужны адрес и
-        логин; всё остальное — по умолчанию. Ничего не сохраняется, это разовый заход.
+        Самый короткий путь: <span class="ui">Быстрое подключение…</span> над деревом. Ничего не
+        сохраняется — это разовый заход. Наверху диалога переключатель <span class="ui">SSH</span> |
+        <span class="ui">RDP</span> <span class="tag t-new">0.19.5</span>: он решает, откроется
+        терминал или рабочий стол.
       </p>
+      <figure class="fig">
+        <div class="shot">
+          <div class="m row" style="display: flex; gap: 22px; flex-wrap: wrap">
+            <div class="m-dialog">
+              <h5>Быстрое подключение</h5>
+              <div class="m-seg">
+                <span class="on">SSH</span><span>RDP</span>
+                <span class="co" style="right: -26px; top: 3px">1</span>
+              </div>
+              <div class="m-row">
+                <div class="m-field">
+                  Хост
+                  <div class="m-input val">db.example.org</div>
+                </div>
+                <div class="m-field narrow">
+                  Порт
+                  <div class="m-input val">22</div>
+                </div>
+              </div>
+              <div class="m-field">
+                Логин
+                <div class="m-input val">deploy</div>
+              </div>
+              <div class="m-field">
+                Способ входа
+                <div class="m-input val m-select">Закрытый ключ</div>
+                <span class="co" style="right: -10px; top: 18px">2</span>
+              </div>
+              <div class="m-field">
+                Файл закрытого ключа
+                <div class="m-input val">~/.ssh/id_ed25519</div>
+              </div>
+              <div class="m-actions">
+                <span class="m-btn">Отмена</span><span class="m-btn pri">Подключиться</span>
+              </div>
+            </div>
+            <div class="m-dialog">
+              <h5>Быстрое подключение</h5>
+              <div class="m-seg"><span>SSH</span><span class="on">RDP</span></div>
+              <div class="m-row">
+                <div class="m-field">
+                  Хост
+                  <div class="m-input val">10.20.0.15</div>
+                </div>
+                <div class="m-field narrow rel">
+                  Порт
+                  <div class="m-input val">3389</div>
+                  <span class="co" style="right: -10px; top: 18px">3</span>
+                </div>
+              </div>
+              <div class="m-field">
+                Логин
+                <div class="m-input val">CORP\ivanov</div>
+                <span class="co" style="right: -10px; top: 18px">4</span>
+              </div>
+              <div class="m-field">
+                Пароль
+                <div class="m-input">Можно оставить пустым и ввести при открытии…</div>
+                <span class="co" style="right: -10px; top: 18px">5</span>
+              </div>
+              <div class="m-actions">
+                <span class="m-btn">Отмена</span><span class="m-btn pri">Подключиться</span>
+              </div>
+            </div>
+          </div>
+          <ol class="legend">
+            <li><span class="co">1</span>Переключатель: терминал по SSH или рабочий стол по RDP</li>
+            <li><span class="co">2</span>SSH: пароль, закрытый ключ или агент SSH</li>
+            <li>
+              <span class="co">3</span>Порт сам меняется на 3389; набранный вручную порт не
+              трогается
+            </li>
+            <li>
+              <span class="co">4</span>Логин в любом виде: <code>user</code>,
+              <code>DOMAIN\user</code> или <code>user@domain</code>
+            </li>
+            <li><span class="co">5</span>Пустой пароль спросят уже в панели рабочего стола</li>
+          </ol>
+        </div>
+        <figcaption>
+          <b>Рис. 3.</b> Быстрое подключение в двух режимах: слева SSH, справа RDP.
+        </figcaption>
+      </figure>
+      <ul>
+        <li>
+          <b>SSH</b> — нужны адрес и логин; способ входа — пароль, закрытый ключ или агент SSH.
+        </li>
+        <li>
+          <b>RDP</b> — адрес, логин и, по желанию, пароль. Способа входа нет: рабочий стол входит по
+          паролю. Всё остальное — как у только что созданного хоста: без шлюза, обычная (не
+          консольная) сессия, звук и буфер обмена включены.
+        </li>
+        <li>
+          Такая вкладка <b>не запоминается</b> при закрытии приложения — ни для SSH, ни для RDP, —
+          поэтому набранный пароль не попадает на диск.
+        </li>
+      </ul>
 
       <h3>Сохранённая сессия</h3>
       <ol class="steps">
@@ -832,20 +1974,45 @@
         <li>
           Логин и способ входа: <span class="ui">Пароль</span>,
           <span class="ui">Закрытый ключ</span> (с парольной фразой, если она есть) или
-          <span class="ui">Агент SSH</span>. Пустое поле означает наследование от группы.
+          <span class="ui">Агент SSH</span>. Пустое поле означает наследование от группы — серый
+          текст в поле подсказывает, что именно придёт и откуда (рис. 4).
         </li>
-        <li><span class="ui">Сохранить</span>. Хост появится в дереве.</li>
         <li>
-          <b>Двойной клик</b> подключает. Одиночный только выделяет — случайным кликом терминал не
-          откроется.
+          <span class="ui">Сохранить</span>. Хост появится в дереве. Если сохранить не удалось —
+          скажем, диск полон, — диалог так и скажет и останется открытым, ничего не потеряв.
+        </li>
+        <li>
+          <b>Двойной клик</b> подключает. Одиночный клик по неоткрытому хосту только выделяет его —
+          случайным кликом терминал не откроется. Одиночный клик по <b>уже открытому</b> хосту
+          выводит его панель вперёд, переключая рабочую область и вкладку; если он открыт в
+          нескольких местах, каждый следующий клик ведёт к следующему.
         </li>
       </ol>
 
       <h3>Импорт из ~/.ssh/config</h3>
       <p>
         <span class="ui">Импорт из ~/.ssh/config</span> в меню дерева забирает хосты из вашего
-        конфига SSH, включая связи <code>ProxyJump</code> — они станут промежуточными хостами.
+        конфига SSH так, как его читает сам OpenSSH:
       </p>
+      <ul>
+        <li>
+          Берутся <code>HostName</code>, <code>User</code>, <code>Port</code>,
+          <code>IdentityFile</code> и <code>ProxyJump</code>; запись вида
+          <code>HostName=example.com</code> без пробелов тоже понимается.
+        </li>
+        <li>
+          Шаблоны (<code>*</code>, <code>?</code>) и отрицания (<code>!bastion</code>) хостами не
+          считаются. Строки после <code>Match</code> к предыдущему <code>Host</code> не относятся.
+          Если параметр указан дважды, действует первое значение — как у OpenSSH.
+        </li>
+        <li>
+          <code>ProxyJump</code> — включая цепочку <code>j1,j2</code> — превращается в промежуточные
+          хосты. Маршрут проверяется <b>до</b> импорта: если промежуточного хоста нет ни среди
+          выбранных, ни среди сохранённых, диалог это перечислит и <b>не импортирует ничего</b>, а
+          не заведёт хост с прямым подключением в обход бастиона.
+        </li>
+        <li>Импорт сохраняется целиком за один раз: половины не бывает.</li>
+      </ul>
 
       <h3>Что ещё есть в правом клике по хосту</h3>
       <table>
@@ -859,8 +2026,22 @@
             <td>Рядом с текущей панелью</td>
           </tr>
           <tr>
+            <td><span class="ui">Подключиться с помощью другой учётной записи…</span></td>
+            <td>Вход под сохранённой учётной записью, см. <a href="#creds">раздел 6</a></td>
+          </tr>
+          <tr>
+            <td><span class="ui">Подключиться несколько раз…</span></td>
+            <td>Сразу несколько окон одного хоста: вкладками, плиткой или в своей области</td>
+          </tr>
+          <tr>
+            <td><span class="ui">Подключиться в режиме консоли</span></td>
+            <td>
+              Только у Windows-хостов: сессия <code>/admin</code>, см. <a href="#rdp">раздел 12</a>
+            </td>
+          </tr>
+          <tr>
             <td><span class="ui">Дублировать</span></td>
-            <td>Копия хоста со всеми настройками</td>
+            <td>Копия хоста со всеми настройками, кроме паролей</td>
           </tr>
           <tr>
             <td><span class="ui">Изменить</span></td>
@@ -873,12 +2054,11 @@
         </tbody>
       </table>
       <p>
-        Там же — <span class="ui">Подключиться как…</span> (вход под сохранённой учётной записью,
-        см. <a href="#creds">раздел 6</a>) и <span class="ui">Подключиться несколько раз…</span>:
-        один хост открывается сразу в нескольких окнах — отдельными вкладками, плиткой в одной
-        вкладке или в собственной рабочей области. Каждое окно — отдельное соединение, они
-        нумеруются; предел — двадцать за раз, потому что каждое из них является настоящим входом на
-        той стороне.
+        <span class="ui">Подключиться несколько раз…</span> открывает каждое окно отдельным
+        соединением, они нумеруются; предел — двадцать за раз, потому что каждое из них является
+        настоящим входом на той стороне. <span class="ui">Дублировать</span> намеренно не копирует
+        пароли: у копии их нет, пока вы их не введёте, — иначе удаление одной забирало бы пароль и у
+        другой.
       </p>
     </section>
 
@@ -898,6 +2078,57 @@
         <span class="arr">→</span>
         <span class="box"><b>Настройки</b><span>значения по умолчанию</span></span>
       </div>
+
+      <figure class="fig">
+        <div class="shot">
+          <div
+            class="m"
+            style="display: flex; gap: 22px; align-items: flex-start; min-width: 700px"
+          >
+            <div class="m-card" style="flex: 0 0 230px">
+              <h6>Группа «Продакшн»</h6>
+              <div class="m-field">
+                Логин
+                <div class="m-input val">deploy</div>
+              </div>
+              <div class="m-field" style="margin-top: 6px">
+                Способ входа
+                <div class="m-input val m-select">Закрытый ключ</div>
+              </div>
+              <div class="m-field" style="margin-top: 6px">
+                Промежуточный хост
+                <div class="m-input val m-select">bastion</div>
+              </div>
+              <span class="co" style="right: -10px; top: -10px">1</span>
+            </div>
+            <div class="arrow" style="font-size: 26px; color: #767d89">→</div>
+            <div class="m-dialog wide" style="box-shadow: none">
+              <h5>Хост prod-db-01</h5>
+              <div class="m-check on">Наследовать настройки подключения от группы</div>
+              <div class="m-field">
+                Логин
+                <div class="m-input">deploy — из Продакшн</div>
+                <span class="co" style="right: -10px; top: 18px">2</span>
+              </div>
+              <div class="m-field">
+                Способ входа
+                <div class="m-input m-select">Наследовать (Закрытый ключ)</div>
+              </div>
+              <div class="m-field">
+                Порт
+                <div class="m-input val">2222</div>
+                <span class="co" style="right: -10px; top: 18px">3</span>
+              </div>
+            </div>
+          </div>
+          <ol class="legend">
+            <li><span class="co">1</span>Задано один раз на группе</li>
+            <li><span class="co">2</span>Пустое поле хоста: серым — что придёт и откуда</li>
+            <li><span class="co">3</span>Своё значение хоста перекрывает группу</li>
+          </ol>
+        </div>
+        <figcaption><b>Рис. 4.</b> Как хост наследует от группы.</figcaption>
+      </figure>
 
       <h3>Как это выглядит на практике</h3>
       <ul>
@@ -944,20 +2175,197 @@
           <span class="ui">Вынести на верхний уровень</span>).
         </li>
         <li>
-          Порядок хранится в базе приложения и переживает перезапуск, переименование и перенос.
+          Порядок хранится в базе приложения и переживает перезапуск, переименование и перенос. Если
+          перенос не удалось сохранить, дерево возвращается к сохранённому, а не делает вид, что всё
+          получилось.
         </li>
       </ul>
 
-      <div class="note">
-        <p>
-          Кнопок в строках дерева нет: всё, что с хостом или папкой можно сделать, — в контекстном
-          меню по правому клику. Раньше на правом краю каждой строки стояла кнопка
-          <span class="ui">Edit</span>, невидимая до наведения, но место занимавшая всегда, — из-за
-          неё длинные имена обрывались многоточием, хотя до края панели оставалась пустота.
-        </p>
-      </div>
-
       <h3>Пометки на строках</h3>
+      <figure class="fig">
+        <div class="shot">
+          <div class="m" style="min-width: 520px">
+            <div class="m-side" style="width: 300px; border: 1px solid #383b42; border-radius: 9px">
+              <div class="m-tree">
+                <div class="m-item"><span class="tw">▼</span>📁 Продакшн</div>
+                <div class="m-item l1">
+                  <span class="m-ic"
+                    ><svg viewBox="0 0 16 16">
+                      <rect
+                        x="1.5"
+                        y="2.5"
+                        width="13"
+                        height="11"
+                        rx="1.5"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.2"
+                      />
+                      <polyline
+                        points="4.3,6 6.6,8 4.3,10"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                      <line
+                        x1="8"
+                        y1="10.5"
+                        x2="11.5"
+                        y2="10.5"
+                        stroke="currentColor"
+                        stroke-width="1.2"
+                        stroke-linecap="round"
+                      /></svg
+                  ></span>
+                  app-01 <span class="co" style="right: 8px; top: 2px">1</span>
+                </div>
+                <div class="m-item l1">
+                  <span class="m-ic"
+                    ><svg viewBox="0 0 16 16">
+                      <rect
+                        x="1.5"
+                        y="2.5"
+                        width="13"
+                        height="9"
+                        rx="1.5"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.2"
+                      />
+                      <line
+                        x1="6"
+                        y1="14"
+                        x2="10"
+                        y2="14"
+                        stroke="currentColor"
+                        stroke-width="1.2"
+                        stroke-linecap="round"
+                      />
+                      <line
+                        x1="8"
+                        y1="11.5"
+                        x2="8"
+                        y2="14"
+                        stroke="currentColor"
+                        stroke-width="1.2"
+                      /></svg
+                  ></span>
+                  ts-01 <span class="co" style="right: 8px; top: 2px">2</span>
+                </div>
+                <div class="m-item l1 open">
+                  <span class="m-ic"
+                    ><svg viewBox="0 0 16 16">
+                      <rect
+                        x="1.5"
+                        y="2.5"
+                        width="13"
+                        height="11"
+                        rx="1.5"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.2"
+                      />
+                      <polyline
+                        points="4.3,6 6.6,8 4.3,10"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                      <line
+                        x1="8"
+                        y1="10.5"
+                        x2="11.5"
+                        y2="10.5"
+                        stroke="currentColor"
+                        stroke-width="1.2"
+                        stroke-linecap="round"
+                      /></svg
+                  ></span>
+                  db-01 <span class="co" style="right: 8px; top: 2px">3</span>
+                </div>
+                <div class="m-item l1 tint" style="--c: #e5534b">
+                  <span class="m-ic"
+                    ><svg viewBox="0 0 16 16">
+                      <rect
+                        x="1.5"
+                        y="2.5"
+                        width="13"
+                        height="11"
+                        rx="1.5"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.2"
+                      />
+                      <polyline
+                        points="4.3,6 6.6,8 4.3,10"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                      <line
+                        x1="8"
+                        y1="10.5"
+                        x2="11.5"
+                        y2="10.5"
+                        stroke="currentColor"
+                        stroke-width="1.2"
+                        stroke-linecap="round"
+                      /></svg
+                  ></span>
+                  billing-01 <span class="co" style="right: 8px; top: 2px">4</span>
+                </div>
+                <div class="m-item l1 sel tint" style="--c: #e5534b">
+                  <span class="m-ic"
+                    ><svg viewBox="0 0 16 16">
+                      <rect
+                        x="1.5"
+                        y="2.5"
+                        width="13"
+                        height="11"
+                        rx="1.5"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.2"
+                      />
+                      <polyline
+                        points="4.3,6 6.6,8 4.3,10"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                      <line
+                        x1="8"
+                        y1="10.5"
+                        x2="11.5"
+                        y2="10.5"
+                        stroke="currentColor"
+                        stroke-width="1.2"
+                        stroke-linecap="round"
+                      /></svg
+                  ></span>
+                  billing-02 <span class="co" style="right: 8px; top: 2px">5</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <ol class="legend">
+            <li><span class="co">1</span>Значок терминала — откроется по SSH</li>
+            <li><span class="co">2</span>Значок монитора — откроется рабочим столом</li>
+            <li><span class="co">3</span>Зелёный значок — хост открыт прямо сейчас</li>
+            <li><span class="co">4</span>Цвет хоста или группы — заливка и полоса слева</li>
+            <li><span class="co">5</span>Полоса остаётся и на выделенной строке</li>
+          </ol>
+        </div>
+        <figcaption><b>Рис. 5.</b> Что говорит строка дерева.</figcaption>
+      </figure>
       <ul>
         <li>
           <b>Значок перед именем</b> — что откроется по двойному клику: окно терминала для SSH,
@@ -966,22 +2374,25 @@
         </li>
         <li>
           <b>Цвет</b> — чтобы отличать продакшн с одного взгляда; наследуется группой целиком. Хост
-          с заданным цветом носит его как <b>собственный фон строки</b> и цветную полосу слева.
-          Полоса остаётся и на выделенной строке: выделение закрашивает фон, и без неё цвет пропадал
-          бы ровно в тот момент, когда вы по этому цвету хост и нашли.
+          с заданным цветом носит его как <b>собственный фон строки</b> и цветную полосу слева,
+          которая остаётся и под выделением.
         </li>
         <li>
-          <b>Зелёный значок</b> — машина открыта прямо сейчас: тот же значок перед именем загорается
-          зелёным на слабой зелёной подложке. Считаются и терминалы, и рабочие столы. Раньше на этом
-          месте была маленькая зелёная точка <i>после</i> имени — она жила внутри обрезаемого текста
-          и пропадала ровно в тех строках, где имя не помещалось, то есть в глубоких папках, где
-          хостов больше всего.
+          <b>Зелёный значок</b> — машина открыта прямо сейчас; считаются и терминалы, и рабочие
+          столы. Закрылась сессия — по <code>exit</code>, по обрыву связи — значок гаснет, даже если
+          панель с надписью «соединение закрыто» ещё на экране.
         </li>
         <li><b>Точка на вкладке или области</b> — там появился новый вывод.</li>
         <li>
           <span class="ui">Не наследует настройки группы</span> — у хоста снят флажок наследования.
         </li>
       </ul>
+      <div class="note">
+        <p>
+          Кнопок в строках дерева нет: всё, что с хостом или папкой можно сделать, — в контекстном
+          меню по правому клику. Поэтому длинные имена не обрываются раньше времени.
+        </p>
+      </div>
     </section>
 
     <section id="creds">
@@ -990,9 +2401,11 @@
       <h3>Хранилище</h3>
       <p>
         Секреты лежат в локальном файле в каталоге пользователя ОС, зашифрованные AES-256-GCM; ключ
-        выводится из мастер-пароля через scrypt и живёт только в памяти главного процесса. Удаление
-        хоста, группы, репозитория или локального переопределения
-        <b>забирает с собой и его секрет</b>, а не оставляет его в хранилище.
+        выводится из мастер-пароля через scrypt и живёт только в памяти главного процесса. Файл
+        записывается так, что сбой питания посреди записи оставляет прежнюю версию, а не пустой
+        файл. Удаление хоста, группы, репозитория или локального переопределения
+        <b>забирает с собой его секреты</b> — и пароль входа, и пароль шлюза, — а не оставляет их в
+        хранилище. Пароль, которым пользуется ещё какой-то хост, не удаляется никогда.
       </p>
 
       <h4>Блокировка</h4>
@@ -1016,8 +2429,8 @@
           подключёнными и продолжают работать, но до них не достаёт ни мышь, ни клавиатура, и
           главный процесс отказывается начинать что-либо новое: ни SSH-сессию, ни рабочий стол, ни
           список файлов. Это важно именно потому, что хост, входящий по ключу, у хранилища ничего не
-          спрашивает — иначе его ничто бы не остановило. Редактор, сохраняющий файл, открытый до
-          блокировки, всё равно его отправит.
+          спрашивает — иначе его ничто бы не остановило. Заодно рабочие столы перестают делить буфер
+          обмена, см. <a href="#rdp">раздел 12</a>.
         </p>
       </div>
 
@@ -1042,13 +2455,18 @@
           </tr>
         </tbody>
       </table>
+      <p>
+        Если несколько хостов спрашивают пароль одновременно, вопросы встают в очередь и задаются по
+        одному. Вопрос, на который никто не ответил за пять минут, снимается; закрытие панели во
+        время подключения тоже снимает её вопрос и закрывает уже открытые по дороге соединения.
+      </p>
 
       <h3>Сохранённые учётные записи</h3>
       <p>
         <span class="ui">Настройки → Учётные записи</span> — логины, которые не принадлежат ни
         хосту, ни группе. У каждой есть имя, логин и пароль, ключ или агент. Дальше правый клик по
         любому хосту — хоть сохранённому, хоть инвентарному — и
-        <span class="ui">Подключиться как…</span>.
+        <span class="ui">Подключиться с помощью другой учётной записи…</span>.
       </p>
       <ul>
         <li>
@@ -1092,7 +2510,9 @@
       <p>
         <span class="ui">Промежуточный хост (ProxyJump)</span> достаёт до машины через другую.
         Переход делает само приложение — на промежуточной машине ничего не выполняется. Работает и
-        для сохранённых сессий, и для хостов из инвентаря.
+        для сохранённых сессий, и для хостов из инвентаря. Удалённый промежуточный хост или хосты,
+        ведущие друг на друга по кругу, останавливают подключение с объяснением — в обход бастиона
+        приложение не пойдёт.
       </p>
       <div class="warn">
         <p>
@@ -1162,6 +2582,64 @@
           </tr>
         </tbody>
       </table>
+      <p>
+        Вставка нескольких строк идёт через сам терминал: если оболочка просит «вставку в скобках»,
+        текст приходит одним куском и <b>не выполняется построчно</b> по мере прибытия — в том числе
+        во всех терминалах, куда идёт трансляция.
+      </p>
+
+      <h3>Когда сессия закрылась</h3>
+      <figure class="fig">
+        <div class="shot">
+          <div class="m" style="min-width: 520px">
+            <div
+              class="m-pane"
+              style="
+                border: 1px solid #383b42;
+                border-radius: 9px;
+                overflow: hidden;
+                max-width: 560px;
+              "
+            >
+              <div class="m-ptool">
+                <b>deploy@app-01</b><span class="sp"></span><span class="t">SFTP</span
+                ><span class="t">Туннели</span>
+              </div>
+              <pre
+                class="m-term"
+                style="position: relative; min-height: 150px"
+              ><span class="p">deploy@app-01</span>:<span class="d">~</span>$ exit
+logout
+
+<span class="e">[error] tunnel local 127.0.0.1:5432 -&gt; 127.0.0.1:5432 failed: address in use</span>
+<span class="e">[connection closed]</span></pre>
+              <div style="position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%)">
+                <span class="m-btn pri">Переподключиться</span>
+                <span class="co" style="right: -26px; top: 3px">2</span>
+              </div>
+              <span class="co" style="right: 12px; top: 66px">1</span>
+            </div>
+          </div>
+          <ol class="legend">
+            <li>
+              <span class="co">1</span>Красные строки — сообщения самого приложения: не поднявшийся
+              туннель, закрытие соединения
+            </li>
+            <li><span class="co">2</span>Одна кнопка — новое подключение в той же панели</li>
+          </ol>
+        </div>
+        <figcaption><b>Рис. 6.</b> Сессия, закрывшаяся сама.</figcaption>
+      </figure>
+      <ul>
+        <li>
+          Туннель из настроек хоста, который не смог подняться при подключении, говорит об этом
+          красной строкой прямо в терминале — само подключение при этом продолжает работать.
+        </li>
+        <li>
+          Закрытая сессия перестаёт считаться открытой: гаснет зелёный значок в дереве, трансляция
+          её пропускает, а файловая панель и мониторинг ждут нового подключения.
+        </li>
+      </ul>
 
       <h3>Сниппеты</h3>
       <p>
@@ -1173,7 +2651,7 @@
       <h3>Трансляция ввода</h3>
       <p>
         <span class="ui">Трансляция</span> повторяет ваш ввод во всех отмеченных терминалах — во
-        всех вкладках и рабочих областях сразу. Отмечается каждый терминал кнопкой на своей панели
+        всех вкладках и рабочих областях сразу. Отмечается каждый терминал флажком на своей панели
         инструментов.
       </p>
 
@@ -1182,7 +2660,9 @@
         <span class="ui">Записывать вывод сессии в файл</span> в диалоге хоста держит расшифровку
         каждого подключения в папке журналов (<span class="ui"
           >Настройки → Безопасность → Открыть папку журналов</span
-        >). В записи есть всё, что показывал терминал, — обращайтесь с ней как с секретом.
+        >). В записи есть всё, что показывал терминал, — обращайтесь с ней как с секретом. Если диск
+        не успевает за выводом или запись не удаётся, журнал останавливается с сообщением, а сессия
+        продолжает работать.
       </p>
     </section>
 
@@ -1194,11 +2674,30 @@
         <li><kbd>⌘D</kbd> — разделить вправо, <kbd>⌘⇧D</kbd> — вниз.</li>
         <li>
           Перетащите хост или целую вкладку на панель, чтобы поставить их рядом; ближайший край при
-          отпускании решает, какую половину займёт новая панель.
+          отпускании решает, какую половину займёт новая панель. Разделённая вкладка переезжает
+          <b>целиком</b>, со своей раскладкой.
         </li>
         <li>Кнопка ⇱ возвращает панель в отдельную вкладку.</li>
         <li>Разделитель между панелями тянется мышью.</li>
         <li><kbd>⌘W</kbd> закрывает активную панель, а если она последняя — вкладку.</li>
+        <li>
+          <kbd>⌘T</kbd> открывает тот же хост в новой вкладке — с тем же цветом и оформлением, что у
+          исходной панели.
+        </li>
+      </ul>
+
+      <h3>Вкладки</h3>
+      <ul>
+        <li>
+          Вкладку можно перетащить <b>между другими вкладками</b>: линия показывает, куда она
+          встанет. Терминал или рабочий стол в ней не переподключается, порядок запоминается вместе
+          с раскладкой.
+        </li>
+        <li>
+          Раскладка вкладок и рабочих областей восстанавливается при следующем запуске — панели ждут
+          кнопку <span class="ui">Подключиться</span>, а не звонят всем хостам сразу. Вкладки
+          быстрого подключения не восстанавливаются: в них мог быть пароль.
+        </li>
       </ul>
 
       <h3>Рабочие области</h3>
@@ -1217,10 +2716,86 @@
           <kbd>⌘⇧1</kbd>…<kbd>⌘⇧9</kbd> — переход к области, <kbd>⌘1</kbd>…<kbd>⌘9</kbd> — к вкладке
           внутри неё.
         </li>
-        <li>Закрытие области закрывает все терминалы в ней.</li>
+        <li>
+          Закрытие области закрывает все терминалы в ней; если вкладок в ней больше одной,
+          приложение сначала спросит.
+        </li>
+        <li>
+          Правый клик по области → <span class="ui">Выйти из сессий Windows</span> — выход из
+          Windows во всех рабочих столах этой области, см. <a href="#rdp">раздел 12</a>.
+        </li>
       </ul>
 
       <h3>Открыть несколько хостов сразу</h3>
+      <figure class="fig">
+        <div class="shot">
+          <div
+            class="m"
+            style="display: flex; gap: 26px; align-items: flex-start; min-width: 720px"
+          >
+            <div class="m-side" style="width: 250px; border: 1px solid #383b42; border-radius: 9px">
+              <div class="m-tree">
+                <div class="m-item"><span class="tw">▼</span>📁 Базы</div>
+                <div class="m-item l1 sel">pg-01</div>
+                <div class="m-item l1 sel">pg-02</div>
+                <div class="m-item l1">pg-03</div>
+                <div class="m-item l1 sel">redis-01</div>
+              </div>
+              <div
+                class="rel"
+                style="
+                  border-top: 1px solid #383b42;
+                  padding: 7px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                "
+              >
+                <div style="display: flex; align-items: center">
+                  <span style="flex: 1">Отмечено: 3</span><span style="color: #9aa0ab">✕</span>
+                </div>
+                <div style="display: flex; flex-wrap: wrap; gap: 5px">
+                  <span class="m-btn">Открыть</span><span class="m-btn">Плиткой</span
+                  ><span class="m-btn">Рабочая область</span><span class="m-btn">Собрать</span>
+                </div>
+                <span class="co" style="right: -10px; top: -10px">1</span>
+              </div>
+            </div>
+            <div class="arrow" style="align-self: center; font-size: 24px; color: #767d89">→</div>
+            <div style="flex: 1; position: relative">
+              <div
+                class="m-panes"
+                style="
+                  grid-template-columns: 1fr 1fr;
+                  grid-template-rows: 70px 70px;
+                  border: 1px solid #383b42;
+                  border-radius: 9px;
+                  overflow: hidden;
+                "
+              >
+                <div class="m-pane act">
+                  <div class="m-ptool"><b>pg-01</b></div>
+                </div>
+                <div class="m-pane">
+                  <div class="m-ptool"><b>pg-02</b></div>
+                </div>
+                <div class="m-pane" style="grid-column: 1 / 3">
+                  <div class="m-ptool"><b>redis-01</b></div>
+                </div>
+              </div>
+              <span class="co" style="right: -10px; top: -10px">2</span>
+            </div>
+          </div>
+          <ol class="legend">
+            <li>
+              <span class="co">1</span>Полоса выделения: по вкладкам, плиткой, в новой области или в
+              набор
+            </li>
+            <li><span class="co">2</span><span class="ui">Плиткой</span> — всё в одной вкладке</li>
+          </ol>
+        </div>
+        <figcaption><b>Рис. 7.</b> Три отмеченных хоста, открытые плиткой.</figcaption>
+      </figure>
       <ul>
         <li>
           <kbd data-win="Ctrl">⌘</kbd>-клик отмечает ещё хост, <kbd data-win="Shift">⇧</kbd>-клик —
@@ -1228,8 +2803,10 @@
           смешиваются свободно.
         </li>
         <li>
-          Появляется полоса с <span class="ui">Открыть</span> (по вкладкам) и
-          <span class="ui">Плиткой</span> (в одной вкладке).
+          Появляется полоса: <span class="ui">Открыть</span> — каждый в своей вкладке,
+          <span class="ui">Плиткой</span> — все в одной вкладке,
+          <span class="ui">Рабочая область</span> — новая область с вкладкой на хост,
+          <span class="ui">Собрать</span> — сохранить как набор.
         </li>
         <li>
           <kbd>⌘P</kbd> — палитра хостов: поиск по имени сразу по сохранённым сессиям и инвентарям.
@@ -1257,10 +2834,9 @@
         </li>
         <li>
           Набор несёт <b>цвет и тему терминала</b>, и оформление действует <b>по контексту</b>: хост
-          носит вид набора там, где вы видите его под этим набором, и там, где открыли его оттуда.
-          Одна и та же машина в наборах «Прод» и «Базы» выглядит так, откуда вы пришли; открытая из
-          обычного дерева — по своим группам. Хост со своими настройками сохраняет их в любом
-          случае.
+          носит вид набора там, где вы видите его под этим набором, и там, где открыли его оттуда —
+          в том числе во всех панелях набора, открытого плиткой. Хост со своими настройками
+          сохраняет их в любом случае.
         </li>
         <li>
           Удалённый или исчезнувший из инвентаря хост помечается как отсутствующий, а не
@@ -1276,13 +2852,75 @@
         живёт на том же соединении, что и терминал.
       </p>
 
+      <figure class="fig">
+        <div class="shot">
+          <div class="m">
+            <div class="m-files">
+              <div class="m-path">
+                <span class="m-btn">↑</span>
+                <div class="m-crumbs">
+                  / <span>var</span> / <span>lib</span> / <span>postgresql</span>
+                </div>
+                <span class="co" style="left: 150px; top: -10px">1</span>
+                <span style="flex: 1"></span>
+                <span class="m-btn" style="border-color: #5b9dff">⇉</span>
+                <span class="co" style="right: -10px; top: -10px">2</span>
+              </div>
+              <div class="m-fbody">
+                <div class="m-ftree">
+                  <div>▸ etc</div>
+                  <div>▾ var</div>
+                  <div>&nbsp;&nbsp;▾ lib</div>
+                  <div class="here">&nbsp;&nbsp;&nbsp;&nbsp;postgresql</div>
+                  <span class="co" style="right: 4px; top: 57px">3</span>
+                </div>
+                <div class="m-flist">
+                  <div class="h">Имя</div>
+                  <div class="h">Размер</div>
+                  <div class="h">Права</div>
+                  <div class="h">Владелец</div>
+                  <div class="dir">📁 16</div>
+                  <div class="num">—</div>
+                  <div class="num dir">drwx------</div>
+                  <div class="num">postgres</div>
+                  <div class="lnk">↪ current</div>
+                  <div class="num">—</div>
+                  <div class="num lnk">lrwxrwxrwx</div>
+                  <div class="num">postgres</div>
+                  <div class="selrow">postgresql.conf</div>
+                  <div class="num selrow">29 КБ</div>
+                  <div class="num selrow">-rw-r--r--</div>
+                  <div class="num selrow">postgres</div>
+                  <div class="exe">backup.sh</div>
+                  <div class="num">2 КБ</div>
+                  <div class="num exe">-rwxr-x---</div>
+                  <div class="num">postgres</div>
+                  <span class="co" style="right: -10px; top: 26px">4</span>
+                </div>
+              </div>
+              <div class="m-progress"><i></i></div>
+            </div>
+          </div>
+          <ol class="legend">
+            <li><span class="co">1</span>Хлебные крошки и строка пути; ↑ — на уровень выше</li>
+            <li><span class="co">2</span>⇉ — следовать за <code>cd</code> в терминале</li>
+            <li><span class="co">3</span>Дерево папок подсвечивает, где вы сейчас</li>
+            <li>
+              <span class="co">4</span>Цвет по типу: синие каталоги, голубые ссылки, красные
+              исполняемые
+            </li>
+          </ol>
+        </div>
+        <figcaption><b>Рис. 8.</b> Файловая панель. Внизу — полоса хода передачи.</figcaption>
+      </figure>
+
       <h3>Как ходить по каталогам</h3>
       <ul>
         <li>
           <b>Строка пути</b> принимает набранный путь: <kbd>⏎</kbd> переходит,
           <kbd>esc</kbd> возвращает как было. <code>~</code> и <code>..</code> разрешает
-          <b>сервер</b>, поэтому они ведут себя как в оболочке, а не как приложение о них думает.
-          Путь к файлу открывает его папку и выделяет сам файл.
+          <b>сервер</b>, поэтому они ведут себя как в оболочке. Путь к файлу открывает его папку и
+          выделяет сам файл.
         </li>
         <li>
           <b>Хлебные крошки</b> — клик по элементу переходит туда, ↑ поднимает на уровень выше.
@@ -1290,13 +2928,12 @@
         <li>
           <b>Дерево папок</b> сбоку заполняется по мере открытия и подсвечивает то место, куда ушёл
           листинг, — независимо от того, кликнули вы, вписали путь или <code>cd</code> сделали в
-          терминале.
+          терминале. Медленный ответ сервера не уводит панель назад: она остаётся там, куда её
+          отправили последним.
         </li>
         <li>
           Листинг перечитывается каждые пять секунд, пока панель видна и не занята передачей или
-          действием с файлами. В скрытой вкладке и скрытом окне опрос приостанавливается; при
-          возвращении список обновляется. Медленный ответ сервера не запускает очередь повторных
-          опросов.
+          действием с файлами. В скрытой вкладке и скрытом окне опрос приостанавливается.
         </li>
       </ul>
 
@@ -1304,7 +2941,7 @@
       <p>
         Кнопка <b>⇉</b> в строке пути заставляет панель ходить за <code>cd</code> в терминале.
         Работает на живом соединении — включается и выключается сразу, без диалога и
-        переподключения.
+        переподключения. Папки с кириллицей и другими не-латинскими именами понимаются правильно.
       </p>
       <p>
         Под этим лежит последовательность <code>OSC 7</code>, которую оболочка печатает на каждом
@@ -1328,11 +2965,13 @@
           </tr>
           <tr>
             <td>Правый клик</td>
-            <td>Скачать, переименовать, удалить, создать папку, сравнить</td>
+            <td>
+              Скачать, переименовать, удалить, создать папку, сравнить, редактировать локально
+            </td>
           </tr>
           <tr>
-            <td>Перетаскивание из Finder</td>
-            <td>Загрузка файлов и целых папок</td>
+            <td>Перетаскивание из Finder или Проводника</td>
+            <td>Загрузка файлов и целых папок, включая пустые</td>
           </tr>
           <tr>
             <td>Перетаскивание между панелями</td>
@@ -1340,22 +2979,86 @@
           </tr>
         </tbody>
       </table>
-      <p>
-        <b>Копирование между хостами</b> идёт потоком из сокета в сокет: двум серверам не нужен
-        маршрут друг к другу, и ничего не оседает на вашем диске по дороге. Бросок на строку папки
-        кладёт внутрь неё, а не в текущий каталог.
-      </p>
-
-      <h3>Столбцы и вид</h3>
-      <p>
-        Размер, время изменения, <b>права</b> (<code>rwxr-xr-x</code>, включая setuid, setgid и
-        sticky), владелец и группа. Имя, режим и владелец красятся по типу: синие каталоги, голубые
-        символические ссылки, красные исполняемые. Тянется всё — панель за левый край, дерево за
-        разделитель, каждый столбец за заголовок; ширины запоминаются. Если ширины не хватает,
-        листинг прокручивается вбок, а не теряет столбец.
-      </p>
+      <ul>
+        <li>
+          <b>Копирование между хостами</b> идёт потоком из сокета в сокет: двум серверам не нужен
+          маршрут друг к другу, и ничего не оседает на вашем диске по дороге. Бросок на строку папки
+          кладёт внутрь неё, а не в текущий каталог.
+        </li>
+        <li>
+          <b>Скачанная папка</b> всегда ложится внутрь выбранного каталога под своим именем. Имя
+          папки с сервера, которое вывело бы её наружу (на Unix <code>..\..\Startup</code> — одно
+          обычное имя), отклоняется.
+        </li>
+        <li>
+          <b>Отправка не портит файл при обрыве.</b> Новая версия пишется под скрытым именем рядом и
+          заменяет старую только целиком, сохраняя её права и владельца; пока идёт передача, копия
+          закрыта от чужих глаз. Если владельца сохранить нельзя, файл остаётся как был — с
+          объяснением.
+        </li>
+        <li>
+          <b>Ошибки пачки не теряются.</b> Если в пачке из нескольких файлов что-то не удалось,
+          сообщение о каждой неудаче остаётся под списком до следующей передачи или до клика по
+          нему.
+        </li>
+      </ul>
 
       <h3>Перезапись и сравнение</h3>
+      <figure class="fig">
+        <div class="shot">
+          <div class="m">
+            <div class="m-dialog wide">
+              <h5>Отправка поверх существующих файлов: 2</h5>
+              <span class="m-hint"
+                >Ничего не перезаписывается, пока вы не скажете об этом здесь.</span
+              >
+              <div
+                style="
+                  display: grid;
+                  grid-template-columns: 1fr auto;
+                  gap: 6px 10px;
+                  align-items: center;
+                "
+              >
+                <div>
+                  postgresql.conf<br /><span class="m-hint"
+                    >сейчас там: 29 КБ, 12.09 · новый: 30 КБ, сегодня</span
+                  >
+                </div>
+                <div class="m-seg rel">
+                  <span class="on">Пропустить</span><span>Перезаписать</span>
+                  <span class="co" style="right: -26px; top: 3px">1</span>
+                </div>
+                <div>
+                  pg_hba.conf<br /><span class="m-hint"
+                    >сейчас там: 4 КБ, 03.09 · новый: 4 КБ, сегодня</span
+                  >
+                </div>
+                <div class="m-seg"><span>Пропустить</span><span class="on">Перезаписать</span></div>
+              </div>
+              <div class="rel" style="color: #5b9dff">
+                Посмотреть, чем отличаются, прежде чем решать
+                <span class="co" style="right: 40px; top: 0">2</span>
+              </div>
+              <div style="display: flex; gap: 6px">
+                <span class="m-btn">Пропустить все</span><span class="m-btn">Перезаписать все</span>
+              </div>
+              <div class="m-actions">
+                <span class="m-btn">Отмена</span><span class="m-btn pri">Передать, заменив: 1</span>
+              </div>
+            </div>
+          </div>
+          <ol class="legend">
+            <li>
+              <span class="co">1</span>Каждый файл начинается на «Пропустить»; ответ не запоминается
+            </li>
+            <li><span class="co">2</span>Построчное сравнение прямо из диалога</li>
+          </ol>
+        </div>
+        <figcaption>
+          <b>Рис. 9.</b> Передача спрашивает до того, как тронет существующие файлы.
+        </figcaption>
+      </figure>
       <ul>
         <li>
           Передача <b>планируется до того, как двинется первый байт</b>: всё, что будет заменено,
@@ -1363,44 +3066,52 @@
         </li>
         <li>
           Каждое совпадение начинается на <span class="ui">Пропустить</span>, ответы
-          <b>не запоминаются</b> — каждая передача спрашивает заново.
+          <b>не запоминаются</b> — каждая передача спрашивает заново. В пачке из нескольких файлов
+          вопрос задаётся по каждому по очереди.
+        </li>
+        <li>
+          Каждое место назначения проверяется ещё раз <b>прямо перед записью</b>: файл, появившийся
+          там после вопроса, не перезаписывается, а называется в сообщении.
         </li>
         <li>Папка на месте файла не заменяется, а отклоняется.</li>
         <li>
           <span class="ui">Сравнить</span> прямо в диалоге показывает построчную разницу. Любой
-          удалённый файл можно сравнить с локальным через контекстное меню. Двоичные файлы и всё,
-          что больше 2 МБ, так и говорят вместо того, чтобы тянуться по сети; разница только в
-          переводах строк CRLF сообщается именно так, а не как переписанный файл.
+          удалённый файл можно сравнить с локальным:
+          <span class="ui">Сравнить с локальным файлом…</span>. Двоичные файлы и всё, что больше 2
+          МБ, так и говорят вместо того, чтобы тянуться по сети; разница только в переводах строк
+          CRLF или только в последнем переводе строки сообщается именно так.
         </li>
       </ul>
 
       <h3>Правка в локальном редакторе</h3>
       <p>
-        <span class="ui">Править локально</span> в контекстном меню открывает файл в вашем редакторе
-        и отправляет его обратно <b>при каждом сохранении</b>. Редактор выбирается в
+        <span class="ui">Редактировать локально</span> в контекстном меню открывает файл в вашем
+        редакторе и отправляет его обратно <b>при каждом сохранении</b>. Сохранение, сделанное пока
+        предыдущее ещё уходит, не теряется — оно уйдёт следом. Редактор выбирается в
         <span class="ui">Настройки → Файлы → Внешний редактор</span>.
       </p>
       <div class="note">
         <p>
-          Указывайте <b>полный путь</b> к программе: оконное приложение не наследует
-          <code>PATH</code> из вашей оболочки, поэтому просто <code>code</code> или
+          Пустое поле — это <b>Блокнот</b> в Windows и текстовый редактор по умолчанию в macOS, а не
+          «то, чем система открывает такой файл»: скачанный с сервера <code>.cmd</code> или
+          <code>.py</code> иначе бы запустился, а не открылся.
+        </p>
+        <p>
+          Если указываете свой редактор — пишите <b>полный путь</b> к программе: оконное приложение
+          не наследует <code>PATH</code> из вашей оболочки, поэтому просто <code>code</code> или
           <code>subl</code> может не найтись. Подстановка <code>{file}</code> в команде заменяется
-          на путь; без неё путь дописывается в конец. Пустое поле отдаёт файл тому, чем его
-          открывает система.
+          на путь; без неё путь дописывается в конец.
         </p>
       </div>
 
-      <h3>
-        <span class="tag t-new">0.13.1</span>Доступ к файлам от другого пользователя (SCP/Shell)
-      </h3>
+      <h3>Доступ к файлам от другого пользователя (SCP/Shell)</h3>
       <p class="lede">
         Файлы можно читать и писать не тем пользователем, которым вы вошли в терминал.
       </p>
       <p>
         Обычная ситуация: SSH пускает вас как <code>ivanov</code>, а лежат файлы у
-        <code>postgres</code>, и <code>sudo</code> вам разрешён. Раньше файловая панель этого не
-        умела — SFTP работает от логина сессии и никак иначе. Теперь у хоста есть раздел
-        <span class="ui">Доступ к файлам</span>:
+        <code>postgres</code>, и <code>sudo</code> вам разрешён. SFTP работает от логина сессии и
+        никак иначе, поэтому у хоста есть раздел <span class="ui">Доступ к файлам</span>:
       </p>
       <ol class="steps">
         <li>Откройте диалог хоста, найдите <span class="ui">Доступ к файлам</span>.</li>
@@ -1450,10 +3161,6 @@
           причине.
         </li>
         <li>Настройка едет вместе с резервной копией.</li>
-        <li>
-          Возврат к обычному поведению — выбрать <b>SFTP</b> обратно. Существующие подключения по
-          умолчанию продолжают работать через SFTP.
-        </li>
       </ul>
     </section>
 
@@ -1465,6 +3172,107 @@
         Кнопка <span class="ui">Туннели</span> на панели инструментов пробрасывает порты через это
         подключение.
       </p>
+      <figure class="fig">
+        <div class="shot">
+          <svg
+            viewBox="0 0 760 210"
+            style="min-width: 640px; width: 100%; font-family: var(--sans)"
+          >
+            <defs>
+              <marker
+                id="ah"
+                viewBox="0 0 10 10"
+                refX="9"
+                refY="5"
+                markerWidth="7"
+                markerHeight="7"
+                orient="auto-start-reverse"
+              >
+                <path d="M0,0 L10,5 L0,10 z" fill="#8fbcff" />
+              </marker>
+            </defs>
+            <g font-size="12" fill="#e4e6eb">
+              <rect
+                x="10"
+                y="20"
+                width="150"
+                height="170"
+                rx="10"
+                fill="#1e2025"
+                stroke="#383b42"
+              />
+              <text x="85" y="44" text-anchor="middle" font-weight="600">Ваш компьютер</text>
+              <rect
+                x="300"
+                y="20"
+                width="160"
+                height="170"
+                rx="10"
+                fill="#1e2025"
+                stroke="#383b42"
+              />
+              <text x="380" y="44" text-anchor="middle" font-weight="600">SSH-хост</text>
+              <rect
+                x="600"
+                y="20"
+                width="150"
+                height="170"
+                rx="10"
+                fill="#1e2025"
+                stroke="#383b42"
+              />
+              <text x="675" y="44" text-anchor="middle" font-weight="600">Сеть за хостом</text>
+              <rect x="160" y="96" width="140" height="18" fill="#26282e" />
+              <text x="230" y="109" text-anchor="middle" font-size="10.5" fill="#9aa0ab">
+                SSH-соединение
+              </text>
+
+              <text x="20" y="80" font-size="11" fill="#9aa0ab">Локальный</text>
+              <text x="20" y="96" font-family="var(--mono)" font-size="11">127.0.0.1:5432</text>
+              <line
+                x1="125"
+                y1="84"
+                x2="640"
+                y2="84"
+                stroke="#8fbcff"
+                stroke-width="1.6"
+                marker-end="url(#ah)"
+              />
+              <text x="648" y="80" font-size="11" fill="#9aa0ab">db:5432</text>
+
+              <text x="20" y="140" font-size="11" fill="#9aa0ab">Удалённый</text>
+              <text x="20" y="156" font-family="var(--mono)" font-size="11">localhost:3000</text>
+              <line
+                x1="420"
+                y1="146"
+                x2="130"
+                y2="146"
+                stroke="#f2b84b"
+                stroke-width="1.6"
+                marker-end="url(#ah)"
+              />
+              <text x="330" y="140" font-size="11" fill="#9aa0ab">порт 8080 на хосте</text>
+
+              <text x="20" y="178" font-size="11" fill="#9aa0ab">SOCKS: браузер → вся сеть</text>
+              <line
+                x1="170"
+                y1="180"
+                x2="640"
+                y2="180"
+                stroke="#3fb950"
+                stroke-width="1.6"
+                stroke-dasharray="5 4"
+                marker-end="url(#ah)"
+              />
+            </g>
+          </svg>
+        </div>
+        <figcaption>
+          <b>Рис. 10.</b> Три вида туннелей. <b>Локальный</b> — порт здесь ведёт туда, куда достаёт
+          хост. <b>Удалённый</b> — порт на хосте ведёт сюда. <b>Динамический (SOCKS)</b> — прокси,
+          через который браузер видит всю сеть за хостом.
+        </figcaption>
+      </figure>
       <table>
         <tbody>
           <tr>
@@ -1472,8 +3280,8 @@
             <td>Отправляет порт отсюда туда, куда достаёт хост</td>
           </tr>
           <tr>
-            <td><span class="ui">Обратный</span></td>
-            <td>Наоборот: порт на хосте появляется здесь</td>
+            <td><span class="ui">Удалённый</span></td>
+            <td>Наоборот: порт на хосте приводит сюда</td>
           </tr>
           <tr>
             <td><span class="ui">Динамический (SOCKS)</span></td>
@@ -1484,20 +3292,51 @@
       <ul>
         <li>
           Правило, сохранённое на сессии (<span class="ui">Проброс портов</span> в её диалоге),
-          запускается <b>само</b> при каждом её подключении.
+          запускается <b>само</b> при каждом её подключении. Если порт занят или сервер отказал,
+          терминал скажет об этом красной строкой (рис. 6), а подключение продолжит работать.
         </li>
         <li>
           <span class="ui">Разовый туннель</span> работает только для этого подключения и не
           сохраняется.
         </li>
+        <li>
+          Остановка туннеля закрывает и все соединения, которые он нёс, с обеих сторон; закрытие
+          сессии освобождает её порты. Два удалённых туннеля на одном порту, но разных адресах не
+          мешают друг другу, а удалённый туннель на порту 0 работает на том порту, который выбрал
+          сервер.
+        </li>
       </ul>
 
       <h3>Мониторинг</h3>
+      <figure class="fig">
+        <div class="shot">
+          <div class="m">
+            <div class="m-strip">
+              <span
+                ><span class="k">ЦП</span
+                ><span class="m-meter"><i style="width: 34%"></i></span> 34%</span
+              >
+              <span
+                ><span class="k">Память</span
+                ><span class="m-meter"><i class="w" style="width: 78%"></i></span> 6,2 / 8 ГБ</span
+              >
+              <span><span class="k">Сеть</span>↓ 1,4 МБ/с ↑ 120 КБ/с</span>
+              <span
+                ><span class="k">/</span
+                ><span class="m-meter"><i class="r" style="width: 93%"></i></span> 93%</span
+              >
+              <span><span class="k">Работает</span>41 д</span>
+            </div>
+          </div>
+        </div>
+        <figcaption>
+          <b>Рис. 11.</b> Полоса мониторинга под панелью: жёлтым — после 75 %, красным — после 90 %.
+        </figcaption>
+      </figure>
       <p>
         <span class="ui">Монитор</span> в той же панели показывает полосу под панелью: загрузку
         процессора с короткой историей, занятую память, скорость сети, время работы, вошедшего
-        пользователя и заполненность каждого смонтированного диска — жёлтым после 75 % и красным
-        после 90 %.
+        пользователя и заполненность каждого смонтированного диска.
       </p>
       <ul>
         <li>Опрашивает хост каждые три секунды и останавливается после трёх неудач подряд.</li>
@@ -1516,6 +3355,138 @@
         Хосты можно не заводить руками, а взять из репозитория с инвентарём Ansible. Только на
         чтение: обратно не отправляется ничего и никогда.
       </p>
+
+      <figure class="fig">
+        <div class="shot">
+          <div class="m">
+            <div class="m-flow">
+              <div class="m-card">
+                <h6>git: inventories/prod.yml</h6>
+                <pre><span class="k">all</span>:
+  <span class="k">children</span>:
+    <span class="k">web</span>:
+      <span class="k">vars</span>:
+        <span class="k">ansible_user</span>: <span class="v">deploy</span>
+      <span class="k">hosts</span>:
+        <span class="k">web-01</span>:
+        <span class="k">web-02</span>:
+    <span class="k">windows</span>:
+      <span class="k">vars</span>:
+        <span class="k">terminaldeck_protocol</span>: <span class="v">rdp</span>
+      <span class="k">hosts</span>:
+        <span class="k">dc1</span>:</pre>
+                <span class="co" style="right: -10px; top: -10px">1</span>
+              </div>
+              <div class="arrow" style="align-self: center; font-size: 24px; color: #767d89">→</div>
+              <div class="m-card" style="flex: 0 0 230px">
+                <h6>Инвентарь</h6>
+                <div class="m-item"><span class="tw">▼</span>📦 prod</div>
+                <div class="m-item l1"><span class="tw">▼</span>web</div>
+                <div class="m-item l2">
+                  <span class="m-ic"
+                    ><svg viewBox="0 0 16 16">
+                      <rect
+                        x="1.5"
+                        y="2.5"
+                        width="13"
+                        height="11"
+                        rx="1.5"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.2"
+                      />
+                      <polyline
+                        points="4.3,6 6.6,8 4.3,10"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      /></svg
+                  ></span>
+                  web-01
+                </div>
+                <div class="m-item l2">
+                  <span class="m-ic"
+                    ><svg viewBox="0 0 16 16">
+                      <rect
+                        x="1.5"
+                        y="2.5"
+                        width="13"
+                        height="11"
+                        rx="1.5"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.2"
+                      />
+                      <polyline
+                        points="4.3,6 6.6,8 4.3,10"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      /></svg
+                  ></span>
+                  web-02
+                </div>
+                <div class="m-item l1"><span class="tw">▼</span>windows</div>
+                <div class="m-item l2 rel">
+                  <span class="m-ic"
+                    ><svg viewBox="0 0 16 16">
+                      <rect
+                        x="1.5"
+                        y="2.5"
+                        width="13"
+                        height="9"
+                        rx="1.5"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.2"
+                      />
+                      <line
+                        x1="6"
+                        y1="14"
+                        x2="10"
+                        y2="14"
+                        stroke="currentColor"
+                        stroke-width="1.2"
+                        stroke-linecap="round"
+                      />
+                      <line
+                        x1="8"
+                        y1="11.5"
+                        x2="8"
+                        y2="14"
+                        stroke="currentColor"
+                        stroke-width="1.2"
+                      /></svg
+                  ></span>
+                  dc1
+                  <span class="co" style="right: 8px; top: 2px">2</span>
+                </div>
+                <div class="m-hint" style="margin-top: 8px">
+                  main · a1b2c3d · 3 хоста · 2 группы
+                </div>
+                <span class="co" style="right: -10px; top: 146px">3</span>
+              </div>
+            </div>
+          </div>
+          <ol class="legend">
+            <li>
+              <span class="co">1</span>Инвентарь Ansible в YAML — как есть в вашем репозитории
+            </li>
+            <li>
+              <span class="co">2</span><code>terminaldeck_protocol: rdp</code> на группе делает
+              машины рабочими столами
+            </li>
+            <li>
+              <span class="co">3</span>Строка под источником: ветка, ревизия, число хостов и групп
+            </li>
+          </ol>
+        </div>
+        <figcaption><b>Рис. 12.</b> Из файла в репозитории — в дерево приложения.</figcaption>
+      </figure>
 
       <h3>Два способа</h3>
       <table>
@@ -1536,23 +3507,26 @@
         <li>
           Группы Ansible, <code>children</code>, встроенные <code>vars</code>,
           <code>group_vars/</code> и <code>host_vars/</code> становятся группами и настройками
-          подключения.
+          подключения. Группа, описанная в файле дважды — например, в <code>all.children</code> и
+          ещё раз на верхнем уровне со своими <code>vars</code>, — считается одной, как у самого
+          Ansible, и её переменные доходят до всех хостов.
         </li>
         <li>
           Только YAML: <code>.yml</code> и <code>.yaml</code>. Каталог читается на один уровень
           вглубь; инвентарь в формате INI не читается вовсе. Соседние <code>group_vars/</code> и
-          <code>host_vars/</code> подхватываются автоматически.
+          <code>host_vars/</code> подхватываются автоматически. Файлы вне клона — через ссылку или
+          имя с <code>../</code> — не читаются.
         </li>
         <li>
           Клонирование идёт <b>системным git</b>, поэтому работают ваши ключи SSH, агенты, помощники
-          учётных данных и прокси — ровно как в терминале.
+          учётных данных и прокси — ровно как в терминале. Команда git, зависшая дольше пяти минут,
+          останавливается.
         </li>
         <li>
           <b>Протокол</b> — <code>terminaldeck_protocol: rdp</code> у хоста или у группы. Всё
-          остальное приезжает как SSH: у Ansible нет своего слова для того, <i>что</i> за машина, а
-          <code>ansible_connection</code> говорит лишь о том, как <i>Ansible</i> ею управляет —
-          Windows управляется по WinRM, а человек садится за неё по RDP. Угадывать по этому признаку
-          значит промахиваться достаточно часто, чтобы кого-то бросить с неработающим хостом.
+          остальное приезжает как SSH: <code>ansible_connection</code> говорит лишь о том, как
+          <i>Ansible</i> управляет машиной — Windows управляется по WinRM, а человек садится за неё
+          по RDP.
         </li>
         <li>
           У такого хоста <code>ansible_port</code> <b>не берётся</b>: это порт управления, а не
@@ -1560,6 +3534,7 @@
           без него клиент идёт на 3389.
         </li>
       </ul>
+
       <h3>Как пометить машины рабочими столами</h3>
       <p>
         Проще всего — <b>на группе</b>: одна строка накрывает все машины в ней, включая те, что
@@ -1589,14 +3564,8 @@
         jump1:
           terminaldeck_protocol: ssh</code></pre>
       <p>
-        Работает и файл <code>group_vars/windows.yml</code> рядом с инвентарём — это то же самое,
-        сказанное отдельным файлом:
-      </p>
-      <pre><code>terminaldeck_protocol: rdp</code></pre>
-      <p>
-        Если рабочий стол слушает <b>не на 3389</b>, порт указывается своей переменной. Обычный
-        <code>ansible_port</code> для этого не годится и не читается: у машины, которой Ansible
-        управляет по WinRM, там будет 5985, и звонить в порт управления за картинкой бессмысленно.
+        Работает и файл <code>group_vars/windows.yml</code> рядом с инвентарём. Если рабочий стол
+        слушает <b>не на 3389</b>, порт указывается своей переменной:
       </p>
       <pre><code>all:
   hosts:
@@ -1611,11 +3580,8 @@
           <span class="ui">Локальные настройки…</span> на хосте, поле
           <span class="ui">Протокол</span>. Как и всё в этом диалоге, выбор переживает каждую
           синхронизацию, а <span class="ui">Из инвентаря</span> возвращает решение репозиторию.
-        </p>
-        <p>
-          Значение читается без учёта регистра: <code>RDP</code> и <code>rdp</code> — одно и то же.
-          Незнакомое значение считается несказанным, и хост остаётся SSH — молча превращаться во
-          что-то третье он не станет.
+          Значение читается без учёта регистра; незнакомое считается несказанным, и хост остаётся
+          SSH.
         </p>
       </div>
 
@@ -1627,16 +3593,17 @@
           не появится, пока вы не назовёте эту ветку или не вольёте её, — и синхронизация в обоих
           случаях <b>проходит успешно</b>, поэтому выглядит так, будто ничего не изменилось. Строка
           под источником называет ветку, ревизию, число хостов и групп и прочитанные файлы — именно
-          чтобы это было видно.
+          чтобы это было видно (рис. 12,
+          <span class="co" style="transform: translateY(3px)">3</span>).
         </p>
       </div>
 
       <h3>Хост в нескольких группах</h3>
       <p>
-        Такой хост показывается под каждой из них с пометкой количества и остаётся
-        <b>одним хостом</b>: один набор локальных настроек, одна запись в наборе, один терминал.
-        Настройки подключения он наследует от <b>одной</b> группы — самой глубокой, а при равенстве
-        последней по алфавиту: это та группа, которой дал бы победить сам Ansible.
+        Такой хост показывается под каждой из них и остаётся <b>одним хостом</b>: один набор
+        локальных настроек, одна запись в наборе, один терминал. Настройки подключения он наследует
+        от <b>одной</b> группы — самой глубокой, а при равенстве последней по алфавиту: это та
+        группа, которой дал бы победить сам Ansible.
       </p>
       <div class="note">
         <p>
@@ -1657,8 +3624,8 @@
         </li>
         <li>
           Сохраните. Ничего не скачивается само: вызовите
-          <span class="ui">Синхронизировать с git…</span> в контекстном меню папки — правым кликом
-          по ней. Пока синхронизация идёт, рядом с именем папки стоит многоточие.
+          <span class="ui">Синхронизировать с git…</span> в контекстном меню папки. Пока
+          синхронизация идёт, рядом с именем папки стоит многоточие.
         </li>
       </ol>
       <ul>
@@ -1668,8 +3635,7 @@
         </li>
         <li>
           Несколько папок на одном репозитории <b>делят клон</b>: он скачивается один раз, и каждая
-          папка берёт из него свои пути — продакшн из одного файла инвентаря, стенд из другого.
-          Рабочая копия исчезает вместе с последней читающей её папкой.
+          папка берёт из него свои пути.
         </li>
         <li>
           <b>Само ничего не происходит.</b> Взятое в прошлый раз лежит на диске, поэтому папка
@@ -1678,10 +3644,42 @@
       </ul>
 
       <h3>Диалог синхронизации</h3>
-      <p>
-        Каждая синхронизация спрашивает, <b>какие группы взять</b>, — до того, как на диске что-то
-        изменится.
-      </p>
+      <figure class="fig">
+        <div class="shot">
+          <div class="m">
+            <div class="m-dialog wide">
+              <h5>Синхронизировать с git — Прод</h5>
+              <span class="m-hint">main · a1b2c3d · inventories/prod.yml</span>
+              <div class="m-check on">web</div>
+              <div class="m-check on" style="padding-left: 18px">web-canary</div>
+              <div class="m-check on rel">
+                db <span class="m-badge">новая</span>
+                <span class="co" style="right: -10px; top: -2px">1</span>
+              </div>
+              <div class="m-check">monitoring</div>
+              <div class="m-check on rel">
+                Разложить хосты по папкам групп
+                <span class="co" style="right: -10px; top: -2px">2</span>
+              </div>
+              <div class="rel" style="border-top: 1px solid #383b42; padding-top: 7px">
+                <span class="m-err">Исчезнут: old-web-03 — есть локальные настройки</span>
+                <span class="co" style="right: -10px; top: 4px">3</span>
+              </div>
+              <div class="m-actions">
+                <span class="m-btn">Отмена</span><span class="m-btn pri">Применить</span>
+              </div>
+            </div>
+          </div>
+          <ol class="legend">
+            <li><span class="co">1</span>Группы, появившиеся с прошлого раза, помечены «новая»</li>
+            <li><span class="co">2</span>Сохранить вложенность групп внутри папки</li>
+            <li>
+              <span class="co">3</span>Что уйдёт из папки — до того, как что-то изменится на диске
+            </li>
+          </ol>
+        </div>
+        <figcaption><b>Рис. 13.</b> Синхронизация спрашивает, прежде чем что-то менять.</figcaption>
+      </figure>
       <ul>
         <li>
           Прошлый выбор отмечен; появившиеся с прошлого раза группы приходят отмеченными и с
@@ -1695,26 +3693,13 @@
           включая сохранённые для них пароли.
         </li>
         <li>
+          <span class="ui">Разложить хосты по папкам групп</span> сохраняет вложенность выбранных
+          групп; без флажка хосты лежат в папке плоским списком. Выбор запоминается.
+        </li>
+        <li>
           До нажатия <span class="ui">Применить</span> на диске не меняется ничего;
-          <span class="ui">Отмена</span> оставляет папку как была.
-        </li>
-      </ul>
-
-      <h3><span class="tag t-new">0.13.0</span>Разложить хосты по папкам групп</h3>
-      <p>
-        По умолчанию хосты попадают в папку <b>одним плоским списком</b>, как бы глубоко их ни
-        вкладывал инвентарь. Новый флажок <span class="ui">Разложить хосты по папкам групп</span>
-        в диалоге синхронизации сохраняет вложенность выбранных групп внутри папки.
-      </p>
-      <ul>
-        <li>
-          Хост, входящий в несколько выбранных групп, виден в каждой из них; открытие всей папки всё
-          равно открывает каждый хост <b>один раз</b>.
-        </li>
-        <li>Выбор раскладки запоминается для будущих синхронизаций.</li>
-        <li>
-          Настройки подключения в любой раскладке наследуются через группы репозитория —
-          расположение на экране на это не влияет.
+          <span class="ui">Отмена</span> оставляет папку как была. Если папку изменили или удалили,
+          пока шла синхронизация, прочитанное выбрасывается, а не накладывается на новые настройки.
         </li>
       </ul>
 
@@ -1725,15 +3710,16 @@
         <b>переживает каждую следующую синхронизацию</b>. Настройки подключения наследуются через
         группы репозитория и дальше вверх — в вашу папку, поэтому логин, заданный на папке,
         покрывает всё, что под ней. <span class="ui">Протокол</span> — исключение: он не наследуется
-        ниоткуда, потому что говорит, <i>что</i> за машина, а в одной группе спокойно лежат Linux и
-        Windows рядом. <span class="ui">Сбросить локальные настройки</span> возвращает хост к тому,
-        что говорит репозиторий.
+        ниоткуда, потому что говорит, <i>что</i> за машина.
+        <span class="ui">Сбросить локальные настройки</span> возвращает хост к тому, что говорит
+        репозиторий.
       </p>
       <p>
         Резервная копия несёт репозиторий, ветку, выбранные группы и ваши локальные настройки — но
         не сами отражённые хосты: их восстановит одна синхронизация на новой машине. Отвязка или
-        удаление папки убирает отражённые хосты вместе с локальными настройками и паролями к ним;
-        сам репозиторий не трогается.
+        удаление папки, как и удаление источника на вкладке «Инвентарь», убирает отражённые хосты
+        вместе с локальными настройками и всеми их паролями, включая пароли шлюзов; сам репозиторий
+        не трогается.
       </p>
     </section>
 
@@ -1750,8 +3736,140 @@
         <span class="ui">Локальных настройках</span>, а сам инвентарь может сказать это за вас через
         <code>terminaldeck_protocol</code> — см. <a href="#inventory">раздел 11</a>. Логин берётся
         от хоста или группы над ним, как любые другие учётные данные; домен едет в имени
-        пользователя как <code>DOMAIN\user</code>.
+        пользователя как <code>DOMAIN\user</code> или <code>user@domain</code>. На разовую машину
+        можно зайти и без сохранения — через <span class="ui">Быстрое подключение…</span> в режиме
+        RDP (рис. 3).
       </p>
+
+      <h3>Как открывается рабочий стол</h3>
+      <figure class="fig">
+        <div class="shot">
+          <div class="m" style="display: flex; gap: 20px; flex-wrap: wrap; min-width: 720px">
+            <div
+              class="m-pane"
+              style="
+                flex: 1;
+                border: 1px solid #383b42;
+                border-radius: 9px;
+                overflow: hidden;
+                min-width: 220px;
+              "
+            >
+              <div class="m-ptool rel">
+                <b>ts-01</b><span class="co" style="right: 6px; top: 2px">1</span>
+              </div>
+              <div class="m-desk">
+                <div class="m-overlay">
+                  <div class="m-notice">
+                    <b>Пароль для CORP\ivanov</b>
+                    <div class="m-input">Пароль</div>
+                    <span class="m-btn pri">Подключиться</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div
+              class="m-pane"
+              style="
+                flex: 1;
+                border: 1px solid #383b42;
+                border-radius: 9px;
+                overflow: hidden;
+                min-width: 220px;
+              "
+            >
+              <div class="m-ptool rel">
+                <b>ts-01</b><span class="co" style="right: 6px; top: 2px">2</span>
+              </div>
+              <div class="m-desk">
+                <div class="m-overlay">
+                  <div class="m-notice">
+                    <b>Не удалось подключиться</b>
+                    <small>Authentication failed</small>
+                    <div style="display: flex; gap: 6px; justify-content: center">
+                      <span class="m-btn">Повторить</span><span class="m-btn">Другой пароль…</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div
+              class="m-pane"
+              style="
+                flex: 1;
+                border: 1px solid #383b42;
+                border-radius: 9px;
+                overflow: hidden;
+                min-width: 220px;
+              "
+            >
+              <div class="m-ptool rel">
+                <b>ts-01</b><span class="sp"></span><span>⛶</span><span>✕</span>
+                <span class="co" style="right: 44px; top: 2px">3</span>
+              </div>
+              <div class="m-desk">
+                <div class="appw"></div>
+                <div class="task"><i></i><i></i><i></i><i></i></div>
+              </div>
+            </div>
+          </div>
+          <ol class="legend">
+            <li><span class="co">1</span>Пароля нет в хранилище — его спросят прямо в панели</li>
+            <li>
+              <span class="co">2</span>Отказ: «Повторить» — тем же паролем, «Другой пароль…» —
+              ввести заново
+            </li>
+            <li><span class="co">3</span>Подключено; ⛶ — полный экран</li>
+          </ol>
+        </div>
+        <figcaption><b>Рис. 14.</b> Рабочий стол от открытия до подключения.</figcaption>
+      </figure>
+      <ul>
+        <li>
+          Панель рабочего стола <b>подключается сама</b>, как только открылась. Хост с сохранённым
+          паролем входит сразу; без пароля — спросит его в панели. Панель, восстановленная из
+          прошлой раскладки, ждёт кнопку, как и терминал.
+        </li>
+        <li>
+          После отказа есть <span class="ui">Повторить</span> и, если пароль вводился здесь,
+          <span class="ui">Другой пароль…</span> — чтобы исправить опечатку, а не повторять её.
+        </li>
+        <li>
+          Если Windows ещё заканчивает вход (освобождает старую сессию, грузит профиль), панель
+          показывает это как замечание хоста и ждёт, а не закрывает сессию посреди входа.
+        </li>
+        <li>
+          Не получилось — панель называет шаг, последнюю жалобу клиента и числовой код ошибки.
+        </li>
+      </ul>
+
+      <h3>Режим консоли (/admin)</h3>
+      <p>
+        Правый клик по Windows-хосту → <span class="ui">Подключиться в режиме консоли</span> —
+        административная сессия, как <code>mstsc /admin</code>. На сервере терминалов она не требует
+        клиентской лицензии и не уводится посредником подключений на другой сервер, поэтому пускает,
+        даже когда лицензирование кончилось. Выбор держится за панелью при переподключениях, хост не
+        меняется. Сделать это поведением по умолчанию —
+        <span class="ui">Подключаться в режиме консоли (/admin)</span> в разделе
+        <span class="ui">Рабочий стол</span> хоста или группы.
+      </p>
+
+      <h3>Выход из Windows</h3>
+      <ul>
+        <li>
+          <b>Изнутри:</b> <span class="ui">Пуск → Выход</span> в самой Windows закрывает и панель —
+          возвращаться некуда. Отключение, тайм-аут простоя или обрыв сети оставляют панель с
+          надписью <span class="ui">Сессия завершена</span> и кнопкой повтора.
+        </li>
+        <li>
+          <b>Для всей рабочей области:</b> правый клик по области →
+          <span class="ui">Выйти из сессий Windows</span>. Каждому рабочему столу в ней отправляется
+          <kbd data-fixed>Win+R</kbd>, <code>logoff</code> и <kbd data-fixed>Enter</kbd> — набором
+          символов, поэтому раскладка той стороны не важна. Панель закрывается, когда хост
+          <b>подтвердил</b> выход; не подтвердившие за двадцать секунд остаются открытыми, и
+          приложение спросит, закрыть ли их всё равно. Терминалы в области не трогаются.
+        </li>
+      </ul>
 
       <h3>Раздел «Рабочий стол»</h3>
       <p>
@@ -1784,6 +3902,14 @@
             <td>Отдельный канал; выключается для хоста или группы</td>
           </tr>
           <tr>
+            <td><span class="ui">Делить буфер обмена с этим хостом</span></td>
+            <td>Текст и файлы в обе стороны; по умолчанию включено</td>
+          </tr>
+          <tr>
+            <td><span class="ui">Подключаться в режиме консоли (/admin)</span></td>
+            <td>Административная сессия вместо обычной</td>
+          </tr>
+          <tr>
             <td><span class="ui">Отправлять ⌘ как Ctrl</span></td>
             <td>macOS: копирование и вставка как в Windows</td>
           </tr>
@@ -1796,7 +3922,6 @@
       </p>
 
       <h3>Размер и резкость</h3>
-      <p>Это самое неочевидное место, и оно стоит трёх абзацев.</p>
       <ul>
         <li>
           <b>Размер считается в пикселях экрана, а не в точках панели.</b> Панель шириной 1400 точек
@@ -1805,87 +3930,112 @@
         </li>
         <li>
           <b>Бюджет пикселей</b> ограничивает запрос: за его пределом стол просят о меньшем размере,
-          чем хотелось. На обычном мониторе с одним пикселем на точку панель и есть запрос, что бы
-          тут ни стояло.
+          чем хотелось. Сверху запрос в любом случае ограничен 4K с сохранением пропорций — дисплей
+          5K запросил бы кадр больше, чем окно способно принять.
         </li>
         <li>
           <b>Приведение к размеру.</b> Стол, запрошенный в собственных пикселях Retina, выходит
-          резким <em>и вдвое мельче</em>, чем нужно, потому что Windows раскладывает меню в 20
-          пикселей одинаково при любой плотности. Поэтому по умолчанию картинка увеличивается
-          <b>здесь</b>: панель Retina запрашивает ровно свои точки, и каждый пиксель рисуется
-          четырьмя. Либо можно <span class="ui">попросить ту сторону</span> — тогда она сама
-          раскладывается крупнее, и это единственный способ получить нужный размер при полной
-          резкости. Windows 8.1 и Server 2012 R2 и новее это учитывают, старее — игнорируют.
+          резким <em>и вдвое мельче</em>, чем нужно. Поэтому по умолчанию картинка увеличивается
+          <b>здесь</b>; либо можно <span class="ui">попросить ту сторону</span> — тогда она сама
+          раскладывается крупнее. Windows 8.1 и Server 2012 R2 и новее это учитывают.
+        </li>
+        <li>
+          Панель, изменившая размер ещё во время подключения, получает правильный размер, как только
+          сервер откроет нужный канал. Новый фиксированный размер, сохранённый для открытого стола,
+          применяется сразу.
         </li>
       </ul>
-      <div class="note">
-        <p>
-          Запрос плотности выключен по умолчанию, потому что это всё-таки просьба к той стороне
-          разложить себя иначе, и хост вправе её не выполнить.
-        </p>
-      </div>
 
-      <h3>Полный экран</h3>
+      <h3>Клавиатура и мышь</h3>
       <ul>
-        <li><kbd>F11</kbd> входит и выходит; <b>удержание</b> <kbd>Escape</kbd> тоже выходит.</li>
         <li>
-          Панель инструментов убирается <b>совсем</b> — верхний край экрана принадлежит той стороне,
-          вместе с её собственной строкой вкладок и кнопками окна. Заодно стол получает размер,
-          который у монитора есть, а такой размер и способен лечь пиксель в пиксель.
+          <b>Пока рабочий стол в фокусе, вся клавиатура уходит ему</b> — в окне так же, как в полном
+          экране. <kbd data-fixed>Ctrl+R</kbd> обновит страницу на той машине, а не здесь; сочетания
+          приложения — <kbd>⌘W</kbd>, номера вкладок, палитры, блокировка — молчат. Кликните вне
+          стола (по дереву, другой панели или другому окну), и приложение получит свои сочетания
+          обратно.
         </li>
         <li>
-          <b>Вся клавиатура уходит сессии.</b> Каждое сочетание приложения — <kbd>⌘W</kbd>, номера
-          вкладок и областей, палитры, блокировка хранилища, масштаб — на время полного экрана
-          умолкает. Списка исключений нет намеренно: клавиша, нацеленная в дальнюю машину и попавшая
-          в эту, — это и есть та беда, которой избегают. Выходов два, и ни один из них не проходит
-          через обработку сочетаний.
+          <kbd>F11</kbd> входит в полный экран и выходит из него; <b>удержание</b>
+          <kbd>Escape</kbd> тоже выходит. Панель инструментов в полном экране убирается совсем.
         </li>
         <li>
-          <kbd>Alt+Tab</kbd> доходит до той стороны только в полном экране. На маке это
-          <kbd data-fixed>⌥Tab</kbd>: <kbd data-fixed>⌘Tab</kbd> принадлежит macOS и отобрать его
-          нельзя.
+          <kbd data-fixed>Alt+Tab</kbd> доходит до той стороны только в полном экране. На маке это
+          <kbd data-fixed>⌥Tab</kbd>: <kbd data-fixed>⌘Tab</kbd> принадлежит macOS.
         </li>
         <li>
-          В окне, а не в полном экране, ничего не меняется: сочетания приложения работают, вкладки
-          остаются доступны с клавиатуры.
+          <b>Num Lock, Caps Lock и Scroll Lock</b> той стороны сверяются с этой клавиатурой:
+          цифровой блок набирает цифры, а не стрелки. На маке Num Lock держится включённым.
+        </li>
+        <li>
+          Кнопка мыши, отпущенная за пределами стола — над панелью инструментов, другой панелью или
+          вне окна, — отпускается и там; зажатая кнопка отпускается и при потере фокуса окном.
         </li>
       </ul>
 
       <h3>Буфер обмена</h3>
       <p>
-        Текст ходит в обе стороны: скопировали здесь — вставили там, и наоборот.
+        Текст и файлы ходят в обе стороны: скопировали здесь — вставили там, и наоборот.
         <b>Включено по умолчанию</b>, как в любом клиенте Windows; флажок
-        <span class="ui">Делить буфер обмена с этим хостом</span> в разделе
-        <span class="ui">Рабочий стол</span> позволяет выключить это для отдельного хоста или для
-        целой группы. Выключать стоит там, где машине не стоит отдавать скопированное: прочитать
-        буфер может всё, что на ней работает, а не только то окно, куда вы вставляете.
+        <span class="ui">Делить буфер обмена с этим хостом</span> выключает это для отдельного хоста
+        или целой группы. Выключать стоит там, где машине не стоит отдавать скопированное.
       </p>
       <div class="note">
         <p>
-          Скопированное здесь <b>объявляется, а не отправляется</b>: та сторона запрашивает данные в
-          момент вставки, и большая часть того, что вы копируете, туда никогда не уезжает.
-        </p>
-        <p>
-          Картинки и форматирование HTML/RTF пока не передаются. Из HTML-страниц можно копировать
-          обычный текст.
+          <b>Буфер делится только с тем столом, которым вы пользуетесь.</b> Скопированное здесь
+          уходит рабочему столу, который <b>виден</b> и окно которого <b>в фокусе</b>; стол в
+          фоновой вкладке получит его, когда вкладку покажут. Заблокированное хранилище отзывает
+          буфер у всех столов и отменяет идущие передачи файлов.
         </p>
       </div>
+      <figure class="fig">
+        <div class="shot">
+          <div class="m" style="display: flex; gap: 14px; flex-wrap: wrap; min-width: 640px">
+            <div class="m-banner" style="min-width: 0; background: #1e2025; border-color: #383b42">
+              <span>⇣ Получение файлов из буфера</span><span class="sp"></span>
+              <span class="m-meter"><i style="width: 60%; background: #5b9dff"></i></span>
+              <span style="color: #9aa0ab">48 / 80 МБ</span>
+            </div>
+            <div class="m-banner" style="min-width: 0; background: #14301a; border-color: #3fb950">
+              <span>✓ Файлы готовы к вставке</span>
+            </div>
+          </div>
+        </div>
+        <figcaption>
+          <b>Рис. 15.</b> Файлы, скопированные в рабочем столе: сначала приходят сюда, потом их
+          можно вставить.
+        </figcaption>
+      </figure>
+      <ul>
+        <li>
+          <b>Сюда → туда.</b> Скопируйте файлы или папки в Finder или Проводнике и вставьте в
+          сессии. Ничего не копируется заранее: та сторона читает файлы с этого диска в момент
+          вставки, поэтому размер не важен. Копируются и открытые документы Office, и файлы с
+          сетевых ресурсов.
+        </li>
+        <li>
+          <b>Туда → сюда.</b> Скопируйте в сессии, дождитесь
+          <span class="ui">Файлы готовы к вставке</span> и вставьте в локальную папку. Файлы сначала
+          скачиваются во временную папку — несколькими запросами сразу, поэтому быстро и на дальнем
+          сервере. Если вы за это время ушли на другую вкладку или в другое окно, файлы ждут и
+          попадают в буфер, когда вы вернётесь.
+        </li>
+        <li>
+          На одну входящую операцию — до 10 000 файлов и папок общим размером до 20 ГБ; ссылки и
+          небезопасные имена не принимаются. Новое копирование отменяет незавершённое. Временные
+          копии удаляются при выходе из TerminalDeck — вставьте нужное до закрытия.
+        </li>
+        <li>Картинки и форматирование HTML/RTF пока не передаются — только текст и файлы.</li>
+      </ul>
 
-      <h3>Файлы</h3>
-      <p>
-        Файлы и папки передаются в обе стороны. Скопируйте их в Finder или Проводнике и вставьте в
-        RDP-сессии. При копировании из RDP дождитесь сообщения
-        <span class="ui">Файлы готовы к вставке</span>, затем вставьте их в локальную папку.
-      </p>
-      <p>
-        Исходящие файлы читаются порциями по запросу сервера. Входящие сначала загружаются во
-        временную папку: новая операция копирования отменяет незавершённую загрузку. На одну
-        входящую операцию допускается до 10 000 файлов и папок общим размером до 20 ГБ. Ссылки и
-        небезопасные имена не принимаются. Временные копии удаляются при выходе из TerminalDeck —
-        вставьте нужные файлы до закрытия программы.
-      </p>
       <h3>Чего пока нет</h3>
-      <p>Файловая панель SFTP, туннели, мониторинг и трансляция у RDP-сессии не показываются.</p>
+      <ul>
+        <li>
+          Файловая панель SFTP, туннели, мониторинг и трансляция у RDP-сессии не показываются.
+        </li>
+        <li>Микрофон, несколько мониторов в одной сессии, принтеры, смарт-карты и диски.</li>
+        <li>Клиент рабочего стола под Linux.</li>
+      </ul>
     </section>
 
     <section id="look">
@@ -1898,10 +4048,10 @@
       </p>
       <ul>
         <li>
-          Группа, репозиторий или отдельный хост переопределяют любое из этого в своём разделе
-          <span class="ui">Оформление</span>.
+          Группа, репозиторий, набор или отдельный хост переопределяют любое из этого в своём
+          разделе <span class="ui">Оформление</span>.
         </li>
-        <li>Каждое поле сообщает, что унаследует и от какой группы.</li>
+        <li>Каждое поле сообщает, что унаследует и откуда: от группы или из настроек.</li>
         <li>
           <span class="ui">Наследовать оформление</span> снимается независимо от наследования
           учётных данных.
@@ -1923,8 +4073,8 @@
       <h3>Экспорт</h3>
       <p>
         <span class="ui">Настройки → Резервная копия → Экспортировать…</span> записывает сессии,
-        группы, сниппеты, наборы и источники инвентаря в один файл. Оформление терминала и
-        доверенные ключи хостов остаются на этой машине.
+        группы, сниппеты, наборы, сохранённые учётные записи и источники инвентаря в один файл.
+        Оформление терминала и доверенные ключи хостов остаются на этой машине.
       </p>
       <ul>
         <li>
@@ -1950,6 +4100,18 @@
         <b>ничего из уже имеющегося не удаляется</b>. По окончании приложение отчитывается, сколько
         сессий, групп, сниппетов, наборов и репозиториев приехало.
       </p>
+      <ul>
+        <li>
+          <b>Всё или ничего.</b> Файл проверяется целиком до того, как что-то запишется:
+          повторяющиеся идентификаторы и группы, вложенные сами в себя, отклоняются, а хост из
+          несуществующей папки попадает на верхний уровень. Если какое-то хранилище не удалось
+          записать, всё возвращается как было.
+        </li>
+        <li>
+          Импорт, прерванный сбоем или принудительным выходом, при следующем запуске откатывается
+          полностью — приложение об этом скажет.
+        </li>
+      </ul>
 
       <h3>Обновления</h3>
       <p>
@@ -1958,26 +4120,66 @@
         настроек; рядом написана версия, которой вы пользуетесь, и с неё стоит начинать любое
         сообщение о проблеме.
       </p>
-      <p>
-        Когда выходит новая версия, сверху появляется полоса
-        <span class="ui">Доступна версия {версия}</span> с кнопками
-        <span class="ui">Скачать</span> и <span class="ui">Позже</span>. После загрузки —
-        <span class="ui">Перезапустить сейчас</span> или
-        <span class="ui">При следующем выходе</span>.
-      </p>
+      <figure class="fig">
+        <div class="shot">
+          <div class="m" style="display: flex; flex-direction: column; gap: 10px">
+            <div class="m-banner">
+              <span>Доступна версия 0.19.5.</span><span class="sp"></span>
+              <span class="m-btn pri rel"
+                >Обновить и перезапустить
+                <span class="co" style="right: -10px; top: -10px">1</span></span
+              >
+              <span class="m-btn">Позже</span>
+            </div>
+            <div class="m-banner">
+              <span>Загрузка обновления… 45%</span><span class="sp"></span>
+              <span class="m-meter" style="width: 120px"
+                ><i style="width: 45%; background: #5b9dff"></i
+              ></span>
+            </div>
+            <div class="m-banner" style="background: #332711; border-color: #d9a441">
+              <span>Вышла версия 0.19.5. Эта сборка не может установить её поверх себя.</span
+              ><span class="sp"></span>
+              <span class="m-btn rel"
+                >Открыть загрузки <span class="co" style="right: -10px; top: -10px">2</span></span
+              >
+            </div>
+          </div>
+          <ol class="legend">
+            <li>
+              <span class="co">1</span>Одна кнопка: скачать, тихо поставить и запуститься в новой
+              версии
+            </li>
+            <li><span class="co">2</span>Сборка без подписи (macOS) ведёт на страницу загрузок</li>
+          </ol>
+        </div>
+        <figcaption><b>Рис. 16.</b> Полоса обновления сверху окна.</figcaption>
+      </figure>
+      <ul>
+        <li>
+          <span class="ui">Обновить и перезапустить</span> делает всё одной кнопкой: скачивает новую
+          версию, ставит её <b>молча в ту же папку</b> — без мастера установки — и запускает
+          приложение снова. Перезапуск закрывает соединения, поэтому, если они открыты, приложение
+          сначала спросит.
+        </li>
+        <li>
+          Установка «для всех пользователей» в Windows может один раз попросить разрешения
+          администратора.
+        </li>
+        <li>
+          Скачанное обновление ждёт установки, даже если следующая проверка не удалась из-за сети:
+          ставить его сеть не нужна.
+        </li>
+      </ul>
       <div class="note">
         <p>
           На macOS обновиться на месте может только подписанная сборка:
           <code>Squirrel.Mac</code> подменяет приложение, лишь когда подпись новой сборки
           удовлетворяет требованию запущенной, а у ad-hoc-подписи нет ничего, кроме собственного
-          хеша, — ни одна следующая версия ей не подойдёт. Такая сборка это про себя знает, и полоса
-          выглядит иначе:
-          <span class="ui"
-            >Вышла версия {версия}. Эта сборка не может установить её поверх себя.</span
-          >
-          с кнопкой <span class="ui">Открыть загрузки</span>, которая ведёт на страницу релизов в
-          браузере. Скачанный оттуда образ ставится поверх прежнего как обычно; настройки, хосты и
-          хранилище остаются на месте.
+          хеша. Такая сборка это про себя знает и показывает
+          <span class="ui">Открыть загрузки</span> — кнопку, ведущую на страницу релизов в браузере.
+          Скачанный оттуда образ ставится поверх прежнего как обычно; настройки, хосты и хранилище
+          остаются на месте.
         </p>
       </div>
     </section>
@@ -1997,6 +4199,12 @@
         <kbd>Ctrl+Shift+E</kbd>, а не <kbd>D</kbd> с шифтом: <kbd>Shift</kbd> там уже часть
         модификатора и не может ещё и выбирать направление.
       </p>
+      <div class="note">
+        <p>
+          Пока в фокусе <b>рабочий стол</b>, ни одно из этих сочетаний не срабатывает — клавиатура
+          целиком принадлежит той машине. Кликните вне стола, чтобы вернуть их.
+        </p>
+      </div>
 
       <h3>Вкладки, панели, области</h3>
       <table class="keys">
@@ -2067,6 +4275,11 @@
             <td><kbd data-fixed>⇧</kbd> клик</td>
             <td><kbd>Shift</kbd> клик</td>
             <td>Растянуть выделение до диапазона</td>
+          </tr>
+          <tr>
+            <td><kbd data-fixed>Esc</kbd></td>
+            <td><kbd>Esc</kbd></td>
+            <td>В фильтре хостов — очистить его</td>
           </tr>
         </tbody>
       </table>
@@ -2147,152 +4360,109 @@
       </table>
       <p>
         Прокрутка внутри RDP следует за преобладающей осью жеста. Небольшое боковое движение
-        трекпада отбрасывается, чтобы вертикальное окно не начинало ехать по диагонали; явная
-        горизонтальная прокрутка и настоящий диагональный жест сохраняются.
+        трекпада отбрасывается, чтобы вертикальное окно не начинало ехать по диагонали.
       </p>
     </section>
 
     <section id="whatsnew">
       <h2><span class="num">16</span>Что нового</h2>
-
-      <h3><span class="tag t-new">0.15.3</span>Файлы в рабочий стол через буфер</h3>
-      <p>
-        Скопировали файл в Finder — вставили в проводнике внутри сессии. Несколько файлов и целые
-        каталоги тоже. До этого положить файл на Windows-машину из приложения было нельзя вовсе: у
-        панели рабочего стола нет SFTP, потому что в RDP нет оболочки, к которой её прицепить.
-        Ничего заранее не копируется — та сторона читает файлы с этого диска в момент вставки,
-        поэтому размер не важен. Обратного направления пока нет.
+      <p class="lede">
+        Главное с версии 0.16 — от свежего к старому. Полный список с подробностями лежит в
+        <code>CHANGELOG.md</code> в репозитории.
       </p>
 
-      <h3><span class="tag t-new">0.15.2</span>Буфер обмена вставлял мешанину</h3>
+      <h3><span class="tag t-new">0.19.5</span>Рабочий стол из быстрого подключения</h3>
       <p>
-        В 0.15.0 и 0.15.1 первое же копирование <b>из</b> сессии приезжало испорченным: вместо
-        текста получались пробелы, квадратики и цифры. Клиент разбирал ответ сервера по чужому полю
-        — тому, что говорит, какой формат последним запросили <i>у нас</i>, а не какой запросили
-        <i>мы</i>. До первого запроса с той стороны там ноль, поэтому UTF-16 читался побайтно.
-        Испорченный текст попадал в местный буфер и возвращался обратно при вставке — отсюда и
-        мешанина в блокноте. Починено; если вы на 0.15.0 или 0.15.1, обновитесь.
-      </p>
-      <p>
-        Заодно перестали оставаться занятыми локальные порты после того, как сессия закрылась сама —
-        по <code>exit</code> или по обрыву связи. Раньше туннель продолжал слушать порт, никуда его
-        не переправляя, и следующее подключение с тем же правилом получало отказ.
+        В <span class="ui">Быстром подключении</span> появился переключатель
+        <span class="ui">SSH</span> | <span class="ui">RDP</span>: на разовую Windows-машину можно
+        зайти, не заводя хост (рис. 3). Порт сам меняется на 3389, логин — в любом виде, пароль
+        можно ввести уже в панели. В фильтре хостов появился <span class="ui">✕</span>, очищающий
+        поле, а <kbd data-fixed>Esc</kbd> делает то же с клавиатуры. Пункт перезагрузки окна убран
+        из меню установленной сборки: он закрывал все сессии без вопроса.
       </p>
 
-      <h3><span class="tag t-new">0.15.1</span>Обновления доходят, не дожидаясь перезапуска</h3>
-      <p>
-        Приложение спрашивало об обновлениях один раз — при запуске. Копия, открытая в момент
-        выпуска релиза, не узнавала о нём никогда: на машине, которую не перезагружают, это
-        буквально никогда. Теперь вопрос задаётся <b>раз в час</b>, пока приложение работает, и
-        замолкает, пока есть что делать с уже найденным обновлением. Спросить самому можно в
-        <span class="ui">Настройки → Резервная копия</span>, там же написана текущая версия — кнопка
-        отвечает в обоих случаях, в том числе «установлена новейшая».
-      </p>
-
-      <h3><span class="tag t-new">0.15.0</span>Буфер обмена с рабочим столом</h3>
-      <p>
-        Текст ходит в обе стороны: скопировали в сессии — вставили здесь, и наоборот. Работает
-        сразу, как в любом клиенте Windows, а флажок
-        <span class="ui">Делить буфер обмена с этим хостом</span> в разделе
-        <span class="ui">Рабочий стол</span> выключает это для хоста или группы, которым отдавать
-        скопированное не стоит. Настройка читается при подключении, так что после её изменения
-        сессию нужно переоткрыть. Картинки, HTML и RTF — следующий шаг; про файлы см.
-        <a href="#rdp">раздел 12</a>.
-      </p>
-
-      <h3><span class="tag t-new">0.15.0</span>Цвет и протокол в дереве</h3>
-      <p>
-        Цветная точка перед именем убрана. Цвет хоста теперь красит <b>саму строку</b> — заливкой и
-        полосой слева, которая остаётся и под выделением. Освободившееся место занял значок того,
-        <b>что откроется</b>: окно терминала для SSH, монитор для RDP. Windows-машина в списке
-        линуксовых видна сразу, ещё до подключения. В обоих деревьях — «Сессии» и «Инвентарь».
-      </p>
-
-      <h3><span class="tag t-new">0.15.0</span>Хост из репозитория открывается тем, что он есть</h3>
-      <p>
-        Панель искала протокол, адрес и порт только среди сохранённых вручную сессий, а хоста из
-        инвентаря там нет. Поэтому любая машина из репозитория открывалась терминалом и шла по SSH,
-        что бы ни говорил <code>terminaldeck_protocol</code>. Заодно открытая панель рабочего стола
-        теперь замечает синхронизацию и локальные правки — раньше для такого хоста не замечала.
-      </p>
-
-      <h3><span class="tag t-new">0.14.0</span>Рабочие столы из инвентаря</h3>
-      <p>
-        Инвентарь из репозитория теперь может сказать, что машина — рабочий стол:
-        <code>terminaldeck_protocol: rdp</code> на хосте или на группе. Раньше любой хост из
-        репозитория приезжал SSH-хостом, открывал терминал и звонил по заявленному порту как по SSH
-        — соединение просто обрывалось. Порт стола, если он не 3389, указывается как
-        <code>terminaldeck_port</code>; <code>ansible_port</code> у такого хоста не читается, это
-        порт управления. Чужой репозиторий, который не поправить, лечится полем
-        <span class="ui">Протокол</span> в локальных настройках хоста. Примеры — в
-        <a href="#inventory">разделе 11</a>.
-      </p>
-
-      <h3><span class="tag t-new">0.14.0</span>Присоединение к чужой сессии убрано</h3>
-      <p>
-        Возможность сесть в сессию, в которой уже кто-то работает, удалена целиком. Её картинку
-        рисовало не это приложение: механизм идёт по RPC и SMB, а не по RDP, поэтому в панели стояло
-        окно <code>mstsc</code>, которое приложение могло только двигать. Оно не масштабировалось
-        под панель, не получало <kbd>Alt+Tab</kbd> даже в полном экране, а список сессий приходилось
-        запрашивать от имени того, кто запустил программу. Сделать это как следует — значит
-        реализовать теневые сессии RDS с нуля, и такого в планах нет.
-      </p>
-
-      <h3><span class="tag t-new">0.14.0</span>macOS больше не предлагает то, чего не может</h3>
-      <p>
-        Сборка без сертификата подписана ad-hoc и не может обновиться поверх себя, поэтому теперь
-        она так и говорит: <span class="ui">Вышла версия …</span> и кнопка
-        <span class="ui">Открыть загрузки</span> вместо установки, которая скачивала пакет целиком и
-        падала на последнем шаге. Подробности — в <a href="#backup">разделе 14</a>.
-      </p>
-
-      <h3><span class="tag t-new">0.13.2</span>Быстродействие</h3>
-      <p>
-        Большие каталоги прокручиваются с отображением только видимых строк; выбор файлов,
-        переименование и перетаскивание сохраняются. Индикатор передачи обновляется отдельно от
-        списка. Подготовка копирования множества файлов проверяет несколько назначений одновременно,
-        сохраняя диалог конфликтов.
-      </p>
-      <p>
-        Скрытые вкладки приостанавливают опрос файлов и мониторинг. Встроенный рабочий стол
-        перестаёт передавать изображение в интерфейс и восстанавливает актуальный полный кадр при
-        возвращении. Соединения, запущенные команды, туннели и передачи файлов продолжают работать.
-        Синхронизация больших inventory разбирает YAML отдельно от основного потока приложения.
-      </p>
-
-      <h3><span class="tag t-new">0.13.1</span>Доступ к файлам от другого пользователя</h3>
-      <p>
-        <span class="ui">Доступ к файлам → SCP / Shell</span> плюс
-        <span class="ui">Команда запуска оболочки</span> вида <code>sudo -n -i -u postgres</code>:
-        файловые операции выполняются от разрешённой учётной записи, а вход в терминал остаётся
-        вашим. Листинг каталогов, передачи, копирование между хостами и отправка из внешнего
-        редактора — всё через эту команду. Поддерживается и в локальных переопределениях хостов из
-        git-инвентаря; настройка едет в резервной копии, а панель показывает действующую команду.
-        Подробности и требования к серверу — <a href="#files">раздел 9</a>.
-      </p>
-
-      <h3><span class="tag t-new">0.13.0</span>Хосты по папкам групп</h3>
-      <p>
-        В диалоге синхронизации git-инвентаря появился флажок
-        <span class="ui">Разложить хосты по папкам групп</span>: выбранные группы становятся
-        вложенными папками, общий хост виден в каждой, выбор запоминается. Выключено — остаётся
-        прежний плоский список. См. <a href="#inventory">раздел 11</a>.
-      </p>
-
-      <h3>Починено</h3>
+      <h3><span class="tag t-new">0.19.4</span>Безопасность и надёжность</h3>
       <ul>
         <li>
-          <b>Настроечная строка отслеживания каталога больше не появляется на экране.</b>
-          На хосте с долгим входом она вводилась, пока login-shell ещё выполнял
-          <code>/etc/profile</code>, и её эхо приходило дважды — из драйвера терминала и из
-          редактора строки. Теперь она отправляется, когда оболочка замолкает, и вырезается целиком.
+          Скачиваемая папка больше не может записаться за пределы выбранного каталога из-за
+          коварного имени на сервере.
         </li>
         <li>
-          <b>Не открывшийся рабочий стол объясняет причину.</b> Панель показывает не только шаг, на
-          котором всё встало, но и последнюю жалобу клиента и числовой код ошибки — снимок экрана с
-          ошибкой теперь стоит столько же, сколько стоил бы журнал.
+          Окно больше не может отдать клиенту рабочего стола команды, которые решает только главный
+          процесс: доверие сертификату или передачу локальных файлов.
+        </li>
+        <li>
+          Хранилище и настройки записываются на диск так, что сбой питания не оставляет пустой файл;
+          занятый антивирусом файл не мешает сохранению.
+        </li>
+        <li>
+          Закрытая SSH-сессия больше не считается открытой; не поднявшийся туннель говорит об этом в
+          терминале; папка с кириллицей в имени правильно понимается при следовании за каталогом.
+        </li>
+        <li>
+          «Редактировать локально» больше не теряет правки при двойном открытии файла и не роняет
+          приложение, если временную папку удалили.
+        </li>
+        <li>
+          Импорт из <code>~/.ssh/config</code> читает файл так, как его читает OpenSSH; группа
+          Ansible, описанная дважды, больше не теряет переменные одного из описаний.
+        </li>
+        <li>
+          Диалоги говорят, почему не удалось сохранить; ошибка первого файла в пачке не исчезает;
+          скачанное обновление не откатывается назад повторной проверкой.
         </li>
       </ul>
+
+      <h3><span class="tag t-new">0.19.1</span>Обновление одной кнопкой</h3>
+      <p>
+        <span class="ui">Обновить и перезапустить</span> скачивает новую версию, молча ставит её в
+        ту же папку и запускает приложение снова — без мастера установки. Если открыты соединения,
+        сначала спрашивает. См. <a href="#backup">раздел 14</a>.
+      </p>
+
+      <h3><span class="tag t-new">0.19.0</span>Клик по открытому хосту показывает его</h3>
+      <p>
+        Одиночный клик по хосту в дереве, инвентаре или наборе выводит вперёд его панель, переключая
+        область и вкладку. Открыт в нескольких местах — каждый клик ведёт к следующему. Неоткрытый
+        хост по-прежнему только выделяется; подключает двойной клик.
+      </p>
+
+      <h3><span class="tag t-new">0.18</span>Рабочие столы ведут себя как надо</h3>
+      <ul>
+        <li>Рабочий стол подключается сам, как только открылась его панель.</li>
+        <li>
+          Выход из Windows изнутри закрывает панель; для всей области есть
+          <span class="ui">Выйти из сессий Windows</span>, и панель закрывается, только когда хост
+          подтвердил выход.
+        </li>
+        <li>Пока стол в фокусе, ему уходит вся клавиатура — в окне так же, как в полном экране.</li>
+        <li>
+          Num Lock больше не выключается сам; отпущенная вне стола кнопка мыши больше не «залипает»;
+          опечатку в пароле можно исправить (<span class="ui">Другой пароль…</span>).
+        </li>
+        <li>
+          Буфер обмена делится только со столом, который виден и в фокусе, и отзывается при
+          блокировке.
+        </li>
+        <li>
+          Журнал диагностики <code>diagnostics.log</code> для редких сбоев — см.
+          <a href="#trouble">раздел 17</a>.
+        </li>
+      </ul>
+
+      <h3><span class="tag t-new">0.17.0</span>Плавный интерфейс</h3>
+      <p>
+        Хост, открытый двойным кликом, вырастает из своей строки в панель и складывается обратно при
+        закрытии. Подсветка, меню, диалоги и вкладки появляются плавно, за 120–160 мс; при системной
+        настройке «уменьшить движение» анимаций нет.
+      </p>
+
+      <h3><span class="tag t-new">0.16.0</span>Режим консоли и порядок вкладок</h3>
+      <p>
+        Windows-хост можно открыть в режиме консоли (<code>/admin</code>) — разово из правого клика
+        или по умолчанию для хоста или группы. Вкладки переставляются перетаскиванием, не
+        переподключаясь.
+      </p>
     </section>
 
     <section id="trouble">
@@ -2301,9 +4471,19 @@
       <h3>Какая у меня версия</h3>
       <p>
         Справка (<kbd>⌘/</kbd>, а на Windows и Linux <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>/</kbd>)
-        печатает номер сборки в правом верхнем углу, рядом с заголовком. С него стоит начинать любое
-        сообщение о проблеме: половина странностей объясняется тем, что версия не та, о которой все
-        думают.
+        печатает номер сборки в правом верхнем углу, рядом с заголовком; тот же номер — в
+        <span class="ui">Настройки → Резервная копия</span>. С него стоит начинать любое сообщение о
+        проблеме: половина странностей объясняется тем, что версия не та, о которой все думают.
+      </p>
+
+      <h3>Журнал диагностики</h3>
+      <p>
+        Для сбоев, которые не повторяются по заказу, — терминал, переставший отвечать, клавиша, не
+        дошедшая до рабочего стола, — приложение ведёт <code>diagnostics.log</code> в папке, которую
+        открывает <span class="ui">Настройки → Безопасность → Открыть папку журналов</span>. Там
+        записано, как каждая SSH-сессия открылась и закрылась, что в неё отправлялось — в виде
+        счётчиков и управляющих символов, без набранного текста — и какие модификаторы уходили
+        рабочему столу. Файл держится меньше 2 МБ. Приложите его к сообщению о проблеме.
       </p>
 
       <h3>Синхронизация прошла, но изменений нет</h3>
@@ -2320,6 +4500,14 @@
         <span class="ui">Настройки → Безопасность → Доверенные ключи хостов</span> — при следующем
         подключении спросят заново. Если сервер не пересобирали, разбирайтесь с сетью, а не с
         приложением.
+      </p>
+
+      <h3>«Файл хранилища повреждён»</h3>
+      <p>
+        Если <code>vault.json</code> оказался пустым или обрезанным — например, его испортила другая
+        программа, — разблокировка скажет именно это, а не «неверный пароль». Файл не трогается:
+        восстановите его из резервной копии папки приложения или переместите в сторону, чтобы начать
+        новое пустое хранилище.
       </p>
 
       <h3>SCP/Shell: отказ в доступе</h3>
@@ -2341,6 +4529,10 @@
       <ul>
         <li>Панель называет шаг, последнюю жалобу клиента и числовой код — начните с них.</li>
         <li>
+          Неверный пароль, набранный в панели, исправляется кнопкой
+          <span class="ui">Другой пароль…</span>; сохранённый — в диалоге хоста.
+        </li>
+        <li>
           Шлюз: реализован только <b>NTLM</b>. Шлюз, предлагающий один Kerberos через SPNEGO, так и
           скажет, а не притворится неверным паролем.
         </li>
@@ -2349,25 +4541,39 @@
           отказ останавливает сессию, а не переводит её в незащищённый режим.
         </li>
         <li>
+          Кончились клиентские лицензии на сервере терминалов — попробуйте
+          <span class="ui">Подключиться в режиме консоли</span>.
+        </li>
+        <li>
+          «Клиент рабочего стола отсутствует» в установленной сборке лечится переустановкой; в Linux
+          клиента пока нет.
+        </li>
+        <li>
           Нужно больше — запустите приложение с <code>TERMINALDECK_RDP_TRACE=1</code>: клиент
-          рабочего стола пойдёт на уровне <code>DEBUG</code> FreeRDP, где названы согласованные
-          кодеки и каналы, и всё это будет печататься в терминал, где запущено приложение.
+          рабочего стола пойдёт на уровне <code>DEBUG</code> FreeRDP и будет печатать в терминал,
+          где запущено приложение.
         </li>
       </ul>
       <pre><code>TERMINALDECK_RDP_TRACE=1 /Applications/TerminalDeck.app/Contents/MacOS/TerminalDeck</code></pre>
 
+      <h3>Сочетания клавиш не работают</h3>
+      <p>
+        Если в фокусе рабочий стол, так и задумано: вся клавиатура уходит той машине. Кликните по
+        дереву или другой панели — сочетания вернутся.
+      </p>
+
       <h3>Хранилище заблокировано, и ничего не открывается</h3>
       <p>
         Так и задумано: заблокированное приложение не начинает ни сессию, ни рабочий стол, ни
-        листинг файлов. Уже открытые сессии при этом живы. Введите мастер-пароль (<span class="ui"
-          >Разблокировать</span
-        >), и всё вернётся. Срок автоблокировки — <span class="ui">Настройки → Безопасность</span>.
+        листинг файлов. Уже открытые сессии при этом живы. Введите мастер-пароль, и всё вернётся.
+        Срок автоблокировки — <span class="ui">Настройки → Безопасность</span>.
       </p>
 
       <h3>Внешний редактор не открывается</h3>
       <p>
         Укажите <b>полный путь</b> к программе в <span class="ui">Настройки → Файлы</span>: оконное
-        приложение не наследует <code>PATH</code> из вашей оболочки.
+        приложение не наследует <code>PATH</code> из вашей оболочки. Или оставьте поле пустым —
+        тогда файл откроется в Блокноте (Windows) или текстовом редакторе по умолчанию (macOS).
       </p>
 
       <h3>Посторонние сообщения от сервера</h3>
@@ -2380,7 +4586,7 @@
 
     <footer>
       <p>
-        TerminalDeck 0.13 · руководство пользователя · интерфейс переключается в
+        TerminalDeck 0.19 · руководство пользователя · интерфейс переключается в
         <span class="ui">Настройки → Язык</span> · полный список сочетаний — <kbd>⌘/</kbd> в
         приложении.
       </p>
