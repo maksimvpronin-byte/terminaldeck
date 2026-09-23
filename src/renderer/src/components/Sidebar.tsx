@@ -1003,16 +1003,16 @@ export default function Sidebar({
               title={t('Each in its own tab, in the current workspace')}
               onClick={() => openSelectedHosts('tabs')}
             >
-              Open
+              {t('Open')}
             </button>
             <button title={t('All tiled in one tab')} onClick={() => openSelectedHosts('grid')}>
-              Tile
+              {t('Tile')}
             </button>
             <button
               title={t('A new workspace with a tab per host')}
               onClick={() => openSelectedHosts('workspace')}
             >
-              Workspace
+              {t('Workspace')}
             </button>
             <button
               title={t('Save these hosts as a collection you can reopen later')}
@@ -1024,7 +1024,7 @@ export default function Sidebar({
                   y: e.clientY,
                   items: [
                     ...collections.map((c) => ({
-                      label: `Add to “${c.name}”`,
+                      label: t('Add to “{name}”', { name: c.name }),
                       onSelect: async () => {
                         await addToCollection(c.id, picked)
                         clearHostSelection()
@@ -1039,7 +1039,7 @@ export default function Sidebar({
                 })
               }}
             >
-              Collect
+              {t('Collect')}
             </button>
           </div>
         </div>

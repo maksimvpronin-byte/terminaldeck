@@ -139,7 +139,7 @@ export default function InventorySourceDialog({
             />
           </label>
           <label style={{ flex: 1 }}>
-            Port
+            {t('Port')}
             <input
               type="number"
               value={source.port ?? ''}
@@ -266,7 +266,7 @@ export default function InventorySourceDialog({
             set={setLook}
             effective={appearance}
             inherited={settings}
-            inheritedFrom={() => 'Settings'}
+            inheritedFrom={() => t('the settings')}
           />
         </details>
 

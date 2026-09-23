@@ -1221,5 +1221,18 @@ export const ru: Record<string, string> = {
   '(saved on this group)': '(сохранён на этой группе)',
   '(leave blank to keep or inherit)': '(оставьте пустым, чтобы сохранить или унаследовать)',
   '(saved here, and it overrides the inventory)': '(сохранён здесь и перебивает inventory)',
-  '(leave blank to keep the current one)': '(оставьте пустым, чтобы сохранить текущий)'
+  '(leave blank to keep the current one)': '(оставьте пустым, чтобы сохранить текущий)',
+  // Where an inherited look comes from, and the verbs for a selection of hosts.
+  'the group {name}': 'группы «{name}»',
+  Tile: 'Плиткой',
+  Workspace: 'Рабочая область',
+  'the settings': 'настроек',
+  'Add to “{name}”': 'Добавить в «{name}»',
+  // The settings kept locally for a host from a repository.
+  'from the inventory': 'из инвентаря',
+  'the inventory': 'инвентаря',
+  'This password is kept locally for this host alone, so nothing set on a group above it is used.':
+    'Этот пароль хранится локально только для этого хоста, поэтому заданное на группах выше не используется.',
+  'On save this password is forgotten, and the host is asked for one on connect.':
+    'При сохранении пароль будет забыт, и хост запросит его при подключении.'
 }

@@ -127,7 +127,7 @@ export default function SessionDialog({
   const inheritedLook = inheritedAppearance(profile, profile.groupId, groups, settings)
   const appearanceFrom = (key: keyof AppearanceDefaults): string => {
     const source = appearanceSource(profile, profile.groupId, groups, key)
-    return source ? `the group ${source.name}` : 'Settings'
+    return source ? t('the group {name}', { name: source.name }) : t('the settings')
   }
 
   async function pickKey(): Promise<void> {

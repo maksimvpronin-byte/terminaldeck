@@ -149,7 +149,7 @@ export default function CollectionDialog({
             set={setLookField}
             effective={appearance}
             inherited={settings}
-            inheritedFrom={() => 'Settings'}
+            inheritedFrom={() => t('the settings')}
           />
         </details>
 

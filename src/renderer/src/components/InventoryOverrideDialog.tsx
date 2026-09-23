@@ -133,14 +133,14 @@ export default function InventoryOverrideDialog({
    */
   const rdpFrom = (key: keyof RdpDefaults): string => {
     const own: RdpDefaults = node
-    return isSet(own[key]) ? 'from the inventory' : ''
+    return isSet(own[key]) ? t('from the inventory') : ''
   }
 
   const appearanceFrom = (key: keyof AppearanceDefaults): string => {
     const own: AppearanceDefaults = node
-    if (isSet(own[key])) return 'the inventory'
+    if (isSet(own[key])) return t('the inventory')
     const source = appearanceSource(node, parentId, groups, key)
-    return source ? `the group ${source.name}` : 'Settings'
+    return source ? t('the group {name}', { name: source.name }) : t('the settings')
   }
 
   async function pickKey(): Promise<void> {
@@ -159,10 +159,12 @@ export default function InventoryOverrideDialog({
       auth.ownSecret && !forgetSecret
         ? t('(saved here, and it overrides the inventory)')
         : t('(leave blank to keep the current one)'),
-    self: 'this host',
-    held: 'This password is kept locally for this host alone, so nothing set on a group above it is used.',
-    forget: 'On save this password is forgotten, and the host is asked for one on connect.',
-    keyPath: fromRepo.privateKeyPath ?? 'No file selected'
+    self: t('this host'),
+    held: t(
+      'This password is kept locally for this host alone, so nothing set on a group above it is used.'
+    ),
+    forget: t('On save this password is forgotten, and the host is asked for one on connect.'),
+    keyPath: fromRepo.privateKeyPath ?? t('No file selected')
   }
 
   async function submit(): Promise<void> {
