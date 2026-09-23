@@ -213,3 +213,40 @@ describe('what the tree holds', () => {
     expect(screen.getAllByText('db1')).toHaveLength(2)
   })
 })
+
+describe('the host filter', () => {
+  function withHosts(): void {
+    useStore.setState({
+      groups: [],
+      sessions: [host({ id: 'h1', name: 'web' }), host({ id: 'h2', name: 'db' })],
+      inventoryTrees: [],
+      gitFolderTrees: [],
+      gitFolderOverrides: [],
+      inventoryOverrides: []
+    })
+    render(<Sidebar onOpenSnippets={() => {}} onOpenHelp={() => {}} />)
+  }
+
+  it('offers a cross only while something is typed, and the cross empties it', () => {
+    withHosts()
+    const field = screen.getByPlaceholderText('Filter hosts…') as HTMLInputElement
+    expect(screen.queryByRole('button', { name: 'Clear filter' })).toBeNull()
+
+    fireEvent.change(field, { target: { value: 'web' } })
+    expect(screen.queryByText('db')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filter' }))
+    expect(field.value).toBe('')
+    expect(screen.getByText('db')).toBeTruthy()
+    expect(document.activeElement).toBe(field)
+    expect(screen.queryByRole('button', { name: 'Clear filter' })).toBeNull()
+  })
+
+  it('empties on Escape too', () => {
+    withHosts()
+    const field = screen.getByPlaceholderText('Filter hosts…') as HTMLInputElement
+    fireEvent.change(field, { target: { value: 'web' } })
+    fireEvent.keyDown(field, { key: 'Escape' })
+    expect(field.value).toBe('')
+  })
+})

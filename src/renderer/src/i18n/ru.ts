@@ -342,6 +342,7 @@ export const ru: Record<string, string> = {
   'A new workspace with a tab per host': 'Новая рабочая область, по вкладке на хост',
   'All tiled in one tab': 'Всё плиткой в одной вкладке',
   Clear: 'Очистить',
+  'Clear filter': 'Очистить фильтр',
   'Does not inherit settings from its group': 'Не наследует настройки группы',
   'Double-click to connect · drag to sort or to move between groups':
     'Двойной клик — подключиться · перетаскивание — порядок или перенос между группами',

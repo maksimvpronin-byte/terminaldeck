@@ -283,6 +283,42 @@ label {
   padding-top: 0;
   padding-bottom: 0;
 }
+/* The host filter, with a cross inside it on the right once it holds text. */
+.filter-field {
+  position: relative;
+  flex: 1;
+  display: flex;
+  min-width: 0;
+}
+.filter-field > input {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding-top: 0;
+  padding-bottom: 0;
+  /* Room for the cross, so long text never runs underneath it. */
+  padding-right: 26px;
+}
+.filter-clear {
+  position: absolute;
+  right: 3px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+.filter-clear:hover {
+  color: var(--text);
+  background: var(--bg-3);
+}
 .sidebar-header > .icon-button,
 .sidebar-footer > .icon-button {
   width: 30px;

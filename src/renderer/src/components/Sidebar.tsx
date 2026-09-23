@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { nanoid } from 'nanoid'
 import type {
   CSSProperties,
@@ -11,7 +11,7 @@ import { applyOverride } from '../../../shared/overrides'
 import { isGitNode, gitFolderLayout } from '../../../shared/gitFolders'
 import { protocolOf } from '../../../shared/protocols'
 import { duplicateProfile } from '../../../shared/duplicate'
-import { DesktopIcon, TerminalIcon } from './icons'
+import { CloseIcon, DesktopIcon, TerminalIcon } from './icons'
 import { groupIndent, hostIndent } from './treeIndent'
 import {
   useStore,
@@ -199,6 +199,7 @@ export default function Sidebar({
   /** The host being opened several times over, once that has been asked for. */
   const [multiConnecting, setMultiConnecting] = useState<SessionProfile | null>(null)
   const [query, setQuery] = useState('')
+  const queryRef = useRef<HTMLInputElement | null>(null)
   const [groupDialog, setGroupDialog] = useState<{
     group?: SessionGroup
     parentId: string | null
@@ -919,12 +920,37 @@ export default function Sidebar({
       </div>
 
       <div className="sidebar-header" style={{ borderTop: 'none' }}>
-        <input
-          style={{ flex: 1 }}
-          placeholder={tab === 'sessions' ? t('Filter hosts…') : t('Filter inventory…')}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
+        <div className="filter-field">
+          <input
+            ref={queryRef}
+            placeholder={tab === 'sessions' ? t('Filter hosts…') : t('Filter inventory…')}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              // Escape empties a filter that has something in it, as the cross
+              // does; an empty one lets the key go on to whatever wants it.
+              if (e.key === 'Escape' && query) {
+                e.stopPropagation()
+                setQuery('')
+              }
+            }}
+          />
+          {query && (
+            <button
+              type="button"
+              className="filter-clear"
+              title={t('Clear filter')}
+              aria-label={t('Clear filter')}
+              onClick={() => {
+                setQuery('')
+                // Back into the field, ready for the next thing to look for.
+                queryRef.current?.focus()
+              }}
+            >
+              <CloseIcon />
+            </button>
+          )}
+        </div>
       </div>
 
       {tab === 'inventory' && <InventoryTree query={query} />}
