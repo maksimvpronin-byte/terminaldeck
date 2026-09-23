@@ -6,6 +6,33 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.19.6
+
+### Added
+
+- **PuTTY key files work as they are.** A `.ppk` can be picked as a host's key
+  file directly — versions 2 and 3, RSA, DSA, ECDSA and Ed25519, with a
+  passphrase or without. Until now only version 2 RSA and DSA keys were read,
+  and PuTTYgen has saved version 3 by default since 0.75, so most `.ppk`
+  files were refused as an unsupported format. The key is converted in memory
+  when connecting; the file itself is not changed.
+
+### Changed
+
+- **Open folders in the host tree look open.** A larger arrow that points
+  down, an open folder icon and the name in full colour; what is inside hangs
+  from a thin line under the arrow, so it is clear where a group ends. The
+  same in the inventory and in collections. Hosts sit a few pixels further in
+  to make room for the line.
+
+### Fixed
+
+- **Midnight Commander and other full-screen programs keep their colours
+  under every theme.** Themes used to replace the sixteen ANSI colours, and
+  under Nord mc's blue panels came out pale with the file names barely
+  readable. A theme now sets the background, text, cursor and selection, and
+  the sixteen colours are the same everywhere.
+
 ## 0.19.5
 
 0.19.4 was built but never published; everything in it arrives with this
