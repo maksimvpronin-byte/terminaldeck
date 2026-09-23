@@ -6,6 +6,32 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.19.5
+
+0.19.4 was built but never published; everything in it arrives with this
+release.
+
+### Added
+
+- **Quick connect opens a desktop as well as a shell.** An SSH | RDP switch at
+  the top of the dialog: RDP takes a host, a port — 3389, following the
+  switch unless one was typed — a login as `user`, `DOMAIN\user` or
+  `user@domain`, and a password that can be left empty and typed when the
+  desktop opens. Nothing is saved: the desktop starts with a new host's
+  defaults, and like a quick shell its tab is not kept in the layout, so the
+  password never reaches disk.
+- **A cross in the host filter** empties it and leaves the cursor there for
+  the next search; Escape does the same.
+
+### Changed
+
+- **The manual is rewritten for 0.19, with pictures.** Sixteen figures drawn
+  in the page — the window with its parts numbered, quick connect, inheritance,
+  the file panel, tunnels, the inventory, a desktop connecting, the update
+  bar — and everything from 0.16 on described, with what had stopped being
+  true put right.
+- The build workflows use the GitHub actions that run on Node 24.
+
 ## 0.19.4
 
 ### Security
