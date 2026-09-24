@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { BrowserWindow, ipcMain } from 'electron'
 import { IPC } from '../../shared/ipc-channels'
 import type { PortForwardRule, QuickConnectParams } from '../../shared/types'
 import { portForwardManager } from '../ssh/PortForwardManager'
@@ -104,9 +104,13 @@ export function registerSshHandlers(): void {
   ipcMain.handle(IPC.sshGetFileAccess, (_e, connectionId: string) =>
     sshManager.getFileAccess(connectionId)
   )
-  ipcMain.handle(IPC.sshGetFollowCwd, (_e, connectionId: string) =>
-    sshManager.isFollowingCwd(connectionId)
-  )
+  ipcMain.handle(IPC.sshGetFollowCwd, (e, connectionId: string) => {
+    // Asked by a file panel as it opens, after it has subscribed: the answer
+    // comes with where the shell is now, if it has said.
+    const win = BrowserWindow.fromWebContents(e.sender)
+    if (win) setImmediate(() => !win.isDestroyed() && sshManager.replayCwd(win, connectionId))
+    return sshManager.isFollowingCwd(connectionId)
+  })
   /**
    * Everything hung off a connection, let go of.
    *

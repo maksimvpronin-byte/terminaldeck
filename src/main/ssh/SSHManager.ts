@@ -16,8 +16,10 @@ import { inheritedFrom, resolveAuth as resolveAuthChain } from '../../shared/aut
 import { applyCredential } from '../../shared/credentials'
 import { IPC } from '../../shared/ipc-channels'
 import { OSC7_SHELL_SETUP, scanOsc7 } from '../../shared/osc7'
-import { EchoSuppressor } from './echoSuppressor'
+import { SetupGate, looksLikePrompt } from './setupGate'
 import { everyGroup, findProfile } from '../store/hosts'
+import { credentialStore } from '../store/CredentialStore'
+import { defaultCredential, authChain } from '../../shared/authResolution'
 import { vault } from '../vault/Vault'
 import { makeHostVerifier } from './hostVerifier'
 import { requireUnlocked } from '../vault/locked'
@@ -46,8 +48,21 @@ interface LiveConnection {
    * SFTP panel without editing — and un-editing — the saved host.
    */
   followCwd: boolean
-  /** Swallows the echo of the setup line we typed in, so it never shows. */
-  echoSuppressor?: EchoSuppressor
+  /** Holds output back from the setup line until the shell answers it. */
+  setupGate?: SetupGate
+  /** Gives up on that answer, so a line that never ran cannot hold output for good. */
+  setupGateTimer?: NodeJS.Timeout
+  /** How many times the setup line has been typed into this connection. */
+  setupAttempts: number
+  /**
+   * The last few hundred characters the host printed, so the setup line is only
+   * typed at something that looks like a prompt. See `looksLikePrompt`.
+   */
+  tail: string
+  /** Where the shell last said it was, for a panel that opens after it did. */
+  lastCwd?: string
+  /** Set once the shell has printed OSC 7 on its own or after the setup line. */
+  shellReportsCwd?: boolean
   /**
    * Set while the setup line is waiting for the shell to stop talking, with
    * the means to put the wait off again when it has not.
@@ -120,7 +135,22 @@ const LOW_WATER = 256 * 1024
 const SETUP_QUIET_MS = 400
 
 /** A host that never stops talking still gets the line, just late. */
-const SETUP_WAIT_CAP_MS = 5000
+const SETUP_WAIT_CAP_MS = 10_000
+
+/**
+ * How long the shell has to answer the setup line before output is let go.
+ *
+ * Output is held for all of it, so it is short; a shell at its prompt answers
+ * in one round trip.
+ */
+const SETUP_ANSWER_MS = 3000
+
+/** Typed once more if the first went unanswered, and no more than that. */
+const SETUP_MAX_ATTEMPTS = 2
+
+const TAIL_CHARS = 256
+
+const OSC7_BYTES = Buffer.from('\u001b]7;', 'latin1')
 
 /**
  * Locates an SSH agent. An explicit SSH_AUTH_SOCK always wins. On Windows the
@@ -144,7 +174,9 @@ function agentSockForPlatform(): string | undefined {
  * typed, even when the whole point was to inherit one.
  */
 function effectiveAuth(profile: SessionProfile): ResolvedAuth {
-  const auth = resolveAuthChain(profile, profile.groupId, everyGroup())
+  const auth = resolveAuthChain(profile, profile.groupId, everyGroup(), {
+    credentials: credentialStore.list()
+  })
   return auth.username ? auth : { ...auth, username: userInfo().username }
 }
 
@@ -159,6 +191,11 @@ function effectiveAuth(profile: SessionProfile): ResolvedAuth {
  * the error names neither.
  */
 function credentialSource(profile: SessionProfile, auth: ResolvedAuth): string {
+  const account = defaultCredential(
+    authChain(profile, profile.groupId, everyGroup()),
+    credentialStore.list()
+  )
+  if (account) return `the saved account ${account.name}`
   if (auth.authMethod === 'agent') return 'the SSH agent'
   if (auth.authMethod === 'privateKey') {
     const from = inheritedFrom(profile, profile.groupId, everyGroup(), 'privateKeyPath')
@@ -941,6 +978,8 @@ class SSHManager {
         clients: chain,
         stream,
         followCwd: auth?.followTerminalCwd === true,
+        setupAttempts: 0,
+        tail: '',
         outbox: [],
         outboxBytes: 0,
         inFlight: 0,
@@ -960,7 +999,6 @@ class SSHManager {
       if (profile?.logToFile) this.startLog(win, connection, profile)
 
       let pending = ''
-      let lastCwd: string | undefined
       /*
        * One decoder for the life of the channel, not `toString` per chunk. The
        * setup line prints $PWD as raw UTF-8, and a read that ended inside a
@@ -978,11 +1016,15 @@ class SSHManager {
         noteReceived(connectionId, raw.length)
         // Still mid-login, or mid-anything: the setup line can wait.
         connection.setupWait?.restart()
+        connection.tail = (connection.tail + raw.toString('latin1')).slice(-TAIL_CHARS)
         // The setup line is ours, not the user's, so its echo is taken back
         // out before anyone sees it. Scanning still runs on the full stream:
-        // the sequence we are looking for rides in that same echo.
-        const suppressor = connection.echoSuppressor
-        const data = suppressor && !suppressor.done ? suppressor.push(raw) : raw
+        // the sequence we are looking for is the shell's answer to that line.
+        const gate = connection.setupGate
+        const data = gate && !gate.done ? gate.push(raw) : raw
+        if (gate?.done) this.settleSetup(win, connection)
+        if (!connection.shellReportsCwd && raw.includes(OSC7_BYTES))
+          connection.shellReportsCwd = true
 
         if (data.length > 0) {
           this.queueOutput(win, connection, data)
@@ -991,8 +1033,8 @@ class SSHManager {
         if (!connection.followCwd) return
         const scan = scanOsc7(pending + utf8.write(raw))
         pending = scan.rest
-        if (scan.path && scan.path !== lastCwd) {
-          lastCwd = scan.path
+        if (scan.path && scan.path !== connection.lastCwd) {
+          connection.lastCwd = scan.path
           this.send(win, connectionId, IPC.sshCwd, scan.path)
         }
       })
@@ -1090,16 +1132,34 @@ class SSHManager {
   }
 
   /**
-   * Waits for the shell to draw breath, then types the setup line in.
+   * Waits for the shell to draw breath at its prompt, then types the setup line in.
    *
    * The wait is pushed back by every chunk that arrives, so a long banner or a
-   * slow profile simply delays it, up to a cap past which the line is sent
-   * anyway rather than never.
+   * slow profile simply delays it. Quiet is not enough on its own: a profile
+   * that stops to think, or a password being asked for, is quiet too, and a
+   * line typed then is echoed by the terminal and thrown away before any shell
+   * reads it. So the last thing printed has to look like a prompt as well —
+   * until the cap, past which the first attempt is typed anyway rather than
+   * never. A second attempt is only ever made at a prompt.
    */
   private sendSetupQuietly(conn: LiveConnection): void {
-    if (conn.setupWait) return
+    if (conn.setupWait || (conn.setupGate && !conn.setupGate.done)) return
+    // The shell already says where it is — set up earlier on this connection,
+    // or by its own profile. Typing the line again would only show it.
+    if (conn.shellReportsCwd) return
+    if (conn.setupAttempts >= SETUP_MAX_ATTEMPTS) return
     const deadline = Date.now() + SETUP_WAIT_CAP_MS
     const fire = (): void => {
+      const atPrompt = looksLikePrompt(conn.tail)
+      if (!atPrompt && (conn.setupAttempts > 0 || Date.now() < deadline)) {
+        if (Date.now() >= deadline) {
+          conn.setupWait = undefined
+          diag('ssh', `${short(conn.id)} setup line not typed: no prompt in sight`)
+          return
+        }
+        restart()
+        return
+      }
       conn.setupWait = undefined
       this.writeSetup(conn)
     }
@@ -1113,21 +1173,44 @@ class SSHManager {
   }
 
   /**
-   * Types the setup line in without showing it. If the shell never echoes it —
-   * echo disabled, or a shell that swallows it — the suppressor is released
-   * shortly after, so nothing of the user's is held back for long.
+   * Types the setup line in and holds the host's output until the shell
+   * answers it — see `SetupGate`. An answer that does not come releases the
+   * output after a few seconds, so nothing of the user's is held back for long.
    */
   private writeSetup(conn: LiveConnection): void {
-    const line = `${OSC7_SHELL_SETUP}\n`
-    conn.echoSuppressor = new EchoSuppressor(Buffer.from(OSC7_SHELL_SETUP, 'utf8'))
-    conn.stream.write(line)
-    setTimeout(() => {
-      const held = conn.echoSuppressor?.done === false ? conn.echoSuppressor.flush() : undefined
-      if (held && held.length > 0) {
-        const win = BrowserWindow.getAllWindows()[0]
-        if (win && !win.isDestroyed()) this.queueOutput(win, conn, held)
-      }
-    }, 2000)
+    conn.setupAttempts++
+    conn.setupGate = new SetupGate(Buffer.from(OSC7_SHELL_SETUP, 'utf8'))
+    conn.stream.write(`${OSC7_SHELL_SETUP}
+`)
+    diag('ssh', `${short(conn.id)} setup line typed, attempt ${conn.setupAttempts}`)
+    conn.setupGateTimer = setTimeout(() => {
+      conn.setupGateTimer = undefined
+      const gate = conn.setupGate
+      if (!gate || gate.done) return
+      const held = gate.flush()
+      const win = BrowserWindow.getAllWindows()[0]
+      if (held.length > 0 && win && !win.isDestroyed()) this.queueOutput(win, conn, held)
+      this.settleSetup(win, conn)
+    }, SETUP_ANSWER_MS)
+  }
+
+  /**
+   * After the wait for the shell's answer has ended, one way or the other. An
+   * unanswered line is tried once more, at the next prompt: it is the case of
+   * a profile that threw the first one away.
+   */
+  private settleSetup(_win: BrowserWindow | undefined, conn: LiveConnection): void {
+    const gate = conn.setupGate
+    if (!gate?.done) return
+    conn.setupGate = undefined
+    if (conn.setupGateTimer) clearTimeout(conn.setupGateTimer)
+    conn.setupGateTimer = undefined
+    if (gate.answered) {
+      conn.shellReportsCwd = true
+      return
+    }
+    diag('ssh', `${short(conn.id)} setup line went unanswered`)
+    if (conn.followCwd) this.sendSetupQuietly(conn)
   }
 
   /**
@@ -1141,13 +1224,28 @@ class SSHManager {
   setFollowCwd(connectionId: string, enabled: boolean): boolean {
     const conn = this.connections.get(connectionId)
     if (!conn) return false
-    if (enabled && !conn.followCwd) this.sendSetupQuietly(conn)
+    if (enabled && !conn.followCwd) {
+      // Asked for by hand: worth trying again even where earlier attempts failed.
+      conn.setupAttempts = 0
+      this.sendSetupQuietly(conn)
+    }
     conn.followCwd = enabled
     return conn.followCwd
   }
 
   isFollowingCwd(connectionId: string): boolean {
     return this.connections.get(connectionId)?.followCwd ?? false
+  }
+
+  /**
+   * Says again where the shell last was. The directory is only sent when it
+   * changes, so a file panel opened after the first prompt heard nothing until
+   * the next `cd` — and a panel that stays put looks exactly like following
+   * that does not work.
+   */
+  replayCwd(win: BrowserWindow, connectionId: string): void {
+    const conn = this.connections.get(connectionId)
+    if (conn?.followCwd && conn.lastCwd) this.send(win, connectionId, IPC.sshCwd, conn.lastCwd)
   }
 
   write(connectionId: string, data: string): void {
@@ -1265,6 +1363,7 @@ class SSHManager {
     for (const watcher of this.closedWatchers) watcher(connectionId)
     if (conn.flushTimer) clearTimeout(conn.flushTimer)
     if (conn.setupWait) clearTimeout(conn.setupWait.timer)
+    if (conn.setupGateTimer) clearTimeout(conn.setupGateTimer)
     conn.logStream?.end()
     try {
       conn.stream.close()
