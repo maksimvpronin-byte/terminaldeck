@@ -458,8 +458,6 @@ export const ru: Record<string, string> = {
   'Inherit appearance from the parent group': 'Наследовать оформление от родительской группы',
   'Inherit desktop settings from the parent group':
     'Наследовать настройки рабочего стола от родительской группы',
-  'Applies to the RDP hosts in this group. A gateway stated here reaches every one of them, which is the point of putting it on a group rather than on each machine.':
-    'Относится к RDP-хостам этой группы. Шлюз, указанный здесь, достаёт до каждого из них — ради этого его и задают на группе, а не на каждой машине.',
   'Drag the inner edge of the host list or the file panel to widen it':
     'Потяните за внутренний край списка хостов или файловой панели, чтобы расширить',
   'Both remember their width in the window they were set in':
@@ -1237,5 +1235,32 @@ export const ru: Record<string, string> = {
   'This password is kept locally for this host alone, so nothing set on a group above it is used.':
     'Этот пароль хранится локально только для этого хоста, поэтому заданное на группах выше не используется.',
   'On save this password is forgotten, and the host is asked for one on connect.':
-    'При сохранении пароль будет забыт, и хост запросит его при подключении.'
+    'При сохранении пароль будет забыт, и хост запросит его при подключении.',
+  'Default account': 'Учётная запись по умолчанию',
+  'A saved account from Settings → Accounts. Its login and password are used instead of the fields below, and hosts inside a folder inherit it unless they name a login or an account of their own.':
+    'Сохранённая учётная запись из «Настройки → Учётные записи». Её логин и пароль используются вместо полей ниже, а хосты внутри папки наследуют её, если у них нет своего логина или своей учётной записи.',
+  'Inherit ({account}, from {group})': 'Наследовать ({account}, из «{group}»)',
+  'None — the login below': 'Не задана — логин ниже',
+  '(deleted account)': '(учётная запись удалена)',
+  'Used by the SSH hosts in this group. Anything left blank is inherited from the parent group.':
+    'Для SSH-хостов этой группы. Всё, что оставлено пустым, наследуется от родительской группы.',
+  'from the account {name}': 'из учётной записи «{name}»',
+  'Used by the RDP hosts in this group. With no login of its own here, an RDP host signs in with the SSH login above, as it always has.':
+    'Для RDP-хостов этой группы. Если свой логин здесь не задан, RDP-хост входит с логином из блока SSH, как и раньше. Шлюз, указанный здесь, достаёт до каждого RDP-хоста группы.',
+  'as for SSH: {user}': 'как в SSH: {user}',
+  'Saved on this group': 'Сохранён на этой группе',
+  'Add {count} hosts to a collection…': 'Добавить хосты в набор ({count})…',
+  'Add to collection…': 'Добавить в набор…',
+  'Host tree': 'Дерево хостов',
+  'Open and close a group only with the arrow beside its name':
+    'Раскрывать и сворачивать группу только стрелкой слева от имени',
+  'Select the host of the tab in front, and scroll the tree to it':
+    'При переключении вкладки выделять её хост в дереве и прокручивать к нему',
+  'Row height: {px} px': 'Высота строки: {px} px',
+  'How close together hosts and groups sit in the left panel. {px} px is the usual height; lower packs a long list onto one screen.':
+    'Насколько плотно стоят хосты и группы в левой панели. {px} px — обычная высота; меньше — длинный список помещается на один экран.',
+  Reset: 'Сбросить',
+  'Colour of coloured rows': 'Заливка цветных строк',
+  'Fading from the edge': 'Градиент от полосы',
+  'Even and faint, across the row': 'Ровная и лёгкая, на всю строку'
 }

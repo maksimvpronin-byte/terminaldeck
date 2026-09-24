@@ -48,6 +48,35 @@ export interface AuthDefaults {
    * the file browser.
    */
   followTerminalCwd?: boolean
+  /**
+   * A saved account (see `Credential`) to sign in with by default, in place of
+   * a login typed here. Inherited like the login it stands for: set on a
+   * folder, it is who every host inside signs in as, unless a host names an
+   * account or a login of its own. The nearest level that states either wins,
+   * and the account's name, method, key and password arrive together.
+   */
+  credentialId?: string
+}
+
+/**
+ * How a group reaches the Windows machines inside it, kept apart from how it
+ * reaches the Linux ones.
+ *
+ * A folder holds both kinds, and the two rarely share a port or an account: SSH
+ * is port 22 and `root`, RDP is 3389 and `DOMAIN\admin`. A host takes the
+ * half that matches its own protocol, so an SSH host never sees these and an
+ * RDP host never sees the group's SSH port.
+ *
+ * When none of the three login fields is set, an RDP host falls back to the
+ * group's ordinary login, which is what every desktop did before these existed.
+ */
+export interface RdpLoginDefaults {
+  rdpPort?: number
+  rdpUsername?: string
+  /** Reference id into the vault for the RDP password. */
+  rdpSecretRef?: string
+  /** A saved account for RDP hosts in this group; see `AuthDefaults.credentialId`. */
+  rdpCredentialId?: string
 }
 
 /**
@@ -299,10 +328,17 @@ export interface ResolvedAppearance {
   scrollback: number
 }
 
-export interface SessionGroup extends AuthDefaults, AppearanceDefaults, RdpDefaults {
+export interface SessionGroup
+  extends AuthDefaults, AppearanceDefaults, RdpDefaults, RdpLoginDefaults {
   id: string
   name: string
   parentId: string | null
+  /**
+   * Worn by the folder in the tree, and by every host inside it that has no
+   * colour of its own — in the tree and on the tabs they open. The nearest
+   * colour wins: a host's own, then its folder's, then that folder's parent's.
+   */
+  color?: string
   /**
    * Set when this folder mirrors an Ansible inventory out of a git repository.
    * The hosts it shows are rebuilt from the repository; the folder itself, and
@@ -409,7 +445,8 @@ export interface InventorySource extends AuthDefaults, AppearanceDefaults, RdpDe
 }
 
 /** Local changes layered over a host that came from a repository. */
-export interface InventoryOverride extends AuthDefaults, AppearanceDefaults, RdpDefaults {
+export interface InventoryOverride
+  extends AuthDefaults, AppearanceDefaults, RdpDefaults, RdpLoginDefaults {
   /** Derived id of the host or group it applies to, stable across syncs. */
   nodeId: string
   color?: string

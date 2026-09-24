@@ -84,7 +84,9 @@ export interface SessionsSlice {
   upsertGroup: (
     group: SessionGroup,
     secret?: string | null,
-    gatewaySecret?: string | null
+    gatewaySecret?: string | null,
+    /** The password RDP hosts in the group sign in with; see RdpLoginDefaults. */
+    rdpSecret?: string | null
   ) => Promise<void>
   removeGroup: (id: string) => Promise<void>
   moveSession: (sessionId: string, groupId: string | null) => Promise<void>

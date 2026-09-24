@@ -228,3 +228,62 @@ describe('file access', () => {
     expect(resolveAuth({ inheritAuth: false }, 'g', groups).fileAccess).toBeUndefined()
   })
 })
+
+describe('the RDP half of a group, and default accounts', () => {
+  const account = {
+    id: 'acc',
+    name: 'domain admin',
+    username: 'corp-admin',
+    authMethod: 'password' as const,
+    secretRef: 'acc-secret',
+    createdAt: 1,
+    updatedAt: 1
+  }
+  const mixed: SessionGroup[] = [
+    {
+      id: 'dc',
+      name: 'DC',
+      parentId: null,
+      port: 2222,
+      username: 'root',
+      secretRef: 'ssh-secret',
+      rdpPort: 3390,
+      rdpUsername: 'corp-ops',
+      rdpSecretRef: 'rdp-secret'
+    },
+    { id: 'legacy', name: 'Legacy', parentId: null, port: 2222, username: 'root' },
+    { id: 'acct', name: 'Accounted', parentId: null, credentialId: 'acc', username: 'ignored' }
+  ]
+
+  it('gives an SSH host the SSH half and an RDP host the RDP half', () => {
+    expect(resolveAuth({}, 'dc', mixed)).toMatchObject({
+      port: 2222,
+      username: 'root',
+      secretRef: 'ssh-secret'
+    })
+    expect(resolveAuth({}, 'dc', mixed, { protocol: 'rdp' })).toMatchObject({
+      port: 3390,
+      username: 'corp-ops',
+      secretRef: 'rdp-secret'
+    })
+  })
+
+  it('never hands an RDP host the SSH port, but keeps the shared login for old groups', () => {
+    expect(resolveAuth({}, 'legacy', mixed, { protocol: 'rdp' })).toMatchObject({
+      port: 3389,
+      username: 'root'
+    })
+  })
+
+  it('signs in with a folder’s default account, unless the host names a login', () => {
+    expect(resolveAuth({}, 'acct', mixed, { credentials: [account] })).toMatchObject({
+      username: 'corp-admin',
+      secretRef: 'acc-secret'
+    })
+    expect(
+      resolveAuth({ username: 'me' }, 'acct', mixed, { credentials: [account] }).username
+    ).toBe('me')
+    // A deleted account names nothing, and the walk goes on past it.
+    expect(resolveAuth({}, 'acct', mixed, { credentials: [] }).username).toBe('ignored')
+  })
+})

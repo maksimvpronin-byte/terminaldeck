@@ -87,9 +87,10 @@ const api = {
     saveGroup: (
       group: SessionGroup,
       secret?: string | null,
-      gatewaySecret?: string | null
+      gatewaySecret?: string | null,
+      rdpSecret?: string | null
     ): Promise<SessionGroup> =>
-      ipcRenderer.invoke(IPC.storeSaveGroup, group, secret, gatewaySecret),
+      ipcRenderer.invoke(IPC.storeSaveGroup, group, secret, gatewaySecret, rdpSecret),
     reorderGroups: (orderedIds: string[]): Promise<void> =>
       ipcRenderer.invoke(IPC.storeReorderGroups, orderedIds),
     deleteGroup: (id: string): Promise<void> => ipcRenderer.invoke(IPC.storeDeleteGroup, id)

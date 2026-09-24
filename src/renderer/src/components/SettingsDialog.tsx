@@ -1,6 +1,17 @@
 import { useState } from 'react'
 import { useStore } from '../state/store'
-import { FONT_CHOICES, THEME_GROUPS, terminalDefaults, themeOf } from '../state/settings'
+import {
+  FONT_CHOICES,
+  THEME_GROUPS,
+  TREE_ROW_DEFAULT,
+  TREE_ROW_MAX,
+  TREE_ROW_MIN,
+  terminalDefaults,
+  themeOf,
+  treeRowHeightOf,
+  treeTintOf,
+  type TreeTint
+} from '../state/settings'
 import SecuritySettings from './SecuritySettings'
 import CredentialsSettings from './CredentialsSettings'
 import BackupSettings from './BackupSettings'
@@ -91,21 +102,77 @@ export default function SettingsDialog({
         {tab === 'backup' && <BackupSettings />}
 
         {tab === 'general' && (
-          <label>
-            <Hint label={t('Language')}>
-              {t('Applies at once, and to this window only — nothing is sent anywhere.')}
-            </Hint>
-            <select
-              value={settings.language}
-              onChange={(e) => updateSettings({ language: e.target.value as Language })}
-            >
-              {LANGUAGES.map((language) => (
-                <option key={language.id} value={language.id}>
-                  {language.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <>
+            <label>
+              <Hint label={t('Language')}>
+                {t('Applies at once, and to this window only — nothing is sent anywhere.')}
+              </Hint>
+              <select
+                value={settings.language}
+                onChange={(e) => updateSettings({ language: e.target.value as Language })}
+              >
+                {LANGUAGES.map((language) => (
+                  <option key={language.id} value={language.id}>
+                    {language.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <h3 className="settings-heading">{t('Host tree')}</h3>
+            <label className="checkbox-row" style={{ flexDirection: 'row' }}>
+              <input
+                type="checkbox"
+                checked={settings.expandOnArrowOnly}
+                onChange={(e) => updateSettings({ expandOnArrowOnly: e.target.checked })}
+              />
+              {t('Open and close a group only with the arrow beside its name')}
+            </label>
+            <label className="checkbox-row" style={{ flexDirection: 'row' }}>
+              <input
+                type="checkbox"
+                checked={settings.revealActiveHost}
+                onChange={(e) => updateSettings({ revealActiveHost: e.target.checked })}
+              />
+              {t('Select the host of the tab in front, and scroll the tree to it')}
+            </label>
+            <label>
+              {t('Colour of coloured rows')}
+              <select
+                value={treeTintOf(settings)}
+                onChange={(e) => updateSettings({ treeTint: e.target.value as TreeTint })}
+              >
+                <option value="fade">{t('Fading from the edge')}</option>
+                <option value="flat">{t('Even and faint, across the row')}</option>
+              </select>
+            </label>
+            <label>
+              <Hint label={t('Row height: {px} px', { px: treeRowHeightOf(settings) })}>
+                {t(
+                  'How close together hosts and groups sit in the left panel. {px} px is the usual height; lower packs a long list onto one screen.',
+                  { px: TREE_ROW_DEFAULT }
+                )}
+              </Hint>
+              <div className="form-row" style={{ alignItems: 'center' }}>
+                <input
+                  type="range"
+                  min={TREE_ROW_MIN}
+                  max={TREE_ROW_MAX}
+                  step={1}
+                  style={{ flex: 1 }}
+                  value={treeRowHeightOf(settings)}
+                  onChange={(e) => updateSettings({ treeRowHeight: Number(e.target.value) })}
+                />
+                <button
+                  type="button"
+                  disabled={treeRowHeightOf(settings) === TREE_ROW_DEFAULT}
+                  onClick={() => updateSettings({ treeRowHeight: TREE_ROW_DEFAULT })}
+                >
+                  {t('Reset')}
+                </button>
+              </div>
+            </label>
+          </>
         )}
 
         {tab === 'terminal' && (

@@ -26,6 +26,7 @@ import RdpFields from './RdpFields'
 import { useT } from '../i18n'
 import ModalBackdrop from './ModalBackdrop'
 import Hint from './Hint'
+import AccountSelect from './AccountSelect'
 
 interface Props {
   initial?: SessionProfile
@@ -56,6 +57,7 @@ export default function SessionDialog({
 }: Props): JSX.Element {
   const sessions = useStore((s) => s.sessions)
   const groups = useStore((s) => s.groups)
+  const credentials = useStore((s) => s.credentials)
   const settings = useStore((s) => s.settings)
   const upsertSession = useStore((s) => s.upsertSession)
 
@@ -100,7 +102,17 @@ export default function SessionDialog({
   // What this session ends up with once inheritance is applied. Pending changes
   // count, so ticking "forget" immediately shows what it would inherit instead.
   const pending: SessionProfile = forgetSecret ? { ...profile, secretRef: undefined } : profile
-  const auth = authFieldsState({ own: profile, parentId: profile.groupId, groups, forgetSecret })
+  // Resolved as the protocol this host speaks: an RDP host takes its group's
+  // RDP port and login, an SSH host the SSH ones.
+  const auth = authFieldsState({
+    own: profile,
+    parentId: profile.groupId,
+    groups,
+    forgetSecret,
+    context: { protocol: protocolOf(profile), credentials }
+  })
+  /** An account chosen on the host itself stands in for the login fields. */
+  const ownAccount = auth.account?.from === 'self'
   const effective = auth.effective
   const inheritNote = (key: keyof AuthDefaults): string => {
     const source = auth.inheritedFrom(key)
@@ -295,11 +307,9 @@ export default function SessionDialog({
             <input
               type="number"
               value={profile.port ?? ''}
-              // The protocol's own default, so switching to RDP offers 3389
-              // rather than the 22 an SSH chain would have inherited.
-              placeholder={String(
-                protocolOf(profile) === 'ssh' ? effective.port : traitsOf(protocolOf(profile)).port
-              )}
+              // Resolved for this host's protocol, so an RDP host offers its
+              // group's RDP port, or 3389 — never the group's SSH port.
+              placeholder={String(effective.port)}
               onChange={(e) => set('port', e.target.value ? Number(e.target.value) : undefined)}
             />
           </label>
@@ -319,10 +329,18 @@ export default function SessionDialog({
           </label>
         )}
 
+        <AccountSelect
+          value={profile.credentialId}
+          onChange={(id) => set('credentialId', id)}
+          credentials={credentials}
+          inherited={ownAccount ? undefined : auth.account}
+        />
+
         <label>
           {t('Username')}
           <input
             value={profile.username ?? ''}
+            disabled={ownAccount}
             /*
              * What this host will actually sign in as, when nothing is typed
              * here: the group's login, or — when no group above it names one —
@@ -332,25 +350,29 @@ export default function SessionDialog({
              * even where inheriting was the whole intention.
              */
             placeholder={
-              inheritNote('username') ||
-              t('{user}, the account on this machine', { user: window.td.localUsername })
+              auth.account
+                ? t('from the account {name}', { name: auth.account.credential.name })
+                : inheritNote('username') ||
+                  t('{user}, the account on this machine', { user: window.td.localUsername })
             }
             onChange={(e) => set('username', e.target.value)}
           />
         </label>
 
-        <AuthFields
-          value={profile}
-          set={setAuth}
-          state={auth}
-          secret={secret}
-          onSecret={setSecret}
-          forgetSecret={forgetSecret}
-          onForgetSecret={setForgetSecret}
-          onPickKey={pickKey}
-          methods={traits.keyAuth ? undefined : ['password']}
-          words={authWords}
-        />
+        {!ownAccount && (
+          <AuthFields
+            value={profile}
+            set={setAuth}
+            state={auth}
+            secret={secret}
+            onSecret={setSecret}
+            forgetSecret={forgetSecret}
+            onForgetSecret={setForgetSecret}
+            onPickKey={pickKey}
+            methods={traits.keyAuth ? undefined : ['password']}
+            words={authWords}
+          />
+        )}
 
         {traits.keyAuth && (
           <label className="checkbox-row" style={{ flexDirection: 'row' }}>

@@ -1,4 +1,5 @@
 import { applyOverride } from '../../../shared/overrides'
+import { colourOf } from '../../../shared/hostColour'
 import type { HostCollection, SessionGroup, SessionProfile } from '../../../shared/types'
 import type { AppState } from './slices/types'
 
@@ -103,4 +104,18 @@ export function findHost(state: AppState, id: string): FoundHost | undefined {
     }
   }
   return undefined
+}
+
+/**
+ * The colour a host's tab wears when it is opened from the tree: its own, else
+ * the nearest folder's above it, else — for a host from an Inventory source —
+ * the source's. The same answer the tree draws, so a tab and its row agree.
+ */
+export function hostColour(state: AppState, id: string): string | undefined {
+  const found = findHost(state, id)
+  if (!found) return undefined
+  const own = colourOf(found.host, found.host.groupId, found.groups)
+  if (own) return own
+  const tree = state.inventoryTrees.find((t) => t.sessions.some((s) => s.id === id))
+  return tree ? state.inventorySources.find((s) => s.id === tree.sourceId)?.color : undefined
 }

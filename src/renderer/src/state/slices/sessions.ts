@@ -68,7 +68,7 @@ export const createSessionsSlice: StateCreator<AppState, [], [], SessionsSlice> 
     set((s) => ({ sessions: s.sessions.filter((x) => !doomed.has(x.id)) }))
   },
 
-  upsertGroup: async (group, secret, gatewaySecret) => {
+  upsertGroup: async (group, secret, gatewaySecret, rdpSecret) => {
     /*
      * Whether this save unties the folder from its repository. Main throws the
      * mirrored tree away when it does, and this window is holding a copy of it:
@@ -76,7 +76,7 @@ export const createSessionsSlice: StateCreator<AppState, [], [], SessionsSlice> 
      * opened and searched until the application is next started.
      */
     const untied = Boolean(get().groups.find((x) => x.id === group.id)?.git) && !group.git
-    const saved = await window.td.store.saveGroup(group, secret, gatewaySecret)
+    const saved = await window.td.store.saveGroup(group, secret, gatewaySecret, rdpSecret)
     set((s) => ({
       groups: s.groups.some((x) => x.id === saved.id)
         ? s.groups.map((x) => (x.id === saved.id ? saved : x))

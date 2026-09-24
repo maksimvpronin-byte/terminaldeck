@@ -8,6 +8,9 @@ import type {
   SessionGroup
 } from '../../../shared/types'
 import { authFieldsState, secretToSave } from '../../../shared/authFields'
+import { inheritedFrom, resolveAuth } from '../../../shared/authResolution'
+import { SESSION_COLOURS } from '../state/colours'
+import AccountSelect from './AccountSelect'
 import { isSet } from '../../../shared/overrides'
 import {
   appearanceSource,
@@ -43,6 +46,7 @@ export default function GroupDialog({
   onLinked
 }: Props): JSX.Element {
   const groups = useStore((s) => s.groups)
+  const credentials = useStore((s) => s.credentials)
   const settings = useStore((s) => s.settings)
   const upsertGroup = useStore((s) => s.upsertGroup)
   /**
@@ -67,6 +71,9 @@ export default function GroupDialog({
   const [forgetSecret, setForgetSecret] = useState(false)
   const [gatewaySecret, setGatewaySecret] = useState('')
   const [forgetGatewaySecret, setForgetGatewaySecret] = useState(false)
+  /** Typed for the RDP hosts inside, which rarely share the SSH password. */
+  const [rdpSecret, setRdpSecret] = useState('')
+  const [forgetRdpSecret, setForgetRdpSecret] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   function set<K extends keyof SessionGroup>(key: K, value: SessionGroup[K]): void {
@@ -97,13 +104,48 @@ export default function GroupDialog({
   // What this group would use if it defines nothing itself. A pending "forget"
   // counts, so the note can say what the group falls back to.
   const pending: SessionGroup = forgetSecret ? { ...group, secretRef: undefined } : group
-  const auth = authFieldsState({ own: group, parentId: group.parentId, groups, forgetSecret })
+  const auth = authFieldsState({
+    own: group,
+    parentId: group.parentId,
+    groups,
+    forgetSecret,
+    context: { credentials }
+  })
   const effective = auth.effective
   const from = (key: keyof AuthDefaults): string => {
     const source = auth.inheritedFrom(key)
     return source ? t('inherited from {name}', { name: source.name }) : ''
   }
   const ownSecret = auth.ownSecret
+  /** An account chosen on this group itself replaces the login fields under it. */
+  const ownAccount = auth.account?.from === 'self'
+
+  /*
+   * The RDP half, as the parent chain hands it down: what a blank field here
+   * falls back to. The group's own RDP fields are the ones being edited, so
+   * only what lies above them is resolved.
+   */
+  const standsAlone = group.inheritAuth === false
+  const rdpAbove = resolveAuth({}, standsAlone ? null : group.parentId, groups, {
+    protocol: 'rdp',
+    credentials
+  })
+  const rdpFrom = (key: 'port' | 'username'): string => {
+    if (standsAlone) return ''
+    const source = inheritedFrom({}, group.parentId, groups, key, { protocol: 'rdp' })
+    return source ? t('inherited from {name}', { name: source.name }) : ''
+  }
+  const rdpAccountAbove = standsAlone
+    ? undefined
+    : authFieldsState({
+        own: {},
+        parentId: group.parentId,
+        groups,
+        forgetSecret: false,
+        context: { protocol: 'rdp', credentials }
+      }).account
+  const ownRdpSecret = isSet(group.rdpSecretRef)
+  const rdpAccount = credentials.find((c) => c.id === group.rdpCredentialId)
 
   const desktop = resolveRdp(pending, pending.parentId, groups)
   const rdpNote = (key: keyof RdpDefaults): string => {
@@ -153,7 +195,8 @@ export default function GroupDialog({
       await upsertGroup(
         { ...group, git },
         secretToSave(auth.shownMethod, forgetSecret, secret),
-        gatewaySecret || (forgetGatewaySecret ? null : undefined)
+        gatewaySecret || (forgetGatewaySecret ? null : undefined),
+        rdpSecret || (forgetRdpSecret ? null : undefined)
       )
     } catch (err) {
       setError((err as Error).message)
@@ -245,58 +288,212 @@ export default function GroupDialog({
           </label>
         )}
 
-        <div className="form-row">
-          <label style={{ flex: 3 }}>
-            {t('Username')}
-            <input
-              value={group.username ?? ''}
-              placeholder={from('username') || effective.username || t('not set')}
-              onChange={(e) => set('username', e.target.value)}
-            />
-          </label>
-          <label style={{ flex: 1 }}>
-            {t('Port')}
-            <input
-              type="number"
-              value={group.port ?? ''}
-              placeholder={String(effective.port)}
-              onChange={(e) => set('port', e.target.value ? Number(e.target.value) : undefined)}
-            />
-          </label>
-        </div>
-
-        <AuthFields
-          value={group}
-          set={setAuth}
-          state={auth}
-          secret={secret}
-          onSecret={setSecret}
-          forgetSecret={forgetSecret}
-          onForgetSecret={setForgetSecret}
-          onPickKey={pickKey}
-          words={authWords}
-        />
-
         <label>
-          <Hint label={t('On connect')}>
-            {t('Run in the shell of every host in this group, one command per line.')}
-          </Hint>
-          <textarea
-            rows={2}
-            value={group.onConnectCommand ?? ''}
-            placeholder={from('onConnectCommand') || t('e.g. sudo -i')}
-            onChange={(e) => set('onConnectCommand', e.target.value)}
-          />
+          {t('Colour')}
+          <div className="colour-row">
+            <button
+              type="button"
+              className={`swatch none ${!group.color ? 'selected' : ''}`}
+              title={t('No colour')}
+              onClick={() => set('color', undefined)}
+            />
+            {SESSION_COLOURS.map((c) => (
+              <button
+                type="button"
+                key={c.value}
+                className={`swatch ${group.color === c.value ? 'selected' : ''}`}
+                style={{ background: c.value }}
+                title={c.name}
+                onClick={() => set('color', c.value)}
+              />
+            ))}
+          </div>
         </label>
 
-        <label className="checkbox-row">
-          <input
-            type="checkbox"
-            checked={effective.followTerminalCwd}
-            onChange={(e) => set('followTerminalCwd', e.target.checked)}
+        {/* Two halves, because a folder holds Linux and Windows machines alike
+            and they share neither a port nor, usually, an account. Each host
+            takes the half that matches the protocol it is saved with. */}
+        <details className="settings-section" open>
+          <summary>
+            <Hint label="SSH">
+              {t(
+                'Used by the SSH hosts in this group. Anything left blank is inherited from the parent group.'
+              )}
+            </Hint>
+          </summary>
+
+          <div className="form-row">
+            <label style={{ flex: 3 }}>
+              {t('Username')}
+              <input
+                value={group.username ?? ''}
+                disabled={ownAccount}
+                placeholder={
+                  auth.account
+                    ? t('from the account {name}', { name: auth.account.credential.name })
+                    : from('username') || effective.username || t('not set')
+                }
+                onChange={(e) => set('username', e.target.value)}
+              />
+            </label>
+            <label style={{ flex: 1 }}>
+              {t('Port')}
+              <input
+                type="number"
+                value={group.port ?? ''}
+                placeholder={String(effective.port)}
+                onChange={(e) => set('port', e.target.value ? Number(e.target.value) : undefined)}
+              />
+            </label>
+          </div>
+
+          <AccountSelect
+            value={group.credentialId}
+            onChange={(id) => set('credentialId', id)}
+            credentials={credentials}
+            inherited={ownAccount ? undefined : auth.account}
           />
-          {t('SFTP panel follows the terminal’s directory')}
-        </label>
+
+          {!ownAccount && (
+            <AuthFields
+              value={group}
+              set={setAuth}
+              state={auth}
+              secret={secret}
+              onSecret={setSecret}
+              forgetSecret={forgetSecret}
+              onForgetSecret={setForgetSecret}
+              onPickKey={pickKey}
+              words={authWords}
+            />
+          )}
+
+          <label>
+            <Hint label={t('On connect')}>
+              {t('Run in the shell of every host in this group, one command per line.')}
+            </Hint>
+            <textarea
+              rows={2}
+              value={group.onConnectCommand ?? ''}
+              placeholder={from('onConnectCommand') || t('e.g. sudo -i')}
+              onChange={(e) => set('onConnectCommand', e.target.value)}
+            />
+          </label>
+
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={effective.followTerminalCwd}
+              onChange={(e) => set('followTerminalCwd', e.target.checked)}
+            />
+            {t('SFTP panel follows the terminal’s directory')}
+          </label>
+        </details>
+
+        <details
+          className="settings-section"
+          open={
+            isSet(group.rdpUsername) ||
+            ownRdpSecret ||
+            isSet(group.rdpPort) ||
+            isSet(group.rdpCredentialId)
+          }
+        >
+          <summary>
+            <Hint label="RDP">
+              {t(
+                'Used by the RDP hosts in this group. With no login of its own here, an RDP host signs in with the SSH login above, as it always has.'
+              )}
+            </Hint>
+          </summary>
+
+          <div className="form-row">
+            <label style={{ flex: 3 }}>
+              {t('Username')}
+              <input
+                value={group.rdpUsername ?? ''}
+                disabled={isSet(group.rdpCredentialId)}
+                placeholder={
+                  isSet(group.rdpCredentialId)
+                    ? t('from the account {name}', {
+                        name: rdpAccount?.name ?? t('(deleted account)')
+                      })
+                    : rdpAccountAbove
+                      ? t('from the account {name}', { name: rdpAccountAbove.credential.name })
+                      : rdpFrom('username') ||
+                        (effective.username
+                          ? t('as for SSH: {user}', { user: effective.username })
+                          : t('not set'))
+                }
+                onChange={(e) => set('rdpUsername', e.target.value || undefined)}
+              />
+            </label>
+            <label style={{ flex: 1 }}>
+              {t('Port')}
+              <input
+                type="number"
+                value={group.rdpPort ?? ''}
+                placeholder={String(rdpAbove.port)}
+                title={rdpFrom('port') || undefined}
+                onChange={(e) =>
+                  set('rdpPort', e.target.value ? Number(e.target.value) : undefined)
+                }
+              />
+            </label>
+          </div>
+
+          <AccountSelect
+            value={group.rdpCredentialId}
+            onChange={(id) => set('rdpCredentialId', id)}
+            credentials={credentials}
+            inherited={rdpAccountAbove}
+          />
+
+          {!isSet(group.rdpCredentialId) && (
+            <>
+              <label>
+                {t('Password')}
+                <input
+                  type="password"
+                  value={rdpSecret}
+                  placeholder={
+                    ownRdpSecret && !forgetRdpSecret
+                      ? t('(saved on this group)')
+                      : t('(leave blank to keep or inherit)')
+                  }
+                  onChange={(e) => setRdpSecret(e.target.value)}
+                />
+              </label>
+              {ownRdpSecret && (
+                <p className="settings-note action-note">
+                  {forgetRdpSecret ? t('Will be forgotten on save') : t('Saved on this group')}
+                  <button type="button" onClick={() => setForgetRdpSecret(!forgetRdpSecret)}>
+                    {forgetRdpSecret ? t('Keep it') : t('Forget it')}
+                  </button>
+                </p>
+              )}
+            </>
+          )}
+
+          <RdpFields
+            value={group}
+            set={setRdp}
+            effective={desktop}
+            inheritedFrom={rdpNote}
+            inheritToggle={
+              group.parentId
+                ? { label: t('Inherit desktop settings from the parent group') }
+                : undefined
+            }
+            secret={{
+              typed: gatewaySecret,
+              onTyped: setGatewaySecret,
+              own: ownGatewaySecret,
+              forget: forgetGatewaySecret,
+              onForget: setForgetGatewaySecret
+            }}
+          />
+        </details>
 
         <details className="settings-section" open={linked && !initial}>
           <summary>
@@ -428,34 +625,6 @@ export default function GroupDialog({
             inheritToggle={
               group.parentId ? { label: t('Inherit appearance from the parent group') } : undefined
             }
-          />
-        </details>
-
-        <details className="settings-section">
-          <summary>
-            <Hint label={t('Desktop')}>
-              {t(
-                'Applies to the RDP hosts in this group. A gateway stated here reaches every one of them, which is the point of putting it on a group rather than on each machine.'
-              )}
-            </Hint>
-          </summary>
-          <RdpFields
-            value={group}
-            set={setRdp}
-            effective={desktop}
-            inheritedFrom={rdpNote}
-            inheritToggle={
-              group.parentId
-                ? { label: t('Inherit desktop settings from the parent group') }
-                : undefined
-            }
-            secret={{
-              typed: gatewaySecret,
-              onTyped: setGatewaySecret,
-              own: ownGatewaySecret,
-              forget: forgetGatewaySecret,
-              onForget: setForgetGatewaySecret
-            }}
           />
         </details>
 

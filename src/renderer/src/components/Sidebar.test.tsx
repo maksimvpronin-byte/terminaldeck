@@ -249,3 +249,50 @@ describe('the host filter', () => {
     expect(field.value).toBe('')
   })
 })
+
+describe('folders in the tree', () => {
+  const prod: SessionGroup = { id: 'g1', name: 'prod', parentId: null, color: '#e5534b' }
+
+  function showTree(): void {
+    useStore.setState({
+      sessions: [host({ id: 'h1', name: 'db-01', groupId: 'g1' })],
+      groups: [prod],
+      inventoryTrees: [],
+      gitFolderTrees: [],
+      gitFolderOverrides: [],
+      inventoryOverrides: []
+    })
+    render(<Sidebar onOpenSnippets={() => {}} onOpenHelp={() => {}} />)
+  }
+
+  it('wears its colour, and lends it to a host that has none of its own', () => {
+    showTree()
+    expect(rowFor('prod').classList.contains('tinted')).toBe(true)
+    expect(rowFor('db-01').style.getPropertyValue('--host-colour')).toBe('#e5534b')
+  })
+
+  it('marks the row a context menu was opened on, without selecting it', () => {
+    showTree()
+    fireEvent.contextMenu(rowFor('db-01'))
+    expect(rowFor('db-01').classList.contains('menu-open')).toBe(true)
+    expect(rowFor('db-01').classList.contains('selected')).toBe(false)
+    expect(screen.getByText('Add to collection…')).toBeTruthy()
+  })
+
+  it('opens only from the arrow when Settings says so', () => {
+    useStore.setState({
+      settings: { ...useStore.getState().settings, expandOnArrowOnly: true }
+    })
+    showTree()
+    fireEvent.click(rowFor('prod'))
+    expect(screen.getByText('db-01')).toBeTruthy()
+    const arrow = rowFor('prod').querySelector('.chevron')
+    if (!arrow) throw new Error('no arrow')
+    fireEvent.click(arrow)
+    expect(screen.queryByText('db-01')).toBeNull()
+    fireEvent.click(rowFor('prod').querySelector('.chevron') as Element)
+    useStore.setState({
+      settings: { ...useStore.getState().settings, expandOnArrowOnly: false }
+    })
+  })
+})

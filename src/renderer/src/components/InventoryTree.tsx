@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react'
 import type { InventorySource, SessionGroup, SessionProfile } from '../../../shared/types'
 import { resolveAuth } from '../../../shared/authResolution'
@@ -15,7 +15,10 @@ import InventoryOverrideDialog from './InventoryOverrideDialog'
 import ContextMenu, { type MenuItem } from './ContextMenu'
 import SettingsDialog, { type SettingsTab } from './SettingsDialog'
 import MultiConnectDialog from './MultiConnectDialog'
-import { connectMenuItems } from './connectMenu'
+import { collectionItems, connectMenuItems } from './connectMenu'
+import CollectionDialog from './CollectionDialog'
+import { colourOf } from '../../../shared/hostColour'
+import { findPane } from '../state/paneTree'
 import { morphOpen } from './hostMorph'
 import { paneTitle } from '../state/connect'
 import { overridesByNode } from '../state/hosts'
@@ -23,7 +26,7 @@ import { useT } from '../i18n'
 import { ago } from '../state/syncStatus'
 import { DesktopIcon, RefreshIcon, TerminalIcon } from './icons'
 import { groupIndent, hostIndent } from './treeIndent'
-import { Chevron, FolderIcon, TreeChildren } from './TreeToggle'
+import { Chevron, FolderIcon, TreeChildren, togglesFolder } from './TreeToggle'
 import Hint from './Hint'
 
 const COLLAPSED_KEY = 'terminaldeck.collapsedInventory'
@@ -59,11 +62,29 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
   const openMany = useStore((s) => s.openMany)
   const credentials = useStore((s) => s.credentials)
   const workspaces = useStore((s) => s.workspaces)
+  const collections = useStore((s) => s.collections)
+  const addToCollection = useStore((s) => s.addToCollection)
+  const clearHostSelection = useStore((s) => s.clearHostSelection)
+  const settings = useStore((s) => s.settings)
+  /** The host of the pane in front, for opening the folders above it. */
+  const frontHostId = useStore((s) => {
+    const tab = currentTab(s)
+    const pane = tab ? findPane(tab.root, tab.activePaneId) : undefined
+    return pane?.type === 'leaf' && pane.target.kind === 'session' ? pane.target.sessionId : null
+  })
   const connected = new Set(allRoots({ workspaces }).flatMap(collectConnectedSessionIds))
 
   const [editing, setEditing] = useState<InventorySource | 'new' | undefined>(undefined)
   const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsed)
-  const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null)
+  /** The open menu, and the row it belongs to — marked while it stands. */
+  const [menu, setMenu] = useState<{
+    x: number
+    y: number
+    items: MenuItem[]
+    forId?: string
+  } | null>(null)
+  /** Hosts waiting to be put into a brand new collection. */
+  const [collecting, setCollecting] = useState<string[] | null>(null)
   const [overriding, setOverriding] = useState<SessionProfile | SessionGroup | null>(null)
   /** Which page Settings should open on, or null while it is closed. */
   const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null)
@@ -103,6 +124,37 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
     () => trees.flatMap((tree) => tree.groups).map((g) => applyOverride(g, overrideOf.get(g.id))),
     [trees, overrideOf]
   )
+
+  /*
+   * With "select the host of the tab in front" on, the folders above that host
+   * are opened so its row can be seen; the Sessions tree selects it and
+   * scrolls to it. Keyed on the tab alone, like there.
+   */
+  const revealState = useRef({ trees, allGroups })
+  revealState.current = { trees, allGroups }
+  useEffect(() => {
+    if (!settings.revealActiveHost || !frontHostId) return
+    const { trees: sourceTrees, allGroups: folders } = revealState.current
+    const tree = sourceTrees.find((candidate) =>
+      candidate.sessions.some((h) => h.id === frontHostId)
+    )
+    if (!tree) return
+    const host = tree.sessions.find((h) => h.id === frontHostId)
+    const above = new Set<string>()
+    for (const start of tree.memberships?.[frontHostId] ?? [host?.groupId ?? null]) {
+      let cursor: string | null = start
+      while (cursor && !above.has(cursor)) {
+        above.add(cursor)
+        cursor = folders.find((g) => g.id === cursor)?.parentId ?? null
+      }
+    }
+    setCollapsed((prev) => {
+      if (![...above].some((id) => prev.has(id))) return prev
+      const next = new Set([...prev].filter((id) => !above.has(id)))
+      localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...next]))
+      return next
+    })
+  }, [frontHostId, settings.revealActiveHost])
 
   /**
    * The tree indexed once per change rather than searched once per row: a group
@@ -222,7 +274,12 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
   function hostMenu(host: SessionProfile, atX: number, atY: number, colour?: string): MenuItem[] {
     const state = useStore.getState()
     const activeTab = currentTab(state)
-    const auth = resolveAuth(host, host.groupId, allGroups)
+    const auth = resolveAuth(host, host.groupId, allGroups, {
+      protocol: protocolOf(host),
+      credentials
+    })
+    // Inside a selection the menu acts on all of it, as in the Sessions tree.
+    const targets = selectedHostIds.includes(host.id) ? [...selectedHostIds] : [host.id]
     const overridden = overrides.some((o) => o.nodeId === host.id)
     return [
       { label: t('Connect'), onSelect: () => connect(host, colour) },
@@ -245,12 +302,30 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
         t,
         credentials,
         connectAs: (credentialId) => connect(host, colour, credentialId),
-        showMenu: (items) => setMenu({ x: atX, y: atY, items }),
+        showMenu: (items) => setMenu({ x: atX, y: atY, items, forId: host.id }),
         manageAccounts: () => setSettingsTab('accounts'),
         openMultiConnect: () => setMultiConnecting({ id: host.id, name: host.name, color: colour }),
         connectConsole:
           protocolOf(host) === 'rdp' ? () => connect(host, colour, undefined, true) : undefined
       }),
+      {
+        label:
+          targets.length > 1
+            ? t('Add {count} hosts to a collection…', { count: targets.length })
+            : t('Add to collection…'),
+        onSelect: () =>
+          setMenu({
+            x: atX,
+            y: atY,
+            forId: host.id,
+            items: collectionItems({
+              t,
+              collections,
+              add: (id) => void addToCollection(id, targets),
+              create: () => setCollecting(targets)
+            })
+          })
+      },
       {
         label: t('Copy {address}', {
           address: `${auth.username ? `${auth.username}@` : ''}${host.host}`
@@ -362,16 +437,27 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
       .filter((g) => !needle || subtreeHasMatch(g.id))
       .map((g) => {
         const isCollapsed = needle === '' && collapsed.has(g.id)
+        // A group coloured locally wears it here, and so does everything inside.
+        const groupColour = colourOf(g, g.parentId, allGroups)
         return (
           <div className="tree-group" key={g.id}>
             <div
-              className="tree-item"
-              style={{ paddingLeft: groupIndent(depth) }}
-              onClick={() => toggleCollapsed(g.id)}
+              className={`tree-item${groupColour ? ' tinted' : ''}${
+                menu?.forId === g.id ? ' menu-open' : ''
+              }`}
+              style={
+                {
+                  paddingLeft: groupIndent(depth),
+                  ...(groupColour ? { '--host-colour': groupColour } : {})
+                } as CSSProperties
+              }
+              onClick={(e) => {
+                if (togglesFolder(e, settings.expandOnArrowOnly)) toggleCollapsed(g.id)
+              }}
               onContextMenu={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
-                setMenu({ x: e.clientX, y: e.clientY, items: groupMenu(g) })
+                setMenu({ x: e.clientX, y: e.clientY, items: groupMenu(g), forId: g.id })
               }}
             >
               <span className={`tree-group-title name ${isCollapsed ? '' : 'open'}`}>
@@ -423,13 +509,14 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
   }
 
   function renderHost(host: SessionProfile, paddingLeft: number, colour?: string): JSX.Element {
-    const rowColour = host.color ?? colour
+    // Its own colour, then its group's, then the repository's.
+    const rowColour = colourOf(host, host.groupId, allGroups) ?? colour
     const Kind = protocolOf(host) === 'rdp' ? DesktopIcon : TerminalIcon
     return (
       <div
         className={`tree-item ${rowColour ? 'tinted' : ''} ${
           selectedHostIds.includes(host.id) ? 'selected' : ''
-        }`}
+        }${menu?.forId === host.id ? ' menu-open' : ''}`}
         key={host.id}
         data-host-id={host.id}
         style={
@@ -451,7 +538,8 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
           setMenu({
             x: e.clientX,
             y: e.clientY,
-            items: hostMenu(host, e.clientX, e.clientY, rowColour)
+            items: hostMenu(host, e.clientX, e.clientY, rowColour),
+            forId: host.id
           })
         }}
       >
@@ -532,13 +620,15 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
           return (
             <div className="tree-group" key={source.id}>
               <div
-                className="tree-item"
+                className={`tree-item${menu?.forId === rootId ? ' menu-open' : ''}`}
                 style={{ paddingLeft: groupIndent(0) }}
-                onClick={() => toggleCollapsed(rootId)}
+                onClick={(e) => {
+                  if (togglesFolder(e, settings.expandOnArrowOnly)) toggleCollapsed(rootId)
+                }}
                 onContextMenu={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
-                  setMenu({ x: e.clientX, y: e.clientY, items: sourceMenu(source) })
+                  setMenu({ x: e.clientX, y: e.clientY, items: sourceMenu(source), forId: rootId })
                 }}
               >
                 <span className={`tree-group-title name ${isCollapsed ? '' : 'open'}`}>
@@ -631,6 +721,15 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
       )}
       {menu && (
         <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />
+      )}
+      {collecting && (
+        <CollectionDialog
+          hostIds={collecting}
+          onClose={() => {
+            setCollecting(null)
+            clearHostSelection()
+          }}
+        />
       )}
     </>
   )

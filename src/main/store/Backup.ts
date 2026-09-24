@@ -162,6 +162,10 @@ function validateDefaults(record: UnknownRecord, path: string): void {
     'gatewayHost',
     'gatewayUsername',
     'gatewaySecretRef',
+    'credentialId',
+    'rdpUsername',
+    'rdpSecretRef',
+    'rdpCredentialId',
     'fontFamily',
     'themeName'
   ]) {
@@ -170,6 +174,7 @@ function validateDefaults(record: UnknownRecord, path: string): void {
   for (const key of [
     'port',
     'gatewayPort',
+    'rdpPort',
     'desktopWidth',
     'desktopHeight',
     'pixelBudget',
@@ -231,6 +236,7 @@ function validateSessionGroup(value: unknown, path: string): SessionGroup {
   }
   requiredString(record, 'name', path)
   requiredNullableString(record, 'parentId', path)
+  optionalString(record, 'color', path)
   validateDefaults(record, path)
   if (record.git !== undefined) validateGitFolderLink(record.git, `${path}.git`)
   return record as unknown as SessionGroup
@@ -440,7 +446,8 @@ export async function exportToFile(
          */
         .flatMap((item) => [
           item.secretRef,
-          (item as { gatewaySecretRef?: string }).gatewaySecretRef
+          (item as { gatewaySecretRef?: string }).gatewaySecretRef,
+          (item as { rdpSecretRef?: string }).rdpSecretRef
         ])
         .filter((ref): ref is string => Boolean(ref))
     )

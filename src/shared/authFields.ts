@@ -1,6 +1,13 @@
-import { inheritedFrom, resolveAuth, sourceOf } from './authResolution'
+import {
+  authChain,
+  defaultCredential,
+  inheritedFrom,
+  resolveAuth,
+  sourceOf,
+  type AuthContext
+} from './authResolution'
 import { isSet, withoutBlanks } from './overrides'
-import type { AuthDefaults, AuthMethod, ResolvedAuth, SessionGroup } from './types'
+import type { AuthDefaults, AuthMethod, Credential, ResolvedAuth, SessionGroup } from './types'
 
 /**
  * What the credential half of an editing dialog needs to know.
@@ -32,9 +39,17 @@ export interface AuthFieldsInput {
    * before anyone commits to it.
    */
   forgetSecret: boolean
+  /** The protocol the item is resolved for, and the saved accounts. */
+  context?: AuthContext
 }
 
 export interface AuthFieldsState {
+  /**
+   * The saved account this item signs in with by default, and where that
+   * comes from: the item itself or a group above it. Absent when a login is
+   * resolved field by field instead.
+   */
+  account?: { credential: Credential; from: 'self' | SessionGroup }
   /** What this item would connect with, with the pending forget applied. */
   effective: ResolvedAuth
   /**
@@ -79,7 +94,8 @@ export function authFieldsState({
   beneath,
   parentId,
   groups,
-  forgetSecret
+  forgetSecret,
+  context = {}
 }: AuthFieldsInput): AuthFieldsState {
   const pending = forgetSecret ? { ...own, secretRef: undefined } : own
 
@@ -97,21 +113,40 @@ export function authFieldsState({
     beneath ? { ...beneath, ...withoutBlanks(item) } : item
 
   const layered = layer(pending)
-  const effective = resolveAuth(layered, parentId, groups)
-  const keyFrom = sourceOf(layered, parentId, groups, 'privateKeyPath')
-  const passphraseFrom = sourceOf(layered, parentId, groups, 'secretRef')
+  const effective = resolveAuth(layered, parentId, groups, context)
+  const keyFrom = sourceOf(layered, parentId, groups, 'privateKeyPath', context)
+  const passphraseFrom = sourceOf(layered, parentId, groups, 'secretRef', context)
+  const credential = defaultCredential(
+    authChain(layered, parentId, groups, context),
+    context.credentials
+  )
+  const account = credential
+    ? {
+        credential,
+        from:
+          layered.credentialId === credential.id
+            ? ('self' as const)
+            : (inheritedFrom(layered, parentId, groups, 'credentialId', context) ??
+              ('self' as const))
+      }
+    : undefined
 
   return {
+    account,
     effective,
     shownMethod: effective.authMethod,
     // Dropped from the item's own settings and layered again, rather than
     // struck off the finished layers: handing the method back hands it to
     // whatever sits directly underneath — an inventory host before its groups —
     // and taking it off the merged object would skip that host entirely.
-    inheritedMethod: resolveAuth(layer({ ...pending, authMethod: undefined }), parentId, groups)
-      .authMethod,
+    inheritedMethod: resolveAuth(
+      layer({ ...pending, authMethod: undefined }),
+      parentId,
+      groups,
+      context
+    ).authMethod,
     ownSecret: isSet(own.secretRef),
-    inheritedFrom: (key) => inheritedFrom(layered, parentId, groups, key),
+    inheritedFrom: (key) => inheritedFrom(layered, parentId, groups, key, context),
     splitCredential:
       effective.authMethod === 'privateKey' &&
       keyFrom !== undefined &&

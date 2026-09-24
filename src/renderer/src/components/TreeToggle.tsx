@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react'
+import type { CSSProperties, MouseEvent as ReactMouseEvent, ReactNode } from 'react'
 import { GUIDE_OFFSET } from './treeIndent'
 
 /**
@@ -26,6 +26,17 @@ export function Chevron({ open }: { open: boolean }): JSX.Element {
       </svg>
     </span>
   )
+}
+
+/**
+ * Whether a click on a folder row should open or close it.
+ *
+ * Anywhere on the row, unless Settings says the arrow alone does it — then
+ * only a click that landed on the arrow.
+ */
+export function togglesFolder(e: ReactMouseEvent, arrowOnly: boolean): boolean {
+  if (!arrowOnly) return true
+  return e.target instanceof Element && e.target.closest('.chevron') !== null
 }
 
 export function FolderIcon({ open }: { open: boolean }): JSX.Element {

@@ -18,6 +18,7 @@ export default function HostPalette({ onClose }: { onClose: () => void }): JSX.E
   const openTab = useStore((s) => s.openTab)
   const openMany = useStore((s) => s.openMany)
 
+  const credentials = useStore((s) => s.credentials)
   const [query, setQuery] = useState('')
   const [cursor, setCursor] = useState(0)
   const [picked, setPicked] = useState<Set<string>>(new Set())
@@ -31,9 +32,10 @@ export default function HostPalette({ onClose }: { onClose: () => void }): JSX.E
         inventoryTrees: trees,
         inventoryOverrides: overrides,
         gitFolderTrees: gitTrees,
-        gitFolderOverrides: gitOverrides
+        gitFolderOverrides: gitOverrides,
+        credentials
       }),
-    [sessions, groups, trees, overrides, gitTrees, gitOverrides]
+    [sessions, groups, trees, overrides, gitTrees, gitOverrides, credentials]
   )
 
   const matches = useMemo(() => {

@@ -11,9 +11,10 @@ import { applyOverride } from '../../../shared/overrides'
 import { isGitNode, gitFolderLayout } from '../../../shared/gitFolders'
 import { protocolOf } from '../../../shared/protocols'
 import { duplicateProfile } from '../../../shared/duplicate'
+import { colourOf } from '../../../shared/hostColour'
 import { CloseIcon, DesktopIcon, TerminalIcon } from './icons'
 import { groupIndent, hostIndent } from './treeIndent'
-import { Chevron, FolderIcon, TreeChildren } from './TreeToggle'
+import { Chevron, FolderIcon, TreeChildren, togglesFolder } from './TreeToggle'
 import {
   useStore,
   collectConnectedSessionIds,
@@ -21,6 +22,7 @@ import {
   allRoots
 } from '../state/store'
 import { DRAG_MIME, type DragItem } from '../state/dnd'
+import { findPane } from '../state/paneTree'
 import { dropSide, dropZone } from '../state/dropZone'
 import SessionDialog from './SessionDialog'
 import QuickConnectDialog from './QuickConnectDialog'
@@ -34,7 +36,7 @@ import CollectionDialog from './CollectionDialog'
 import SettingsDialog, { type SettingsTab } from './SettingsDialog'
 import MultiConnectDialog from './MultiConnectDialog'
 import ContextMenu, { type MenuItem } from './ContextMenu'
-import { connectMenuItems } from './connectMenu'
+import { collectionItems, connectMenuItems } from './connectMenu'
 import { morphOpen } from './hostMorph'
 import { paneTitle } from '../state/connect'
 import { overridesByNode } from '../state/hosts'
@@ -119,6 +121,13 @@ export default function Sidebar({
   const credentials = useStore((s) => s.credentials)
   const addToCollection = useStore((s) => s.addToCollection)
   const workspaces = useStore((s) => s.workspaces)
+  const settings = useStore((s) => s.settings)
+  /** The host of the pane in front, for keeping the tree on it. */
+  const frontHostId = useStore((s) => {
+    const tab = currentTab(s)
+    const pane = tab ? findPane(tab.root, tab.activePaneId) : undefined
+    return pane?.type === 'leaf' && pane.target.kind === 'session' ? pane.target.sessionId : null
+  })
 
   // Which hosts already have a terminal open anywhere, so the tree says so.
   const connected = new Set(allRoots({ workspaces }).flatMap(collectConnectedSessionIds))
@@ -214,7 +223,17 @@ export default function Sidebar({
    */
   const [dragItem, setDragItem] = useState<DragItem | null>(null)
   const [isDragging, setIsDragging] = useState(false)
-  const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null)
+  /**
+   * The open context menu, and the row it was opened on. That row is marked
+   * while the menu stands, so it is plain which host the menu will act on —
+   * without selecting it, which would throw away a selection being built.
+   */
+  const [menu, setMenu] = useState<{
+    x: number
+    y: number
+    items: MenuItem[]
+    forId?: string
+  } | null>(null)
   const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsed)
   const [tab, setTab] = useState<'sessions' | 'inventory'>('sessions')
   /** Hosts waiting to be put into a brand new collection. */
@@ -238,6 +257,53 @@ export default function Sidebar({
   }
 
   /**
+   * Keeps the tree on the host of the tab in front: selects it, opens the
+   * folders above it and scrolls it into view. Only when the tab changes — a
+   * selection built by hand is left alone until you move to another tab.
+   *
+   * Read through a ref rather than listed as dependencies: the hosts and their
+   * placements change on every save and sync, and each change would otherwise
+   * snap the selection back to the tab's host.
+   */
+  const revealState = useRef({ sessions, groups, hostsByGroup })
+  revealState.current = { sessions, groups, hostsByGroup }
+  useEffect(() => {
+    if (!settings.revealActiveHost || !frontHostId) return
+    const state = useStore.getState()
+    if (state.selectedHostIds.length !== 1 || state.selectedHostIds[0] !== frontHostId) {
+      state.selectOnlyHost(frontHostId)
+    }
+    const { sessions: hosts, groups: folders, hostsByGroup: placed } = revealState.current
+    const host = hosts.find((h) => h.id === frontHostId)
+    if (host) {
+      const parents = isGitNode(host.id)
+        ? [...placed].filter(([, ids]) => ids.has(host.id)).map(([groupId]) => groupId)
+        : host.groupId
+          ? [host.groupId]
+          : []
+      const above = new Set<string>()
+      for (const start of parents) {
+        let cursor: string | null = start
+        while (cursor && !above.has(cursor)) {
+          above.add(cursor)
+          cursor = folders.find((g) => g.id === cursor)?.parentId ?? null
+        }
+      }
+      setCollapsed((prev) => {
+        if (![...above].some((id) => prev.has(id))) return prev
+        const next = new Set([...prev].filter((id) => !above.has(id)))
+        localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...next]))
+        return next
+      })
+    }
+    requestAnimationFrame(() =>
+      document
+        .querySelector(`.sidebar [data-host-id="${CSS.escape(frontHostId)}"]`)
+        ?.scrollIntoView({ block: 'nearest' })
+    )
+  }, [frontHostId, settings.revealActiveHost])
+
+  /**
    * Opens the host in a tab. An account named here is used for that tab alone —
    * it travels on the pane, so a reconnect keeps it, and the saved host is not
    * touched by any of it.
@@ -248,13 +314,21 @@ export default function Sidebar({
     openTab(
       admin ? `${title} · ${t('console')}` : title,
       { kind: 'session', sessionId: session.id, credentialId, admin },
-      session.color
+      colourFor(session)
     )
+  }
+
+  /** The colour a host wears here: its own, else its folder's. */
+  function colourFor(s: SessionProfile): string | undefined {
+    return colourOf(s, s.groupId, groups)
   }
 
   /** user@host as it will actually be used, inheritance included. */
   function addressOf(s: SessionProfile): string {
-    const { username } = resolveAuth(s, s.groupId, groups)
+    const { username } = resolveAuth(s, s.groupId, groups, {
+      protocol: protocolOf(s),
+      credentials
+    })
     return username ? `${username}@${s.host}` : s.host
   }
 
@@ -263,14 +337,17 @@ export default function Sidebar({
     () =>
       needle
         ? sessions.filter((s) => {
-            const { username } = resolveAuth(s, s.groupId, groups)
+            const { username } = resolveAuth(s, s.groupId, groups, {
+              protocol: protocolOf(s),
+              credentials
+            })
             const address = username ? `${username}@${s.host}` : s.host
             return [s.name, s.host, address, ...s.tags].some((f) =>
               f.toLowerCase().includes(needle)
             )
           })
         : sessions,
-    [sessions, groups, needle]
+    [sessions, groups, needle, credentials]
   )
 
   /**
@@ -559,7 +636,7 @@ export default function Sidebar({
             'after',
             s.name,
             { kind: 'session', sessionId: s.id },
-            s.color
+            colourFor(s)
           )
         }
       },
@@ -569,11 +646,29 @@ export default function Sidebar({
         t,
         credentials,
         connectAs: (credentialId) => connect(s, credentialId),
-        showMenu: (items) => setMenu({ x: atX, y: atY, items }),
+        showMenu: (items) => setMenu({ x: atX, y: atY, items, forId: s.id }),
         manageAccounts: () => setSettingsTab('accounts'),
         openMultiConnect: () => setMultiConnecting(s),
         connectConsole: protocolOf(s) === 'rdp' ? () => connect(s, undefined, true) : undefined
       }),
+      {
+        label:
+          targets.length > 1
+            ? t('Add {count} hosts to a collection…', { count: targets.length })
+            : t('Add to collection…'),
+        onSelect: () =>
+          setMenu({
+            x: atX,
+            y: atY,
+            forId: s.id,
+            items: collectionItems({
+              t,
+              collections,
+              add: (id) => void addToCollection(id, targets),
+              create: () => setCollecting(targets)
+            })
+          })
+      },
       ...(mirrored
         ? [
             {
@@ -649,7 +744,7 @@ export default function Sidebar({
             hosts.map((s) => ({
               title: s.name,
               target: { kind: 'session' as const, sessionId: s.id },
-              color: s.color
+              color: colourFor(s)
             })),
             'workspace',
             group?.name
@@ -730,19 +825,25 @@ export default function Sidebar({
     const edge = dropEdge?.id === s.id ? ` drop-${dropEdge.place}` : ''
     const mirrored = isGitNode(s.id)
     const Kind = protocolOf(s) === 'rdp' ? DesktopIcon : TerminalIcon
+    const colour = colourFor(s)
     return (
       <div
-        className={`tree-item ${s.color ? 'tinted' : ''} ${
+        className={`tree-item ${colour ? 'tinted' : ''} ${
           selectedHostIds.includes(s.id) ? 'selected' : ''
-        }${edge}`}
+        }${menu?.forId === s.id ? ' menu-open' : ''}${edge}`}
         onContextMenu={(e) => {
           e.preventDefault()
           e.stopPropagation()
-          setMenu({ x: e.clientX, y: e.clientY, items: sessionMenu(s, e.clientX, e.clientY) })
+          setMenu({
+            x: e.clientX,
+            y: e.clientY,
+            items: sessionMenu(s, e.clientX, e.clientY),
+            forId: s.id
+          })
         }}
         key={s.id}
         data-host-id={s.id}
-        style={{ paddingLeft, ...(s.color ? { '--host-colour': s.color } : {}) } as CSSProperties}
+        style={{ paddingLeft, ...(colour ? { '--host-colour': colour } : {}) } as CSSProperties}
         draggable={!mirrored}
         onDragStart={(e) => startDrag(e, { kind: 'session', id: s.id }, s.name)}
         onDragEnd={endDrag}
@@ -753,7 +854,7 @@ export default function Sidebar({
         onDoubleClick={(e) => {
           const row = e.currentTarget
           connect(s)
-          morphOpen(row, currentTab(useStore.getState())?.id, { title: s.name, colour: s.color })
+          morphOpen(row, currentTab(useStore.getState())?.id, { title: s.name, colour })
         }}
         title={
           mirrored
@@ -802,14 +903,22 @@ export default function Sidebar({
         const isCollapsed = needle === '' && collapsed.has(g.id)
         const childCount = hostsIn(g.id, visible).length + (childrenOf.get(g.id)?.length ?? 0)
         const isSyncing = gitSyncing.includes(g.id)
+        const colour = colourOf(g, g.parentId, groups)
 
         return (
           <div className="tree-group" key={g.id}>
             <div
-              className={`tree-item ${dropTarget === g.id ? 'drop-target' : ''}${
-                dropEdge?.id === g.id ? ` drop-${dropEdge.place}` : ''
+              className={`tree-item${colour ? ' tinted' : ''}${
+                dropTarget === g.id ? ' drop-target' : ''
+              }${dropEdge?.id === g.id ? ` drop-${dropEdge.place}` : ''}${
+                menu?.forId === g.id ? ' menu-open' : ''
               }`}
-              style={{ paddingLeft: groupIndent(depth) }}
+              style={
+                {
+                  paddingLeft: groupIndent(depth),
+                  ...(colour ? { '--host-colour': colour } : {})
+                } as CSSProperties
+              }
               draggable={!isGitNode(g.id)}
               onDragStart={(e) => startDrag(e, { kind: 'group', id: g.id }, g.name)}
               onDragEnd={endDrag}
@@ -819,11 +928,13 @@ export default function Sidebar({
                 setDropEdge((cur) => (cur?.id === g.id ? null : cur))
               }}
               onDrop={(e) => handleGroupDrop(e, g)}
-              onClick={() => toggleCollapsed(g.id)}
+              onClick={(e) => {
+                if (togglesFolder(e, settings.expandOnArrowOnly)) toggleCollapsed(g.id)
+              }}
               onContextMenu={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
-                setMenu({ x: e.clientX, y: e.clientY, items: groupMenu(g.id) })
+                setMenu({ x: e.clientX, y: e.clientY, items: groupMenu(g.id), forId: g.id })
               }}
               /* A folder tied to a repository is still a folder, and keeps the
                  folder's own icon; the link beside it is the difference. What a

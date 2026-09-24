@@ -6,7 +6,9 @@ import {
   TERMINAL_KEYS,
   THEMES,
   terminalDefaults,
-  themeOf
+  themeOf,
+  treeRowHeightOf,
+  treeTintOf
 } from './settings'
 
 /**
@@ -50,5 +52,26 @@ describe('the ANSI colours', () => {
     const theme = themeOf({ themeName: 'Nord' })
     expect(theme.background).toBe(THEMES.Nord.terminal.background)
     expect(theme.foreground).toBe(THEMES.Nord.terminal.foreground)
+  })
+})
+
+describe('the host tree row height', () => {
+  it('is what it always was until changed', () => {
+    expect(treeRowHeightOf(DEFAULT_SETTINGS)).toBe(32)
+  })
+  it('is kept inside the range, whatever was stored', () => {
+    expect(treeRowHeightOf({ treeRowHeight: 4 })).toBe(20)
+    expect(treeRowHeightOf({ treeRowHeight: 400 })).toBe(40)
+    expect(treeRowHeightOf({ treeRowHeight: Number.NaN })).toBe(32)
+    expect(treeRowHeightOf({ treeRowHeight: 23.6 })).toBe(24)
+  })
+})
+
+describe('how coloured rows are painted', () => {
+  it('fades from the edge unless the even wash was chosen', () => {
+    expect(treeTintOf(DEFAULT_SETTINGS)).toBe('fade')
+    expect(treeTintOf({ treeTint: 'flat' })).toBe('flat')
+    // A value from some other build is not trusted.
+    expect(treeTintOf({ treeTint: 'stripes' as never })).toBe('fade')
   })
 })

@@ -22,6 +22,7 @@ import RdpFields from './RdpFields'
 import ModalBackdrop from './ModalBackdrop'
 import { useT } from '../i18n'
 import Hint from './Hint'
+import AccountSelect from './AccountSelect'
 
 interface Props {
   /** The host or Ansible group the local settings apply to. */
@@ -58,6 +59,7 @@ export default function InventoryOverrideDialog({
     fromGit ? s.clearGitFolderOverride : s.clearInventoryOverride
   )
   const sessions = useStore((s) => s.sessions)
+  const credentials = useStore((s) => s.credentials)
   const settings = useStore((s) => s.settings)
   const t = useT()
 
@@ -100,7 +102,7 @@ export default function InventoryOverrideDialog({
   const protocol = isHost(node) ? (override.protocol ?? protocolOf(node)) : 'ssh'
   const traits = traitsOf(protocol)
   // What the repository alone would give this node, ignoring the override.
-  const fromRepo = resolveAuth(node, parentId, groups)
+  const fromRepo = resolveAuth(node, parentId, groups, { protocol, credentials })
 
   /**
    * The override, then what the repository and its groups say, then the
@@ -116,7 +118,16 @@ export default function InventoryOverrideDialog({
   const merged = applyOverride(node, override)
   // The same layering, through the shared rules the other two dialogs use: the
   // override on top, the inventory host beneath it, then the groups.
-  const auth = authFieldsState({ own: override, beneath: node, parentId, groups, forgetSecret })
+  const auth = authFieldsState({
+    own: override,
+    beneath: node,
+    parentId,
+    groups,
+    forgetSecret,
+    context: { protocol, credentials }
+  })
+  /** An account chosen here stands in for the login fields. */
+  const ownAccount = auth.account?.from === 'self'
   const effective = auth.effective
   const appearance = resolveAppearance(merged, parentId, groups, settings)
   const inheritedLook = resolveAppearance(
@@ -260,7 +271,12 @@ export default function InventoryOverrideDialog({
             <input
               autoFocus
               value={override.username ?? ''}
-              placeholder={fromRepo.username || t('not set in the inventory')}
+              disabled={ownAccount}
+              placeholder={
+                auth.account
+                  ? t('from the account {name}', { name: auth.account.credential.name })
+                  : fromRepo.username || t('not set in the inventory')
+              }
               onChange={(e) => set('username', e.target.value)}
             />
           </label>
@@ -269,26 +285,34 @@ export default function InventoryOverrideDialog({
             <input
               type="number"
               value={override.port ?? ''}
-              /* A desktop does not inherit a port from its groups — see the
-                 handler in ipc/rdp.ts, which reads the host's own — so the
-                 placeholder is the protocol's rather than the chain's. */
-              placeholder={String(protocol === 'ssh' ? fromRepo.port : traits.port)}
+              /* Resolved for the protocol: a desktop takes its groups' RDP
+                 port, or 3389 — never an SSH port. */
+              placeholder={String(fromRepo.port)}
               onChange={(e) => set('port', e.target.value ? Number(e.target.value) : undefined)}
             />
           </label>
         </div>
 
-        <AuthFields
-          value={override}
-          set={setAuth}
-          state={auth}
-          secret={secret}
-          onSecret={setSecret}
-          forgetSecret={forgetSecret}
-          onForgetSecret={setForgetSecret}
-          onPickKey={pickKey}
-          words={authWords}
+        <AccountSelect
+          value={override.credentialId}
+          onChange={(id) => set('credentialId', id)}
+          credentials={credentials}
+          inherited={ownAccount ? undefined : auth.account}
         />
+
+        {!ownAccount && (
+          <AuthFields
+            value={override}
+            set={setAuth}
+            state={auth}
+            secret={secret}
+            onSecret={setSecret}
+            forgetSecret={forgetSecret}
+            onForgetSecret={setForgetSecret}
+            onPickKey={pickKey}
+            words={authWords}
+          />
+        )}
 
         {traits.jumpHost && (
           <label>

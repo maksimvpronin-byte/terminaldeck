@@ -91,7 +91,13 @@ export function registerStoreHandlers(): void {
   })
   ipcMain.handle(
     IPC.storeSaveGroup,
-    (_e, group: SessionGroup, secret?: string | null, gatewaySecret?: string | null) => {
+    (
+      _e,
+      group: SessionGroup,
+      secret?: string | null,
+      gatewaySecret?: string | null,
+      rdpSecret?: string | null
+    ) => {
       const had = sessionStore.getAll().groups.find((g) => g.id === group.id)?.git
       const saved = saveWithSecrets(
         group,
@@ -99,7 +105,8 @@ export function registerStoreHandlers(): void {
           group,
           [
             ['secretRef', secret],
-            ['gatewaySecretRef', gatewaySecret]
+            ['gatewaySecretRef', gatewaySecret],
+            ['rdpSecretRef', rdpSecret]
           ],
           heldByOthers(group.id)
         ),

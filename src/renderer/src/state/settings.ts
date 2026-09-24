@@ -35,6 +35,49 @@ export interface TerminalSettings extends ResolvedAppearance {
    * open office.
    */
   lockAfterMinutes: number
+  /**
+   * A folder in the host tree opens and closes only from the arrow beside its
+   * name. Off, the whole row does it — which is quicker, and which is also how
+   * a folder gets opened by a click that was meant to select or drag it.
+   */
+  expandOnArrowOnly: boolean
+  /**
+   * Bringing a tab forward selects its host in the tree, opening the folders
+   * above it and scrolling it into view, so the tree always says what you are
+   * looking at.
+   */
+  revealActiveHost: boolean
+  /**
+   * How tall a row of the host tree is, in pixels — hosts, folders and
+   * collections alike. 32 is what it always was; a long inventory reads better
+   * packed closer, a touchpad better further apart.
+   */
+  treeRowHeight: number
+  /**
+   * How a coloured row of the host tree carries its colour. `fade` is strong
+   * at the left edge and fades out before the name; `flat` is the faint even
+   * wash the tree had before, across the whole row.
+   */
+  treeTint: TreeTint
+}
+
+export type TreeTint = 'fade' | 'flat'
+
+/** A stored tint style, or the default when it is not one this build knows. */
+export function treeTintOf(settings: Pick<TerminalSettings, 'treeTint'>): TreeTint {
+  return settings.treeTint === 'flat' ? 'flat' : 'fade'
+}
+
+/** The range the row height may be set within; outside it rows clip or sprawl. */
+export const TREE_ROW_MIN = 20
+export const TREE_ROW_MAX = 40
+export const TREE_ROW_DEFAULT = 32
+
+/** A stored height brought back inside the range, whatever wrote it. */
+export function treeRowHeightOf(settings: Pick<TerminalSettings, 'treeRowHeight'>): number {
+  const value = Math.round(Number(settings.treeRowHeight))
+  if (!Number.isFinite(value)) return TREE_ROW_DEFAULT
+  return Math.min(TREE_ROW_MAX, Math.max(TREE_ROW_MIN, value))
 }
 
 /** Chrome colours, mapped onto the CSS custom properties in styles.css. */
@@ -408,7 +451,11 @@ export const DEFAULT_SETTINGS: TerminalSettings = {
   rightClick: 'paste',
   externalEditor: '',
   // What it always was, now that it can be something else.
-  lockAfterMinutes: 15
+  lockAfterMinutes: 15,
+  expandOnArrowOnly: false,
+  revealActiveHost: true,
+  treeRowHeight: 32,
+  treeTint: 'fade'
 }
 
 /**
@@ -435,7 +482,11 @@ export const TERMINAL_KEYS = [
 export const OTHER_KEYS = [
   'language',
   'externalEditor',
-  'lockAfterMinutes'
+  'lockAfterMinutes',
+  'expandOnArrowOnly',
+  'revealActiveHost',
+  'treeRowHeight',
+  'treeTint'
 ] as const satisfies ReadonlyArray<keyof TerminalSettings>
 
 /** The defaults for the Terminal tab alone. */
@@ -503,6 +554,10 @@ export function applyUiPalette(settings: TerminalSettings): void {
   root.setProperty('--accent-dim', ui.accentDim)
   root.setProperty('--danger', ui.danger)
   root.setProperty('--success', ui.success)
+  // The host tree's row height, which the rows and the branch lines both read.
+  root.setProperty('--tree-row', `${treeRowHeightOf(settings)}px`)
+  // Read by styles.css to pick how a coloured row is painted.
+  document.documentElement.dataset.treeTint = treeTintOf(settings)
   // Native form controls and scrollbars follow this.
   root.setProperty('color-scheme', def.light ? 'light' : 'dark')
 }

@@ -46,7 +46,10 @@ function authFor(
   groups: SessionGroup[],
   credentialId?: string
 ): ResolvedAuth {
-  const auth = resolveAuth(profile, profile.groupId, groups)
+  const auth = resolveAuth(profile, profile.groupId, groups, {
+    protocol: 'rdp',
+    credentials: credentialStore.list()
+  })
   if (!credentialId) return auth
   const credential = credentialStore.find(credentialId)
   if (!credential) throw new Error('That saved account no longer exists')
@@ -201,7 +204,9 @@ export function registerRdpHandlers(): void {
 
       const desktop: DesktopRequest = {
         host: found.profile.host,
-        port: found.profile.port,
+        // The host's own port, else its group's RDP port, else 3389 — never
+        // the group's SSH port, which is what a shared `port` would have meant.
+        port: auth.port,
         width: request.width,
         height: request.height,
         scale: rdp.sendDensity ? request.scale : undefined,

@@ -10,8 +10,11 @@ import { vault } from '../vault/Vault'
  * here rather than three times over.
  */
 
-/** Every field an item keeps a vault reference in: its own login, and its gateway's. */
-export const SECRET_FIELDS = ['secretRef', 'gatewaySecretRef'] as const
+/**
+ * Every field an item keeps a vault reference in: its own login, its gateway's,
+ * and — on a group — the one its RDP hosts sign in with.
+ */
+export const SECRET_FIELDS = ['secretRef', 'gatewaySecretRef', 'rdpSecretRef'] as const
 
 /**
  * Drops an item's own credential so it inherits again. Without this a host that

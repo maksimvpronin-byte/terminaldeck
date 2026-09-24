@@ -385,20 +385,51 @@ label {
   /* Fixed height: the row must not resize when hover reveals the action buttons. */
   min-height: 28px;
   border-radius: 5px;
-  cursor: pointer;
+  /* The ordinary arrow, not a hand. A hand said "link" on every row, and the
+     grab hand said "drag me" on rows people mostly click; dragging still works
+     from anywhere on the row. */
+  cursor: default;
   gap: 6px;
 }
 .tree-item:hover {
   background: var(--bg-2);
 }
-.tree-item[draggable='true'] {
-  cursor: grab;
+/* The row a context menu was opened on, marked for as long as the menu stands.
+   An outline rather than the selection colour: the menu acts on this row, and
+   it is not selected — a selection being built is left exactly as it was. */
+.tree-item.menu-open {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+  background: var(--bg-2);
+}
+.tree-item.tinted.menu-open {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--host-colour) 38%, var(--bg-2)),
+    var(--bg-2) 75%
+  );
+}
+/* A larger target than the twelve pixels drawn, for when the arrow alone opens
+   a folder; the negative margin keeps the row laid out exactly as before. */
+.tree-item .chevron {
+  padding: 4px;
+  margin: -4px;
+  box-sizing: content-box;
 }
 .tree-item.selected {
   background: var(--accent-dim);
 }
+/* The height is a setting (Settings → General → Host tree). The rows' own
+   vertical padding goes, so a low setting is not overruled by it: the text is
+   centred by the flex box, not pushed down by padding. */
 .sidebar-tree .tree-item {
-  min-height: 32px;
+  min-height: var(--tree-row, 32px);
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.sidebar-tree .tree-item .tree-group-title {
+  padding-top: 0;
+  padding-bottom: 0;
 }
 .sidebar-tree .tree-item.selected:not(.tinted) {
   box-shadow: inset 2px 0 0 var(--accent);
@@ -413,15 +444,45 @@ label {
  * colour where the wash is too quiet to see, and survives selection, which
  * paints over the wash: the row you just clicked is the one you were hunting
  * for by colour, and it must not lose it at the moment of being found. */
+/* The wash is strongest at the edge and fades out before the name, so the
+   colour reads from across the room while the text stands on plain ground.
+   A flat wash had to stay faint for the text's sake, and faint was too little
+   once three or four environments sat next to each other. */
 .tree-item.tinted {
-  background: color-mix(in srgb, var(--host-colour) 10%, transparent);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--host-colour) 30%, transparent),
+    transparent 75%
+  );
   box-shadow: inset 3px 0 0 var(--host-colour);
 }
 .tree-item.tinted:hover {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--host-colour) 38%, var(--bg-2)),
+    var(--bg-2) 75%
+  );
+}
+/* The other style, chosen in Settings → General → Host tree: the faint even
+   wash the tree had before, across the whole row. */
+:root[data-tree-tint='flat'] .tree-item.tinted {
+  background: color-mix(in srgb, var(--host-colour) 10%, transparent);
+}
+:root[data-tree-tint='flat'] .tree-item.tinted:hover,
+:root[data-tree-tint='flat'] .tree-item.tinted.menu-open {
   background: color-mix(in srgb, var(--host-colour) 16%, var(--bg-2));
 }
-.tree-item.tinted.selected {
+.tree-item.tinted.selected,
+:root[data-tree-tint='flat'] .tree-item.tinted.selected {
   background: var(--accent-dim);
+}
+/* A host that is open right now: its name in bold, brighter than the rest.
+   The green plate on its icon said the same thing, and was too small to be
+   seen on a coloured row; the name is where the eye already is. White on a
+   dark theme, the ordinary text colour on a light one. */
+.tree-item:has(.session-kind.live) .name {
+  font-weight: 700;
+  color: light-dark(var(--text), #fff);
 }
 /* Sits where the dot sat, and says two things at once: what the row opens, and
    whether it is open right now. The padding is there whether or not it is, so
@@ -578,13 +639,13 @@ label {
 .tree-children > .tree-item:last-child::after,
 .tree-children > .tree-group:last-child::after {
   bottom: auto;
-  height: 16px;
+  height: calc(var(--tree-row, 32px) / 2);
 }
 .tree-children > .tree-item::before,
 .tree-children > .tree-group > .tree-item::before {
   content: '';
   position: absolute;
-  top: 15.5px;
+  top: calc(var(--tree-row, 32px) / 2 - 0.5px);
   left: var(--guide-x);
   width: 16px;
   height: 1px;

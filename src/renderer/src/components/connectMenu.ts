@@ -1,4 +1,4 @@
-import type { Credential } from '../../../shared/types'
+import type { Credential, HostCollection } from '../../../shared/types'
 import type { Translate } from '../i18n'
 import type { MenuItem } from './ContextMenu'
 
@@ -59,6 +59,31 @@ export function accountItems({
           onSelect: () => connectAs(credential.id)
         }))),
     { label: t('Manage accounts…'), separated: true, onSelect: manageAccounts }
+  ]
+}
+
+/**
+ * The collections a host can be put into, as the menu "Add to collection…"
+ * opens. The last row makes a new one, which is the only row when there are
+ * none yet.
+ */
+export function collectionItems({
+  t,
+  collections,
+  add,
+  create
+}: {
+  t: Translate
+  collections: HostCollection[]
+  add: (collectionId: string) => void
+  create: () => void
+}): MenuItem[] {
+  return [
+    ...collections.map((c) => ({
+      label: t('Add to “{name}”', { name: c.name }),
+      onSelect: () => add(c.id)
+    })),
+    { label: t('New collection…'), separated: collections.length > 0, onSelect: create }
   ]
 }
 

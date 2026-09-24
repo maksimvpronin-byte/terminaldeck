@@ -7,7 +7,7 @@ import { DesktopIcon, TerminalIcon } from './icons'
 import ContextMenu, { type MenuItem } from './ContextMenu'
 import { useT } from '../i18n'
 import CollectionDialog from './CollectionDialog'
-import { Chevron, TreeChildren } from './TreeToggle'
+import { Chevron, TreeChildren, togglesFolder } from './TreeToggle'
 import { TREE_HOST_NUDGE } from './treeIndent'
 
 const COLLAPSED_KEY = 'terminaldeck.collapsedCollections'
@@ -45,7 +45,14 @@ export default function CollectionsPanel({ query }: { query: string }): JSX.Elem
 
   const [editing, setEditing] = useState<HostCollection | 'new' | undefined>(undefined)
   const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsed)
-  const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null)
+  const settings = useStore((s) => s.settings)
+  /** The open menu, and the row it belongs to — marked while it stands. */
+  const [menu, setMenu] = useState<{
+    x: number
+    y: number
+    items: MenuItem[]
+    forId?: string
+  } | null>(null)
 
   useEffect(() => {
     loadCollections()
@@ -180,14 +187,21 @@ export default function CollectionsPanel({ query }: { query: string }): JSX.Elem
           return (
             <div className="tree-group" key={collection.id}>
               <div
-                className="tree-item"
+                className={`tree-item${menu?.forId === collection.id ? ' menu-open' : ''}`}
                 style={{ paddingLeft: COLLECTION_INDENT }}
-                onClick={() => toggleCollapsed(collection.id)}
+                onClick={(e) => {
+                  if (togglesFolder(e, settings.expandOnArrowOnly)) toggleCollapsed(collection.id)
+                }}
                 onDoubleClick={() => openCollection(collection.id)}
                 onContextMenu={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
-                  setMenu({ x: e.clientX, y: e.clientY, items: collectionMenu(collection) })
+                  setMenu({
+                    x: e.clientX,
+                    y: e.clientY,
+                    items: collectionMenu(collection),
+                    forId: collection.id
+                  })
                 }}
                 title={t('Double-click to open the whole set in a new workspace')}
               >
@@ -223,7 +237,9 @@ export default function CollectionsPanel({ query }: { query: string }): JSX.Elem
                   {members.map((m) => (
                     <div
                       key={m.id}
-                      className="tree-item"
+                      className={`tree-item${
+                        menu?.forId === `${collection.id}/${m.id}` ? ' menu-open' : ''
+                      }`}
                       // Past the branch drawn to it, like a host in the Sessions tree.
                       style={{ paddingLeft: COLLECTION_INDENT + TREE_HOST_NUDGE }}
                       title={m.missing ? undefined : t('Double-click to connect')}
@@ -245,6 +261,7 @@ export default function CollectionsPanel({ query }: { query: string }): JSX.Elem
                         setMenu({
                           x: e.clientX,
                           y: e.clientY,
+                          forId: `${collection.id}/${m.id}`,
                           items: [
                             {
                               label: t('Remove from collection'),
