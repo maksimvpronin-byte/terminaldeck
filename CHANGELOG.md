@@ -6,6 +6,43 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.20.0
+
+### Added
+
+- **Folders have a colour.** Set in the group dialog; the folder, the folders
+  inside it and every host without a colour of its own wear it — in the tree
+  and on the tabs they open. A host's own colour still wins.
+- **A group holds SSH and RDP apart.** Its dialog has an SSH half (port 22,
+  login, key, on-connect commands) and an RDP half (port 3389, login,
+  password or account, gateway). A host takes the half that matches its
+  protocol, so a Windows machine no longer inherits the Linux port. A group
+  with no RDP login of its own gives its RDP hosts the shared login, as before.
+- **A default account.** A saved account can be a folder's or a host's login,
+  in the group and host dialogs and in local settings; hosts inside inherit
+  it unless they name a login or an account of their own.
+- **Add to collection** from a host's menu, in Sessions and Inventory alike.
+- **Settings → General → Host tree:** open a folder only by its arrow; select
+  the host of the tab in front and scroll the tree to it (on by default); the
+  height of a row; and how coloured rows are painted.
+
+### Changed
+
+- **Coloured rows fade from their edge** and read from across the room; the
+  even faint wash they had is still there, as a choice in Settings.
+- **Open hosts are named in bold.**
+- **The row a context menu belongs to is marked**, without being selected.
+- **No hand cursor over the tree.** Dragging works as before.
+
+### Fixed
+
+- **Following the terminal from the host's settings works, and leaves nothing
+  on the screen.** The setup line was typed before the shell was ready: it was
+  echoed, never ran, and three hundred characters of shell code stayed in the
+  terminal. It now waits for a prompt, and its echo is taken out whole once
+  the shell answers. A file panel opened later goes straight to the shell's
+  directory.
+
 ## 0.19.9
 
 ### Changed
