@@ -6,6 +6,16 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.20.4
+
+### Fixed
+
+- **The mouse no longer vanishes over text fields on a remote desktop.**
+  Windows' text cursor has no transparency of its own and is sent as a 32-bit
+  image with none, so it was drawn fully transparent. It is now drawn by its
+  mask, the inverting part as a black and white checker, as FreeRDP draws it
+  elsewhere.
+
 ## 0.20.3
 
 ### Fixed
