@@ -6,6 +6,16 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.20.3
+
+### Fixed
+
+- **A two-line prompt no longer shows its first line twice on connecting.**
+  With a prompt such as `user@host ~` and `$` under it, the directory setup
+  line left the first line behind when its echo was taken out, and the next
+  prompt printed under it — as though Enter had been pressed. The whole old
+  prompt is cleared now, however many lines it takes.
+
 ## 0.20.2
 
 ### Added
