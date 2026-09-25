@@ -407,6 +407,68 @@ static BOOL td_desktop_resize(rdpContext* context)
 
 /* -------------------------------------------------------------- the pointer */
 
+/** Whether any pixel of an RGBA image can be seen at all. */
+static BOOL td_any_visible(const BYTE* rgba, size_t pixels)
+{
+	for (size_t i = 0; i < pixels; i++)
+		if (rgba[i * 4u + 3u] != 0)
+			return TRUE;
+	return FALSE;
+}
+
+/**
+ * A pointer converted to RGBA, in the same byte order as the picture, so the
+ * renderer has one rule for both and the cursor cannot come out with its
+ * colours swapped while the desktop looks right.
+ *
+ * One kind needs a second reading. Windows' text cursor, the I-beam, is a
+ * monochrome cursor: it has no alpha of its own, and the AND mask says which
+ * pixels are drawn and which invert what is under them. Sent as a 32-bit
+ * pointer its alpha is zero throughout, FreeRDP takes that zero at its word,
+ * and the whole cursor comes out transparent — the mouse vanished over every
+ * text field and came back when it left. A 32-bit pointer with an AND mask
+ * that converts to nothing visible is therefore read again as 24-bit, where
+ * the mask decides: drawn pixels opaque, inverting ones a black and white
+ * checker, the rest transparent. A pointer that really is meant to be
+ * invisible — mask all set, colour all black — stays invisible that way too.
+ */
+static BOOL td_convert_pointer(BYTE* dst, const rdpPointer* pointer, const gdiPalette* palette)
+{
+	const UINT32 w = pointer->width;
+	const UINT32 h = pointer->height;
+	if (!freerdp_image_copy_from_pointer_data(dst, PIXEL_FORMAT_RGBA32, 0, 0, 0, w, h,
+	                                          pointer->xorMaskData, pointer->lengthXorMask,
+	                                          pointer->andMaskData, pointer->lengthAndMask,
+	                                          pointer->xorBpp, palette))
+		return FALSE;
+
+	if (pointer->xorBpp != 32 || !pointer->andMaskData || pointer->lengthAndMask == 0 ||
+	    td_any_visible(dst, (size_t)w * h))
+		return TRUE;
+
+	const size_t srcStep = (size_t)w * 4u;
+	const size_t step = (size_t)w * 3u + (((size_t)w * 3u) % 2u);
+	if (srcStep * h > pointer->lengthXorMask)
+		return TRUE;
+	BYTE* rgb = calloc(step * h, 1);
+	if (!rgb)
+		return TRUE;
+	for (UINT32 y = 0; y < h; y++)
+		for (UINT32 x = 0; x < w; x++)
+			memcpy(&rgb[y * step + x * 3u], &pointer->xorMaskData[y * srcStep + x * 4u], 3);
+	BYTE* again = malloc((size_t)w * h * 4u);
+	if (again && freerdp_image_copy_from_pointer_data(
+	                 again, PIXEL_FORMAT_RGBA32, 0, 0, 0, w, h, rgb, (UINT32)(step * h),
+	                 pointer->andMaskData, pointer->lengthAndMask, 24, palette))
+	{
+		memcpy(dst, again, (size_t)w * h * 4u);
+		WLog_INFO(TAG, "pointer: %ux%u, 32-bit without alpha, drawn by its mask", w, h);
+	}
+	free(again);
+	free(rgb);
+	return TRUE;
+}
+
 static BOOL td_pointer_new(rdpContext* context, rdpPointer* pointer)
 {
 	tdPointer* ptr = (tdPointer*)pointer;
@@ -418,13 +480,7 @@ static BOOL td_pointer_new(rdpContext* context, rdpPointer* pointer)
 	if (!ptr->pixels)
 		return FALSE;
 
-	/* Into the same byte order as the picture, so the renderer has one rule
-	 * for both and the cursor cannot come out with its colours swapped while
-	 * the desktop looks right. */
-	if (!freerdp_image_copy_from_pointer_data(
-	        ptr->pixels, PIXEL_FORMAT_RGBA32, 0, 0, 0, pointer->width, pointer->height,
-	        pointer->xorMaskData, pointer->lengthXorMask, pointer->andMaskData,
-	        pointer->lengthAndMask, pointer->xorBpp, &gdi->palette))
+	if (!td_convert_pointer(ptr->pixels, pointer, &gdi->palette))
 	{
 		free(ptr->pixels);
 		ptr->pixels = NULL;
