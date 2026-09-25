@@ -1,4 +1,8 @@
+import { useState } from 'react'
 import ModalBackdrop from './ModalBackdrop'
+import { WhatsNewDialog } from './WhatsNew'
+import { recentNotes } from '../whatsNew'
+import { useStore } from '../state/store'
 import { keyHint } from '../state/keys'
 import { useT } from '../i18n'
 
@@ -200,7 +204,9 @@ const SECTIONS: Section[] = [
       },
       { what: 'A locked app opens nothing new: no session, no desktop, no remote file listing' },
       { what: 'Open sessions stay connected behind the lock, and the keyboard cannot reach them' },
-      { what: 'Settings → Backup moves everything to another machine, credentials optional' }
+      { what: 'Settings → Backup moves everything to another machine, credentials optional' },
+      { what: 'After an update a plate above the window says what came with it' },
+      { what: 'What’s new, beside the version above, reads the last few releases again' }
     ]
   },
   {
@@ -359,6 +365,17 @@ export default function HelpDialog({ onClose }: { onClose: () => void }): JSX.El
   // The rows are written in English and translated as they are drawn, so the
   // list above stays one readable table rather than a wall of lookup keys.
   const t = useT()
+  const language = useStore((s) => s.settings.language)
+  const [notesOpen, setNotesOpen] = useState(false)
+
+  if (notesOpen) {
+    return (
+      <WhatsNewDialog
+        releases={recentNotes(language, window.td.appVersion)}
+        onClose={() => setNotesOpen(false)}
+      />
+    )
+  }
 
   return (
     <ModalBackdrop onClose={onClose}>
@@ -369,6 +386,9 @@ export default function HelpDialog({ onClose }: { onClose: () => void }): JSX.El
               for it. Read once as the bridge is built, so it is a value here
               rather than something to wait for. */}
           <span className="help-version">{window.td.appVersion}</span>
+          <button className="help-whats-new" onClick={() => setNotesOpen(true)}>
+            {t('What’s new')}
+          </button>
         </h2>
         <p className="settings-note">
           {t('On Windows and Linux read ⌘ as Ctrl+Shift — plain Ctrl belongs to the shell.')}

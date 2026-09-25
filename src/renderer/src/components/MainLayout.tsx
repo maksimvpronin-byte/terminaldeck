@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import Sidebar from './Sidebar'
 import Workspace from './Workspace'
 import UpdateBanner from './UpdateBanner'
+import WhatsNewBanner from './WhatsNew'
 import SnippetPalette from './SnippetPalette'
 import AuthPromptDialog from './AuthPromptDialog'
 import HelpDialog from './HelpDialog'
@@ -49,6 +50,7 @@ export default function MainLayout(): JSX.Element {
   return (
     <div className="app-root">
       <UpdateBanner />
+      <WhatsNewBanner />
       <div className="app-shell">
         <Sidebar onOpenSnippets={() => setPaletteOpen(true)} onOpenHelp={() => setHelpOpen(true)} />
         <Workspace />

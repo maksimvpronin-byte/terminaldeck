@@ -2142,6 +2142,37 @@ textarea:focus {
   font-weight: 400;
   color: var(--text-dim);
 }
+.help-whats-new {
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 400;
+  align-self: center;
+}
+/* The notes of a release, read after an update or from Help. */
+.whats-new-card p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.whats-new-card section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.whats-new-version {
+  margin: 4px 0 0;
+  font-size: 14px;
+}
+.whats-new-item {
+  position: relative;
+  padding-left: 14px;
+}
+.whats-new-item::before {
+  content: '•';
+  position: absolute;
+  left: 2px;
+  color: var(--text-dim);
+}
 .help-rows {
   display: flex;
   flex-direction: column;

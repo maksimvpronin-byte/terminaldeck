@@ -192,6 +192,9 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   Settings → General → Host tree chooses how a coloured row is filled (fading from the edge, or
   even across it), whether it keeps the coloured stripe down its left edge, whether open hosts
   are named in bold, and the height of a row
+- **What's new** after an update: a plate above the window, once, opening the release notes of
+  every version since the one last run (the latest five at most), in Russian when the interface
+  is. Help reads the latest few again
 - **Export and import** everything to one file to move machines or keep a backup; credentials
   are optional and re-encrypted under a password of their own
 - Optional per-session logging to a local file
@@ -721,6 +724,11 @@ second job apiece, each building its own client.
 changes what the app reports about itself and nothing else: no build runs, no release appears,
 and nobody is offered the update. Versions 0.1.10 through 0.3.2 were bumped this way and never
 published, which is why the newest release on GitHub is far behind the source.
+
+**Write the release notes twice before tagging.** The app shows its own changelog after an
+update — `CHANGELOG.md`, and `CHANGELOG.ru.md` when the interface is in Russian — built into it at
+build time. A version missing from the Russian file is shown in English; one missing from both
+is not shown at all.
 
 `npm version` does both halves at once and is the only route that cannot drift:
 

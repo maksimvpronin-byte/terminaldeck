@@ -1269,5 +1269,12 @@ export const ru: Record<string, string> = {
   'An open host’s name is in bold as well, so it stands out on a coloured row':
     'Имя открытого хоста к тому же набрано жирным — его видно и на цветной строке',
   'Settings → General → Host tree takes away the edge, or the bold':
-    'В Настройках → Общие → Дерево хостов можно убрать полосу или жирный шрифт'
+    'В Настройках → Общие → Дерево хостов можно убрать полосу или жирный шрифт',
+  'What’s new': 'Что нового',
+  'No release notes.': 'Заметок к выпуску нет.',
+  'Updated to {version}.': 'Приложение обновлено до {version}.',
+  'After an update a plate above the window says what came with it':
+    'После обновления плашка над окном рассказывает, что в нём нового',
+  'What’s new, beside the version above, reads the last few releases again':
+    '«Что нового» рядом с версией вверху этого окна — последние выпуски ещё раз'
 }
