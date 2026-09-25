@@ -6,6 +6,17 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.20.1
+
+### Added
+
+- **Settings → General → Host tree: the coloured edge can go.** Unticked, a
+  coloured row loses the stripe down its left edge — the one that stacked into
+  a bracket beside a coloured folder — and the fill alone carries the colour,
+  gradient or even.
+- **Bold for open hosts is a checkbox**, in the same place. On by default, as
+  before.
+
 ## 0.20.0
 
 ### Added
