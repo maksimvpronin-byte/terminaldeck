@@ -6,6 +6,16 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.20.2
+
+### Added
+
+- **What's new, after an update.** Once the app has updated itself, a plate
+  above the window names the new version, and **What's new** opens the notes
+  of every release since the one last run — the latest five at most, in
+  Russian when the interface is. Closing either marks it read. Help has the
+  same button beside the version number, to read the latest few again.
+
 ## 0.20.1
 
 ### Added
