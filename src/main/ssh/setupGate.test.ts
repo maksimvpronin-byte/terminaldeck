@@ -44,6 +44,39 @@ describe('SetupGate', () => {
     expect(text(g.push(buf('after')))).toBe('after')
   })
 
+  it('climbs over every line of a two-line prompt', () => {
+    const g = new SetupGate(buf(LINE))
+    const out = text(g.push(buf(`${LINE}\r\n${OSC7}max@box ~\r\n$ `)))
+    expect(out).toBe(`\r\u001b[K\u001b[A\u001b[K${OSC7}max@box ~\r\n$ `)
+  })
+
+  it('counts a blank line a prompt starts with', () => {
+    const g = new SetupGate(buf(LINE))
+    const out = text(g.push(buf(`${LINE}\r\n${OSC7}\r\nmax@box ~\r\n$ `)))
+    expect(out).toBe(`\r\u001b[K${'\u001b[A\u001b[K'.repeat(2)}${OSC7}\r\nmax@box ~\r\n$ `)
+  })
+
+  it('waits for the prompt that follows the answer', () => {
+    const g = new SetupGate(buf(LINE))
+    expect(text(g.push(buf(`${LINE}\r\n${OSC7}max@box ~\r\n`)))).toBe('')
+    expect(g.answering).toBe(true)
+    expect(text(g.push(buf('$ ')))).toBe(`\r\u001b[K\u001b[A\u001b[K${OSC7}max@box ~\r\n$ `)
+    expect(g.answered).toBe(true)
+  })
+
+  it('lets an unrecognised prompt go on flush, still counted as answered', () => {
+    const g = new SetupGate(buf(LINE))
+    g.push(buf(`${LINE}\r\n${OSC7}max@box ~\r\n→ `))
+    expect(text(g.flush())).toBe(`\r\u001b[K\u001b[A\u001b[K${OSC7}max@box ~\r\n→ `)
+    expect(g.answered).toBe(true)
+  })
+
+  it('climbs nothing when output came between the prompt and the echo', () => {
+    const g = new SetupGate(buf(LINE))
+    const out = text(g.push(buf(`late\r\n${LINE}\r\n${OSC7}max@box ~\r\n$ `)))
+    expect(out).toBe(`late\r\n\r\u001b[K${OSC7}max@box ~\r\n$ `)
+  })
+
   it('gives up once too much is held', () => {
     const g = new SetupGate(buf(LINE), 16)
     expect(text(g.push(buf('0123456789abcdefXYZ')))).toBe('0123456789abcdefXYZ')

@@ -52,6 +52,8 @@ interface LiveConnection {
   setupGate?: SetupGate
   /** Gives up on that answer, so a line that never ran cannot hold output for good. */
   setupGateTimer?: NodeJS.Timeout
+  /** Whether that timer has been cut short because the shell has answered. */
+  setupPromptWait?: boolean
   /** How many times the setup line has been typed into this connection. */
   setupAttempts: number
   /**
@@ -144,6 +146,13 @@ const SETUP_WAIT_CAP_MS = 10_000
  * in one round trip.
  */
 const SETUP_ANSWER_MS = 3000
+
+/**
+ * Once it has answered, how long its prompt has to follow. It comes in the
+ * same breath; this is only for a prompt the gate does not recognise as one,
+ * which is then let go with whatever of it has arrived.
+ */
+const SETUP_PROMPT_MS = 250
 
 /** Typed once more if the first went unanswered, and no more than that. */
 const SETUP_MAX_ATTEMPTS = 2
@@ -1023,6 +1032,10 @@ class SSHManager {
         const gate = connection.setupGate
         const data = gate && !gate.done ? gate.push(raw) : raw
         if (gate?.done) this.settleSetup(win, connection)
+        else if (gate?.answering && !connection.setupPromptWait) {
+          connection.setupPromptWait = true
+          this.holdSetupFor(connection, SETUP_PROMPT_MS)
+        }
         if (!connection.shellReportsCwd && raw.includes(OSC7_BYTES))
           connection.shellReportsCwd = true
 
@@ -1180,9 +1193,16 @@ class SSHManager {
   private writeSetup(conn: LiveConnection): void {
     conn.setupAttempts++
     conn.setupGate = new SetupGate(Buffer.from(OSC7_SHELL_SETUP, 'utf8'))
+    conn.setupPromptWait = false
     conn.stream.write(`${OSC7_SHELL_SETUP}
 `)
     diag('ssh', `${short(conn.id)} setup line typed, attempt ${conn.setupAttempts}`)
+    this.holdSetupFor(conn, SETUP_ANSWER_MS)
+  }
+
+  /** Lets the held output go after `ms`, if the gate has not let it go itself. */
+  private holdSetupFor(conn: LiveConnection, ms: number): void {
+    if (conn.setupGateTimer) clearTimeout(conn.setupGateTimer)
     conn.setupGateTimer = setTimeout(() => {
       conn.setupGateTimer = undefined
       const gate = conn.setupGate
@@ -1191,7 +1211,7 @@ class SSHManager {
       const win = BrowserWindow.getAllWindows()[0]
       if (held.length > 0 && win && !win.isDestroyed()) this.queueOutput(win, conn, held)
       this.settleSetup(win, conn)
-    }, SETUP_ANSWER_MS)
+    }, ms)
   }
 
   /**
