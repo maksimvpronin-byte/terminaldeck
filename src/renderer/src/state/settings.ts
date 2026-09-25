@@ -59,6 +59,13 @@ export interface TerminalSettings extends ResolvedAppearance {
    * wash the tree had before, across the whole row.
    */
   treeTint: TreeTint
+  /**
+   * The 3px stripe of the host's colour down the left edge of a coloured row.
+   * Off, the fill alone carries the colour — solid or gradient alike.
+   */
+  treeEdge: boolean
+  /** An open host's name in bold and brighter than the rest of the tree. */
+  treeBoldOpen: boolean
 }
 
 export type TreeTint = 'fade' | 'flat'
@@ -455,7 +462,9 @@ export const DEFAULT_SETTINGS: TerminalSettings = {
   expandOnArrowOnly: false,
   revealActiveHost: true,
   treeRowHeight: 32,
-  treeTint: 'fade'
+  treeTint: 'fade',
+  treeEdge: true,
+  treeBoldOpen: true
 }
 
 /**
@@ -486,7 +495,9 @@ export const OTHER_KEYS = [
   'expandOnArrowOnly',
   'revealActiveHost',
   'treeRowHeight',
-  'treeTint'
+  'treeTint',
+  'treeEdge',
+  'treeBoldOpen'
 ] as const satisfies ReadonlyArray<keyof TerminalSettings>
 
 /** The defaults for the Terminal tab alone. */
@@ -558,6 +569,8 @@ export function applyUiPalette(settings: TerminalSettings): void {
   root.setProperty('--tree-row', `${treeRowHeightOf(settings)}px`)
   // Read by styles.css to pick how a coloured row is painted.
   document.documentElement.dataset.treeTint = treeTintOf(settings)
+  document.documentElement.dataset.treeEdge = settings.treeEdge ? 'on' : 'off'
+  document.documentElement.dataset.treeBoldOpen = settings.treeBoldOpen ? 'on' : 'off'
   // Native form controls and scrollbars follow this.
   root.setProperty('color-scheme', def.light ? 'light' : 'dark')
 }

@@ -188,7 +188,10 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   ever wanted them, and splitting downwards is `Ctrl+Shift+E` rather than a shifted `D`, because
   `Shift` is part of the modifier there and cannot also choose the direction
 - Colour-coded sessions, restored workspace and tab layout on launch, activity marks on
-  background tabs and workspaces, and a green dot on hosts that already have a terminal open
+  background tabs and workspaces, and a green mark and a bold name on hosts that are open.
+  Settings → General → Host tree chooses how a coloured row is filled (fading from the edge, or
+  even across it), whether it keeps the coloured stripe down its left edge, whether open hosts
+  are named in bold, and the height of a row
 - **Export and import** everything to one file to move machines or keep a backup; credentials
   are optional and re-encrypted under a password of their own
 - Optional per-session logging to a local file

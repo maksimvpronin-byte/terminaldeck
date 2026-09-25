@@ -164,6 +164,8 @@ const SECTIONS: Section[] = [
       { what: 'It turns green while that machine is open, desktops and terminals alike' },
       { what: 'A host given a colour wears it as its own background and a coloured edge' },
       { what: 'The edge stays while the row is selected, so the colour survives the click' },
+      { what: 'An open host’s name is in bold as well, so it stands out on a coloured row' },
+      { what: 'Settings → General → Host tree takes away the edge, or the bold' },
       { what: 'Right-click for connect, split, duplicate, edit and delete' },
       { what: 'Deleting lives in that menu alone, behind a prompt — no button to misclick' },
       { keys: '⌘ click', what: 'Tick a host as well, to open several at once' },

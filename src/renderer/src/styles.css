@@ -476,11 +476,16 @@ label {
 :root[data-tree-tint='flat'] .tree-item.tinted.selected {
   background: var(--accent-dim);
 }
+/* Settings → General → Host tree can take the edge away and leave the fill
+   alone to carry the colour. */
+:root[data-tree-edge='off'] .tree-item.tinted {
+  box-shadow: none;
+}
 /* A host that is open right now: its name in bold, brighter than the rest.
    The green plate on its icon said the same thing, and was too small to be
    seen on a coloured row; the name is where the eye already is. White on a
    dark theme, the ordinary text colour on a light one. */
-.tree-item:has(.session-kind.live) .name {
+:root:not([data-tree-bold-open='off']) .tree-item:has(.session-kind.live) .name {
   font-weight: 700;
   color: light-dark(var(--text), #fff);
 }

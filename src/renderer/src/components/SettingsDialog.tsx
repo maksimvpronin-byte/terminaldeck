@@ -146,6 +146,22 @@ export default function SettingsDialog({
                 <option value="flat">{t('Even and faint, across the row')}</option>
               </select>
             </label>
+            <label className="checkbox-row" style={{ flexDirection: 'row' }}>
+              <input
+                type="checkbox"
+                checked={settings.treeEdge}
+                onChange={(e) => updateSettings({ treeEdge: e.target.checked })}
+              />
+              {t('A stripe of the colour down the left edge of a coloured row')}
+            </label>
+            <label className="checkbox-row" style={{ flexDirection: 'row' }}>
+              <input
+                type="checkbox"
+                checked={settings.treeBoldOpen}
+                onChange={(e) => updateSettings({ treeBoldOpen: e.target.checked })}
+              />
+              {t('Name open hosts in bold')}
+            </label>
             <label>
               <Hint label={t('Row height: {px} px', { px: treeRowHeightOf(settings) })}>
                 {t(

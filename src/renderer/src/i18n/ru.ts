@@ -1261,6 +1261,13 @@ export const ru: Record<string, string> = {
     'Насколько плотно стоят хосты и группы в левой панели. {px} px — обычная высота; меньше — длинный список помещается на один экран.',
   Reset: 'Сбросить',
   'Colour of coloured rows': 'Заливка цветных строк',
-  'Fading from the edge': 'Градиент от полосы',
-  'Even and faint, across the row': 'Ровная и лёгкая, на всю строку'
+  'Fading from the edge': 'Градиент от левого края',
+  'Even and faint, across the row': 'Ровная и лёгкая, на всю строку',
+  'A stripe of the colour down the left edge of a coloured row':
+    'Цветная полоса у левого края цветной строки',
+  'Name open hosts in bold': 'Выделять открытые хосты жирным шрифтом',
+  'An open host’s name is in bold as well, so it stands out on a coloured row':
+    'Имя открытого хоста к тому же набрано жирным — его видно и на цветной строке',
+  'Settings → General → Host tree takes away the edge, or the bold':
+    'В Настройках → Общие → Дерево хостов можно убрать полосу или жирный шрифт'
 }
