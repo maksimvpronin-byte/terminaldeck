@@ -6,6 +6,14 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.21.1
+
+### Fixed
+
+- **Owner and group by name on SCP/Shell hosts.** The file panel showed them
+  as numbers — `26 26` where SFTP says `postgres postgres`. They are names now,
+  and a number only where the server has no name for it.
+
 ## 0.21.0
 
 ### Added
