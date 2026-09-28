@@ -6,6 +6,15 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.20.5
+
+### Fixed
+
+- **Ctrl+R searches the shell's history again.** The installed application
+  took the key for itself, as a page reload it no longer has, so it never
+  reached the terminal. It now goes to the session like every other bare
+  `Ctrl` key.
+
 ## 0.20.4
 
 ### Fixed
