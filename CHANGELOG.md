@@ -6,6 +6,41 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.21.0
+
+### Added
+
+- **Sorting in the file panel.** Click a column heading to sort by it, and
+  again to reverse. Size and date start at the largest and newest, folders
+  stay on top, and the order is remembered. Before, the headings sorted
+  nothing, on SFTP and SCP/Shell alike.
+- **Finding files.** A box under the path narrows the folder as you type, `*`
+  and `?` included. `⏎` searches every folder below it as well — one `find`
+  on the server over SCP/Shell, a walk through the folders over SFTP — and
+  lists each result with the path it was found at, up to 500. Right-click a
+  result for **Show in its folder**.
+- **SCP / Shell on a group.** A group's SSH settings now carry **File access**,
+  inherited by every SSH host inside. A host can choose **Inherit** again
+  after having a method of its own.
+- **Collections in the host and group settings.** Tick the collections a host
+  is in right in its dialog. In a group's, the same ticks put every host it
+  holds now, subgroups included, into a collection or take them out.
+- **The host filter matches group names.** A group whose name matches is shown
+  whole, with everything in it.
+- **Expand all and Collapse all** beside Quick connect open or close every
+  folder in the tree at once, collections included.
+
+### Changed
+
+- **Double-clicking a file opens it in your editor**, and saves go back to the
+  server. It used to offer to save the file to disk; that stays in the context
+  menu as **Download**. A file over 50 MB asks first.
+
+### Fixed
+
+- The file panel's **Size, Changed, Rights and Owner** headings were in English
+  in the Russian interface.
+
 ## 0.20.5
 
 ### Fixed
