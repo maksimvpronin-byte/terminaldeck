@@ -14,11 +14,37 @@ const canRun = process.platform !== 'win32'
 describe('shell metadata', () => {
   it('keeps spaces, quotes and newlines in file names and special mode bits', () => {
     const [entry] = parseShellStats(
-      Buffer.from("/tmp/a 'b\nc\0" + '81ed\0' + '7\0' + '123\0' + '1000\0' + '1001\0')
+      Buffer.from(
+        "/tmp/a 'b\nc\0" + '81ed\0' + '7\0' + '123\0' + '1000\0' + '1001\0' + 'ivan\0' + 'dev\0'
+      )
     )
     expect(entry.name).toBe("a 'b\nc")
     expect(entry.permissions).toBe('755')
     expect(entry.size).toBe(7)
+  })
+  it('shows owner and group by name, and by number when the server has no name', () => {
+    const [named, orphan] = parseShellStats(
+      Buffer.from(
+        '/srv/a\0' +
+          '81a4\0' +
+          '1\0' +
+          '0\0' +
+          '26\0' +
+          '26\0' +
+          'postgres\0' +
+          'postgres\0' +
+          '/srv/b\0' +
+          '81a4\0' +
+          '1\0' +
+          '0\0' +
+          '4242\0' +
+          '26\0' +
+          'UNKNOWN\0' +
+          'postgres\0'
+      )
+    )
+    expect(named).toMatchObject({ owner: 'postgres', group: 'postgres' })
+    expect(orphan).toMatchObject({ owner: '4242', group: 'postgres' })
   })
   it('rejects banners, incomplete records and NUL paths', () => {
     expect(() => parseShellStats(Buffer.from('welcome'))).toThrow()

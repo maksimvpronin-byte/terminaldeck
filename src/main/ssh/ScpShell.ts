@@ -84,14 +84,28 @@ class Reader {
   }
 }
 
+/** Fields `STAT` prints for each path, each ended by a NUL. */
+const STAT_FIELDS = 8
+
+/**
+ * The name `stat` prints, or the number when it has none.
+ *
+ * GNU stat answers `UNKNOWN` for an id with no entry in the server's user or
+ * group database — files unpacked from somebody else's archive, or owned by a
+ * container's user — and the number says more than that word does.
+ */
+function nameOr(name: string, id: string): string {
+  return name && name !== 'UNKNOWN' ? name : id
+}
+
 export function parseShellStats(output: Buffer): SftpEntry[] {
   if (!output.length) return []
   const fields = output.toString('utf8').split('\0')
-  if (fields.pop() !== '' || fields.length % 6)
+  if (fields.pop() !== '' || fields.length % STAT_FIELDS)
     throw new Error('Invalid shell file listing (GNU stat is required)')
   const entries: SftpEntry[] = []
-  for (let i = 0; i < fields.length; i += 6) {
-    const [path, hex, size, mtime, uid, gid] = fields.slice(i, i + 6)
+  for (let i = 0; i < fields.length; i += STAT_FIELDS) {
+    const [path, hex, size, mtime, uid, gid, user, group] = fields.slice(i, i + STAT_FIELDS)
     const mode = Number.parseInt(hex, 16)
     if (!/^[0-9a-f]+$/i.test(hex) || !/^\d+$/.test(size) || !/^-?\d+$/.test(mtime)) {
       throw new Error('Invalid shell file metadata')
@@ -104,14 +118,16 @@ export function parseShellStats(output: Buffer): SftpEntry[] {
       isDirectory: (mode & 0o170000) === 0o040000,
       isSymlink: (mode & 0o170000) === 0o120000,
       permissions: (mode & 0o7777).toString(8),
-      owner: uid,
-      group: gid
+      // Names, as SFTP shows them from its listing lines: the ids alone left
+      // every row of an SCP/Shell panel reading 26 26 where it meant postgres.
+      owner: nameOr(user, uid),
+      group: nameOr(group, gid)
     })
   }
   return entries
 }
 
-const STAT = "stat --printf '%n\\0%f\\0%s\\0%Y\\0%u\\0%g\\0' --"
+const STAT = "stat --printf '%n\\0%f\\0%s\\0%Y\\0%u\\0%g\\0%U\\0%G\\0' --"
 
 /** Linux SCP/Shell backend. Every command uses the same locally configured identity. */
 export class ScpShell {

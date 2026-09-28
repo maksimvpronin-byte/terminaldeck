@@ -361,7 +361,9 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   GNU `find`, and permission to run the command without an interactive password or
   a TTY. An authorization failure is reported; it never falls back to the SSH user.
   Commands are launched afresh for each operation, so shell state is not shared
-  with the terminal. Select **SFTP** to return to the default file access mode.
+  with the terminal. Owner and group are shown by name, as over SFTP, and by number
+  only where the server has no name for them. Select **SFTP** to return to the default
+  file access mode.
 
 - SFTP browser: multi-select, context menu, rename, delete, mkdir, whole-directory transfers,
   Finder drag-and-drop upload, transfer progress, and auto-refresh
