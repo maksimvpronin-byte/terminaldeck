@@ -93,6 +93,8 @@ export const IPC = {
   sftpList: 'sftp:list',
   sftpRealpath: 'sftp:realpath',
   sftpStat: 'sftp:stat',
+  /** A folder and everything under it, searched by name. */
+  sftpFind: 'sftp:find',
   sftpDownload: 'sftp:download',
   sftpUpload: 'sftp:upload',
   sftpMkdir: 'sftp:mkdir',

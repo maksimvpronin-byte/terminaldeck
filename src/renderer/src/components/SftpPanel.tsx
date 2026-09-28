@@ -1,11 +1,14 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from 'react'
-import type { SftpEntry } from '../../../shared/types'
+import type { FileAccess, SftpEntry, SftpSearchResult } from '../../../shared/types'
+import { nameMatcher } from '../../../shared/fileSearch'
 import { parentOf, segmentsOf } from '../../../shared/remotePath'
 import { formatChanged, formatPermissions, kindOf } from '../../../shared/permissions'
 import { formatSize } from '../../../shared/fileSize'
 import SftpTree from './SftpTree'
 import SftpProgress from './SftpProgress'
+import { CloseIcon } from './icons'
+import { confirmAction } from '../confirm'
 import { useVirtualRows, FILE_ROW_HEIGHT } from '../hooks/useVirtualRows'
 import { useTransfers } from '../hooks/useTransfers'
 import ModalBackdrop from './ModalBackdrop'
@@ -43,6 +46,14 @@ import {
   type ColumnWidths
 } from '../state/sftpLayout'
 import { startWidthDrag } from '../state/dragWidth'
+import { loadSort, nextSort, saveSort, sortEntries, type SftpSort } from '../state/sftpSort'
+
+/**
+ * Past this, opening a file in the editor asks first: a double-click on a
+ * multi-gigabyte log would otherwise start downloading all of it into a
+ * temporary folder, with nothing on screen to say why the editor never came.
+ */
+const EDIT_CONFIRM_SIZE = 50 * 1024 * 1024
 
 interface MenuState {
   x: number
@@ -60,11 +71,26 @@ export default function SftpPanel({
 }): JSX.Element {
   const t = useT()
   const externalEditor = useStore((s) => s.settings.externalEditor)
-  const [fileAccess, setFileAccess] = useState<import('../../../shared/types').FileAccess>()
+  const [fileAccess, setFileAccess] = useState<FileAccess>()
   const [path, setPath] = useState('.')
   /** What is in the path box, which may differ from `path` while being edited. */
   const [draftPath, setDraftPath] = useState('.')
-  const [entries, setEntries] = useState<SftpEntry[]>([])
+  /** The folder as the server listed it; `entries` is what is shown of it. */
+  const [listing, setListing] = useState<SftpEntry[]>([])
+  const [sort, setSort] = useState<SftpSort>(loadSort)
+  /** Narrows the folder on screen as it is typed; Enter searches below it. */
+  const [filter, setFilter] = useState('')
+  /** A search through the folder and its subfolders, shown in place of the listing. */
+  const [found, setFound] = useState<(SftpSearchResult & { query: string }) | null>(null)
+  const [searching, setSearching] = useState(false)
+  /** Counts searches, so the answer to one overtaken by another is dropped. */
+  const searchRef = useRef(0)
+  const filterRef = useRef<HTMLInputElement | null>(null)
+  const entries = useMemo(() => {
+    if (found) return sortEntries(found.entries, sort, true)
+    const matches = nameMatcher(filter)
+    return sortEntries(matches ? listing.filter((e) => matches(e.name)) : listing, sort)
+  }, [listing, found, filter, sort])
   const [error, setError] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
   const [draggedPath, setDraggedPath] = useState<string | null>(null)
@@ -140,6 +166,9 @@ export default function SftpPanel({
     () => () => {
       requestRef.current++
       pendingListsRef.current.clear()
+      searchRef.current++
+      setFound(null)
+      setSearching(false)
     },
     [connectionId]
   )
@@ -186,7 +215,8 @@ export default function SftpPanel({
       if (pathRef.current === cwd) return
       if (visibleRef.current) load(cwd)
       else {
-        setEntries([])
+        setListing([])
+        clearSearch()
         setSelected(new Set())
         pathRef.current = cwd
         setPath(cwd)
@@ -227,10 +257,7 @@ export default function SftpPanel({
         p !== pathRef.current
       )
         return null
-      list.sort(
-        (a, b) => Number(b.isDirectory) - Number(a.isDirectory) || a.name.localeCompare(b.name)
-      )
-      setEntries((previous) =>
+      setListing((previous) =>
         previous.length === list.length &&
         previous.every((e, i) => {
           const next = list[i]
@@ -264,7 +291,11 @@ export default function SftpPanel({
   /** Navigate to a directory. */
   async function load(p: string): Promise<SftpEntry[] | null> {
     navigationRef.current++
-    if (pathRef.current !== p) setEntries([])
+    if (pathRef.current !== p) {
+      setListing([])
+      // A filter or a search belongs to the folder it was typed in.
+      clearSearch()
+    }
     pathRef.current = p
     setPath(p)
     setDraftPath(p)
@@ -318,6 +349,53 @@ export default function SftpPanel({
       const kept = [...prev].filter((p) => alive.has(p))
       return kept.length === prev.size ? prev : new Set(kept)
     })
+  }
+
+  /** Back to the folder's own listing, unfiltered. */
+  function clearSearch(): void {
+    searchRef.current++
+    setFilter('')
+    setFound(null)
+    setSearching(false)
+  }
+
+  /** Looks through the folder on screen and every folder under it. */
+  async function runSearch(query = filter): Promise<void> {
+    if (!connectionId || !query.trim()) return
+    const ticket = ++searchRef.current
+    setSearching(true)
+    setError(null)
+    try {
+      const result = await window.td.sftp.find(connectionId, pathRef.current, query)
+      if (ticket !== searchRef.current) return
+      setFound({ ...result, query })
+      setSelected(new Set())
+      if (rows.ref.current) rows.ref.current.scrollTop = 0
+      rows.measure()
+    } catch (err) {
+      if (ticket === searchRef.current) setError((err as Error).message)
+    } finally {
+      if (ticket === searchRef.current) setSearching(false)
+    }
+  }
+
+  /** After a change made from the panel: the search again, or the folder. */
+  function afterChange(): void {
+    if (found) void runSearch(found.query)
+    else void load(path)
+  }
+
+  function changeSort(key: SftpSort['key']): void {
+    const next = nextSort(sort, key)
+    setSort(next)
+    saveSort(next)
+  }
+
+  /** Where a search result lives, relative to the folder searched. */
+  function foundName(entry: SftpEntry): string {
+    if (!found) return entry.name
+    const prefix = found.root.endsWith('/') ? found.root : `${found.root}/`
+    return entry.path.startsWith(prefix) ? entry.path.slice(prefix.length) : entry.path
   }
 
   useEffect(() => {
@@ -378,7 +456,14 @@ export default function SftpPanel({
   useEffect(() => {
     if (!connectionId) return
     if (!visible) return
-    const busy = transfers.transferring || renaming !== null || newFolder !== null || menu !== null
+    // Paused under search results too: the poll keeps only the selection that
+    // is still in the folder, and a result from a subfolder never is.
+    const busy =
+      transfers.transferring ||
+      renaming !== null ||
+      newFolder !== null ||
+      menu !== null ||
+      found !== null
     if (busy) return
     const id = setInterval(() => refresh(true), 5000)
     return () => clearInterval(id)
@@ -387,7 +472,7 @@ export default function SftpPanel({
     // a new identity every render would restart the five-second clock on every
     // render, which is a poll that never fires.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connectionId, path, visible, transfers.transferring, renaming, newFolder, menu])
+  }, [connectionId, path, visible, transfers.transferring, renaming, newFolder, menu, found])
 
   const wasVisible = useRef(visible)
   useEffect(() => {
@@ -512,6 +597,16 @@ export default function SftpPanel({
   /** Opens the file in the local editor; saves are pushed back automatically. */
   async function edit(entry: SftpEntry): Promise<void> {
     if (!connectionId) return
+    if (
+      entry.size > EDIT_CONFIRM_SIZE &&
+      !confirmAction(
+        t('“{name}” is {size}. Download all of it to open in the editor?', {
+          name: entry.name,
+          size: formatSize(entry.size)
+        })
+      )
+    )
+      return
     setError(null)
     try {
       await window.td.sftp.edit(connectionId, entry.path, externalEditor)
@@ -598,7 +693,7 @@ export default function SftpPanel({
       }
     }
     if (failures.length > 0) setError(failures.join('; '))
-    load(path)
+    afterChange()
   }
 
   async function doRename(): Promise<void> {
@@ -615,7 +710,7 @@ export default function SftpPanel({
       setError((err as Error).message)
     }
     setRenaming(null)
-    load(path)
+    afterChange()
   }
 
   async function doMkdir(): Promise<void> {
@@ -631,7 +726,7 @@ export default function SftpPanel({
       setError((err as Error).message)
     }
     setNewFolder(null)
-    load(path)
+    afterChange()
   }
 
   function sftpMenuItems(targets: SftpEntry[]): MenuItem[] {
@@ -645,6 +740,15 @@ export default function SftpPanel({
     if (only && !only.isDirectory) {
       items.push({ label: t('Edit locally'), onSelect: () => edit(only) })
       items.push({ label: t('Download'), onSelect: () => download(only) })
+    }
+    if (only && found) {
+      items.push({
+        label: t('Show in its folder'),
+        onSelect: () => {
+          clearSearch()
+          void navigateTo(only.path)
+        }
+      })
     }
     if (only) {
       items.push({
@@ -788,6 +892,67 @@ export default function SftpPanel({
           </span>
         ))}
       </div>
+      <div className="sftp-search" onClick={(e) => e.stopPropagation()}>
+        <div className="filter-field">
+          <input
+            ref={filterRef}
+            value={filter}
+            spellCheck={false}
+            placeholder={t('Filter by name · ⏎ searches subfolders too')}
+            title={t(
+              'Typing narrows this folder. Enter looks through every folder under it as well. * and ? match any characters.'
+            )}
+            onChange={(e) => {
+              setFilter(e.target.value)
+              // Results were for what was typed before; the folder is shown
+              // again, narrowed by the new text, until Enter asks once more.
+              if (found || searching) {
+                searchRef.current++
+                setFound(null)
+                setSearching(false)
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void runSearch()
+              if (e.key === 'Escape' && filter) {
+                e.stopPropagation()
+                clearSearch()
+              }
+            }}
+          />
+          {filter && (
+            <button
+              type="button"
+              className="filter-clear"
+              title={t('Clear filter')}
+              aria-label={t('Clear filter')}
+              onClick={() => {
+                clearSearch()
+                filterRef.current?.focus()
+              }}
+            >
+              <CloseIcon />
+            </button>
+          )}
+        </div>
+        <button
+          disabled={!connectionId || !filter.trim() || searching}
+          title={t('Search this folder and every folder under it')}
+          onClick={() => runSearch()}
+        >
+          {searching ? t('Searching…') : t('Subfolders')}
+        </button>
+      </div>
+      {found && (
+        <div className="sftp-found settings-note">
+          {found.truncated
+            ? t('Showing the first {count} found under {path}', {
+                count: found.entries.length,
+                path: found.root
+              })
+            : t('Found {count} under {path}', { count: found.entries.length, path: found.root })}
+        </div>
+      )}
       <div className="sftp-body">
         {treeOpen && (
           <>
@@ -814,8 +979,26 @@ export default function SftpPanel({
         <div className="sftp-list" ref={rows.ref} onScroll={rows.measure}>
           <div className="sftp-head" style={{ minWidth: rowWidth }}>
             {COLUMNS.map(([key, label]) => (
-              <span key={key} className={`head-cell ${key}`} style={col(columns[key])}>
-                {t(label)}
+              <span
+                key={key}
+                className={`head-cell ${key}${sort.key === key ? ' sorted' : ''}`}
+                style={col(columns[key])}
+                aria-sort={
+                  sort.key === key ? (sort.descending ? 'descending' : 'ascending') : undefined
+                }
+              >
+                {/* The label sorts, the grip beside it resizes: a drag that ends
+                    on the label is a click on the cell, never on the label. */}
+                <span
+                  className="head-label"
+                  title={t('Sort by {column}', { column: t(label) })}
+                  onClick={() => changeSort(key)}
+                >
+                  {t(label)}
+                  {sort.key === key && (
+                    <span className="sort-mark">{sort.descending ? '▼' : '▲'}</span>
+                  )}
+                </span>
                 <span
                   className="col-grip"
                   title={t('Drag to resize {column}', { column: t(label) })}
@@ -824,7 +1007,7 @@ export default function SftpPanel({
               </span>
             ))}
           </div>
-          {path !== '.' && path !== '/' && (
+          {!found && path !== '.' && path !== '/' && (
             <div
               className="sftp-row"
               style={{ minWidth: rowWidth }}
@@ -869,11 +1052,13 @@ export default function SftpPanel({
                   onDragOver={e.isDirectory ? (ev) => onFolderDragOver(ev, e) : undefined}
                   onClick={(ev) => onRowClick(ev, e)}
                   onContextMenu={(ev) => onRowContextMenu(ev, e)}
-                  onDoubleClick={() => (e.isDirectory ? load(e.path) : download(e))}
+                  onDoubleClick={() => (e.isDirectory ? load(e.path) : edit(e))}
                   title={
                     e.isDirectory
                       ? t('Double-click to open, or drag onto another host’s panel to copy')
-                      : t('Double-click to download, or drag onto another host’s panel to copy')
+                      : t(
+                          'Double-click to open in the editor, or drag onto another host’s panel to copy'
+                        )
                   }
                 >
                   {renaming?.entry.path === e.path ? (
@@ -894,9 +1079,9 @@ export default function SftpPanel({
                       <span
                         className={`name kind-${kindOf(e)}`}
                         style={col(columns.name)}
-                        title={e.name}
+                        title={found ? e.path : e.name}
                       >
-                        {e.isDirectory ? '📁' : '📄'} {e.name}
+                        {e.isDirectory ? '📁' : '📄'} {foundName(e)}
                         {editing.has(e.path) && (
                           <span
                             className="no-inherit"

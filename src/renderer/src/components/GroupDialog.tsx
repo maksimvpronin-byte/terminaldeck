@@ -22,6 +22,10 @@ import { useStore } from '../state/store'
 import AppearanceFields from './AppearanceFields'
 import AuthFields, { type AuthWords } from './AuthFields'
 import RdpFields from './RdpFields'
+import FileAccessFields from './FileAccessFields'
+import CollectionFields from './CollectionFields'
+import { changedCollections, membershipsOf, type Membership } from '../state/membership'
+import { descendsFrom } from '../../../shared/groups'
 import ModalBackdrop from './ModalBackdrop'
 import { useT } from '../i18n'
 import Hint from './Hint'
@@ -49,6 +53,10 @@ export default function GroupDialog({
   const credentials = useStore((s) => s.credentials)
   const settings = useStore((s) => s.settings)
   const upsertGroup = useStore((s) => s.upsertGroup)
+  const sessions = useStore((s) => s.sessions)
+  const gitFolderTrees = useStore((s) => s.gitFolderTrees)
+  const collections = useStore((s) => s.collections)
+  const upsertCollection = useStore((s) => s.upsertCollection)
   /**
    * Repositories already in use. The same inventory regularly holds production
    * in one file and staging in another, so the second folder on it should be a
@@ -75,6 +83,27 @@ export default function GroupDialog({
   const [rdpSecret, setRdpSecret] = useState('')
   const [forgetRdpSecret, setForgetRdpSecret] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /**
+   * Every host in this group as it stands, subgroups and what folders inside
+   * mirror from git included — what ticking a collection below puts into it.
+   * Taken once, when the dialog opens: a sync finishing meanwhile must not
+   * change what the ticks were shown against.
+   */
+  const [hostIds] = useState<string[]>(() =>
+    initial
+      ? [
+          ...sessions
+            .filter((s) => s.groupId && descendsFrom(groups, s.groupId, initial.id))
+            .map((s) => s.id),
+          ...gitFolderTrees
+            .filter((tree) => descendsFrom(groups, tree.groupId, initial.id))
+            .flatMap((tree) => tree.sessions.map((s) => s.id))
+        ]
+      : []
+  )
+  const [memberOf, setMemberOf] = useState<Record<string, Membership>>(() =>
+    membershipsOf(collections, hostIds)
+  )
 
   function set<K extends keyof SessionGroup>(key: K, value: SessionGroup[K]): void {
     setGroup((g) => ({ ...g, [key]: value }))
@@ -175,6 +204,13 @@ export default function GroupDialog({
       setError(t('Name is required'))
       return
     }
+    if (
+      group.fileAccess?.protocol === 'scp' &&
+      (!group.fileAccess.shell?.trim() || /[\r\n\0]/.test(group.fileAccess.shell))
+    ) {
+      setError(t('Enter a single-line shell launch command.'))
+      return
+    }
     if (linked && !link?.repoUrl.trim()) {
       setError(t('A repository address is required'))
       return
@@ -198,6 +234,9 @@ export default function GroupDialog({
         gatewaySecret || (forgetGatewaySecret ? null : undefined),
         rdpSecret || (forgetRdpSecret ? null : undefined)
       )
+      for (const collection of changedCollections(collections, hostIds, memberOf)) {
+        await upsertCollection(collection)
+      }
     } catch (err) {
       setError((err as Error).message)
       return
@@ -388,6 +427,20 @@ export default function GroupDialog({
             />
             {t('SFTP panel follows the terminal’s directory')}
           </label>
+
+          {/* The file panel's way in, for every SSH host inside: a folder of
+              database servers all reached through `sudo -u postgres` says so
+              once, here, instead of on each host. */}
+          <FileAccessFields
+            value={group.fileAccess}
+            inherited={
+              resolveAuth({}, standsAlone ? null : group.parentId, groups, { credentials })
+                .fileAccess
+            }
+            canInherit={Boolean(group.parentId) && !standsAlone}
+            inheritedFrom={from('fileAccess')}
+            onChange={(value) => set('fileAccess', value)}
+          />
         </details>
 
         <details
@@ -607,6 +660,15 @@ export default function GroupDialog({
             </p>
           )}
         </details>
+
+        {hostIds.length > 0 && (
+          <CollectionFields
+            collections={collections}
+            value={memberOf}
+            onChange={setMemberOf}
+            forGroup
+          />
+        )}
 
         <details className="settings-section">
           <summary>

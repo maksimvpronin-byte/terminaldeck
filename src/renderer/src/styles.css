@@ -1360,6 +1360,32 @@ label {
 .sftp-crumbs .crumb-sep {
   color: var(--text-dim);
 }
+/* The filter box and its "search below" button, under the breadcrumbs. */
+.sftp-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.sftp-search .filter-field {
+  flex: 1;
+  min-width: 0;
+}
+.sftp-search .filter-field > input {
+  height: 22px;
+  font-size: 11px;
+}
+.sftp-search > button {
+  padding: 1px 7px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.sftp-found {
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
 .sftp-path button {
   padding: 1px 7px;
   font-size: 12px;
@@ -1406,6 +1432,21 @@ label {
 }
 /* Inside the cell, not overhanging it: the cell clips its label, and an
    overhanging grip would be clipped with it. */
+/* The whole cell sorts, bar the grip laid over its right edge. */
+.sftp-head .head-label {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.sftp-head .head-label:hover,
+.sftp-head .sorted .head-label {
+  color: var(--text);
+}
+.sftp-head .sort-mark {
+  margin-left: 3px;
+  font-size: 8px;
+}
 .sftp-head .col-grip {
   position: absolute;
   top: 0;
@@ -1901,6 +1942,15 @@ textarea:focus {
   gap: 6px;
   flex-direction: row;
   color: var(--text);
+}
+/* The collections a host or group is in, one tick per set. */
+.collection-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.collection-checks .session-dot {
+  margin-right: 0;
 }
 .modal-actions {
   display: flex;

@@ -12,7 +12,7 @@ import { isGitNode, gitFolderLayout } from '../../../shared/gitFolders'
 import { protocolOf } from '../../../shared/protocols'
 import { duplicateProfile } from '../../../shared/duplicate'
 import { colourOf } from '../../../shared/hostColour'
-import { CloseIcon, DesktopIcon, TerminalIcon } from './icons'
+import { CloseIcon, CollapseAllIcon, DesktopIcon, ExpandAllIcon, TerminalIcon } from './icons'
 import { groupIndent, hostIndent } from './treeIndent'
 import { Chevron, FolderIcon, TreeChildren, togglesFolder } from './TreeToggle'
 import {
@@ -246,6 +246,18 @@ export default function Sidebar({
   /** The mirrored host whose local settings are being edited. */
   const [overriding, setOverriding] = useState<SessionProfile | SessionGroup | null>(null)
 
+  /**
+   * Every folder opened or closed at once — the collections below the groups
+   * too, which the panel that draws them is told through `fold`.
+   */
+  const [fold, setFold] = useState<{ open: boolean; at: number } | null>(null)
+  function foldAll(open: boolean): void {
+    const next = new Set(open ? [] : groups.map((g) => g.id))
+    localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...next]))
+    setCollapsed(next)
+    setFold({ open, at: Date.now() })
+  }
+
   function toggleCollapsed(groupId: string): void {
     setCollapsed((prev) => {
       const next = new Set(prev)
@@ -390,6 +402,35 @@ export default function Sidebar({
     return index.get(groupId) ?? []
   }
 
+  /**
+   * Folders shown whole while searching: those whose own name matches, and
+   * everything inside them. Looking for "prod" should bring up the Prod
+   * folder with what is in it, not only the hosts that happen to say prod.
+   */
+  const wholeGroups = useMemo(() => {
+    const whole = new Set<string>()
+    if (!needle) return whole
+    const byId = new Map(groups.map((g) => [g.id, g]))
+    for (const g of groups) {
+      const seen = new Set<string>()
+      let cursor: SessionGroup | undefined = g
+      while (cursor && !seen.has(cursor.id)) {
+        if (cursor.name.toLowerCase().includes(needle)) {
+          whole.add(g.id)
+          break
+        }
+        seen.add(cursor.id)
+        cursor = cursor.parentId ? byId.get(cursor.parentId) : undefined
+      }
+    }
+    return whole
+  }, [needle, groups])
+
+  /** The hosts drawn under a folder: all of them in a folder shown whole. */
+  function shownIn(groupId: string): SessionProfile[] {
+    return hostsIn(groupId, wholeGroups.has(groupId) ? sessions : visible)
+  }
+
   /** Groups holding a match somewhere below them, once per search. */
   const matchingGroups = useMemo(() => {
     const found = new Map<string, boolean>()
@@ -399,7 +440,7 @@ export default function Sidebar({
       if (known !== undefined) return known
       // Settled as "no" before looking down, so a loop in a broken tree ends.
       found.set(groupId, false)
-      let match = (visibleByGroup.get(groupId)?.length ?? 0) > 0
+      let match = wholeGroups.has(groupId) || (visibleByGroup.get(groupId)?.length ?? 0) > 0
       for (const child of childrenOf.get(groupId) ?? []) {
         if (visit(child.id)) match = true
       }
@@ -408,7 +449,7 @@ export default function Sidebar({
     }
     for (const g of groups) visit(g.id)
     return found
-  }, [needle, visibleByGroup, childrenOf, groups])
+  }, [needle, visibleByGroup, childrenOf, groups, wholeGroups])
 
   const rootSessions = visible.filter((s) => s.groupId === null)
 
@@ -419,7 +460,7 @@ export default function Sidebar({
       (g) => !needle || groupHasMatch(g.id)
     )) {
       if (needle === '' && collapsed.has(g.id)) continue
-      out.push(...hostsIn(g.id, visible).map((s) => s.id))
+      out.push(...shownIn(g.id).map((s) => s.id))
       out.push(...flattenOrder(g.id))
     }
     return [...new Set(out)]
@@ -901,7 +942,7 @@ export default function Sidebar({
       .map((g) => {
         // While filtering, stay expanded — matches must not hide inside a closed group.
         const isCollapsed = needle === '' && collapsed.has(g.id)
-        const childCount = hostsIn(g.id, visible).length + (childrenOf.get(g.id)?.length ?? 0)
+        const childCount = shownIn(g.id).length + (childrenOf.get(g.id)?.length ?? 0)
         const isSyncing = gitSyncing.includes(g.id)
         const colour = colourOf(g, g.parentId, groups)
 
@@ -978,7 +1019,7 @@ export default function Sidebar({
             )}
             {!isCollapsed && (
               <TreeChildren indent={groupIndent(depth)}>
-                {hostsIn(g.id, visible).map((s) => renderSession(s, hostIndent(depth)))}
+                {shownIn(g.id).map((s) => renderSession(s, hostIndent(depth)))}
                 {renderGroups(g.id, depth + 1)}
               </TreeChildren>
             )}
@@ -1035,7 +1076,9 @@ export default function Sidebar({
         <div className="filter-field">
           <input
             ref={queryRef}
-            placeholder={tab === 'sessions' ? t('Filter hosts…') : t('Filter inventory…')}
+            placeholder={
+              tab === 'sessions' ? t('Filter hosts and groups…') : t('Filter inventory…')
+            }
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
@@ -1082,6 +1125,22 @@ export default function Sidebar({
             <button style={{ flex: 1 }} onClick={() => setShowQuickConnect(true)}>
               {t('Quick connect…')}
             </button>
+            <button
+              className="icon-button"
+              title={t('Expand all')}
+              aria-label={t('Expand all')}
+              onClick={() => foldAll(true)}
+            >
+              <ExpandAllIcon />
+            </button>
+            <button
+              className="icon-button"
+              title={t('Collapse all')}
+              aria-label={t('Collapse all')}
+              onClick={() => foldAll(false)}
+            >
+              <CollapseAllIcon />
+            </button>
           </div>
           <div className="sidebar-tree">
             {renderGroups(null, 0)}
@@ -1098,7 +1157,7 @@ export default function Sidebar({
                 {t('No saved sessions yet. Click "+ Session" to add one.')}
               </div>
             )}
-            {needle !== '' && visible.length === 0 && (
+            {needle !== '' && visible.length === 0 && wholeGroups.size === 0 && (
               <div style={{ padding: 12, color: 'var(--text-dim)', fontSize: 12 }}>
                 Nothing matches “{query}”.
               </div>
@@ -1119,7 +1178,7 @@ export default function Sidebar({
 
             {/* Custom sets live in the same tree as the groups, below them: they are
             another way of grouping the very same hosts, not a separate place. */}
-            <CollectionsPanel query={query} />
+            <CollectionsPanel query={query} fold={fold} />
           </div>
         </>
       )}

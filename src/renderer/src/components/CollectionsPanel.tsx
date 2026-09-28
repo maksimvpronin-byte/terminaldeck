@@ -23,7 +23,14 @@ function loadCollapsed(): Set<string> {
   }
 }
 
-export default function CollectionsPanel({ query }: { query: string }): JSX.Element {
+export default function CollectionsPanel({
+  query,
+  fold = null
+}: {
+  query: string
+  /** The tree's "expand all" or "collapse all", stamped so a repeat still acts. */
+  fold?: { open: boolean; at: number } | null
+}): JSX.Element {
   const t = useT()
   const collections = useStore((s) => s.collections)
   const loadCollections = useStore((s) => s.loadCollections)
@@ -57,6 +64,13 @@ export default function CollectionsPanel({ query }: { query: string }): JSX.Elem
   useEffect(() => {
     loadCollections()
   }, [loadCollections])
+
+  useEffect(() => {
+    if (!fold) return
+    const next = new Set(fold.open ? [] : useStore.getState().collections.map((c) => c.id))
+    localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...next]))
+    setCollapsed(next)
+  }, [fold])
 
   const connected = new Set(allRoots({ workspaces }).flatMap(collectConnectedSessionIds))
   const needle = query.trim().toLowerCase()

@@ -164,16 +164,15 @@ export class ScpShell {
     return { channel, done, reader: new Reader(channel, () => diagnostic.trim()) }
   }
 
-  private async capture(command: string): Promise<Buffer> {
+  private async capture(
+    command: string,
+    timeout = {
+      ms: 30_000,
+      message: 'SCP/Shell command timed out; interactive sudo passwords are not supported'
+    }
+  ): Promise<Buffer> {
     const { channel, done } = await this.open(command)
-    const timer = setTimeout(
-      () =>
-        channel.emit(
-          'error',
-          new Error('SCP/Shell command timed out; interactive sudo passwords are not supported')
-        ),
-      30_000
-    )
+    const timer = setTimeout(() => channel.emit('error', new Error(timeout.message)), timeout.ms)
     try {
       const chunks: Buffer[] = []
       let size = 0
@@ -201,6 +200,29 @@ export class ScpShell {
     return parseShellStats(
       await this.capture(`find ${shellQuote(absolute)} -mindepth 1 -maxdepth 1 -exec ${STAT} {} +`)
     )
+  }
+  /**
+   * Everything under `path` whose name matches `glob`, case ignored — one
+   * `find` on the server rather than a listing per folder.
+   *
+   * Folders it may not read are passed over rather than failing the search,
+   * which is why errors are discarded and the exit status ignored: `find`
+   * answers 1 for a single unreadable folder among a thousand good ones. One
+   * more than the limit is asked for, so a cut can be told from an exact fit.
+   */
+  async find(
+    path: string,
+    glob: string,
+    limit: number
+  ): Promise<{ root: string; entries: SftpEntry[]; truncated: boolean }> {
+    const root = await this.realpath(path)
+    const output = await this.capture(
+      `find ${shellQuote(root)} -mindepth 1 -iname ${shellQuote(glob)} -print0 2>/dev/null` +
+        ` | head -z -n ${limit + 1} | xargs -0 -r ${STAT} 2>/dev/null; exit 0`,
+      { ms: 60_000, message: 'The search took longer than a minute; search a smaller folder' }
+    )
+    const entries = parseShellStats(output)
+    return { root, entries: entries.slice(0, limit), truncated: entries.length > limit }
   }
   async statPath(path: string, follow = false): Promise<SftpEntry | null> {
     try {

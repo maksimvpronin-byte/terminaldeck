@@ -363,7 +363,9 @@ export default function InventoryOverrideDialog({
 
         {traits.files && (
           <FileAccessFields
-            value={auth.effective.fileAccess}
+            value={override.fileAccess}
+            inherited={fromRepo.fileAccess}
+            canInherit
             onChange={(value) => set('fileAccess', value)}
           />
         )}

@@ -172,7 +172,9 @@ describe('what the tree holds', () => {
     })
     render(<Sidebar onOpenSnippets={() => {}} onOpenHelp={() => {}} />)
 
-    fireEvent.change(screen.getByPlaceholderText('Filter hosts…'), { target: { value: 'deep' } })
+    fireEvent.change(screen.getByPlaceholderText('Filter hosts and groups…'), {
+      target: { value: 'deep' }
+    })
 
     expect(screen.getByText('outer')).toBeTruthy()
     expect(screen.getByText('inner')).toBeTruthy()
@@ -228,7 +230,7 @@ describe('the host filter', () => {
 
   it('offers a cross only while something is typed, and the cross empties it', () => {
     withHosts()
-    const field = screen.getByPlaceholderText('Filter hosts…') as HTMLInputElement
+    const field = screen.getByPlaceholderText('Filter hosts and groups…') as HTMLInputElement
     expect(screen.queryByRole('button', { name: 'Clear filter' })).toBeNull()
 
     fireEvent.change(field, { target: { value: 'web' } })
@@ -243,7 +245,7 @@ describe('the host filter', () => {
 
   it('empties on Escape too', () => {
     withHosts()
-    const field = screen.getByPlaceholderText('Filter hosts…') as HTMLInputElement
+    const field = screen.getByPlaceholderText('Filter hosts and groups…') as HTMLInputElement
     fireEvent.change(field, { target: { value: 'web' } })
     fireEvent.keyDown(field, { key: 'Escape' })
     expect(field.value).toBe('')
@@ -294,5 +296,64 @@ describe('folders in the tree', () => {
     useStore.setState({
       settings: { ...useStore.getState().settings, expandOnArrowOnly: false }
     })
+  })
+})
+
+/**
+ * Searching by a folder's name, and opening or closing every folder at once.
+ * The filter used to look at hosts alone, so typing the name of the folder
+ * you could see in the tree made it vanish.
+ */
+describe('finding and folding folders', () => {
+  const group = (id: string, parentId: string | null) =>
+    ({ id, name: id, parentId }) as SessionGroup
+
+  function setTree(): void {
+    localStorage.clear()
+    useStore.setState({
+      groups: [group('prod', null), group('db', 'prod'), group('stage', null)],
+      sessions: [
+        host({ id: 'h1', name: 'web-1', groupId: 'prod' }),
+        host({ id: 'h2', name: 'pg-1', groupId: 'db' }),
+        host({ id: 'h3', name: 'web-2', groupId: 'stage' })
+      ],
+      collections: [],
+      inventoryTrees: [],
+      gitFolderTrees: [],
+      gitFolderOverrides: [],
+      inventoryOverrides: []
+    })
+  }
+
+  it('shows a folder whose name matches with everything in it', () => {
+    setTree()
+    render(<Sidebar onOpenSnippets={() => {}} onOpenHelp={() => {}} />)
+
+    fireEvent.change(screen.getByPlaceholderText('Filter hosts and groups…'), {
+      target: { value: 'PROD' }
+    })
+
+    expect(screen.getByText('prod')).toBeTruthy()
+    expect(screen.getByText('web-1')).toBeTruthy()
+    expect(screen.getByText('db')).toBeTruthy()
+    expect(screen.getByText('pg-1')).toBeTruthy()
+    expect(screen.queryByText('stage')).toBeNull()
+    expect(screen.queryByText('web-2')).toBeNull()
+  })
+
+  it('closes and opens every folder at once', () => {
+    setTree()
+    render(<Sidebar onOpenSnippets={() => {}} onOpenHelp={() => {}} />)
+    expect(screen.getByText('pg-1')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse all' }))
+    expect(screen.queryByText('web-1')).toBeNull()
+    expect(screen.queryByText('db')).toBeNull()
+    expect(screen.getByText('stage')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand all' }))
+    expect(screen.getByText('web-1')).toBeTruthy()
+    expect(screen.getByText('pg-1')).toBeTruthy()
+    expect(screen.getByText('web-2')).toBeTruthy()
   })
 })

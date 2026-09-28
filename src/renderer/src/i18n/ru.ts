@@ -226,8 +226,22 @@ export const ru: Record<string, string> = {
     'Настройка хоста или группы решает только то, как начнётся новое соединение',
   'Toggle one file, or extend the selection to a range':
     'Переключить один файл или растянуть выделение до диапазона',
-  'Double-click opens a folder or downloads a file':
-    'Двойной клик открывает папку или скачивает файл',
+  'Double-click opens a folder, or a file in your editor':
+    'Двойной клик открывает папку, а файл — в вашем редакторе',
+  'Click a column heading to sort by it, and again to reverse the order':
+    'Щелчок по заголовку столбца сортирует по нему, повторный — в обратном порядке',
+  'The box under the path narrows the folder as you type; * and ? work':
+    'Поле под путём сужает список папки по мере ввода; * и ? работают',
+  '⏎ in it searches every folder below as well, and shows where each result is':
+    '⏎ в нём ищет и во всех вложенных папках и показывает, где лежит каждый результат',
+  'SCP / Shell can be set on a group, for every SSH host inside it':
+    'SCP / Shell можно задать на группе — для всех SSH-хостов в ней',
+  'The filter matches group names too, and shows a matching group whole':
+    'Фильтр ищет и по именам групп, а подходящую группу показывает целиком',
+  'The arrows beside Quick connect open or close every folder at once':
+    'Стрелки рядом с «Быстрым подключением» разом разворачивают или сворачивают все папки',
+  'Or tick them under Collections in a host’s settings, or a whole group’s':
+    'Или отметьте наборы в настройках хоста — или сразу всей группы',
   'Right-click to download, rename, delete, or make a folder':
     'Правый клик — скачать, переименовать, удалить или создать папку',
   '"Edit locally" opens a file in your editor and uploads it on every save':
@@ -334,7 +348,7 @@ export const ru: Record<string, string> = {
   'New subgroup…': 'Новая подгруппа…',
   'New session here': 'Новая сессия здесь',
   'New collection…': 'Новый набор…',
-  'Filter hosts…': 'Фильтр хостов…',
+  'Filter hosts and groups…': 'Фильтр хостов и групп…',
   'Filter inventory…': 'Фильтр инвентаря…',
   'Lock vault (⌘L)': 'Заблокировать хранилище (⌘L)',
   'Shortcuts and features (⌘/)': 'Сочетания клавиш и возможности (⌘/)',
@@ -392,6 +406,8 @@ export const ru: Record<string, string> = {
   'New workspace': 'Новая рабочая область',
   Inventory: 'Инвентарь',
   'Quick connect…': 'Быстрое подключение…',
+  'Expand all': 'Развернуть все',
+  'Collapse all': 'Свернуть все',
   Snippets: 'Сниппеты',
   Broadcast: 'Трансляция',
   'A gateway says where a machine lives rather than who you are on it, so it is usually stated once on a group and left blank below. Blank reaches the host directly.':
@@ -714,6 +730,10 @@ export const ru: Record<string, string> = {
   ', and {secrets} credentials': ', учётных данных — {secrets}',
 
   // The file browser
+  Size: 'Размер',
+  Changed: 'Изменён',
+  Rights: 'Права',
+  Owner: 'Владелец',
   Open: 'Открыть',
   'Download folder…': 'Скачать папку…',
   'Edit locally': 'Редактировать локально',
@@ -744,8 +764,20 @@ export const ru: Record<string, string> = {
   'Drag to resize {column}': 'Потяните, чтобы изменить ширину столбца «{column}»',
   'Double-click to open, or drag onto another host’s panel to copy':
     'Двойной щелчок — открыть; перетащите на панель другого хоста, чтобы скопировать',
-  'Double-click to download, or drag onto another host’s panel to copy':
-    'Двойной щелчок — скачать; перетащите на панель другого хоста, чтобы скопировать',
+  'Double-click to open in the editor, or drag onto another host’s panel to copy':
+    'Двойной щелчок — открыть в редакторе; перетащите на панель другого хоста, чтобы скопировать',
+  '“{name}” is {size}. Download all of it to open in the editor?':
+    '«{name}» занимает {size}. Скачать его целиком, чтобы открыть в редакторе?',
+  'Show in its folder': 'Показать в папке',
+  'Filter by name · ⏎ searches subfolders too': 'Фильтр по имени · ⏎ — искать и в подпапках',
+  'Typing narrows this folder. Enter looks through every folder under it as well. * and ? match any characters.':
+    'Ввод сужает список этой папки. Enter ищет и во всех вложенных папках. * и ? заменяют любые символы.',
+  'Search this folder and every folder under it': 'Искать в этой папке и во всех вложенных',
+  'Searching…': 'Поиск…',
+  Subfolders: 'В подпапках',
+  'Showing the first {count} found under {path}': 'Показаны первые {count} найденных в {path}',
+  'Found {count} under {path}': 'Найдено в {path}: {count}',
+  'Sort by {column}': 'Сортировать по столбцу «{column}»',
   'Open in a local editor; saves upload':
     'Открыт в локальном редакторе; сохранение отправит файл на хост',
   'Mode {mode}': 'Права {mode}',
@@ -812,6 +844,13 @@ export const ru: Record<string, string> = {
 
   // Collections
   'New collection': 'Новый набор',
+  'Puts every host now in this group, subgroups included, into the ticked collections — or takes them out. A host added to the group later is not added on its own.':
+    'Добавляет все хосты, которые сейчас есть в группе и её подгруппах, в отмеченные наборы — или убирает их оттуда. Хост, добавленный в группу позже, сам в набор не попадёт.',
+  'The collections this host is in. A host lives in one group but can be in any number of collections; being in one changes nothing about how it connects.':
+    'Наборы, в которые входит этот хост. Хост лежит в одной группе, но может входить в сколько угодно наборов; на подключение это не влияет.',
+  'No collections yet. Make one with “+” beside Collections in the host tree.':
+    'Наборов пока нет. Создайте набор кнопкой «+» рядом с «Наборами» в дереве хостов.',
+  'Only some of the hosts are in it': 'В набор входит только часть хостов',
   'Edit collection': 'Изменить набор',
   'Delete collection': 'Удалить набор',
   'Remove from collection': 'Убрать из набора',

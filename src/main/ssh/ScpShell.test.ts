@@ -152,6 +152,33 @@ describe.skipIf(!canRun)('SCP over SSH', () => {
   })
 
   it.skipIf(!container && process.platform !== 'linux')(
+    'finds files by name in a folder and every folder under it, up to a limit',
+    async () => {
+      const dir = `${root}/search`
+      await shell.mkdir(dir)
+      await shell.mkdir(`${dir}/a`)
+      await shell.mkdir(`${dir}/a/b`)
+      const source = join(local, 'search-source')
+      writeFileSync(source, 'x')
+      for (const name of ['a/b/Deep.LOG', "top '$(x).log", 'other.txt']) {
+        await shell.upload(source, `${dir}/${name}`)
+      }
+
+      const found = await shell.find(dir, '*.log', 10)
+      expect(found.root).toBe(dir)
+      expect(found.truncated).toBe(false)
+      expect(found.entries.map((e) => e.path).sort()).toEqual([
+        `${dir}/a/b/Deep.LOG`,
+        `${dir}/top '$(x).log`
+      ])
+
+      const cut = await shell.find(dir, '*', 2)
+      expect(cut.entries).toHaveLength(2)
+      expect(cut.truncated).toBe(true)
+    }
+  )
+
+  it.skipIf(!container && process.platform !== 'linux')(
     'lists, resolves, renames, transfers and deletes using the configured identity',
     async () => {
       const name = "folder ' $(touch SHOULD_NOT_EXIST)\nname"

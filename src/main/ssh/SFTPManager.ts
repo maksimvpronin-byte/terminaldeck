@@ -16,9 +16,11 @@ import {
 } from '../../shared/transferPlan'
 import { baseNameOf, joinRemote, parentOf } from '../../shared/remotePath'
 import { parseLongnameOwner } from '../../shared/permissions'
+import { SEARCH_LIMIT, globFor, nameMatcher } from '../../shared/fileSearch'
 import type {
   FileComparison,
   SftpEntry,
+  SftpSearchResult,
   TransferDecisions,
   TransferItem,
   TransferPlan,
@@ -241,6 +243,57 @@ class SFTPManager {
         group: named?.group ?? String(e.attrs.gid ?? '')
       }
     })
+  }
+
+  /**
+   * Everything under `remotePath` whose name matches `query` — see
+   * shared/fileSearch.ts for what matches.
+   *
+   * SCP/Shell hands the whole walk to `find` on the server. SFTP has nothing
+   * of the kind, so the folders are listed here, a few at a time, breadth
+   * first so that what is near the top is found before the walk runs out.
+   * Symlinked folders are not entered, for the reason transfers skip them: one
+   * can loop, or lead out of the tree. A folder that cannot be read is passed
+   * over. The walk stops at the result limit or after a minute, and says so.
+   */
+  async find(connectionId: string, remotePath: string, query: string): Promise<SftpSearchResult> {
+    const shell = this.getShell(connectionId)
+    if (shell) return shell.find(remotePath, globFor(query), SEARCH_LIMIT)
+    const matches = nameMatcher(query)
+    const root = await this.realpath(connectionId, remotePath)
+    if (!matches) return { root, entries: [], truncated: false }
+
+    const deadline = Date.now() + 60_000
+    const entries: SftpEntry[] = []
+    let truncated = false
+    let level = [root]
+    while (level.length > 0 && !truncated) {
+      const next: string[] = []
+      await forEachConcurrent(level, async (dir) => {
+        if (truncated) return
+        if (Date.now() > deadline) {
+          truncated = true
+          return
+        }
+        let listing: SftpEntry[]
+        try {
+          listing = await this.list(connectionId, dir)
+        } catch {
+          return
+        }
+        for (const entry of listing) {
+          if (entry.isDirectory && !entry.isSymlink) next.push(entry.path)
+          if (!matches(entry.name)) continue
+          if (entries.length >= SEARCH_LIMIT) {
+            truncated = true
+            return
+          }
+          entries.push(entry)
+        }
+      })
+      level = next
+    }
+    return { root, entries, truncated }
   }
 
   /**

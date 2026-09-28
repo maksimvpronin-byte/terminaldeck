@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import {
   mkdirSync,
   mkdtempSync,
@@ -12,7 +12,7 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import { PassThrough, Writable } from 'stream'
 import type { SFTPWrapper } from 'ssh2'
-import type { TransferDecisions, TransferItem, TransferPlan } from '../../shared/types'
+import type { SftpEntry, TransferDecisions, TransferItem, TransferPlan } from '../../shared/types'
 
 /**
  * `buildTransferPlan` decides what a transfer would trample and is tested in
@@ -946,5 +946,61 @@ describe('downloading a folder', () => {
     attach('conn', withListing(stubSession([], entries), {}))
 
     await expect(sftpManager.planDownload('conn', '/srv/..', localDir)).rejects.toThrow(/unsafe/i)
+  })
+})
+
+/**
+ * SFTP has no `find`, so a search walks the folders itself. It must go down
+ * into real folders only, pass over one it cannot read, and stop at the limit
+ * rather than listing a whole server into the panel.
+ */
+describe('searching below a folder over SFTP', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  function file(path: string, isDirectory = false, isSymlink = false): SftpEntry {
+    return {
+      name: path.slice(path.lastIndexOf('/') + 1),
+      path,
+      isDirectory,
+      isSymlink,
+      size: 1,
+      mtime: 0,
+      permissions: '644',
+      owner: '',
+      group: ''
+    }
+  }
+
+  const tree: Record<string, SftpEntry[]> = {
+    '/srv': [file('/srv/app.log'), file('/srv/logs', true), file('/srv/loop', true, true)],
+    '/srv/logs': [file('/srv/logs/old.LOG'), file('/srv/logs/locked', true), file('/srv/logs/x')],
+    '/srv/loop': [file('/srv/loop/never.log')]
+  }
+
+  it('finds matches in every real folder below, and skips what it cannot read', async () => {
+    vi.spyOn(sftpManager, 'realpath').mockResolvedValue('/srv')
+    const list = vi.spyOn(sftpManager, 'list').mockImplementation(async (_id, path) => {
+      if (!tree[path]) throw new Error('Permission denied')
+      return tree[path]
+    })
+
+    const found = await sftpManager.find('conn', '.', '*.log')
+
+    expect(found.root).toBe('/srv')
+    expect(found.truncated).toBe(false)
+    expect(found.entries.map((e) => e.path).sort()).toEqual(['/srv/app.log', '/srv/logs/old.LOG'])
+    expect(list).not.toHaveBeenCalledWith('conn', '/srv/loop')
+  })
+
+  it('stops at the limit and says the result was cut', async () => {
+    vi.spyOn(sftpManager, 'realpath').mockResolvedValue('/big')
+    vi.spyOn(sftpManager, 'list').mockResolvedValue(
+      Array.from({ length: 600 }, (_, i) => file(`/big/f${i}.txt`))
+    )
+
+    const found = await sftpManager.find('conn', '/big', 'f')
+
+    expect(found.entries).toHaveLength(500)
+    expect(found.truncated).toBe(true)
   })
 })

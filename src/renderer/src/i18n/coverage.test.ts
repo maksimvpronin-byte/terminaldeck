@@ -73,6 +73,17 @@ function keysAskedFor(): Map<string, string[]> {
         add(match[1].replace(/\\"/g, '"'), file)
       }
     }
+
+    /**
+     * The file panel's column headings, kept as `[key, label]` pairs and put
+     * through `t(label)` — the same shape of problem as the help dialog, and
+     * four of the six had never been translated because of it.
+     */
+    if (file.endsWith('sftpLayout.ts')) {
+      for (const match of text.matchAll(/\[\s*'\w+',\s*'((?:[^'\\]|\\.)*)'\s*\]/g)) {
+        add(match[1], file)
+      }
+    }
   }
   /*
    * And the sentences that are never written in the renderer at all: a failed

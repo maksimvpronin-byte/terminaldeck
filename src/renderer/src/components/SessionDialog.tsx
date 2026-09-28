@@ -9,6 +9,7 @@ import type {
   SessionProfile
 } from '../../../shared/types'
 import { authFieldsState, secretToSave } from '../../../shared/authFields'
+import { resolveAuth } from '../../../shared/authResolution'
 import { isSet } from '../../../shared/overrides'
 import {
   appearanceSource,
@@ -27,6 +28,8 @@ import { useT } from '../i18n'
 import ModalBackdrop from './ModalBackdrop'
 import Hint from './Hint'
 import AccountSelect from './AccountSelect'
+import CollectionFields from './CollectionFields'
+import { changedCollections, membershipsOf, type Membership } from '../state/membership'
 
 interface Props {
   initial?: SessionProfile
@@ -60,6 +63,8 @@ export default function SessionDialog({
   const credentials = useStore((s) => s.credentials)
   const settings = useStore((s) => s.settings)
   const upsertSession = useStore((s) => s.upsertSession)
+  const collections = useStore((s) => s.collections)
+  const upsertCollection = useStore((s) => s.upsertCollection)
 
   const [profile, setProfile] = useState<SessionProfile>(initial ?? blank(defaultGroupId))
   const [secret, setSecret] = useState('')
@@ -71,6 +76,9 @@ export default function SessionDialog({
   const [gatewaySecret, setGatewaySecret] = useState('')
   const [forgetGatewaySecret, setForgetGatewaySecret] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [memberOf, setMemberOf] = useState<Record<string, Membership>>(() =>
+    membershipsOf(collections, [profile.id])
+  )
   const t = useT()
 
   function set<K extends keyof SessionProfile>(key: K, value: SessionProfile[K]): void {
@@ -197,6 +205,9 @@ export default function SessionDialog({
     // dialog simply stayed open with Save doing nothing.
     try {
       await upsertSession(toSave, secretToStore, gatewayToStore)
+      for (const collection of changedCollections(collections, [profile.id], memberOf)) {
+        await upsertCollection(collection)
+      }
     } catch (err) {
       setError((err as Error).message)
       return
@@ -404,7 +415,15 @@ export default function SessionDialog({
 
         {traits.files && (
           <FileAccessFields
-            value={auth.effective.fileAccess}
+            value={profile.fileAccess}
+            inherited={
+              resolveAuth({ ...profile, fileAccess: undefined }, profile.groupId, groups, {
+                protocol: protocolOf(profile),
+                credentials
+              }).fileAccess
+            }
+            canInherit={Boolean(profile.groupId) && profile.inheritAuth !== false}
+            inheritedFrom={inheritNote('fileAccess')}
             onChange={(value) => set('fileAccess', value)}
           />
         )}
@@ -500,6 +519,8 @@ export default function SessionDialog({
           {t('Tags (comma separated)')}
           <input value={tagsInput} onChange={(e) => setTagsInput(e.target.value)} />
         </label>
+
+        <CollectionFields collections={collections} value={memberOf} onChange={setMemberOf} />
 
         {traits.textual && (
           <details className="settings-section">

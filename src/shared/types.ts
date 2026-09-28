@@ -775,3 +775,12 @@ export interface SftpEntry {
   owner: string
   group: string
 }
+
+/** What a search through a folder and everything under it brought back. */
+export interface SftpSearchResult {
+  /** The folder searched, as the server resolved it. */
+  root: string
+  entries: SftpEntry[]
+  /** Stopped early — at the result limit, or the walk took too long. */
+  truncated: boolean
+}

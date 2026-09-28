@@ -157,3 +157,35 @@ export function DesktopIcon(): JSX.Element {
     </svg>
   )
 }
+
+/** Two chevrons pointing apart: every folder in the tree opened. */
+export function ExpandAllIcon(): JSX.Element {
+  return (
+    <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" focusable="false">
+      <path
+        d="M4.5 6 8 2.5 11.5 6M4.5 10 8 13.5 11.5 10"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+/** Two chevrons pointing together: every folder in the tree closed. */
+export function CollapseAllIcon(): JSX.Element {
+  return (
+    <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" focusable="false">
+      <path
+        d="M4.5 2.5 8 6 11.5 2.5M4.5 13.5 8 10 11.5 13.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}

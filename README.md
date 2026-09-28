@@ -95,6 +95,10 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   another goes inside it, which is what dragging a folder has always done — the edges are the new
   part, and half the row still means "inside"
 - The order is the one the store keeps, so it survives a restart, a rename and a move
+- The filter matches **folder names** as well as hosts: a folder whose name matches is shown whole,
+  with everything inside it, so typing the name of an environment brings the environment up
+- **Expand all / Collapse all** beside Quick connect opens or closes every folder at once, the
+  collections below them included
 
 ### Credentials
 
@@ -150,7 +154,9 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
 - **Collections**: hand-picked sets of hosts, listed under the groups in the session tree and
   reopened as a workspace whenever you want them back. Unlike a group, a host can be in any
   number of them, membership has no effect on credentials, and a workspace can be saved as one
-  before you close it. Hosts that later vanish are flagged rather than quietly dropped
+  before you close it. Hosts that later vanish are flagged rather than quietly dropped.
+  Membership is also ticked in a host's own settings, under **Collections** — or in a group's,
+  which puts every host it holds (subgroups included) into a set, or takes them out
 - A collection also carries an **appearance profile** — colour and terminal theme — so a whole
   environment reads as one thing at a glance. It applies **by context**: a host wears the set's
   look where you see it under that set, and where you opened it from that set. The same machine
@@ -344,7 +350,9 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
 - **SCP/Shell as another user (Linux servers):** in the host's settings, under
   **File access**, select **SCP / Shell** and set **Shell launch command** to
   `sudo -n -i -u postgres` (replace `postgres` with the intended account).
-  Reconnect for the change to apply. Git inventory hosts support the same setting
+  Reconnect for the change to apply. A **group** carries the same setting under its SSH
+  half, inherited by every host inside, which can in turn choose **Inherit** or a method
+  of its own. Git inventory hosts support the same setting
   in their local overrides; repositories cannot supply this command. The file
   panel displays the configured command, while the terminal keeps its own login.
   Directory operations and SCP transfers run through that command on separate SSH
@@ -357,6 +365,14 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
 
 - SFTP browser: multi-select, context menu, rename, delete, mkdir, whole-directory transfers,
   Finder drag-and-drop upload, transfer progress, and auto-refresh
+- **Sorting** by any column — click a heading, click again to reverse. Size and date start at the
+  largest and newest; folders stay on top. The order is remembered
+- **Finding files**: the box under the path narrows the folder as you type (`*` and `?` work as
+  in a shell). `⏎` searches every folder below it as well — one `find` on the server over
+  SCP/Shell, a walk through the folders over SFTP — and lists what it found with the path it was
+  found at, up to 500 results. Right-click a result for **Show in its folder**
+- **Double-click a file to open it in your editor**; saves go back to the server. A file over
+  50 MB asks first. Downloading stays in the context menu
 - **Host-to-host copying**: drag files or folders from one open SFTP panel onto another and they
   are streamed across, source socket to destination socket. The two servers need no route to
   each other, and nothing is staged on your disk on the way. Drop onto a folder row to land

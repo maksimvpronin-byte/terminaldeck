@@ -116,6 +116,12 @@ export function registerSftpHandlers(): void {
   handleWhileUnlocked(IPC.sftpStat, (_e, connectionId: string, path: string) =>
     sftpManager.statPath(connectionId, path)
   )
+  handleWhileUnlocked(IPC.sftpFind, (_e, connectionId: string, path: string, query: string) => {
+    isString(connectionId, 'connectionId')
+    isString(path, 'path')
+    isString(query, 'query')
+    return sftpManager.find(connectionId, path, query)
+  })
   handleWhileUnlocked(IPC.sftpMkdir, (_e, connectionId: string, path: string) =>
     sftpManager.mkdir(connectionId, path)
   )

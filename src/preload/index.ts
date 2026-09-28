@@ -8,6 +8,7 @@ import type {
   VaultStatus,
   SessionStoreData,
   SftpEntry,
+  SftpSearchResult,
   SshConfigHost,
   UpdateState,
   Snippet,
@@ -350,6 +351,8 @@ const api = {
       ipcRenderer.invoke(IPC.sftpRealpath, connectionId, path),
     stat: (connectionId: string, path: string): Promise<SftpEntry | null> =>
       ipcRenderer.invoke(IPC.sftpStat, connectionId, path),
+    find: (connectionId: string, path: string, query: string): Promise<SftpSearchResult> =>
+      ipcRenderer.invoke(IPC.sftpFind, connectionId, path, query),
     mkdir: (connectionId: string, path: string): Promise<void> =>
       ipcRenderer.invoke(IPC.sftpMkdir, connectionId, path),
     delete: (connectionId: string, path: string, isDirectory: boolean): Promise<void> =>
