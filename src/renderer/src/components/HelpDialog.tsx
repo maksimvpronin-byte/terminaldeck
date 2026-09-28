@@ -89,7 +89,7 @@ const SECTIONS: Section[] = [
       { keys: '⌘C / ⌘V', what: 'Copy the selection, and paste' },
       {
         keys: 'Ctrl+anything',
-        what: 'Goes to the shell, never to this app: Ctrl+C interrupts, Ctrl+D ends the session, Ctrl+K, Ctrl+W and Ctrl+L do what readline says'
+        what: 'Goes to the shell, never to this app: Ctrl+C interrupts, Ctrl+D ends the session, Ctrl+R, Ctrl+K, Ctrl+W and Ctrl+L do what readline says'
       },
       { what: 'Selecting text copies it straight away; right-click pastes' },
       { what: 'Both of those are switchable in Settings if you prefer a menu' }

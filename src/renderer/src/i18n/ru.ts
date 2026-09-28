@@ -649,8 +649,8 @@ export const ru: Record<string, string> = {
   'Host and username are required': 'Нужно указать адрес и логин',
 
   // Security settings
-  'Goes to the shell, never to this app: Ctrl+C interrupts, Ctrl+D ends the session, Ctrl+K, Ctrl+W and Ctrl+L do what readline says':
-    'Уходит в оболочку, а не в приложение: Ctrl+C прерывает, Ctrl+D завершает сессию, Ctrl+K, Ctrl+W и Ctrl+L делают то, что положено readline',
+  'Goes to the shell, never to this app: Ctrl+C interrupts, Ctrl+D ends the session, Ctrl+R, Ctrl+K, Ctrl+W and Ctrl+L do what readline says':
+    'Уходит в оболочку, а не в приложение: Ctrl+C прерывает, Ctrl+D завершает сессию, Ctrl+R, Ctrl+K, Ctrl+W и Ctrl+L делают то, что положено readline',
   'Lock the vault; it also locks itself after the delay set in Settings → Security':
     'Заблокировать хранилище; оно и само блокируется через срок, заданный в Настройки → Безопасность',
   SFTP: 'SFTP',

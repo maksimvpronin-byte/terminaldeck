@@ -1,7 +1,7 @@
 import { app, dialog, shell, BrowserWindow, Menu, type MenuItemConstructorOptions } from 'electron'
 import { join, resolve } from 'path'
 import { fileURLToPath } from 'url'
-import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { electronApp, is } from '@electron-toolkit/utils'
 import { installSenderCheck } from './ipc/guard'
 import { registerIpcHandlers } from './ipc/handlers'
 import { recoverInterruptedImport } from './store/Backup'
@@ -33,10 +33,13 @@ function buildApplicationMenu(): void {
         /*
          * Reloading is for development. In a build it looks like a harmless
          * refresh and closes every session and desktop in the window, without
-         * asking — the keys for it are already taken away in a build, and the
-         * menu was the way left to do it by accident.
+         * asking, so a build has no menu item and no key for it.
+         *
+         * Only the forced reload, on Cmd/Ctrl+Shift+R: the plain one sits on
+         * Ctrl+R, which a shell uses to search its history, and a menu
+         * accelerator fires before the terminal ever sees the key.
          */
-        ...(is.dev ? [{ role: 'reload' as const }, { role: 'forceReload' as const }] : []),
+        ...(is.dev ? [{ role: 'forceReload' as const }] : []),
         { role: 'toggleDevTools' },
         { type: 'separator' },
         { role: 'togglefullscreen' }
@@ -170,8 +173,8 @@ function createWindow(): void {
      * can actually give it to one.
      *
      * The window can stop its own shortcuts and does, but a menu accelerator
-     * never reaches the window at all — ⌘W is "Close Window" on a Mac, ⌘R
-     * reloads, ⌘Q quits — and preventing the default here is documented to
+     * never reaches the window at all — ⌘W is "Close Window" on a Mac, ⌘M
+     * minimises, ⌘Q quits — and preventing the default here is documented to
      * stop the page events *and* the menu shortcuts. So the key is taken and
      * handed to the session over a channel of its own, which is the same trick
      * the zoom keys below have always needed.
@@ -312,11 +315,13 @@ if (!primaryInstance) {
 app.whenReady().then(() => {
   if (!primaryInstance) return
   electronApp.setAppUserModelId('com.terminaldeck.app')
+  /*
+   * No optimizer.watchWindowShortcuts: in a build it swallowed Cmd/Ctrl+R
+   * outright, before the page, so a shell's history search never reached the
+   * session. What else it did is done here already — the zoom keys in
+   * createWindow, reloading by leaving it out of a build's menu.
+   */
   buildApplicationMenu()
-
-  app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window)
-  })
 
   // Before anything reads a store: an import the application did not live
   // through is put back first.

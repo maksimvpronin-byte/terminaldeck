@@ -181,7 +181,7 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   copy-on-select, right-click paste
 - **`Ctrl` belongs to the shell, on every platform.** Every shortcut here is on `⌘` on a Mac and
   on `Ctrl+Shift` elsewhere — the convention Windows Terminal and MobaXterm follow — so `Ctrl+C`,
-  `Ctrl+D`, `Ctrl+K`, `Ctrl+W`, `Ctrl+L` and `Ctrl+F` reach the far end and mean what readline
+  `Ctrl+D`, `Ctrl+R`, `Ctrl+K`, `Ctrl+W`, `Ctrl+L` and `Ctrl+F` reach the far end and mean what readline
   says they mean. Until 0.10.2 that held on a Mac alone: elsewhere the shortcuts sat on plain
   `Ctrl` and took exactly those keys, so `Ctrl+D` split the pane instead of ending the session.
   Two exceptions, both deliberate: `Ctrl+1 … Ctrl+9` still jump between tabs, since no shell has
