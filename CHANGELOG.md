@@ -6,6 +6,20 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.22.0
+
+### Added
+
+- **A bar over a full-screen desktop**, like the one a Remote Desktop client
+  keeps at the top of the screen: the session's name, **minimise**, **leave
+  full screen** and **close**. Drag it along the top edge out of the way, or
+  onto another display to move the window there, full screen again. A window
+  minimised from it comes back full screen.
+- **Its pin** keeps it on screen, or lets it slide away until the pointer is
+  pushed against the top edge above it. The choice and where the bar was left
+  are remembered. Its labels are drawn by the app itself, so none of them can
+  be left stuck over the screen the way a system tooltip could.
+
 ## 0.21.1
 
 ### Fixed
