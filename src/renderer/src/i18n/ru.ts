@@ -242,6 +242,14 @@ export const ru: Record<string, string> = {
     'Стрелки рядом с «Быстрым подключением» разом разворачивают или сворачивают все папки',
   'Or tick them under Collections in a host’s settings, or a whole group’s':
     'Или отметьте наборы в настройках хоста — или сразу всей группы',
+  'Hosts and groups from git or an inventory tick them in their Local settings':
+    'Хостам и группам из git или инвентаря наборы отмечают в их локальных настройках',
+  'A click on a host already open brings its pane forward':
+    'Клик по уже открытому хосту выводит вперёд его панель',
+  'A double-click still opens a new tab, where you were — in a collection too':
+    'Двойной клик всё равно открывает новую вкладку — там, где вы были, и в наборе тоже',
+  'Or drag a host, the ticked hosts, or a whole folder onto a set — one from git too':
+    'Или перетащите на набор хост, отмеченные хосты или целую папку — в том числе из git',
   'Right-click to download, rename, delete, or make a folder':
     'Правый клик — скачать, переименовать, удалить или создать папку',
   '"Edit locally" opens a file in your editor and uploads it on every save':
@@ -360,8 +368,9 @@ export const ru: Record<string, string> = {
   'Leave empty to type it when the desktop opens':
     'Можно оставить пустым и ввести при открытии рабочего стола',
   'Does not inherit settings from its group': 'Не наследует настройки группы',
-  'Double-click to connect · drag to sort or to move between groups':
-    'Двойной клик — подключиться · перетаскивание — порядок или перенос между группами',
+  'Double-click to connect · drag to sort, to move between groups or into a collection':
+    'Двойной клик — подключиться · перетаскивание — порядок, перенос между группами или в набор',
+  '{name} and {count} more': '{name} и ещё {count}',
   'Each in its own tab, in the current workspace':
     'Каждый в своей вкладке, в текущей рабочей области',
   'Import from ~/.ssh/config': 'Импорт из ~/.ssh/config',
@@ -1149,6 +1158,9 @@ export const ru: Record<string, string> = {
   'Ticking a group takes its subgroups too. Only what is ticked appears in “{folder}” — anything untied here is left in the repository, not deleted from it.':
     'Отметка на группе берёт и её подгруппы. В «{folder}» попадает только отмеченное — снятое здесь остаётся в репозитории, а не удаляется из него.',
   'This repository holds no groups.': 'В этом репозитории нет групп.',
+  'Include hosts of child groups': 'Учитывать хосты дочерних групп',
+  'A group also brings the hosts of every group beneath it, the way Ansible counts them — including a child whose hosts are listed elsewhere in the inventory.':
+    'Группа берёт и хосты всех вложенных в неё групп, как их считает Ansible, — даже если хосты дочерней группы перечислены в другом месте инвентаря.',
   'Arrange hosts in group folders': 'Разложить хосты по папкам групп',
   'Keep the selected group hierarchy inside this folder. Hosts belonging to several groups appear in each of them.':
     'Сохранить вложенность выбранных групп внутри этой папки. Хосты из нескольких групп будут видны в каждой из них.',
@@ -1182,8 +1194,8 @@ export const ru: Record<string, string> = {
     'Сохранение отвяжет эту папку: отражённые хосты исчезнут вместе с локальными настройками и сохранёнными для них паролями. Сам репозиторий не трогается.',
   'Reset local settings': 'Сбросить локальные настройки',
   'Sync with git…': 'Синхронизировать с git…',
-  'From the repository this folder mirrors · double-click to connect':
-    'Из репозитория, который отражает эта папка · двойной клик — подключиться',
+  'From the repository this folder mirrors · double-click to connect · drag into a collection':
+    'Из репозитория, который отражает эта папка · двойной клик — подключиться · перетащите в набор, чтобы добавить',
   'Settings kept here, over what the repository says':
     'Настройки, которые хранятся здесь поверх того, что говорит репозиторий',
   'Reading the repository…': 'Читаем репозиторий…',
@@ -1208,6 +1220,8 @@ export const ru: Record<string, string> = {
     'Появившиеся с прошлого раза группы приходят отмеченными и с пометкой «новая»',
   'A subgroup you untick stays unticked — it is not offered again as new':
     'Снятая вами подгруппа остаётся снятой — как новую её больше не предлагают',
+  'Include hosts of child groups: a group brings every host beneath it, children found by name as Ansible does':
+    '«Учитывать хосты дочерних групп»: группа берёт все хосты под собой, дочерние группы ищутся по имени, как у Ansible',
   'What has left the repository leaves the folder, and the dialog says what goes':
     'Ушедшее из репозитория уходит из папки, и диалог говорит, что именно',
   'Local settings and passwords kept for a host that goes are deleted with it':
@@ -1225,8 +1239,8 @@ export const ru: Record<string, string> = {
     'Однажды использованный репозиторий предлагается всем папкам, созданным потом',
   'Two folders on one repository share a clone and read their own paths from it':
     'Две папки на одном репозитории делят клон и читают из него свои пути',
-  'Drag by the edge of a row to sort · drop onto a folder to put it inside':
-    'Тяните за край строки, чтобы отсортировать · бросьте на папку, чтобы вложить внутрь',
+  'Drag by the edge of a row to sort · drop onto a folder to put it inside · onto a collection to add its hosts':
+    'Тяните за край строки, чтобы отсортировать · бросьте на папку, чтобы вложить внутрь · на набор — добавить в него её хосты',
   'A group sorts the same way: its edges are the gaps, its middle means inside':
     'Группа сортируется так же: края строки — это промежутки, середина означает «внутрь»',
   '{user}, the account on this machine': '{user} — учётная запись на этой машине',

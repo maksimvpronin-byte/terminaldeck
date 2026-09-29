@@ -125,11 +125,31 @@ describe('a Sessions folder mirroring a repository', () => {
 
   it('persists the folder layout and restores it in the next sync preview', async () => {
     await gitFolderStore.preview(FOLDER)
-    gitFolderStore.apply(FOLDER, ['all', 'all/prod'], forget, true)
+    gitFolderStore.apply(FOLDER, ['all', 'all/prod'], forget, { showGroupFolders: true })
     expect(linkNow().showGroupFolders).toBe(true)
     expect((await gitFolderStore.preview(FOLDER)).showGroupFolders).toBe(true)
-    gitFolderStore.apply(FOLDER, ['all', 'all/prod'], forget, false)
+    gitFolderStore.apply(FOLDER, ['all', 'all/prod'], forget, { showGroupFolders: false })
     expect(linkNow().showGroupFolders).toBe(false)
+  })
+
+  it('takes the hosts of child groups when asked, and remembers it', async () => {
+    const preview = await gitFolderStore.preview(FOLDER)
+    expect(preview.groups.find((g) => g.path === 'all')).toMatchObject({
+      hostCount: 0,
+      hostCountWithChildren: 3
+    })
+
+    const alone = gitFolderStore.apply(FOLDER, ['all'], forget)
+    expect(alone.sessions).toEqual([])
+
+    await gitFolderStore.preview(FOLDER)
+    const tree = gitFolderStore.apply(FOLDER, ['all'], forget, { includeChildHosts: true })
+    expect(tree.sessions.map((s) => s.name).sort()).toEqual(['db1', 'dev1', 'web1'])
+    expect(linkNow().includeChildHosts).toBe(true)
+    expect((await gitFolderStore.preview(FOLDER)).includeChildHosts).toBe(true)
+
+    // Put back as the tests after this one expect to find it.
+    gitFolderStore.apply(FOLDER, ['all', 'all/prod'], forget, { includeChildHosts: false })
   })
 
   it('resolves a host through the repository groups and on into the folder', () => {

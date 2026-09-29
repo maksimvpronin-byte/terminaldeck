@@ -21,7 +21,8 @@ import {
   activeTab as currentTab,
   allRoots
 } from '../state/store'
-import { DRAG_MIME, type DragItem } from '../state/dnd'
+import { DRAG_MIME, HOSTS_MIME, type DragItem } from '../state/dnd'
+import { currentPlace, returnTo, type Place } from '../state/clickPlace'
 import { findPane } from '../state/paneTree'
 import { dropSide, dropZone } from '../state/dropZone'
 import SessionDialog from './SessionDialog'
@@ -210,6 +211,8 @@ export default function Sidebar({
   const [multiConnecting, setMultiConnecting] = useState<SessionProfile | null>(null)
   const [query, setQuery] = useState('')
   const queryRef = useRef<HTMLInputElement | null>(null)
+  /** Where a host's first click found the window — see `state/clickPlace`. */
+  const clickedFrom = useRef<Place | null>(null)
   const [groupDialog, setGroupDialog] = useState<{
     group?: SessionGroup
     parentId: string | null
@@ -479,6 +482,10 @@ export default function Sidebar({
     // stray click on the tree cannot start a session by itself. A host that is
     // already open is shown, though — that starts nothing.
     selectOnlyHost(s.id)
+    // The second click of a double-click opens; it does not move on to the
+    // next place the host is open in.
+    if (e.detail > 1) return
+    clickedFrom.current = currentPlace()
     revealSession(s.id)
   }
 
@@ -508,9 +515,11 @@ export default function Sidebar({
     return matchingGroups.get(groupId) === true
   }
 
-  function startDrag(e: ReactDragEvent, item: DragItem, label: string): void {
+  function startDrag(e: ReactDragEvent, item: DragItem, label: string, hostIds: string[]): void {
     e.stopPropagation()
     e.dataTransfer.setData(DRAG_MIME, JSON.stringify(item))
+    // What a collection takes if this lands on one — see HOSTS_MIME.
+    if (hostIds.length > 0) e.dataTransfer.setData(HOSTS_MIME, JSON.stringify(hostIds))
     // Panes accept the same payload as a 'copy' (open here), the tree as a 'move'.
     e.dataTransfer.effectAllowed = 'copyMove'
     setIsDragging(true)
@@ -536,6 +545,9 @@ export default function Sidebar({
 
   function allowDrop(e: ReactDragEvent, targetId: string | null): void {
     if (!e.dataTransfer.types.includes(DRAG_MIME)) return
+    // What a repository placed stays where it placed it; such a node is dragged
+    // only to be put into a collection or opened in a pane.
+    if (dragItem && isGitNode(dragItem.id)) return
     // The contents of a mirrored group are the repository's; a host dropped in
     // would vanish at the next sync without ever having been moved.
     if (targetId && isGitNode(targetId)) return
@@ -599,7 +611,7 @@ export default function Sidebar({
    * meaning "inside", which is what it has always meant.
    */
   function allowGroupDrop(e: ReactDragEvent, target: SessionGroup): void {
-    if (dragItem?.kind !== 'group' || dragItem.id === target.id) {
+    if (dragItem?.kind !== 'group' || dragItem.id === target.id || isGitNode(dragItem.id)) {
       allowDrop(e, target.id)
       return
     }
@@ -626,7 +638,7 @@ export default function Sidebar({
     const raw = e.dataTransfer.getData(DRAG_MIME)
     if (!raw) return
     const item = JSON.parse(raw) as DragItem
-    if (item.kind !== 'group' || item.id === target.id) {
+    if (item.kind !== 'group' || item.id === target.id || isGitNode(item.id)) {
       await handleDrop(e, target.id)
       return
     }
@@ -647,6 +659,7 @@ export default function Sidebar({
     const raw = e.dataTransfer.getData(DRAG_MIME)
     if (!raw) return
     const item = JSON.parse(raw) as DragItem
+    if (isGitNode(item.id) || (targetGroupId && isGitNode(targetGroupId))) return
     if (item.kind === 'session') await moveSession(item.id, targetGroupId)
     else if (item.kind === 'group') await moveGroup(item.id, targetGroupId)
   }
@@ -770,12 +783,24 @@ export default function Sidebar({
     return ids
   }
 
-  function groupMenu(groupId: string): MenuItem[] {
-    const group = groups.find((g) => g.id === groupId)
+  /** Every host in a folder and the folders inside it, each once, in tree order. */
+  function hostsUnder(groupId: string): SessionProfile[] {
     // Include hosts from every visible placement, deduplicated by session id.
     const inGroup = groupSubtree(groupId)
     const hostIds = new Set([...inGroup].flatMap((id) => hostsIn(id, sessions).map((s) => s.id)))
-    const hosts = sessions.filter((s) => hostIds.has(s.id))
+    return sessions.filter((s) => hostIds.has(s.id))
+  }
+
+  /** What a host dragged from the tree carries: the whole selection it is part of. */
+  function draggedHosts(s: SessionProfile): string[] {
+    return selectedHostIds.includes(s.id)
+      ? selectedHostIds.filter((id) => sessions.some((x) => x.id === id))
+      : [s.id]
+  }
+
+  function groupMenu(groupId: string): MenuItem[] {
+    const group = groups.find((g) => g.id === groupId)
+    const hosts = hostsUnder(groupId)
     return [
       {
         label: `Open all in a new workspace (${hosts.length})`,
@@ -885,8 +910,17 @@ export default function Sidebar({
         key={s.id}
         data-host-id={s.id}
         style={{ paddingLeft, ...(colour ? { '--host-colour': colour } : {}) } as CSSProperties}
-        draggable={!mirrored}
-        onDragStart={(e) => startDrag(e, { kind: 'session', id: s.id }, s.name)}
+        // A host from a repository is dragged too, though only a collection or
+        // a pane will take it: its place in the tree is the repository's.
+        draggable
+        onDragStart={(e) => {
+          const hostIds = draggedHosts(s)
+          const label =
+            hostIds.length > 1
+              ? t('{name} and {count} more', { name: s.name, count: hostIds.length - 1 })
+              : s.name
+          startDrag(e, { kind: 'session', id: s.id }, label, hostIds)
+        }}
         onDragEnd={endDrag}
         onDragOver={(e) => allowReorder(e, s)}
         onDragLeave={() => setDropEdge((cur) => (cur?.id === s.id ? null : cur))}
@@ -894,13 +928,18 @@ export default function Sidebar({
         onClick={(e) => onSessionClick(e, s)}
         onDoubleClick={(e) => {
           const row = e.currentTarget
+          returnTo(clickedFrom.current)
           connect(s)
           morphOpen(row, currentTab(useStore.getState())?.id, { title: s.name, colour })
         }}
         title={
           mirrored
-            ? t('From the repository this folder mirrors · double-click to connect')
-            : t('Double-click to connect · drag to sort or to move between groups')
+            ? t(
+                'From the repository this folder mirrors · double-click to connect · drag into a collection'
+              )
+            : t(
+                'Double-click to connect · drag to sort, to move between groups or into a collection'
+              )
         }
       >
         <span className="name">
@@ -960,8 +999,15 @@ export default function Sidebar({
                   ...(colour ? { '--host-colour': colour } : {})
                 } as CSSProperties
               }
-              draggable={!isGitNode(g.id)}
-              onDragStart={(e) => startDrag(e, { kind: 'group', id: g.id }, g.name)}
+              draggable
+              onDragStart={(e) =>
+                startDrag(
+                  e,
+                  { kind: 'group', id: g.id },
+                  g.name,
+                  hostsUnder(g.id).map((h) => h.id)
+                )
+              }
               onDragEnd={endDrag}
               onDragOver={(e) => allowGroupDrop(e, g)}
               onDragLeave={() => {
@@ -991,7 +1037,9 @@ export default function Sidebar({
                     ` · ${g.git.repoUrl}`
                   : isGitNode(g.id)
                     ? t('Settings kept here, over what the repository says')
-                    : t('Drag by the edge of a row to sort · drop onto a folder to put it inside')
+                    : t(
+                        'Drag by the edge of a row to sort · drop onto a folder to put it inside · onto a collection to add its hosts'
+                      )
               }
             >
               <span className={`tree-group-title name ${isCollapsed ? '' : 'open'}`}>
@@ -1165,7 +1213,7 @@ export default function Sidebar({
 
             {/* An explicit strip, rather than outlining the whole tree, which made
             it look as though the entire structure were being moved. */}
-            {isDragging && (
+            {isDragging && !(dragItem && isGitNode(dragItem.id)) && (
               <div
                 className={`root-drop-zone ${dropTarget === ROOT_TARGET ? 'over' : ''}`}
                 onDragOver={(e) => allowDrop(e, null)}

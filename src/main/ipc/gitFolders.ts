@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
 import { IPC } from '../../shared/ipc-channels'
-import type { GitFolderLink, InventoryOverride } from '../../shared/types'
+import type { GitFolderApplyOptions, GitFolderLink, InventoryOverride } from '../../shared/types'
 import { gitFolderStore } from '../gitFolders/GitFolderStore'
 import { forgetSecret, forgetSecretAt, saveWithSecrets } from './secrets'
 
@@ -32,8 +32,8 @@ export function registerGitFolderHandlers(): void {
 
   ipcMain.handle(
     IPC.gitFolderApply,
-    (_e, groupId: string, includedGroups: string[], showGroupFolders?: boolean) =>
-      gitFolderStore.apply(groupId, includedGroups, forgetBoth, showGroupFolders)
+    (_e, groupId: string, includedGroups: string[], options?: GitFolderApplyOptions) =>
+      gitFolderStore.apply(groupId, includedGroups, forgetBoth, options)
   )
 
   ipcMain.handle(

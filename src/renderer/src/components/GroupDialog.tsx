@@ -327,6 +327,16 @@ export default function GroupDialog({
           </label>
         )}
 
+        {/* Under the parent, as the other place its hosts belong to. */}
+        {hostIds.length > 0 && (
+          <CollectionFields
+            collections={collections}
+            value={memberOf}
+            onChange={setMemberOf}
+            forGroup
+          />
+        )}
+
         <label>
           {t('Colour')}
           <div className="colour-row">
@@ -660,15 +670,6 @@ export default function GroupDialog({
             </p>
           )}
         </details>
-
-        {hostIds.length > 0 && (
-          <CollectionFields
-            collections={collections}
-            value={memberOf}
-            onChange={setMemberOf}
-            forGroup
-          />
-        )}
 
         <details className="settings-section">
           <summary>

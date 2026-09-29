@@ -1,4 +1,5 @@
-import type { HostCollection } from '../../../shared/types'
+import type { HostCollection, SessionGroup, SessionProfile } from '../../../shared/types'
+import { descendsFrom } from '../../../shared/groups'
 
 /**
  * Which collections a host — or every host in a group — belongs to, as the
@@ -47,4 +48,30 @@ export function changedCollections(
   return collections
     .map((c) => (chosen[c.id] ? withMembership(c, hostIds, chosen[c.id]) : null))
     .filter((c): c is HostCollection => c !== null)
+}
+
+/**
+ * Every host an inventory or repository group holds, its subgroups included —
+ * what ticking a collection in its Local settings puts in or takes out.
+ *
+ * Read from the memberships rather than each host's one `groupId`, because an
+ * Ansible host belongs to every group that names it, and is shown under each.
+ */
+export function hostsInTreeGroup(
+  trees: {
+    groups: SessionGroup[]
+    sessions: SessionProfile[]
+    memberships: Record<string, string[]>
+  }[],
+  groupId: string
+): string[] {
+  const tree = trees.find((t) => t.groups.some((g) => g.id === groupId))
+  if (!tree) return []
+  return tree.sessions
+    .filter((s) =>
+      (tree.memberships[s.id] ?? (s.groupId ? [s.groupId] : [])).some((id) =>
+        descendsFrom(tree.groups, id, groupId)
+      )
+    )
+    .map((s) => s.id)
 }

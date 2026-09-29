@@ -26,6 +26,7 @@ export default function GitFolderSyncDialog({
   const applyGitFolder = useStore((s) => s.applyGitFolder)
   const [chosen, setChosen] = useState<Set<string>>(() => new Set(preview.included))
   const [showGroupFolders, setShowGroupFolders] = useState(preview.showGroupFolders ?? false)
+  const [includeChildHosts, setIncludeChildHosts] = useState(preview.includeChildHosts ?? false)
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
 
@@ -46,7 +47,7 @@ export default function GitFolderSyncDialog({
     setBusy(true)
     setError(undefined)
     try {
-      await applyGitFolder(preview.groupId, [...chosen], showGroupFolders)
+      await applyGitFolder(preview.groupId, [...chosen], { showGroupFolders, includeChildHosts })
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -90,28 +91,46 @@ export default function GitFolderSyncDialog({
             </div>
 
             <div className="sync-group-list">
-              {preview.groups.map((group) => (
-                <label
-                  key={group.path}
-                  className="checkbox-row"
-                  style={{
-                    flexDirection: 'row',
-                    paddingLeft: group.path.split('/').length * 12 - 12
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={chosen.has(group.path)}
-                    onChange={() => toggle(group.path)}
-                  />
-                  <span className="name">{group.name}</span>
-                  {group.hostCount > 0 && <span className="child-count">{group.hostCount}</span>}
-                  {group.isNew && <span className="badge-new">{t('new')}</span>}
-                </label>
-              ))}
+              {preview.groups.map((group) => {
+                const hosts = includeChildHosts ? group.hostCountWithChildren : group.hostCount
+                return (
+                  <label
+                    key={group.path}
+                    className="checkbox-row"
+                    style={{
+                      flexDirection: 'row',
+                      paddingLeft: group.path.split('/').length * 12 - 12
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={chosen.has(group.path)}
+                      onChange={() => toggle(group.path)}
+                    />
+                    <span className="name">{group.name}</span>
+                    {hosts > 0 && <span className="child-count">{hosts}</span>}
+                    {group.isNew && <span className="badge-new">{t('new')}</span>}
+                  </label>
+                )
+              })}
             </div>
           </>
         )}
+
+        <label className="checkbox-row" style={{ flexDirection: 'row' }}>
+          <input
+            type="checkbox"
+            checked={includeChildHosts}
+            disabled={busy}
+            onChange={(e) => setIncludeChildHosts(e.target.checked)}
+          />
+          {t('Include hosts of child groups')}
+        </label>
+        <p className="settings-note">
+          {t(
+            'A group also brings the hosts of every group beneath it, the way Ansible counts them — including a child whose hosts are listed elsewhere in the inventory.'
+          )}
+        </p>
 
         <label className="checkbox-row" style={{ flexDirection: 'row' }}>
           <input

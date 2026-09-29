@@ -2,6 +2,7 @@ import type { TerminalSettings } from '../settings'
 import type { PaneNode, PaneTarget } from '../paneTree'
 import type {
   Credential,
+  GitFolderApplyOptions,
   GitFolderPreview,
   GitFolderTree,
   GitRepo,
@@ -156,7 +157,7 @@ export interface GitFoldersSlice {
   applyGitFolder: (
     groupId: string,
     includedGroups: string[],
-    showGroupFolders?: boolean
+    options?: GitFolderApplyOptions
   ) => Promise<void>
   saveGitFolderOverride: (
     override: InventoryOverride,

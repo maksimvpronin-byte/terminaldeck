@@ -19,10 +19,38 @@ import GitFolderSyncDialog from './GitFolderSyncDialog'
 const preview: GitFolderPreview = {
   groupId: 'folder-1',
   groups: [
-    { path: 'all', name: 'all', parentPath: null, hostCount: 0, isNew: false },
-    { path: 'all/prod', name: 'prod', parentPath: 'all', hostCount: 2, isNew: false },
-    { path: 'all/prod/web', name: 'web', parentPath: 'all/prod', hostCount: 1, isNew: true },
-    { path: 'all/dev', name: 'dev', parentPath: 'all', hostCount: 1, isNew: false }
+    {
+      path: 'all',
+      name: 'all',
+      parentPath: null,
+      hostCount: 0,
+      hostCountWithChildren: 4,
+      isNew: false
+    },
+    {
+      path: 'all/prod',
+      name: 'prod',
+      parentPath: 'all',
+      hostCount: 2,
+      hostCountWithChildren: 3,
+      isNew: false
+    },
+    {
+      path: 'all/prod/web',
+      name: 'web',
+      parentPath: 'all/prod',
+      hostCount: 1,
+      hostCountWithChildren: 1,
+      isNew: true
+    },
+    {
+      path: 'all/dev',
+      name: 'dev',
+      parentPath: 'all',
+      hostCount: 1,
+      hostCountWithChildren: 1,
+      isNew: false
+    }
   ],
   included: ['all', 'all/prod'],
   removedGroups: [],
@@ -71,7 +99,10 @@ describe('the sync dialog', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Apply' }))
 
-    expect(applyGitFolder).toHaveBeenCalledWith('folder-1', ['all', 'all/prod', 'all/dev'], false)
+    expect(applyGitFolder).toHaveBeenCalledWith('folder-1', ['all', 'all/prod', 'all/dev'], {
+      showGroupFolders: false,
+      includeChildHosts: false
+    })
     expect(onClose).toHaveBeenCalled()
   })
 
@@ -87,10 +118,32 @@ describe('the sync dialog', () => {
     expect((layout as HTMLInputElement).checked).toBe(true)
     await userEvent.click(layout)
     await userEvent.click(screen.getByRole('button', { name: 'Apply' }))
-    expect(applyGitFolder).toHaveBeenCalledWith('folder-1', preview.included, false)
+    expect(applyGitFolder).toHaveBeenCalledWith('folder-1', preview.included, {
+      showGroupFolders: false,
+      includeChildHosts: false
+    })
     await userEvent.click(layout)
     await userEvent.click(screen.getByRole('button', { name: 'Apply' }))
-    expect(applyGitFolder).toHaveBeenLastCalledWith('folder-1', preview.included, true)
+    expect(applyGitFolder).toHaveBeenLastCalledWith('folder-1', preview.included, {
+      showGroupFolders: true,
+      includeChildHosts: false
+    })
+  })
+
+  it('counts and applies the hosts of child groups when that is ticked', async () => {
+    render(<GitFolderSyncDialog folderName="Infra" preview={preview} onClose={() => {}} />)
+    const counts = (): string[] =>
+      [...document.querySelectorAll('.sync-group-list .child-count')].map((c) => c.textContent!)
+    expect(counts()).toEqual(['2', '1', '1'])
+
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Include hosts of child groups' }))
+    expect(counts()).toEqual(['4', '3', '1', '1'])
+
+    await userEvent.click(screen.getByRole('button', { name: 'Apply' }))
+    expect(applyGitFolder).toHaveBeenCalledWith('folder-1', preview.included, {
+      showGroupFolders: false,
+      includeChildHosts: true
+    })
   })
 
   it('keeps the dialog open with an error when applying fails', async () => {

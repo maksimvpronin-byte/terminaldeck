@@ -89,6 +89,62 @@ function hasChosenParent(path: string, chosen: Set<string>): boolean {
 }
 
 /**
+ * Every host each group holds the way Ansible counts it: the ones it names
+ * itself, and every host of every group beneath it, all the way down.
+ *
+ * Children are followed by name, not by where they sit in the file. An
+ * inventory states a group's hosts once and then refers to the group by name
+ * elsewhere — kubespray's `k8s_cluster: children: kube_node:` is a reference to
+ * `kube_node`, not a second, empty group — and Ansible reads every mention of a
+ * name as the one group. Parsed by path, the reference arrives with no hosts,
+ * which is why ticking `k8s_cluster` on its own brought nothing in.
+ *
+ * Keyed by group id, so each place a name appears answers for the whole group.
+ */
+export function hostsWithChildren(full: GitFolderTree): Map<string, Set<string>> {
+  const nameOf = new Map(full.groups.map((g) => [g.id, g.name]))
+  const direct = new Map<string, Set<string>>()
+  const children = new Map<string, Set<string>>()
+  const entry = <T>(map: Map<string, Set<T>>, name: string): Set<T> => {
+    const found = map.get(name)
+    if (found) return found
+    const made = new Set<T>()
+    map.set(name, made)
+    return made
+  }
+
+  for (const g of full.groups) {
+    const parent = g.parentId ? nameOf.get(g.parentId) : undefined
+    if (parent !== undefined) entry(children, parent).add(g.name)
+  }
+  for (const host of full.sessions) {
+    const claims = full.memberships[host.id] ?? (host.groupId ? [host.groupId] : [])
+    for (const id of claims) {
+      const name = nameOf.get(id)
+      if (name !== undefined) entry(direct, name).add(host.id)
+    }
+  }
+
+  const done = new Map<string, Set<string>>()
+  // Ansible refuses a group that contains itself; here it just stops the walk.
+  const walking = new Set<string>()
+  const collect = (name: string): Set<string> => {
+    const cached = done.get(name)
+    if (cached) return cached
+    const hosts = new Set(direct.get(name))
+    walking.add(name)
+    for (const child of children.get(name) ?? []) {
+      if (!walking.has(child)) for (const h of collect(child)) hosts.add(h)
+    }
+    walking.delete(name)
+    done.set(name, hosts)
+    return hosts
+  }
+
+  return new Map(full.groups.map((g) => [g.id, collect(g.name)]))
+}
+
+/**
  * The repository tree cut down to the chosen groups.
  *
  * A group whose parent was left out is not orphaned: it hangs off the nearest
@@ -96,11 +152,17 @@ function hasChosenParent(path: string, chosen: Set<string>): boolean {
  * single deep group gives you that group, in the folder, rather than nothing.
  * A host survives if any chosen group names it, and takes its connection
  * settings from the last of those in Ansible's own order.
+ *
+ * With `includeChildHosts`, a chosen group also holds the hosts of the groups
+ * beneath it, as `hostsWithChildren` counts them. A host a chosen group names
+ * itself still takes its settings from that group; one that only arrives
+ * through a child takes them from the chosen group that brought it.
  */
 export function pruneTree(
   folderId: string,
   full: GitFolderTree,
-  included: string[]
+  included: string[],
+  includeChildHosts = false
 ): GitFolderTree {
   const chosen = new Set(included)
   const parentOf = new Map(full.groups.map((g) => [g.id, g.parentId]))
@@ -124,15 +186,20 @@ export function pruneTree(
     .filter((g) => keptIds.has(g.id))
     .map((g) => ({ ...g, parentId: nearestKept(g.parentId) }))
 
+  const inherited = includeChildHosts ? hostsWithChildren(full) : undefined
   const sessions: SessionProfile[] = []
   const memberships: Record<string, string[]> = {}
   for (const host of full.sessions) {
     const claims = (full.memberships[host.id] ?? (host.groupId ? [host.groupId] : [])).filter(
       (id) => keptIds.has(id)
     )
-    if (claims.length === 0) continue
-    sessions.push({ ...host, groupId: claims[claims.length - 1] })
-    memberships[host.id] = claims
+    const through = inherited
+      ? groups.filter((g) => !claims.includes(g.id) && inherited.get(g.id)?.has(host.id))
+      : []
+    if (claims.length === 0 && through.length === 0) continue
+    const primary = claims.length > 0 ? claims[claims.length - 1] : through[through.length - 1].id
+    sessions.push({ ...host, groupId: primary })
+    memberships[host.id] = [...claims, ...through.map((g) => g.id)]
   }
 
   return { groupId: folderId, groups, sessions, memberships }

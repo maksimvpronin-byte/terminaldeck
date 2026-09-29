@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
+import { createEvent, fireEvent, render, screen } from '@testing-library/react'
 import Sidebar from './Sidebar'
 import { useStore } from '../state/store'
 import type { SessionGroup, SessionProfile } from '../../../shared/types'
@@ -355,5 +355,94 @@ describe('finding and folding folders', () => {
     expect(screen.getByText('web-1')).toBeTruthy()
     expect(screen.getByText('pg-1')).toBeTruthy()
     expect(screen.getByText('web-2')).toBeTruthy()
+  })
+})
+
+/**
+ * Putting hosts into a collection by dragging them there: a host, the ticked
+ * hosts it is one of, or a whole folder — a folder a repository mirrors
+ * included, whose hosts could not be dragged anywhere before.
+ */
+describe('dragging into a collection', () => {
+  const group = (id: string, parentId: string | null, over: Partial<SessionGroup> = {}) =>
+    ({ id, name: id, parentId, ...over }) as SessionGroup
+
+  function transfer(): {
+    types: string[]
+    effectAllowed: string
+    dropEffect: string
+    setData: (k: string, v: string) => void
+    getData: (k: string) => string
+    setDragImage: () => void
+  } {
+    const data = new Map<string, string>()
+    const t = {
+      types: [] as string[],
+      effectAllowed: '',
+      dropEffect: '',
+      setData: (k: string, v: string) => {
+        data.set(k, v)
+        if (!t.types.includes(k)) t.types.push(k)
+      },
+      getData: (k: string) => data.get(k) ?? '',
+      setDragImage: () => {}
+    }
+    return t
+  }
+
+  function setTree(addToCollection: (id: string, hostIds: string[]) => Promise<void>): void {
+    localStorage.clear()
+    const a = host({ id: 'git:repo:h:a', name: 'mirrored-a', groupId: 'repo' })
+    const b = host({ id: 'git:repo:h:b', name: 'mirrored-b', groupId: 'repo' })
+    useStore.setState({
+      groups: [
+        group('repo', null, { git: { repoUrl: 'r', paths: [], includedGroups: [] } }),
+        group('mine', null)
+      ],
+      sessions: [host({ id: 'h1', name: 'saved', groupId: 'mine' })],
+      collections: [{ id: 'rel', name: 'Release', hostIds: [], createdAt: 0, updatedAt: 0 }],
+      loadCollections: async () => {},
+      addToCollection,
+      inventoryTrees: [],
+      gitFolderTrees: [{ groupId: 'repo', groups: [], sessions: [a, b], memberships: {} }],
+      gitFolderOverrides: [],
+      inventoryOverrides: [],
+      selectedHostIds: []
+    })
+    render(<Sidebar onOpenSnippets={() => {}} onOpenHelp={() => {}} />)
+  }
+
+  it('puts every host of a folder from a repository into the collection it lands on', () => {
+    const add = vi.fn(async () => {})
+    setTree(add)
+    const dt = transfer()
+    fireEvent.dragStart(rowFor('repo'), { dataTransfer: dt })
+    const target = rowFor('Release')
+    fireEvent.dragOver(target, { dataTransfer: dt })
+    expect(target.className).toContain('drop-target')
+    fireEvent.drop(target, { dataTransfer: dt })
+
+    expect(add).toHaveBeenCalledWith('rel', ['git:repo:h:a', 'git:repo:h:b'])
+  })
+
+  it('takes a single host, one from a repository included', () => {
+    const add = vi.fn(async () => {})
+    setTree(add)
+    const dt = transfer()
+    fireEvent.dragStart(rowFor('mirrored-b'), { dataTransfer: dt })
+    fireEvent.drop(rowFor('Release'), { dataTransfer: dt })
+
+    expect(add).toHaveBeenCalledWith('rel', ['git:repo:h:b'])
+  })
+
+  it('does not let a host from a repository move to another folder', () => {
+    setTree(vi.fn(async () => {}))
+    const dt = transfer()
+    fireEvent.dragStart(rowFor('mirrored-a'), { dataTransfer: dt })
+    const over = createEvent.dragOver(rowFor('mine'), { dataTransfer: dt })
+    fireEvent(rowFor('mine'), over)
+
+    expect(over.defaultPrevented).toBe(false)
+    expect(screen.queryByText('Move to top level')).toBeNull()
   })
 })

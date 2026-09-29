@@ -1001,6 +1001,13 @@ label {
   padding: 2px 6px;
   font-size: 11px;
 }
+/* SFTP, Tunnels and Monitor lit while their panel is open, so which of them
+   are on reads from the toolbar and not only from the pane below it. */
+.pane-toolbar button.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--text);
+}
 /* Keeps the SVG glyphs optically centred next to the text buttons. */
 .icon-button {
   display: inline-flex;

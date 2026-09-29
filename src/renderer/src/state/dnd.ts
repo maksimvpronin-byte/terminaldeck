@@ -1,5 +1,15 @@
 export const DRAG_MIME = 'application/x-terminaldeck-item'
 
+/**
+ * The hosts a drag from the host tree carries, as a JSON list of ids: the host,
+ * the ticked hosts it is one of, or everything in a folder.
+ *
+ * A type of its own rather than a field of `DragItem`, because a drop target
+ * can only read the types while the drag is in flight — and a collection must
+ * light up for a host or a folder and stay dark for a tab.
+ */
+export const HOSTS_MIME = 'application/x-terminaldeck-hosts'
+
 export type DragItem =
   { kind: 'session'; id: string } | { kind: 'group'; id: string } | { kind: 'tab'; id: string }
 

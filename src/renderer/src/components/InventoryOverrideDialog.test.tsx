@@ -77,3 +77,56 @@ describe('a save that is refused', () => {
     expect(onClose).not.toHaveBeenCalled()
   })
 })
+
+/**
+ * A host or group from a repository can be put into a collection from its own
+ * Local settings, as a saved host or group can from its dialog — not only by
+ * ticking it in the tree and pressing Collect.
+ */
+describe('collections in Local settings', () => {
+  const release = { id: 'rel', name: 'Release', hostIds: [], createdAt: 0, updatedAt: 0 }
+
+  it('puts a host from a repository into a ticked collection', async () => {
+    const upsertCollection = vi.fn().mockResolvedValue(undefined)
+    useStore.setState({
+      collections: [release],
+      upsertCollection,
+      gitFolderOverrides: [],
+      gitFolderTrees: []
+    })
+
+    render(<InventoryOverrideDialog node={host} groups={[]} scope="gitFolder" onClose={() => {}} />)
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Release' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(upsertCollection).toHaveBeenCalledWith({ ...release, hostIds: [host.id] })
+  })
+
+  it('puts every host of a repository group into it', async () => {
+    const upsertCollection = vi.fn().mockResolvedValue(undefined)
+    const group = { id: 'git:f:g:all/web', name: 'web', parentId: 'f' }
+    const inWeb = { ...host, id: 'git:f:h:w1', groupId: group.id }
+    const elsewhere = { ...host, id: 'git:f:h:d1', groupId: 'git:f:g:all/dev' }
+    useStore.setState({
+      collections: [release],
+      upsertCollection,
+      gitFolderOverrides: [],
+      gitFolderTrees: [
+        {
+          groupId: 'f',
+          groups: [group, { id: 'git:f:g:all/dev', name: 'dev', parentId: 'f' }],
+          sessions: [inWeb, elsewhere],
+          memberships: { [inWeb.id]: [group.id], [elsewhere.id]: ['git:f:g:all/dev'] }
+        }
+      ]
+    })
+
+    render(
+      <InventoryOverrideDialog node={group} groups={[group]} scope="gitFolder" onClose={() => {}} />
+    )
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Release' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(upsertCollection).toHaveBeenCalledWith({ ...release, hostIds: [inWeb.id] })
+  })
+})

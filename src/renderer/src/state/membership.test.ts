@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import type { HostCollection } from '../../../shared/types'
-import { changedCollections, membershipOf, membershipsOf, withMembership } from './membership'
+import type { HostCollection, SessionProfile } from '../../../shared/types'
+import {
+  changedCollections,
+  hostsInTreeGroup,
+  membershipOf,
+  membershipsOf,
+  withMembership
+} from './membership'
 
 function collection(id: string, hostIds: string[]): HostCollection {
   return { id, name: id, hostIds, createdAt: 0, updatedAt: 0 }
@@ -43,5 +49,32 @@ describe('changedCollections', () => {
       collection('two', ['a']),
       collection('three', [])
     ])
+  })
+})
+
+describe('hostsInTreeGroup', () => {
+  const g = (id: string, parentId: string | null) => ({ id, name: id, parentId })
+  const h = (id: string, groupId: string): SessionProfile => ({
+    id,
+    name: id,
+    host: id,
+    groupId,
+    tags: [],
+    logToFile: false,
+    portForwards: [],
+    createdAt: 0,
+    updatedAt: 0
+  })
+
+  it('takes every host named by the group or a group beneath it', () => {
+    const tree = {
+      groups: [g('all', null), g('prod', 'all'), g('web', 'prod'), g('dev', 'all')],
+      sessions: [h('w1', 'web'), h('p1', 'prod'), h('d1', 'dev')],
+      // w1 is named by dev as well, but its settings come from web.
+      memberships: { w1: ['dev', 'web'], p1: ['prod'], d1: ['dev'] }
+    }
+    expect(hostsInTreeGroup([tree], 'prod')).toEqual(['w1', 'p1'])
+    expect(hostsInTreeGroup([tree], 'dev')).toEqual(['w1', 'd1'])
+    expect(hostsInTreeGroup([tree], 'elsewhere')).toEqual([])
   })
 })

@@ -2,6 +2,7 @@ import { app } from 'electron'
 import { createHash } from 'crypto'
 import { basename, join, relative } from 'path'
 import type {
+  GitFolderApplyOptions,
   GitFolderData,
   GitFolderLink,
   GitFolderPreview,
@@ -12,7 +13,13 @@ import type {
   SessionGroup,
   SessionProfile
 } from '../../shared/types'
-import { gitNodePrefix, groupPathOf, pruneTree, reconcileSelection } from '../../shared/gitFolders'
+import {
+  gitNodePrefix,
+  groupPathOf,
+  hostsWithChildren,
+  pruneTree,
+  reconcileSelection
+} from '../../shared/gitFolders'
 import { applyOverride } from '../../shared/overrides'
 import { parseInWorker } from '../inventory/parseInWorker'
 import { noInventoryFound } from '../inventory/files'
@@ -266,6 +273,7 @@ class GitFolderStore {
       known: link.knownGroups
     })
 
+    const withChildren = hostsWithChildren(repo.tree)
     const byPath = new Map(
       repo.tree.groups.map((g) => [groupPathOf(folderId, g.id) ?? g.id, g] as const)
     )
@@ -278,6 +286,7 @@ class GitFolderStore {
         parentPath: parentPath && repo.paths.includes(parentPath) ? parentPath : null,
         hostCount: Object.values(repo.tree.memberships).filter((ids) => ids.includes(group.id))
           .length,
+        hostCountWithChildren: withChildren.get(group.id)?.size ?? 0,
         isNew: newPaths.includes(path)
       }
     })
@@ -285,7 +294,9 @@ class GitFolderStore {
     // Hosts about to go: what this folder shows now, minus what the chosen
     // groups would still hold. Local settings are called out — deleting the host
     // deletes them, and its stored password with them.
-    const wouldKeep = new Set(pruneTree(folderId, repo.tree, included).sessions.map((s) => s.id))
+    const wouldKeep = new Set(
+      pruneTree(folderId, repo.tree, included, link.includeChildHosts).sessions.map((s) => s.id)
+    )
     const removedHosts = (this.treeOf(folderId)?.sessions ?? [])
       .filter((h) => !wouldKeep.has(h.id))
       .map((h) => ({
@@ -298,6 +309,7 @@ class GitFolderStore {
       groupId: folderId,
       groups,
       showGroupFolders: link.showGroupFolders ?? false,
+      includeChildHosts: link.includeChildHosts ?? false,
       included,
       removedGroups,
       removedHosts,
@@ -319,7 +331,7 @@ class GitFolderStore {
     folderId: string,
     includedGroups: string[],
     forgetSecret: (override: InventoryOverride) => void,
-    showGroupFolders?: boolean
+    options: GitFolderApplyOptions = {}
   ): GitFolderTree {
     const found = this.linkOf(folderId)
     if (!found) throw new Error('This folder is not linked to a repository')
@@ -338,7 +350,8 @@ class GitFolderStore {
     }
 
     const included = includedGroups.filter((p) => repo.paths.includes(p))
-    const tree = pruneTree(folderId, repo.tree, included)
+    const includeChildHosts = options.includeChildHosts ?? found.link.includeChildHosts ?? false
+    const tree = pruneTree(folderId, repo.tree, included, includeChildHosts)
 
     let orphaned: InventoryOverride[] = []
     const before = this.doc.snapshot()
@@ -353,7 +366,8 @@ class GitFolderStore {
     try {
       this.saveLink(folderId, found.link, {
         includedGroups: included,
-        showGroupFolders: showGroupFolders ?? found.link.showGroupFolders ?? false,
+        showGroupFolders: options.showGroupFolders ?? found.link.showGroupFolders ?? false,
+        includeChildHosts,
         knownGroups: repo.paths,
         lastSyncedAt: Date.now(),
         lastRevision: repo.revision,

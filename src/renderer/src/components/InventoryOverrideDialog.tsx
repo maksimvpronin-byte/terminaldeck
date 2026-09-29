@@ -23,6 +23,13 @@ import ModalBackdrop from './ModalBackdrop'
 import { useT } from '../i18n'
 import Hint from './Hint'
 import AccountSelect from './AccountSelect'
+import CollectionFields from './CollectionFields'
+import {
+  changedCollections,
+  hostsInTreeGroup,
+  membershipsOf,
+  type Membership
+} from '../state/membership'
 
 interface Props {
   /** The host or Ansible group the local settings apply to. */
@@ -61,7 +68,21 @@ export default function InventoryOverrideDialog({
   const sessions = useStore((s) => s.sessions)
   const credentials = useStore((s) => s.credentials)
   const settings = useStore((s) => s.settings)
+  const collections = useStore((s) => s.collections)
+  const upsertCollection = useStore((s) => s.upsertCollection)
+  const trees = useStore((s) => (fromGit ? s.gitFolderTrees : s.inventoryTrees))
   const t = useT()
+  /**
+   * The hosts the collections below are ticked for: this one, or every host in
+   * this group. Taken once, when the dialog opens, as the other dialogs do — a
+   * sync finishing meanwhile must not change what the ticks were shown against.
+   */
+  const [hostIds] = useState<string[]>(() =>
+    isHost(node) ? [node.id] : hostsInTreeGroup(trees, node.id)
+  )
+  const [memberOf, setMemberOf] = useState<Record<string, Membership>>(() =>
+    membershipsOf(collections, hostIds)
+  )
 
   const [override, setOverride] = useState<InventoryOverride>(existing ?? { nodeId: node.id })
   const [error, setError] = useState<string>()
@@ -207,6 +228,11 @@ export default function InventoryOverrideDialog({
           gatewaySecret || (forgetGatewaySecret ? null : undefined)
         )
       }
+      // Kept in the collections, not in the override: being in a set is not
+      // a connection setting, and resetting the override leaves it alone.
+      for (const collection of changedCollections(collections, hostIds, memberOf)) {
+        await upsertCollection(collection)
+      }
     } catch (err) {
       setError((err as Error).message)
       return
@@ -243,6 +269,15 @@ export default function InventoryOverrideDialog({
           )}
           {!isHost(node) && ` ${t('Everything in this group inherits what you set here.')}`}
         </p>
+
+        {hostIds.length > 0 && (
+          <CollectionFields
+            collections={collections}
+            value={memberOf}
+            onChange={setMemberOf}
+            forGroup={!isHost(node)}
+          />
+        )}
 
         {isHost(node) && (
           <label>

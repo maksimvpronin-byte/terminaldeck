@@ -35,6 +35,10 @@ const SECTIONS: Section[] = [
       { what: 'Tick hosts in either tab, then press Collect to save them as a set' },
       { what: 'Or right-click a workspace above and choose “Save as collection…”' },
       { what: 'Or tick them under Collections in a host’s settings, or a whole group’s' },
+      { what: 'Hosts and groups from git or an inventory tick them in their Local settings' },
+      {
+        what: 'Or drag a host, the ticked hosts, or a whole folder onto a set — one from git too'
+      },
       { what: 'Close the workspace freely — Open brings the whole set back' },
       { what: 'Saving under a name that already exists offers to add to it or replace it' },
       { what: 'Independent of groups: one host can sit in as many collections as you like' },
@@ -178,6 +182,8 @@ const SECTIONS: Section[] = [
       { what: 'The edge stays while the row is selected, so the colour survives the click' },
       { what: 'An open host’s name is in bold as well, so it stands out on a coloured row' },
       { what: 'Settings → General → Host tree takes away the edge, or the bold' },
+      { what: 'A click on a host already open brings its pane forward' },
+      { what: 'A double-click still opens a new tab, where you were — in a collection too' },
       { what: 'Right-click for connect, split, duplicate, edit and delete' },
       { what: 'Deleting lives in that menu alone, behind a prompt — no button to misclick' },
       { keys: '⌘ click', what: 'Tick a host as well, to open several at once' },
@@ -364,6 +370,9 @@ terminaldeck_protocol: rdp`
       { what: 'Every sync asks which groups to take; ticking a group takes its subgroups' },
       { what: 'Groups that appeared since last time arrive ticked and marked new' },
       { what: 'A subgroup you untick stays unticked — it is not offered again as new' },
+      {
+        what: 'Include hosts of child groups: a group brings every host beneath it, children found by name as Ansible does'
+      },
       { what: 'What has left the repository leaves the folder, and the dialog says what goes' },
       { what: 'Local settings and passwords kept for a host that goes are deleted with it' },
       { what: 'Nothing on disk changes until you press Apply; Cancel leaves the folder as it was' },

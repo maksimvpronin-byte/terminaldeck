@@ -5,6 +5,7 @@ import {
   gitGroupId,
   gitHostId,
   groupPathOf,
+  hostsWithChildren,
   isGitNode,
   pruneTree,
   reconcileSelection
@@ -140,6 +141,80 @@ describe('pruneTree', () => {
     const pruned = pruneTree(FOLDER, tree(), ['all/dev'])
     const web1 = pruned.sessions.find((s) => s.name === 'web1')
     expect(web1?.groupId).toBe(gitGroupId(FOLDER, 'all/dev'))
+  })
+})
+
+/**
+ * A kubespray-shaped inventory: hosts stated once under their own group, and
+ * the grouping groups referring to those by name.
+ *
+ *   all → cp (cp1), all → worker (w1), all → node → worker,
+ *   all → cluster → cp, all → cluster → node
+ */
+function referenced(): GitFolderTree {
+  const id = (p: string): string => gitGroupId(FOLDER, p)
+  return {
+    groupId: FOLDER,
+    groups: [
+      group('all', FOLDER),
+      group('all/cp', id('all')),
+      group('all/worker', id('all')),
+      group('all/node', id('all')),
+      group('all/node/worker', id('all/node')),
+      group('all/cluster', id('all')),
+      group('all/cluster/cp', id('all/cluster')),
+      group('all/cluster/node', id('all/cluster'))
+    ],
+    sessions: [host('cp1', 'all/cp'), host('w1', 'all/worker')],
+    memberships: {
+      [gitHostId(FOLDER, 'cp1')]: [id('all/cp')],
+      [gitHostId(FOLDER, 'w1')]: [id('all/worker')]
+    }
+  }
+}
+
+describe('hostsWithChildren', () => {
+  it('counts a child by name, wherever its hosts are listed', () => {
+    const counted = hostsWithChildren(referenced())
+    const names = (path: string): string[] =>
+      [...counted.get(gitGroupId(FOLDER, path))!].map((h) => h.split(':h:')[1]).sort()
+
+    expect(names('all/node')).toEqual(['w1'])
+    expect(names('all/node/worker')).toEqual(['w1'])
+    // Two levels down, through a reference to a reference.
+    expect(names('all/cluster')).toEqual(['cp1', 'w1'])
+    expect(names('all/cluster/node')).toEqual(['w1'])
+    expect(names('all')).toEqual(['cp1', 'w1'])
+  })
+
+  it('stops at a group that contains itself', () => {
+    const looped = referenced()
+    looped.groups.push(group('all/cp/cluster', gitGroupId(FOLDER, 'all/cp')))
+    const counted = hostsWithChildren(looped)
+    expect(counted.get(gitGroupId(FOLDER, 'all/cp'))?.size).toBe(2)
+  })
+})
+
+describe('pruneTree with the hosts of child groups', () => {
+  it('brings nothing for a grouping group alone when it is off', () => {
+    const pruned = pruneTree(FOLDER, referenced(), ['all/cluster'])
+    expect(pruned.sessions).toEqual([])
+  })
+
+  it('brings every host beneath a grouping group when it is on', () => {
+    const pruned = pruneTree(FOLDER, referenced(), ['all/cluster'], true)
+    expect(pruned.sessions.map((s) => s.name)).toEqual(['cp1', 'w1'])
+    expect(pruned.sessions.every((s) => s.groupId === gitGroupId(FOLDER, 'all/cluster'))).toBe(true)
+  })
+
+  it('keeps settings from the group a host names, and lists it under both', () => {
+    const pruned = pruneTree(FOLDER, referenced(), ['all/cluster', 'all/worker'], true)
+    const w1 = pruned.sessions.find((s) => s.name === 'w1')!
+    expect(w1.groupId).toBe(gitGroupId(FOLDER, 'all/worker'))
+    expect(pruned.memberships[w1.id]).toEqual([
+      gitGroupId(FOLDER, 'all/worker'),
+      gitGroupId(FOLDER, 'all/cluster')
+    ])
   })
 })
 

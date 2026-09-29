@@ -127,7 +127,8 @@ function Pane({
     let title: string
     let target: PaneTarget
     if (item.kind === 'session') {
-      const session = useStore.getState().sessions.find((s) => s.id === item.id)
+      // Through `findHost`: a host from a repository is dragged here too.
+      const session = findHost(useStore.getState(), item.id)?.host
       if (!session) return
       title = session.name
       target = { kind: 'session', sessionId: session.id }
@@ -205,12 +206,19 @@ function Pane({
           {/* Hidden rather than disabled: these ride on an SSH connection, and a
               desktop session will never have one to offer them. */}
           {traits.files && (
-            <button title={t('Toggle SFTP browser')} onClick={() => toggleSftp(tabId, node.id)}>
+            <button
+              className={node.sftpOpen ? 'active' : ''}
+              aria-pressed={Boolean(node.sftpOpen)}
+              title={t('Toggle SFTP browser')}
+              onClick={() => toggleSftp(tabId, node.id)}
+            >
               {t('SFTP')}
             </button>
           )}
           {traits.tunnels && (
             <button
+              className={node.tunnelsOpen ? 'active' : ''}
+              aria-pressed={Boolean(node.tunnelsOpen)}
               title={t('Toggle port forwarding')}
               onClick={() => toggleTunnels(tabId, node.id)}
             >
@@ -220,6 +228,7 @@ function Pane({
           {traits.monitor && (
             <button
               className={node.monitorOpen ? 'active' : ''}
+              aria-pressed={Boolean(node.monitorOpen)}
               disabled={!node.connectionId}
               title={t('Toggle remote monitoring')}
               onClick={() => toggleMonitor(tabId, node.id)}
@@ -248,9 +257,13 @@ function Pane({
               <DetachIcon />
             </button>
           )}
-          <button className="icon-button" title={keyHint(t('Close pane (⌘W)'))} onClick={close}>
-            <CloseIcon />
-          </button>
+          {/* A lone pane is the whole tab, and the tab's own ✕ sits right above
+              it; a second one here only doubled it. ⌘W still closes either. */}
+          {isSplit && (
+            <button className="icon-button" title={keyHint(t('Close pane (⌘W)'))} onClick={close}>
+              <CloseIcon />
+            </button>
+          )}
         </div>
       </div>
       <div className="pane-body">

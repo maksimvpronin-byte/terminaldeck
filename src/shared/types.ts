@@ -368,6 +368,12 @@ export interface GitFolderLink {
   /** Display selected inventory groups as folders instead of a flat host list. */
   showGroupFolders?: boolean
   /**
+   * A chosen group also holds the hosts of the groups beneath it, the way
+   * Ansible counts a group — children followed by name, wherever they are
+   * defined. Off, a group holds only the hosts it names itself.
+   */
+  includeChildHosts?: boolean
+  /**
    * Every group path the repository held at the last sync, chosen or not. It is
    * what makes "new" mean new: a subgroup left unticked on purpose is not
    * offered again as a discovery on the next sync.
@@ -532,8 +538,16 @@ export interface GitFolderPreviewGroup {
   parentPath: string | null
   /** Hosts this group names itself, before any parent's are counted. */
   hostCount: number
+  /** Its own hosts and every child group's, as `hostsWithChildren` counts them. */
+  hostCountWithChildren: number
   /** Not in the repository the last time this folder was synced. */
   isNew: boolean
+}
+
+/** How the chosen groups are laid out in the folder, answered alongside the choice. */
+export interface GitFolderApplyOptions {
+  showGroupFolders?: boolean
+  includeChildHosts?: boolean
 }
 
 /**
@@ -542,6 +556,7 @@ export interface GitFolderPreviewGroup {
  */
 export interface GitFolderPreview {
   showGroupFolders?: boolean
+  includeChildHosts?: boolean
   groupId: string
   groups: GitFolderPreviewGroup[]
   /** Previously chosen paths that the repository still has. */

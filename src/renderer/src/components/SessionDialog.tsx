@@ -283,6 +283,26 @@ export default function SessionDialog({
           <input value={profile.name} onChange={(e) => set('name', e.target.value)} />
         </label>
 
+        {/* Straight under the name, as a group's parent is: everything below
+            inherits from it, down to the tickbox that says whether it does. */}
+        <label>
+          {t('Group')}
+          <select
+            value={profile.groupId ?? ''}
+            onChange={(e) => set('groupId', e.target.value || null)}
+          >
+            <option value="">{t('(no group)')}</option>
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {groupPath(g.id, groups)}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {/* Beside the group, as the other thing a host belongs to. */}
+        <CollectionFields collections={collections} value={memberOf} onChange={setMemberOf} />
+
         <div className="form-row">
           <label style={{ flex: 1 }}>
             {/* The mark only where it says something — for SSH the answer is
@@ -479,21 +499,6 @@ export default function SessionDialog({
         )}
 
         <label>
-          {t('Group')}
-          <select
-            value={profile.groupId ?? ''}
-            onChange={(e) => set('groupId', e.target.value || null)}
-          >
-            <option value="">{t('(no group)')}</option>
-            {groups.map((g) => (
-              <option key={g.id} value={g.id}>
-                {groupPath(g.id, groups)}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label>
           {t('Colour')}
           <div className="colour-row">
             <button
@@ -519,8 +524,6 @@ export default function SessionDialog({
           {t('Tags (comma separated)')}
           <input value={tagsInput} onChange={(e) => setTagsInput(e.target.value)} />
         </label>
-
-        <CollectionFields collections={collections} value={memberOf} onChange={setMemberOf} />
 
         {traits.textual && (
           <details className="settings-section">

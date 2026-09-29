@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { DragEvent as ReactDragEvent } from 'react'
 import type { HostCollection } from '../../../shared/types'
 import { useStore, collectConnectedSessionIds, allRoots } from '../state/store'
 import { colorOf, findHost } from '../state/hosts'
@@ -9,6 +10,8 @@ import { useT } from '../i18n'
 import CollectionDialog from './CollectionDialog'
 import { Chevron, TreeChildren, togglesFolder } from './TreeToggle'
 import { TREE_HOST_NUDGE } from './treeIndent'
+import { HOSTS_MIME } from '../state/dnd'
+import { currentPlace, returnTo, type Place } from '../state/clickPlace'
 
 const COLLAPSED_KEY = 'terminaldeck.collapsedCollections'
 /** A set's own row sits here; its hosts hang from a branch below its arrow. */
@@ -37,6 +40,7 @@ export default function CollectionsPanel({
   const removeCollection = useStore((s) => s.removeCollection)
   const moveCollection = useStore((s) => s.moveCollection)
   const removeFromCollection = useStore((s) => s.removeFromCollection)
+  const addToCollection = useStore((s) => s.addToCollection)
   const openCollection = useStore((s) => s.openCollection)
   const openTab = useStore((s) => s.openTab)
   const revealSession = useStore((s) => s.revealSession)
@@ -61,9 +65,46 @@ export default function CollectionsPanel({
     forId?: string
   } | null>(null)
 
+  /** Where a member's first click found the window — see `state/clickPlace`. */
+  const clickedFrom = useRef<Place | null>(null)
+  /** The set a host or folder from the tree is being held over. */
+  const [dropOn, setDropOn] = useState<string | null>(null)
+
   useEffect(() => {
     loadCollections()
   }, [loadCollections])
+
+  /**
+   * A set takes whatever the tree drags onto it — a host, the ticked hosts it
+   * is one of, or every host in a folder — anywhere over the set: its row or
+   * the hosts listed under it, not a strip that has to be aimed for.
+   */
+  function allowHostsDrop(e: ReactDragEvent, collectionId: string): void {
+    if (!e.dataTransfer.types.includes(HOSTS_MIME)) return
+    e.preventDefault()
+    e.stopPropagation()
+    e.dataTransfer.dropEffect = 'copy'
+    if (dropOn !== collectionId) setDropOn(collectionId)
+  }
+
+  function leaveHostsDrop(e: ReactDragEvent, collectionId: string): void {
+    // Moving between the rows inside the set is not leaving it.
+    if (e.relatedTarget instanceof Node && e.currentTarget.contains(e.relatedTarget)) return
+    setDropOn((cur) => (cur === collectionId ? null : cur))
+  }
+
+  async function dropHosts(e: ReactDragEvent, collectionId: string): Promise<void> {
+    e.preventDefault()
+    e.stopPropagation()
+    setDropOn(null)
+    const raw = e.dataTransfer.getData(HOSTS_MIME)
+    if (!raw) return
+    const hostIds = JSON.parse(raw) as string[]
+    if (hostIds.length === 0) return
+    await addToCollection(collectionId, hostIds)
+    // Opened, so what just went in is seen going in.
+    if (collapsed.has(collectionId)) toggleCollapsed(collectionId)
+  }
 
   useEffect(() => {
     if (!fold) return
@@ -199,9 +240,17 @@ export default function CollectionsPanel({
           const members = membersOf(collection)
           const missing = members.filter((m) => m.missing).length
           return (
-            <div className="tree-group" key={collection.id}>
+            <div
+              className="tree-group"
+              key={collection.id}
+              onDragOver={(e) => allowHostsDrop(e, collection.id)}
+              onDragLeave={(e) => leaveHostsDrop(e, collection.id)}
+              onDrop={(e) => void dropHosts(e, collection.id)}
+            >
               <div
-                className={`tree-item${menu?.forId === collection.id ? ' menu-open' : ''}`}
+                className={`tree-item${menu?.forId === collection.id ? ' menu-open' : ''}${
+                  dropOn === collection.id ? ' drop-target' : ''
+                }`}
                 style={{ paddingLeft: COLLECTION_INDENT }}
                 onClick={(e) => {
                   if (togglesFolder(e, settings.expandOnArrowOnly)) toggleCollapsed(collection.id)
@@ -257,9 +306,16 @@ export default function CollectionsPanel({
                       // Past the branch drawn to it, like a host in the Sessions tree.
                       style={{ paddingLeft: COLLECTION_INDENT + TREE_HOST_NUDGE }}
                       title={m.missing ? undefined : t('Double-click to connect')}
-                      onClick={() => revealSession(m.id)}
+                      onClick={(e) => {
+                        // The second click of a double-click opens; it does not
+                        // move on to the next place the host is open in.
+                        if (e.detail > 1) return
+                        clickedFrom.current = currentPlace()
+                        revealSession(m.id)
+                      }}
                       onDoubleClick={() => {
                         if (!m.missing) {
+                          returnTo(clickedFrom.current)
                           // Opened from here, so this set lends its look.
                           openTab(
                             m.name,

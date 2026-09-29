@@ -71,6 +71,11 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   is ticked, groups that appeared since last time are ticked and marked *new*, and a subgroup you
   untick stays unticked rather than being offered again as a discovery. Ticking a group takes its
   subgroups
+- **Include hosts of child groups** makes a group hold what Ansible says it holds: its own hosts
+  and every host of every group beneath it. Children are found by name, so a kubespray-style
+  `k8s_cluster: children: kube_node:` — a reference to a group whose hosts are listed elsewhere —
+  brings those hosts in rather than nothing. The counts in the dialog follow the checkbox, and the
+  choice is remembered
 - A sync brings the folder to what the repository says now, so **a group or host that has left it
   leaves the folder** — the dialog lists what is about to go, and how many of those hosts hold
   local settings, because those and any password saved for them go with them
@@ -156,7 +161,11 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   number of them, membership has no effect on credentials, and a workspace can be saved as one
   before you close it. Hosts that later vanish are flagged rather than quietly dropped.
   Membership is also ticked in a host's own settings, under **Collections** — or in a group's,
-  which puts every host it holds (subgroups included) into a set, or takes them out
+  which puts every host it holds (subgroups included) into a set, or takes them out. Hosts and
+  groups from git or an inventory have the same ticks in their **Local settings**
+- **Drag onto a collection** to fill it: a host, the ticked hosts it is one of, or a whole folder
+  with everything inside. Hosts and folders a repository mirrors drag too — into a collection or a
+  pane, though never to another folder, since where they sit is the repository's decision
 - A collection also carries an **appearance profile** — colour and terminal theme — so a whole
   environment reads as one thing at a glance. It applies **by context**: a host wears the set's
   look where you see it under that set, and where you opened it from that set. The same machine
@@ -168,7 +177,8 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
 - **Broadcast** input to the terminals you tick, across every tab
 - **Snippet library** (`⌘K`): saved commands, run or merely pasted, stating where they will land
 - The session tree connects on **double-click** — a single click only selects, so a stray one
-  cannot open a terminal — and deleting a host or a group lives in the right-click menu behind a
+  cannot open a terminal. A single click on a host that is already open brings its pane forward;
+  a double-click, in the tree or in a collection, still opens a new tab where you were — and deleting a host or a group lives in the right-click menu behind a
   prompt, never as a button on the row
 - Hosts are **sorted by hand**: drag one onto the upper or lower edge of another to drop it into
   that gap, in its group or into a different one, and the order is kept between launches

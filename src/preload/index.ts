@@ -19,6 +19,7 @@ import type {
   InventoryOverride,
   InventoryTree,
   ForwardedKey,
+  GitFolderApplyOptions,
   GitFolderPreview,
   GitFolderTree,
   GitRepo,
@@ -138,9 +139,9 @@ const api = {
     apply: (
       groupId: string,
       includedGroups: string[],
-      showGroupFolders?: boolean
+      options?: GitFolderApplyOptions
     ): Promise<GitFolderTree> =>
-      ipcRenderer.invoke(IPC.gitFolderApply, groupId, includedGroups, showGroupFolders),
+      ipcRenderer.invoke(IPC.gitFolderApply, groupId, includedGroups, options),
     saveOverride: (
       override: InventoryOverride,
       secret?: string | null,
