@@ -289,6 +289,14 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   asked for is the display's own rather than the display less a toolbar — which matters beyond
   the room it frees, since a size no monitor has is the one that cannot land pixel for pixel.
   F11 enters and leaves, and holding Escape leaves; while there, Alt+Tab reaches the far side.
+  In its place is a **small bar in the middle of the top edge**, after the one a Remote Desktop
+  client keeps there: the session's name, **minimise**, **leave full screen** and **close**. It
+  drags along the edge out of the way of whatever is under it, and dropped on **another
+  display** the window moves there and goes full screen again; a window minimised from it comes
+  back full screen too. Its **pin** keeps it on screen, or lets it slide away until the pointer
+  is pushed against the top edge above it. It lies over the picture rather than taking a strip
+  of it, and its labels are drawn by the page — none of them is a system tooltip that could be
+  left behind.
   On a Mac that is **⌥Tab**: `⌘Tab` is the system's own switcher, taken by macOS below the level
   any application can reach, so it never arrives — while `⌥Tab` is reserved for nothing there and
   lands on the far machine as the Alt+Tab that Windows is waiting for

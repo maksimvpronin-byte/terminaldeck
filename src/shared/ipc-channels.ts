@@ -201,6 +201,13 @@ export const IPC = {
   uiForwardKey: 'ui:forwardKey',
   /** renderer -> main: give the window its keyboard back after `confirm()`. See renderer confirm.ts. */
   uiRefocus: 'ui:refocus',
+  /**
+   * renderer -> main: the bar over a full-screen desktop, asking for what only
+   * the window can do — minimise, or move to the display under the pointer.
+   * See main/fullscreenWindow.ts.
+   */
+  uiMinimizeFullscreen: 'ui:minimizeFullscreen',
+  uiMoveFullscreen: 'ui:moveFullscreen',
 
   /**
    * The two things a sandboxed preload cannot do for itself.

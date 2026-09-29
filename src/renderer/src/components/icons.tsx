@@ -189,3 +189,47 @@ export function CollapseAllIcon(): JSX.Element {
     </svg>
   )
 }
+
+/**
+ * The bar over a full-screen desktop: a pin, the minimise line, and full
+ * screen leaving. Outlined pin while the bar hides itself, filled while it
+ * stays — the same reading as the pin on a Remote Desktop client's own bar.
+ */
+export function PinIcon({ pinned }: { pinned: boolean }): JSX.Element {
+  return (
+    <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" focusable="false">
+      <path
+        d="M5.5 2h5l-.8 4.2 2.3 2.3H4.9l2.3-2.3z"
+        fill={pinned ? 'currentColor' : 'none'}
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+      />
+      <line x1="8" y1="8.5" x2="8" y2="14" stroke="currentColor" strokeWidth="1.3" />
+    </svg>
+  )
+}
+
+export function MinimizeIcon(): JSX.Element {
+  return (
+    <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" focusable="false">
+      <line x1="3.5" y1="12" x2="12.5" y2="12" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  )
+}
+
+/** Four corners turned inwards: the picture coming back into its window. */
+export function LeaveFullscreenIcon(): JSX.Element {
+  return (
+    <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" focusable="false">
+      <path
+        d="M6 2.5V6H2.5M10 2.5V6h3.5M6 13.5V10H2.5M10 13.5V10h3.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}

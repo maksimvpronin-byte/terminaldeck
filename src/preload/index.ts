@@ -490,6 +490,12 @@ const api = {
     setKeyboardCapture: (held: boolean): void => ipcRenderer.send(IPC.uiKeyboardCapture, held),
     /** Hands the keyboard back to the page after a `confirm()`; see renderer `confirm.ts`. */
     refocus: (): void => ipcRenderer.send(IPC.uiRefocus),
+    /** Minimises a window a pane holds full screen; the pane takes it back on restore. */
+    minimizeFullscreen: (paneId: string): Promise<void> =>
+      ipcRenderer.invoke(IPC.uiMinimizeFullscreen, paneId),
+    /** Moves a full-screen pane to the display under the pointer; false if it is already there. */
+    moveFullscreen: (paneId: string): Promise<boolean> =>
+      ipcRenderer.invoke(IPC.uiMoveFullscreen, paneId),
     /** A key main had to claim, arriving as its `code`, for the session to send. */
     onForwardKey: (cb: (key: ForwardedKey) => void): (() => void) => {
       const listener = (_e: unknown, key: ForwardedKey): void => cb(key)

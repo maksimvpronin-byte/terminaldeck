@@ -377,6 +377,19 @@ export const ru: Record<string, string> = {
   'Or tell the session the density and it draws itself larger, sharply':
     'Или сообщите сессии плотность — она нарисует себя крупнее и резко',
   'Full screen (F11) — hold Escape to leave': 'Полный экран (F11) — удерживайте Escape для выхода',
+  'Unpin: hide until the pointer reaches the top edge':
+    'Открепить: прятать, пока указатель не дойдёт до верхнего края',
+  'Pin: keep the bar on screen': 'Закрепить: панель всегда на экране',
+  'Let go to move to that display': 'Отпустите — окно переедет на этот экран',
+  Minimize: 'Свернуть',
+  'Leave full screen (F11)': 'Выйти из полноэкранного режима (F11)',
+  'Close this session': 'Закрыть сессию',
+  'In full screen, a bar at the top: minimise, leave full screen, close the session':
+    'В полном экране сверху челка: свернуть, выйти из полного экрана, закрыть сессию',
+  'Drag it along the edge, or onto another display to move the window there':
+    'Её можно тянуть вдоль края, а на другой монитор — окно переедет туда',
+  'Unpinned, it hides until the pointer reaches the top edge above it':
+    'Откреплённая, она прячется, пока указатель не упрётся в верхний край над ней',
   'Include this terminal in broadcast': 'Включить этот терминал в трансляцию',
   'Move this pane to its own tab': 'Вынести панель в отдельную вкладку',
   'Toggle SFTP browser': 'Показать или скрыть файловый браузер',

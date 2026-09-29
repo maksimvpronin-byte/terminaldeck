@@ -1,4 +1,4 @@
-import { memo, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import type { DragEvent as ReactDragEvent } from 'react'
 import type { PaneNode, PaneTarget } from '../state/store'
 import { useStore, collectBroadcastTargets, activeTab, allTabs, findTab } from '../state/store'
@@ -10,6 +10,7 @@ import GraphicalHost, { toggleFullscreen } from './GraphicalHost'
 import SftpPanel from './SftpPanel'
 import TunnelsPanel from './TunnelsPanel'
 import MonitorBar from './MonitorBar'
+import FullscreenBar from './FullscreenBar'
 import { protocolOf, traitsOf } from '../../../shared/protocols'
 import { SplitRightIcon, SplitDownIcon, CloseIcon, DetachIcon } from './icons'
 import Hint from './Hint'
@@ -90,6 +91,19 @@ function Pane({
    */
   const [measured, setMeasured] = useState('')
 
+  /**
+   * Whether this pane is the one holding the screen — the bar over a
+   * full-screen desktop is drawn only then. `fullscreenchange` goes to every
+   * pane, so each asks about itself.
+   */
+  const [fullscreen, setFullscreen] = useState(false)
+  useEffect(() => {
+    const onChange = (): void =>
+      setFullscreen(rootRef.current !== null && document.fullscreenElement === rootRef.current)
+    document.addEventListener('fullscreenchange', onChange)
+    return () => document.removeEventListener('fullscreenchange', onChange)
+  }, [])
+
   const documentVisible = useDocumentVisible()
   const visible = isActiveTab && documentVisible
   const isActive = isActiveTab && activePaneId === node.id
@@ -130,6 +144,11 @@ function Pane({
     splitPaneWith(tabId, node.id, dir, position, title, target)
   }
 
+  const close = (): void => {
+    morphClose(rootRef.current, hostOfLeaf(node))
+    closePane(tabId, node.id)
+  }
+
   return (
     <div
       className={`pane ${isActive ? 'active' : ''}`}
@@ -140,6 +159,9 @@ function Pane({
       onDrop={onDrop}
     >
       {dropEdge && <div className={`pane-drop-hint ${dropEdge}`} />}
+      {fullscreen && rootRef.current && (
+        <FullscreenBar paneId={node.id} title={node.title} pane={rootRef.current} onClose={close} />
+      )}
       <div
         className={`pane-toolbar ${broadcast && node.broadcastEnabled ? 'broadcasting' : ''}`}
         style={node.color ? { borderLeft: `3px solid ${node.color}` } : undefined}
@@ -226,14 +248,7 @@ function Pane({
               <DetachIcon />
             </button>
           )}
-          <button
-            className="icon-button"
-            title={keyHint(t('Close pane (⌘W)'))}
-            onClick={() => {
-              morphClose(rootRef.current, hostOfLeaf(node))
-              closePane(tabId, node.id)
-            }}
-          >
+          <button className="icon-button" title={keyHint(t('Close pane (⌘W)'))} onClick={close}>
             <CloseIcon />
           </button>
         </div>
@@ -268,12 +283,9 @@ function Pane({
             admin={admin}
             onMeasured={setMeasured}
             onSession={(desktopId) => setPaneDesktop(tabId, node.id, desktopId)}
-            onSignedOut={() => {
-              // As if its close button had been pressed: the session it held is
-              // gone from the host, and the tab goes with its last pane.
-              morphClose(rootRef.current, hostOfLeaf(node))
-              closePane(tabId, node.id)
-            }}
+            // As if its close button had been pressed: the session it held is
+            // gone from the host, and the tab goes with its last pane.
+            onSignedOut={close}
             paneVisible={visible}
             restored={node.restored}
           />

@@ -1018,9 +1018,9 @@ label {
  * which is the one case where the picture cannot land pixel for pixel however
  * the density is negotiated. Out of the flow, the body is the screen exactly.
  *
- * Nothing is left at the top to find it by. F11 leaves, and so does holding
- * Escape; both are stated in the help, and neither needs a strip of interface
- * kept over the picture to be reachable.
+ * What is left at the top is the small bar below, laid over the picture
+ * rather than taking a strip of it. F11 leaves as well, and so does holding
+ * Escape.
  */
 /**
  * No frame around a pane that is the only thing on the screen.
@@ -1053,8 +1053,116 @@ label {
  * keystroke: F11 leaves full screen, and so does holding Escape.
  *
  * `display: none` rather than a transform, so there is no element there to be
- * hovered, focused, or left holding a tooltip. */
+ * hovered, focused, or left holding a tooltip. Its place is taken by
+ * `.fullscreen-bar`, which draws its labels itself. */
 .pane:fullscreen .pane-toolbar {
+  display: none;
+}
+
+/**
+ * The bar over a full-screen desktop, in place of the toolbar — see
+ * FullscreenBar.tsx for why it is small, why it moves, and why nothing on it
+ * has a `title`.
+ *
+ * Laid over the picture rather than in the flow, so the desktop is still asked
+ * for the size of the display itself. Tucked, it is moved up out of sight and
+ * made `hidden` once it is there: no element left at the top to be hovered,
+ * and its labels go with it.
+ */
+.fullscreen-bar {
+  position: absolute;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  padding: 0 4px;
+  background: color-mix(in srgb, var(--bg-1) 92%, transparent);
+  border: 1px solid var(--border);
+  border-top: 0;
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+  transition:
+    transform 160ms var(--ease-out),
+    left 120ms var(--ease-out),
+    visibility 0s;
+}
+.fullscreen-bar.tucked {
+  transform: translateY(-100%);
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    transform 160ms var(--ease-out),
+    visibility 0s linear 160ms;
+}
+/* Under the pointer while it is being dragged, not gliding after it. */
+.fullscreen-bar.dragging {
+  cursor: grabbing;
+  transition: none;
+}
+.fullscreen-bar.away {
+  border-color: var(--accent);
+}
+.fullscreen-bar-title {
+  max-width: 360px;
+  padding: 0 10px;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--text);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.fullscreen-bar.away .fullscreen-bar-title {
+  color: var(--accent);
+}
+.fullscreen-bar-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 22px;
+  padding: 0;
+  line-height: 0;
+  color: var(--text-dim);
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+}
+.fullscreen-bar-button:hover {
+  color: var(--text);
+  background: var(--bg-3);
+}
+.fullscreen-bar-button.active {
+  color: var(--accent);
+}
+.fullscreen-bar-button.danger:hover {
+  color: #fff;
+  background: var(--danger);
+}
+/* The label, drawn by the page rather than the system: below the button,
+   since above it is the edge of the display. */
+.fullscreen-bar-button[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 8px;
+  font-size: 11px;
+  line-height: 1.3;
+  white-space: nowrap;
+  color: var(--text);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  pointer-events: none;
+}
+.fullscreen-bar.dragging .fullscreen-bar-button::after {
   display: none;
 }
 

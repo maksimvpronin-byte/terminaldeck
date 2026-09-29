@@ -107,6 +107,11 @@ const SECTIONS: Section[] = [
       { what: 'On a Mac that is ⌥Tab: ⌘Tab belongs to macOS and cannot be taken from it' },
       { what: 'Hold Escape to leave full screen: while there, it belongs to the session' },
       {
+        what: 'In full screen, a bar at the top: minimise, leave full screen, close the session'
+      },
+      { what: 'Drag it along the edge, or onto another display to move the window there' },
+      { what: 'Unpinned, it hides until the pointer reaches the top edge above it' },
+      {
         what: 'A desktop with the focus takes every shortcut this app owns, ⌘W and Ctrl+W included'
       },
       { what: 'So a key aimed at the far machine cannot close a tab on this one instead' },

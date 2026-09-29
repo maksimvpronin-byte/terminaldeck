@@ -1,4 +1,5 @@
 import { registerDiagnostics } from '../diagnostics'
+import { registerFullscreenWindow } from '../fullscreenWindow'
 import { registerKeyboardCapture } from '../keyboardCapture'
 import { registerAppHandlers } from './app'
 import { registerGitFolderHandlers } from './gitFolders'
@@ -31,5 +32,6 @@ export function registerIpcHandlers(): void {
   registerRdpHandlers()
   registerAppHandlers()
   registerKeyboardCapture()
+  registerFullscreenWindow()
   registerDiagnostics()
 }
