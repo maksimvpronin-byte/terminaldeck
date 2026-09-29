@@ -6,6 +6,40 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.23.0
+
+### Added
+
+- **Drag onto a collection** to fill it: a host, the ticked hosts it is one
+  of, or a whole folder with everything inside. The set lights up wherever the
+  pointer is over it — its own row or the hosts under it. Hosts and folders
+  mirrored from git drag too, into a collection or a pane, though never to
+  another folder: where they sit is the repository's decision.
+- **Include hosts of child groups** in the git sync dialog. A group then holds
+  what Ansible says it holds — its own hosts and every host of every group
+  beneath it, children found by name — so ticking a kubespray `k8s_cluster`
+  brings its nodes in rather than nothing. The counts beside the groups follow
+  the checkbox, and the choice is remembered.
+- **Collections in Local settings.** Hosts and groups from git or an
+  inventory can be put into collections from their own settings, as saved
+  ones already could.
+
+### Changed
+
+- **Group, then Collections, right under the name** in the host dialog, and
+  Collections under the parent in the group dialog — they used to sit near
+  the bottom, where they were easy to miss.
+- **SFTP, Tunnels and Monitor light up** while their panel is open.
+- **No close button on a lone pane.** It only doubled the tab's own; a split
+  pane keeps it, and ⌘W closes either.
+
+### Fixed
+
+- **A double-click on a host that is already open** opens a new tab where you
+  were. Its first click brought the running copy forward, and the new tab
+  used to open over there instead — from a collection it looked as though the
+  host would not open at all.
+
 ## 0.22.0
 
 ### Added
