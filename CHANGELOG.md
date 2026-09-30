@@ -6,6 +6,37 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.23.1
+
+### Added
+
+- **A remote desktop types in this Mac's layout.** Letters go over as the
+  characters typed here, so fn changes the language there as it does
+  everywhere else, whatever the far side has selected. Shortcuts, arrows,
+  Space and the keypad still go as keys, so Ctrl+C is Ctrl+C in any layout.
+  It is a per-host setting, on by default — turn it off for a game or a
+  console that listens for keys rather than text.
+- **The far side's language follows.** A session starts in the layout the
+  Mac has, and Alt+Shift keeps the two level once the typing pauses, so the
+  taskbar shows the language in the menu bar. Changed over there by hand, they
+  can run the wrong way round; one ⌥⇧ in the session puts them back.
+- **⌘Tab in a full-screen desktop** is its Alt+Tab: hold ⌘, tap Tab, ⇧ to
+  go back, let go to pick. Only ⌘Tab and ⌘⇧Tab are taken from macOS, and only
+  while that desktop is full screen and in front — screenshots, fn and
+  Spotlight stay with the system, and a three-finger swipe still leaves.
+
+### Changed
+
+- **The keyboard follows a click.** A click on a host that is already open,
+  or on a tab, gives its pane the keyboard at once — a desktop too — and a
+  desktop that has just opened takes it by itself. Jumping with ⌘1…9 leaves it
+  where it was, since a focused desktop would take the next ⌘ as well.
+
+### Fixed
+
+- **Letters typed straight after fn** reached a desktop out of order and one
+  short. A desktop now takes its keys the way the terminal does.
+
 ## 0.23.0
 
 ### Added
