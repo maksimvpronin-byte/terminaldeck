@@ -10,7 +10,8 @@ const plain: RdpView = {
   pixelBudget: 3.5,
   magnification: 0,
   sendDensity: false,
-  commandAsControl: false
+  commandAsControl: false,
+  typeAsText: true
 }
 
 const pane = { width: 1400, height: 900 }

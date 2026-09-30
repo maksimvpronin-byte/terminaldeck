@@ -1681,6 +1681,23 @@ label {
      which one is active. */
   outline: none;
 }
+/* The field the keyboard really goes to — see `keysRef` in RemoteScreen. Kept
+   in the layout, since a field that is not rendered cannot be focused, and
+   made invisible and untouchable: the mouse belongs to the canvas. */
+.graphical-keys {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  resize: none;
+  overflow: hidden;
+  pointer-events: none;
+  caret-color: transparent;
+}
 /* Sized in JavaScript, from the desktop's own dimensions and the pane's, so
    that the picture keeps its shape. `flex: 1` here would hand the main axis
    back to the flexbox and stretch it — invisible for exactly as long as the

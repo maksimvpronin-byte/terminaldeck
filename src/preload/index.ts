@@ -502,6 +502,14 @@ const api = {
       const listener = (_e: unknown, key: ForwardedKey): void => cb(key)
       ipcRenderer.on(IPC.uiForwardKey, listener)
       return () => ipcRenderer.removeListener(IPC.uiForwardKey, listener)
+    },
+    /** The Mac's input language, "en" or "ru"; null off a Mac. */
+    inputLanguage: (): Promise<string | null> => ipcRenderer.invoke(IPC.uiInputLanguage),
+    /** Every change of the Mac's input language, as it happens. */
+    onInputLanguage: (cb: (language: string) => void): (() => void) => {
+      const listener = (_e: unknown, language: string): void => cb(language)
+      ipcRenderer.on(IPC.uiInputLanguageChanged, listener)
+      return () => ipcRenderer.removeListener(IPC.uiInputLanguageChanged, listener)
     }
   },
   /**

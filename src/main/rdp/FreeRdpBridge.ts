@@ -9,6 +9,7 @@ import { createRecordReader, encodeCommand, readCursor, readFrame, RECORD } from
 import { complaintIn, failureText } from './clientLog'
 import { ClipboardDownload, cleanClipboardDownloads } from './ClipboardDownload'
 import { pathsToUris, readFileClipboard, writeClipboardFiles } from './clipboardFiles'
+import { currentInputLanguage, keyboardLayoutFor } from '../inputLanguage'
 
 /**
  * Drives td-rdp, which is what draws a desktop pane.
@@ -295,6 +296,8 @@ class FreeRdpBridge {
       composition: request.composition,
       noWallpaper: request.noWallpaper,
       admin: request.admin,
+      // The layout the session starts in: this Mac's, as it stands now.
+      keyboardLayout: keyboardLayoutFor(currentInputLanguage()),
       gatewayHost: gateway?.host,
       gatewayPort: gateway?.port,
       // Stated rather than inferred: on most deployments the gateway takes the

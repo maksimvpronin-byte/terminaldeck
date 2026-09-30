@@ -41,6 +41,12 @@ mac:
       to: freerdp/lib
       filter:
         - '*.dylib'
+    # What lets ⌘Tab through to a full-screen desktop — see
+    # resources/hotkeys/td_hotkeys.c. Built by `build:hotkeys`, which
+    # `build:mac` runs first. Outside the asar, since a native module is loaded
+    # by the system's loader, which cannot read one.
+    - from: resources/hotkeys/build/td_hotkeys.node
+      to: hotkeys/td_hotkeys.node
   # Apple Silicon only, for as long as the desktop client is built by the runner
   # that packages it. `macos-latest` is arm64, so an x64 package would either
   # carry an arm64 client or fail on a path that does not exist — and the first

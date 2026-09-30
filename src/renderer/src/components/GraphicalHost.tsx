@@ -33,6 +33,7 @@ export default function GraphicalHost({
   onSession,
   onSignedOut,
   paneVisible,
+  active,
   restored
 }: {
   protocol: Protocol
@@ -74,6 +75,8 @@ export default function GraphicalHost({
   /** False while another tab is in front: a pane nobody is looking at is not
    *  sent any pixels until it comes back. */
   paneVisible: boolean
+  /** The pane in front of its tab, which a click on its host or tab focuses. */
+  active?: boolean
   /**
    * Came back from a saved layout, so it waits for "New session" rather than
    * connecting — as a terminal does, and for the same reasons: dialling every
@@ -82,6 +85,7 @@ export default function GraphicalHost({
   restored?: boolean
 }): JSX.Element {
   const [phase, setPhase] = useState<Phase>({ at: 'loading' })
+  const focusRequest = useStore((s) => s.focusRequest)
   const [username, setUsername] = useState('')
   /** Only ever typed, and only when the host has none saved. */
   const [password, setPassword] = useState('')
@@ -293,6 +297,8 @@ export default function GraphicalHost({
       {running && (sessionId || (quick && host)) && (
         <RemoteScreen
           visible={paneVisible}
+          active={active}
+          focusRequest={focusRequest}
           key={attempt}
           sessionId={sessionId}
           quick={

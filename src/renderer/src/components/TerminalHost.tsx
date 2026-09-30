@@ -319,9 +319,12 @@ export default function TerminalHost({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // `focusRequest` too: a click on the tab or host of the pane already in
+  // front leaves `active` as it was, and the focus on whatever was clicked.
+  const focusRequest = useStore((s) => s.focusRequest)
   useEffect(() => {
     if (active) termRef.current?.focus()
-  }, [active])
+  }, [active, focusRequest])
 
   // Apply appearance changes to terminals that are already open.
   useEffect(() => {

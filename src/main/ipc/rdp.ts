@@ -256,7 +256,8 @@ export function registerRdpHandlers(): void {
       pixelBudget: rdp.pixelBudget,
       magnification: rdp.magnification,
       sendDensity: rdp.sendDensity,
-      commandAsControl: rdp.commandAsControl
+      commandAsControl: rdp.commandAsControl,
+      typeAsText: rdp.typeAsText
     }
     return view
   })

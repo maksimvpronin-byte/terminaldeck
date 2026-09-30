@@ -1647,6 +1647,16 @@ static BOOL configure(tdContext* td, const td_cmd* start)
 	 * is taken on a Session Host and no broker redirects it elsewhere. */
 	SET_BOOL(FreeRDP_ConsoleSession, td_cmd_bool(start, "admin", 0));
 
+	/* The layout the session starts in: whatever the Mac had selected when the
+	 * pane connected, so the far side's language indicator begins where this
+	 * keyboard is. Zero, a language with no plain Windows layout, leaves it to
+	 * the server as before. The window keeps it in step afterwards. */
+	{
+		const UINT32 layout = (UINT32)td_cmd_int(start, "keyboardLayout", 0);
+		if (layout)
+			SET_U32(FreeRDP_KeyboardLayout, layout);
+	}
+
 	SET_U32(FreeRDP_DesktopWidth, td_cmd_int(start, "width", 1280) & ~1);
 	SET_U32(FreeRDP_DesktopHeight, td_cmd_int(start, "height", 800) & ~1);
 	/**

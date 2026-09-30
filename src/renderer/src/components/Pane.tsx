@@ -300,6 +300,7 @@ function Pane({
             // gone from the host, and the tab goes with its last pane.
             onSignedOut={close}
             paneVisible={visible}
+            active={isActive}
             restored={node.restored}
           />
         )}

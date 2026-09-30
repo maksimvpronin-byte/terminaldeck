@@ -184,6 +184,129 @@ describe('desktop shortcuts', () => {
     expect(forwarded.size).toBe(0)
   })
 
+  it('types in this layout, and keeps commands as keys', async () => {
+    const view = render(<RemoteScreen {...props} visible active />)
+    await act(async () => {})
+    const screen = view.container.querySelector<HTMLElement>('.graphical-screen')!
+    const unicode = (): unknown[] =>
+      desktopSend.mock.calls
+        .filter(([, fields]) => fields.a === 'unicode')
+        .map(([, fields]) => fields)
+    desktopSend.mockClear()
+
+    // "d" on a Mac switched to Russian with fn.
+    fireEvent.keyDown(screen, { code: 'KeyD', key: 'в' })
+    fireEvent.keyUp(screen, { code: 'KeyD', key: 'в' })
+    expect(unicode()).toEqual([
+      { a: 'unicode', code: 0x432, down: true },
+      { a: 'unicode', code: 0x432, down: false }
+    ])
+    expect(keys()).toEqual([])
+
+    desktopSend.mockClear()
+    fireEvent.keyDown(screen, { code: 'ControlLeft', key: 'Control', ctrlKey: true })
+    fireEvent.keyDown(screen, { code: 'KeyC', key: 'с', ctrlKey: true })
+    fireEvent.keyUp(screen, { code: 'KeyC', key: 'с', ctrlKey: true })
+    expect(unicode()).toEqual([])
+    expect(keys()).toEqual([
+      { a: 'key', code: 0x1d, down: true, ext: false },
+      { a: 'key', code: 0x2e, down: true, ext: false },
+      { a: 'key', code: 0x2e, down: false, ext: false }
+    ])
+  })
+
+  it('types keys, as before, for a host that turned text off', async () => {
+    const look = {
+      resolution: 'fit' as const,
+      desktopWidth: 1920,
+      desktopHeight: 1080,
+      pixelBudget: 3.5,
+      magnification: 0,
+      sendDensity: false,
+      commandAsControl: false,
+      typeAsText: false
+    }
+    const view = render(<RemoteScreen {...props} look={look} visible active />)
+    await act(async () => {})
+    const screen = view.container.querySelector<HTMLElement>('.graphical-screen')!
+    desktopSend.mockClear()
+    fireEvent.keyDown(screen, { code: 'KeyD', key: 'в' })
+    fireEvent.keyUp(screen, { code: 'KeyD', key: 'в' })
+    expect(keys()).toEqual([
+      { a: 'key', code: 0x20, down: true, ext: false },
+      { a: 'key', code: 0x20, down: false, ext: false }
+    ])
+  })
+
+  it('takes the keyboard when its host or tab is clicked, not merely by becoming active', async () => {
+    const view = render(<RemoteScreen {...props} visible active={false} focusRequest={3} />)
+    await act(async () => {})
+    const screen = view.container.querySelector<HTMLElement>('.graphical-screen')!
+    // Reached with ⌘1…9: in front now, but nobody asked for the keyboard.
+    view.rerender(<RemoteScreen {...props} visible active focusRequest={3} />)
+    expect(screen.contains(document.activeElement)).toBe(false)
+    // A click on its tab or host.
+    view.rerender(<RemoteScreen {...props} visible active focusRequest={4} />)
+    expect(screen.contains(document.activeElement)).toBe(true)
+    expect(setKeyboardCapture).toHaveBeenLastCalledWith(true)
+  })
+
+  it('takes the keyboard when it opens in front, but not out of a field elsewhere', async () => {
+    const opened = render(<RemoteScreen {...props} visible active />)
+    await act(async () => {})
+    const screen = opened.container.querySelector<HTMLElement>('.graphical-screen')!
+    expect(screen.contains(document.activeElement)).toBe(true)
+    opened.unmount()
+
+    const filter = document.createElement('input')
+    document.body.append(filter)
+    filter.focus()
+    render(<RemoteScreen {...props} visible active />)
+    await act(async () => {})
+    expect(document.activeElement).toBe(filter)
+    filter.remove()
+  })
+
+  it('hands the keyboard to its hidden field, where the system’s text input can reach it', async () => {
+    const view = render(<RemoteScreen {...props} visible />)
+    await act(async () => {})
+    const screen = view.container.querySelector<HTMLElement>('.graphical-screen')!
+    const field = view.container.querySelector<HTMLTextAreaElement>('.graphical-keys')!
+    act(() => screen.focus())
+    expect(document.activeElement).toBe(field)
+    expect(setKeyboardCapture).toHaveBeenLastCalledWith(true)
+  })
+
+  it('sends on as characters any text the system composed into that field', async () => {
+    const view = render(<RemoteScreen {...props} visible />)
+    await act(async () => {})
+    const field = view.container.querySelector<HTMLTextAreaElement>('.graphical-keys')!
+    desktopSend.mockClear()
+    fireEvent.input(field, { target: { value: 'é' } })
+    expect(
+      desktopSend.mock.calls.map(([, fields]) => fields).filter((f) => f.a === 'unicode')
+    ).toEqual([
+      { a: 'unicode', code: 0xe9, down: true },
+      { a: 'unicode', code: 0xe9, down: false }
+    ])
+    expect(field.value).toBe('')
+  })
+
+  it('leaves the keyboard alone when it opens behind another pane', async () => {
+    const view = render(<RemoteScreen {...props} visible active={false} />)
+    await act(async () => {})
+    const screen = view.container.querySelector<HTMLElement>('.graphical-screen')!
+    expect(screen.contains(document.activeElement)).toBe(false)
+  })
+
+  it('leaves the keyboard alone when a click was for another pane', async () => {
+    const view = render(<RemoteScreen {...props} visible active={false} focusRequest={0} />)
+    await act(async () => {})
+    view.rerender(<RemoteScreen {...props} visible active={false} focusRequest={1} />)
+    const screen = view.container.querySelector<HTMLElement>('.graphical-screen')!
+    expect(screen.contains(document.activeElement)).toBe(false)
+  })
+
   it('keeps the focused desktop captured when an unfocused sibling closes', async () => {
     const first = render(<RemoteScreen {...props} visible />)
     const second = render(<RemoteScreen {...props} sessionId="second" visible />)
@@ -418,7 +541,8 @@ describe('a pinned desktop whose pin changes', () => {
     pixelBudget: 3.5,
     magnification: 0,
     sendDensity: false,
-    commandAsControl: false
+    commandAsControl: false,
+    typeAsText: true
   })
   const props = {
     sessionId: 'host',

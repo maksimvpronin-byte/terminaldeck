@@ -7,6 +7,8 @@ import { registerIpcHandlers } from './ipc/handlers'
 import { recoverInterruptedImport } from './store/Backup'
 import { desktopHoldsKeyboard, releaseKeyboard } from './keyboardCapture'
 import { diag } from './diagnostics'
+import { registerSystemHotkeys } from './systemHotkeys'
+import { followInputLanguage } from './inputLanguage'
 import { installCertificateVerifier } from './rdp/CertificateTrust'
 import { freeRdpBridge } from './rdp/FreeRdpBridge'
 import { remoteEdit } from './ssh/RemoteEdit'
@@ -131,6 +133,10 @@ function createWindow(): void {
   // Leaving full screen can keep focus inside RDP. Only losing window focus
   // clears the native claim; the renderer renews it when focus returns.
   mainWindow.on('blur', releaseKeyboard)
+  // ⌘Tab and the rest of macOS's own shortcuts, for a full-screen desktop.
+  registerSystemHotkeys(mainWindow)
+  // And the Mac's layout, for a desktop to keep its own in step with.
+  followInputLanguage(mainWindow)
 
   /**
    * What the page opened goes when the page does.

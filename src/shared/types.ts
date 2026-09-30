@@ -251,6 +251,12 @@ export interface RdpDefaults {
    * desktop and this app's own shortcuts do not fire over a focused session.
    */
   commandAsControl?: boolean
+  /**
+   * Type letters as the characters this keyboard makes, not as the keys it
+   * has, so the far end prints whatever layout is chosen here and its own is
+   * never consulted. On by default — see `textKey`.
+   */
+  typeAsText?: boolean
 }
 
 /**
@@ -266,6 +272,7 @@ export type RdpView = Pick<
   | 'magnification'
   | 'sendDensity'
   | 'commandAsControl'
+  | 'typeAsText'
 >
 
 /** An RdpDefaults chain collapsed into concrete values ready to connect with. */
@@ -290,6 +297,7 @@ export interface ResolvedRdp {
   /** Whether the far end is told this display's density instead. */
   sendDensity: boolean
   commandAsControl: boolean
+  typeAsText: boolean
 }
 
 export type CursorStyle = 'block' | 'underline' | 'bar'

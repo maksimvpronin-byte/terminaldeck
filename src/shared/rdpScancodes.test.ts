@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { rdpKeyFor, substituteCommand, unicodeKey } from './rdpScancodes'
+import { rdpKeyFor, substituteCommand, textKey, unicodeKey } from './rdpScancodes'
 
 describe('rdpKeyFor', () => {
   it('names physical keys, not the letters printed on them', () => {
@@ -111,5 +111,34 @@ describe('unicodeKey', () => {
     expect(unicodeKey('ArrowLeft')).toBeUndefined()
     expect(unicodeKey('\n')).toBeUndefined()
     expect(unicodeKey('')).toBeUndefined()
+  })
+})
+
+describe('textKey', () => {
+  const press = (
+    key: string,
+    code: string,
+    mods: Partial<{ ctrlKey: boolean; altKey: boolean; metaKey: boolean }> = {}
+  ) => ({ key, code, ctrlKey: false, altKey: false, metaKey: false, ...mods })
+
+  it('sends a letter as the character this layout made of it', () => {
+    // The key for "d" on a Mac switched to Russian.
+    expect(textKey(press('в', 'KeyD'), true)).toBe(0x432)
+    expect(textKey(press('В', 'KeyD'), true)).toBe(0x412)
+    expect(textKey(press('.', 'Slash'), true)).toBe(0x2e)
+  })
+
+  it('leaves commands, space, the keypad and unprintable keys as keys', () => {
+    expect(textKey(press('с', 'KeyC', { ctrlKey: true }), true)).toBeUndefined()
+    expect(textKey(press('ы', 'KeyS', { altKey: true }), true)).toBeUndefined()
+    expect(textKey(press('в', 'KeyD', { metaKey: true }), true)).toBeUndefined()
+    expect(textKey(press(' ', 'Space'), true)).toBeUndefined()
+    expect(textKey(press('7', 'Numpad7'), true)).toBeUndefined()
+    expect(textKey(press('Enter', 'Enter'), true)).toBeUndefined()
+    expect(textKey(press('Dead', 'Quote'), true)).toBeUndefined()
+  })
+
+  it('does nothing when the host asked for keys', () => {
+    expect(textKey(press('в', 'KeyD'), false)).toBeUndefined()
   })
 })

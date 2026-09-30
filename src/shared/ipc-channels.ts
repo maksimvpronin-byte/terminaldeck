@@ -199,6 +199,10 @@ export const IPC = {
   uiKeyboardCapture: 'ui:keyboardCapture',
   /** main -> renderer: a key main had to claim, for the session to send on. */
   uiForwardKey: 'ui:forwardKey',
+  /** renderer -> main: the Mac's input language now, "en" or "ru", or null. */
+  uiInputLanguage: 'ui:inputLanguage',
+  /** main -> renderer: the Mac's input language has just changed to this. */
+  uiInputLanguageChanged: 'ui:inputLanguageChanged',
   /** renderer -> main: give the window its keyboard back after `confirm()`. See renderer confirm.ts. */
   uiRefocus: 'ui:refocus',
   /**

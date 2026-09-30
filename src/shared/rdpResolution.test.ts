@@ -95,6 +95,11 @@ describe('resolveRdp', () => {
     expect(resolveRdp({}, 'work', groups).commandAsControl).toBe(true)
   })
 
+  it('types letters as text unless a host or group turns it off', () => {
+    expect(resolveRdp({}, null, groups).typeAsText).toBe(true)
+    expect(resolveRdp({ typeAsText: false }, 'work', groups).typeAsText).toBe(false)
+  })
+
   it('stands alone when the host opts out', () => {
     expect(resolveRdp({ inheritRdp: false }, 'work', groups).gatewayHost).toBeUndefined()
   })

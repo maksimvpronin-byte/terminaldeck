@@ -179,3 +179,21 @@ describe('a collection opened as a grid', () => {
     ])
   })
 })
+
+describe('revealSession', () => {
+  it('asks the pane it brings forward for the keyboard, and asks nothing when there is none', () => {
+    useStore.setState({ workspaces: [], activeWorkspaceId: null, focusRequest: 0 })
+    const paneId = useStore.getState().openTab('db', { kind: 'session', sessionId: 'db' })
+    const tabId = useStore.getState().workspaces[0].tabs[0].id
+    useStore.getState().setPaneConnection(tabId, paneId, 'conn-1')
+
+    expect(useStore.getState().revealSession('db')).toBe(true)
+    expect(useStore.getState().focusRequest).toBe(1)
+    // The pane already in front is asked again: that is the click it answers.
+    expect(useStore.getState().revealSession('db')).toBe(true)
+    expect(useStore.getState().focusRequest).toBe(2)
+
+    expect(useStore.getState().revealSession('nowhere')).toBe(false)
+    expect(useStore.getState().focusRequest).toBe(2)
+  })
+})

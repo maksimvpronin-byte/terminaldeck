@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useT, type Translate } from '../i18n'
 import { desktopSizeFor, type DesktopSize } from '../../../shared/desktopSize'
 import { buttonEvent, PTR, wheelFlags, wheelTurns } from '../../../shared/rdpInput'
-import { rdpKeyFor, substituteCommand, unicodeKey } from '../../../shared/rdpScancodes'
+import { rdpKeyFor, substituteCommand, textKey, unicodeKey } from '../../../shared/rdpScancodes'
 import { modifierFixes } from '../../../shared/modifierSync'
 import { isLockKey, lockFlags } from '../../../shared/lockSync'
 import { IS_MAC } from '../state/keys'
@@ -44,6 +44,15 @@ interface PointerImage {
 
 interface Props {
   visible: boolean
+  /** The pane in front of its tab. */
+  active?: boolean
+  /**
+   * Bumped when a host or tab is clicked, to hand the keyboard to the active
+   * pane — see `focusActivePane`. Becoming active alone is not enough: a tab
+   * reached with ⌘1…9 has to leave the keyboard where it was, or the next ⌘2
+   * would go to the far end with everything else a focused desktop takes.
+   */
+  focusRequest?: number
   /** The saved host. Where it is reached, and as whom, is settled in main. */
   sessionId?: string
   /**
@@ -91,6 +100,21 @@ interface Props {
 const RESIZE_SETTLE = 250
 
 /**
+ * Between the presses of the Alt+Shift that keeps the far layout in step:
+ * enough for the far side to see four events rather than a burst, and short
+ * enough that what is typed meanwhile, held back until it is done, is not
+ * noticeably late.
+ */
+const LANGUAGE_KEY_GAP = 15
+
+/**
+ * How long the keys have to be still before the far layout is matched: longer
+ * than the gap between two keys of one word, short enough that the taskbar
+ * has caught up by the time anyone looks at it. See `alignLanguage`.
+ */
+const LANGUAGE_IDLE = 600
+
+/**
  * The bytes that arrived, in the form `ImageData` takes, without copying them.
  *
  * Two things are going on in one line. The obvious one: `new
@@ -122,12 +146,34 @@ function explainFailure(t: Translate, text: string): string {
   return where ? `${t(reason)} — ${where}` : t(reason)
 }
 
+/**
+ * How long after a change of the Mac's language each keystroke is described in
+ * the log. Letters typed straight after fn were arriving in a mix of the two
+ * layouts, and this is what tells a stale character from this side apart from
+ * one the far side's layout made of a key.
+ */
+const LANGUAGE_WATCH = 1500
+
+/**
+ * Which alphabet a keystroke's character is in, for that log line. Never the
+ * character itself, and never which key: together those would be the text.
+ */
+function scriptOf(key: string): string {
+  if (key.length !== 1)
+    return `no character (${key === 'Dead' || key === 'Process' || key === 'Unidentified' ? key : 'a named key'})`
+  if (/[A-Za-z]/.test(key)) return 'Latin'
+  if (/[\u0400-\u04ff]/.test(key)) return 'Cyrillic'
+  return 'another character'
+}
+
 function asPixels(bytes: Uint8Array): Uint8ClampedArray<ArrayBuffer> {
   return new Uint8ClampedArray(bytes.buffer as ArrayBuffer, bytes.byteOffset, bytes.byteLength)
 }
 
 export default function RemoteScreen({
   visible,
+  active = false,
+  focusRequest = 0,
   sessionId,
   quick,
   credentialId,
@@ -146,11 +192,28 @@ export default function RemoteScreen({
   visibleRef.current = visible
   const containerRef = useRef<HTMLDivElement | null>(null)
   /**
+   * Where the keyboard actually is: a text field nobody sees, inside the screen.
+   *
+   * The screen itself is a div, and Chromium hands a key to a div without
+   * passing it through the system's text input. That is fine until the Mac
+   * changes layout — the keys typed in that moment arrived as a burst, out of
+   * order and one short, where the same fingers in a terminal (xterm keeps a
+   * hidden textarea for the same reason) or in Chrome's address bar came
+   * through whole. So the focus sits here, and the keys bubble up to the
+   * screen's handlers exactly as before; see `takeKeyboard`.
+   */
+  const keysRef = useRef<HTMLTextAreaElement | null>(null)
+  /**
    * What the far end has been told to hold, so a release that never arrives can
    * be noticed and made good. A ref rather than a local of the keyboard effect
    * because the mouse needs it too — see `syncModifiers`.
    */
   const heldRef = useRef<Set<string>>(new Set())
+  /**
+   * Whether ⌘Tab has the far end's window switcher open, with Alt held over
+   * there for the ⌘ held here. See `switchWindows`.
+   */
+  const switchingRef = useRef(false)
   /**
    * The lock states the far end was last told, or null while that is not
    * known — a new session, or just after a lock key went through as a key.
@@ -234,6 +297,7 @@ export default function RemoteScreen({
       held: heldRef.current,
       down: (state) => event.getModifierState(state),
       commandAsControl: lookRef.current?.commandAsControl === true,
+      commandAsAlt: switchingRef.current,
       ignore: options.ignore,
       press: options.press
     })
@@ -293,6 +357,31 @@ export default function RemoteScreen({
             : state === 'Alt'
               ? key.alt
               : state === 'Meta' && key.meta
+    }
+  }
+
+  /** Gives this desktop the keyboard: its hidden field, see `keysRef`. */
+  function takeKeyboard(): void {
+    ;(keysRef.current ?? containerRef.current)?.focus()
+  }
+
+  /**
+   * Whatever text made it into the hidden field, sent on as characters.
+   *
+   * Every key is stopped on its way down, so ordinarily nothing does. What
+   * can is text the system composes on its own — an input method, a dead key
+   * finished off — which arrives as input rather than as a key. It goes over
+   * as Unicode, the way a key the keyboard has no scancode for does, and the
+   * field is emptied so nothing gathers there.
+   */
+  function sendComposed(field: HTMLTextAreaElement): void {
+    const text = field.value
+    field.value = ''
+    for (const character of text) {
+      const unit = unicodeKey(character)
+      if (unit === undefined) continue
+      tell({ a: 'unicode', code: unit, down: true })
+      tell({ a: 'unicode', code: unit, down: false })
     }
   }
 
@@ -712,6 +801,39 @@ export default function RemoteScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible])
 
+  /*
+   * A desktop that has just been opened takes the keyboard, as a new terminal
+   * does: it was double-clicked, picked from the palette, or retried, and it
+   * is what is about to be typed into. Only the pane in front of its tab — of
+   * several opened at once, that one — and never out of a field being filled
+   * in elsewhere while it connects, the tree's filter or a dialog.
+   */
+  useEffect(() => {
+    if (!active) return
+    const focused = document.activeElement as HTMLElement | null
+    const typing =
+      focused !== null &&
+      focused.closest('.pane') === null &&
+      (['INPUT', 'TEXTAREA', 'SELECT'].includes(focused.tagName) || focused.isContentEditable)
+    if (!typing) takeKeyboard()
+    // Once, at mount: a retry is a remount and is asked again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  /*
+   * The value at mount is an old request, made before this desktop existed,
+   * and is answered by the mount itself above: only a click from here on
+   * moves the keyboard.
+   */
+  const answeredRequest = useRef(focusRequest)
+  useEffect(() => {
+    if (focusRequest === answeredRequest.current) return
+    answeredRequest.current = focusRequest
+    if (active) takeKeyboard()
+    // Only a new request focuses; becoming active by itself does not.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusRequest])
+
   /* ------------------------------------------------------------- the resize */
 
   /**
@@ -821,9 +943,78 @@ export default function RemoteScreen({
      * they are not inside this effect.
      */
     const held = heldRef.current
+    /**
+     * Keys whose press went as a character, so their release is not sent as a
+     * key that was never pressed. See `textKey`.
+     */
+    const typed = new Set<string>()
+    /**
+     * Keys pressed while the far layout is being switched — see
+     * `alignLanguage` — held back until it is done. Typed straight after fn,
+     * a letter would otherwise land between that Alt and its Shift and arrive
+     * as Alt+letter: a menu opening in whatever program was in front.
+     */
+    const waiting: Array<() => void> = []
+    let switchingLayout = false
+    /** When this Mac last said its language changed; see `LANGUAGE_WATCH`. */
+    let languageChangedAt = Number.NEGATIVE_INFINITY
+    /**
+     * The Mac's language, waiting for a pause in the typing to be matched over
+     * there — see `alignLanguage` for why it waits — and the timer counting
+     * down to that pause.
+     */
+    let languageWanted: string | null = null
+    let languageTimer: number | undefined
+
+    /**
+     * ⌘Tab, as the Alt+Tab it is on Windows.
+     *
+     * It only ever arrives in full screen, where `systemHotkeys` in the main
+     * process has asked macOS to let it through; anywhere else the system keeps
+     * it. Held ⌘ with Tab tapped is Alt held with Tab tapped, so ⌘ becomes Alt
+     * for as long as it stays down — Shift walks back, the arrows and Escape
+     * work in the switcher as they would there — and letting go of ⌘ lets go
+     * of Alt, which picks the window.
+     *
+     * Alt goes down before whatever ⌘ was standing for comes up. A Windows key
+     * released with nothing pressed since opens the Start menu, and Alt in
+     * between is exactly the something that stops it.
+     */
+    const switchWindows = (state: { getModifierState(state: string): boolean }): void => {
+      if (!switchingRef.current) {
+        switchingRef.current = true
+        diag('rdp', '⌘Tab: switching windows as Alt+Tab')
+        if (!held.has('AltLeft') && !held.has('AltRight') && sendKey('AltLeft', true)) {
+          held.add('AltLeft')
+        }
+        // Lets go of the Windows key or Ctrl that ⌘ was, now that ⌘ is Alt.
+        syncModifiers(state, { ignore: 'Tab' })
+      }
+      sendKey('Tab', true)
+      sendKey('Tab', false)
+    }
+
+    /** ⌘ let go while switching: Alt comes up and the window is chosen. */
+    const stopSwitching = (event: KeyboardEvent): void => {
+      switchingRef.current = false
+      diag('rdp', '⌘Tab: done switching')
+      for (const code of ['AltLeft', 'AltRight']) {
+        if (held.delete(code)) sendKey(code, false)
+      }
+      // A real Alt still held, or Shift, is put right from the event.
+      syncModifiers(event, { press: false })
+    }
 
     const onKeyDown = (event: KeyboardEvent): void => {
       if (!container.contains(document.activeElement)) return
+      // Still typing: the far layout is matched when this stops.
+      if (languageTimer !== undefined) alignWhenIdle()
+      if (switchingLayout) {
+        event.preventDefault()
+        event.stopPropagation()
+        waiting.push(() => onKeyDown(event))
+        return
+      }
       const code = substituteCommand(event.code, lookRef.current?.commandAsControl === true)
       diagKey('rdp', event, `held=${[...held].join(',') || '-'}`)
       // Every key carries the truth about every modifier, so the one this event
@@ -862,6 +1053,12 @@ export default function RemoteScreen({
         held.delete('AltLeft')
         return
       }
+      if (IS_MAC && event.metaKey && !event.altKey && event.code === 'Tab') {
+        event.preventDefault()
+        event.stopPropagation()
+        switchWindows(event)
+        return
+      }
       if (event.altKey && !event.ctrlKey && event.key === 'Home') {
         event.preventDefault()
         event.stopPropagation()
@@ -872,6 +1069,25 @@ export default function RemoteScreen({
 
       event.preventDefault()
       event.stopPropagation()
+
+      // A quick desktop has no saved look, and takes the default with it.
+      const asText = lookRef.current?.typeAsText !== false
+      const text = textKey(event, asText)
+      const sinceChange = performance.now() - languageChangedAt
+      if (sinceChange < LANGUAGE_WATCH) {
+        diag(
+          'rdp',
+          `${Math.round(sinceChange)} ms after the layout change: ${scriptOf(event.key)}, sent as ${text !== undefined ? 'text' : 'a key'}`
+        )
+      }
+      if (text !== undefined) {
+        tell({ a: 'unicode', code: text, down: true })
+        tell({ a: 'unicode', code: text, down: false })
+        typed.add(event.code)
+        return
+      }
+      // Half of a character: the finished one arrives with the next key.
+      if (asText && event.key === 'Dead') return
 
       if (sendKey(code, true)) {
         held.add(code)
@@ -891,12 +1107,23 @@ export default function RemoteScreen({
 
     const onKeyUp = (event: KeyboardEvent): void => {
       if (!container.contains(document.activeElement)) return
+      if (switchingLayout) {
+        event.preventDefault()
+        event.stopPropagation()
+        waiting.push(() => onKeyUp(event))
+        return
+      }
       const code = substituteCommand(event.code, lookRef.current?.commandAsControl === true)
       diagKey('rdp', event, `held=${[...held].join(',') || '-'}`)
       event.preventDefault()
       event.stopPropagation()
+      if (switchingRef.current && (event.code === 'MetaLeft' || event.code === 'MetaRight')) {
+        // What ⌘ stood for was let go when switching began.
+        stopSwitching(event)
+        return
+      }
       held.delete(code)
-      sendKey(code, false)
+      if (!typed.delete(event.code)) sendKey(code, false)
       /*
        * And again afterwards, because a release can be the thing that puts the
        * two ends out of step rather than the thing that fixes it. With ⌘ acting
@@ -914,6 +1141,8 @@ export default function RemoteScreen({
       diag('rdp', `focus lost, releasing ${[...held].join(',') || 'nothing'}`)
       for (const code of held) sendKey(code, false)
       held.clear()
+      typed.clear()
+      switchingRef.current = false
       releaseButtonsRef.current()
       focusIn()
     }
@@ -926,7 +1155,98 @@ export default function RemoteScreen({
         target instanceof Element && target.closest('.graphical-screen') !== null
       )
     }
-    const onFocus = (): void => captureFor(document.activeElement)
+    /**
+     * The far side's layout, kept in step with this Mac's.
+     *
+     * What is typed never depended on it — letters go over as the characters
+     * this Mac made, see `textKey` — but the language on its taskbar did, and
+     * so does any program that reads keys rather than text. RDP has no message
+     * for a client that changed its layout, so the session starts in the one
+     * this Mac had at connect (main sends it with the start), and afterwards
+     * this presses the far side's own Alt+Shift whenever this Mac's language
+     * changes under a focused desktop, or differs from it on coming back.
+     *
+     * Alt+Shift rather than Win+Space: it is Windows' own default for changing
+     * the input language, on every version, it opens no flyout, and it is what
+     * people already press there — Win+Space was tried first and a Server's
+     * taskbar did not move for it. Pressed at a hand's pace rather than all in
+     * one instant, since the language hotkey is read from the key-up of a
+     * combination and a burst of four events is not a hand.
+     *
+     * And only in a pause. Windows drops and reorders characters that arrive
+     * while it is changing language under a program — a letter typed straight
+     * after fn came out as a letter from the middle of the word — and the
+     * notice from macOS arrives some 250 ms after fn, by when the next word is
+     * well under way. What is typed does not need the far layout at all, so
+     * the switch waits until the keys have been still for `LANGUAGE_IDLE`,
+     * and the taskbar catches up then.
+     *
+     * Either means "the next language", not "this one", so what the far side
+     * has is remembered here rather than known. With the usual two languages on
+     * each side that is the same thing. A language changed over there by hand
+     * — from its language bar, or its own shortcut — is not seen, and the two
+     * then run the wrong way round until ⌥⇧ over there puts them back; what is
+     * typed stays right throughout.
+     */
+    let farLanguage: string | null = null
+    void window.td.ui.inputLanguage().then((language) => {
+      farLanguage ??= language
+    })
+    const switchTimers = new Set<number>()
+    const alignLanguage = (language: string | null): void => {
+      if (!language || language === farLanguage) return
+      if (farLanguage === null) {
+        farLanguage = language
+        return
+      }
+      // Not while it is not ours to press keys in, and not into a session that
+      // is not there yet: the press would be lost and the memory of it kept.
+      if (!visibleRef.current || !container.contains(document.activeElement)) return
+      if (!idRef.current) return
+      // Nor over a hand already holding either key: the press would be its own.
+      if (['AltLeft', 'AltRight', 'ShiftLeft', 'ShiftRight'].some((code) => held.has(code))) return
+      diag('rdp', `layout ${farLanguage} → ${language}: Alt+Shift over there`)
+      const presses: Array<[string, boolean]> = [
+        ['AltLeft', true],
+        ['ShiftLeft', true],
+        ['ShiftLeft', false],
+        ['AltLeft', false]
+      ]
+      switchingLayout = true
+      presses.forEach(([code, down], step) => {
+        const timer = window.setTimeout(() => {
+          switchTimers.delete(timer)
+          sendKey(code, down)
+          if (step < presses.length - 1) return
+          // Done: what was typed meanwhile goes now, in the order it was typed.
+          switchingLayout = false
+          for (const run of waiting.splice(0)) run()
+        }, step * LANGUAGE_KEY_GAP)
+        switchTimers.add(timer)
+      })
+      farLanguage = language
+    }
+    /** Matches the far layout once the keys have been still for a while. */
+    const alignWhenIdle = (language: string | null = languageWanted): void => {
+      languageWanted = language
+      window.clearTimeout(languageTimer)
+      languageTimer = window.setTimeout(() => {
+        languageTimer = undefined
+        alignLanguage(languageWanted)
+      }, LANGUAGE_IDLE)
+    }
+    const stopLanguage = window.td.ui.onInputLanguage((language) => {
+      languageChangedAt = performance.now()
+      alignWhenIdle(language)
+    })
+
+    const onFocus = (): void => {
+      captureFor(document.activeElement)
+      // The layout may have changed while another application had the keys.
+      if (container.contains(document.activeElement)) {
+        void window.td.ui.inputLanguage().then((language) => alignWhenIdle(language))
+      }
+    }
     const onBlur = (event: FocusEvent): void => {
       releaseAll()
       captureFor(event.relatedTarget)
@@ -952,8 +1272,12 @@ export default function RemoteScreen({
      * Every mounted pane hears this; only the one actually holding focus
      * acts on it.
      */
-    const stopForwarded = window.td.ui.onForwardKey((key) => {
+    const onForwarded = (key: ForwardedKey): void => {
       if (!visibleRef.current || !container.contains(document.activeElement)) return
+      if (switchingLayout) {
+        waiting.push(() => onForwarded(key))
+        return
+      }
       diag(
         'rdp',
         `forwarded from main ${key.code} mods=${describeModifiers({ ctrl: key.control, shift: key.shift, alt: key.alt, meta: key.meta })}`
@@ -970,10 +1294,15 @@ export default function RemoteScreen({
        * that had been released too early made those two arrive as a bare
        * letter.
        */
+      if (IS_MAC && key.meta && !key.alt && key.code === 'Tab') {
+        switchWindows(modifierStateOf(key))
+        return
+      }
       syncModifiers(modifierStateOf(key), { ignore: key.code })
       sendKey(key.code, true)
       sendKey(key.code, false)
-    })
+    }
+    const stopForwarded = window.td.ui.onForwardKey(onForwarded)
 
     container.addEventListener('keydown', onKeyDown)
     container.addEventListener('keyup', onKeyUp)
@@ -985,6 +1314,9 @@ export default function RemoteScreen({
 
     return () => {
       stopForwarded()
+      stopLanguage()
+      window.clearTimeout(languageTimer)
+      for (const timer of switchTimers) window.clearTimeout(timer)
       container.removeEventListener('keydown', onKeyDown)
       container.removeEventListener('keyup', onKeyUp)
       container.removeEventListener('focus', onFocus, true)
@@ -1088,7 +1420,7 @@ export default function RemoteScreen({
          * key goes nowhere at all. Alt+Tab is the one that shows it first,
          * since the lock has just made this the only route it has.
          */
-        container.focus()
+        takeKeyboard()
       } else {
         keyboard?.unlock()
       }
@@ -1139,12 +1471,20 @@ export default function RemoteScreen({
       // and every key would go to whatever was focused before the pane opened.
       tabIndex={0}
       onMouseDown={(e) => {
-        containerRef.current?.focus()
+        takeKeyboard()
         onMouse(e, true)
       }}
       onMouseUp={(e) => e.preventDefault()}
       onMouseMove={(e) => onMouse(e, null)}
-      onFocus={focusIn}
+      onFocus={(e) => {
+        // Focused itself — by Tab, or by anything that focuses the screen —
+        // it passes the keyboard on to the field that takes it properly.
+        if (e.target === e.currentTarget && keysRef.current) {
+          keysRef.current.focus()
+          return
+        }
+        focusIn()
+      }}
       // The far side's own menu, not this machine's.
       onContextMenu={(e) => e.preventDefault()}
       onWheel={(e) => {
@@ -1161,6 +1501,22 @@ export default function RemoteScreen({
         }
       }}
     >
+      <textarea
+        ref={keysRef}
+        className="graphical-keys"
+        aria-label={t('Keyboard for the remote desktop')}
+        tabIndex={-1}
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck={false}
+        onInput={(e) => {
+          // Mid-composition the text is not finished; it goes when it is.
+          if ((e.nativeEvent as InputEvent).isComposing) return
+          sendComposed(e.currentTarget)
+        }}
+        onCompositionEnd={(e) => sendComposed(e.currentTarget)}
+      />
       <canvas ref={canvasRef} className="graphical-canvas" />
       {clipboardStatus && (
         <div

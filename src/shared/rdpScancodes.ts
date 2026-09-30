@@ -210,3 +210,35 @@ export function unicodeKey(key: string): number | undefined {
   // Control characters have keys of their own and must not come this way.
   return unit >= 0x20 && unit !== 0x7f ? unit : undefined
 }
+
+/**
+ * A keystroke to send as the character it typed rather than as the key, or
+ * nothing when it has to go as the key.
+ *
+ * A key alone says nothing about the layout: the far end applies its own, so a
+ * Mac switched to Russian with fn still types English on a desktop left in
+ * English — the switch is taken by macOS and never gets there. The character
+ * is what this side already worked out with its own layout, so sending that
+ * makes the far end's layout beside the point. Dead keys and compositions come
+ * out right as well, since only the finished character is ever sent.
+ *
+ * Only what is plainly typing, though. With Ctrl, ⌥ or ⌘ down the keystroke is
+ * a command, and Windows reads Ctrl+C off the key — in any layout, Russian
+ * included — so it stays a key. Space, the keypad and everything unprintable
+ * stay keys too: a game or a keypad-driven program listens for the key, and
+ * Num Lock is kept in step for the keypad's sake.
+ */
+export function textKey(
+  event: {
+    key: string
+    code: string
+    ctrlKey: boolean
+    altKey: boolean
+    metaKey: boolean
+  },
+  enabled: boolean
+): number | undefined {
+  if (!enabled || event.ctrlKey || event.altKey || event.metaKey) return undefined
+  if (event.code === 'Space' || event.code.startsWith('Numpad')) return undefined
+  return unicodeKey(event.key)
+}

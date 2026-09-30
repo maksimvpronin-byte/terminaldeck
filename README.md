@@ -177,8 +177,11 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
 - **Broadcast** input to the terminals you tick, across every tab
 - **Snippet library** (`⌘K`): saved commands, run or merely pasted, stating where they will land
 - The session tree connects on **double-click** — a single click only selects, so a stray one
-  cannot open a terminal. A single click on a host that is already open brings its pane forward;
-  a double-click, in the tree or in a collection, still opens a new tab where you were — and deleting a host or a group lives in the right-click menu behind a
+  cannot open a terminal. A single click on a host that is already open brings its pane forward
+  and hands it the keyboard, a remote desktop included — as does a click on a tab (`⌘1`…`⌘9` do
+  not, since a focused desktop would take the next one too);
+  a double-click, in the tree or in a collection, still opens a new tab where you were, and a
+  desktop opened that way takes the keyboard as a new terminal does — and deleting a host or a group lives in the right-click menu behind a
   prompt, never as a button on the row
 - Hosts are **sorted by hand**: drag one onto the upper or lower edge of another to drop it into
   that gap, in its group or into a different one, and the order is kept between launches
@@ -307,9 +310,13 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   is pushed against the top edge above it. It lies over the picture rather than taking a strip
   of it, and its labels are drawn by the page — none of them is a system tooltip that could be
   left behind.
-  On a Mac that is **⌥Tab**: `⌘Tab` is the system's own switcher, taken by macOS below the level
-  any application can reach, so it never arrives — while `⌥Tab` is reserved for nothing there and
-  lands on the far machine as the Alt+Tab that Windows is waiting for
+  On a Mac that is **⌘Tab**, as well as `⌥Tab`: macOS answers `⌘Tab` below the level any
+  application can reach, so for a full-screen desktop in front the app asks the window server to
+  let `⌘Tab` and `⌘⇧Tab` through — those two and nothing else, so the screenshot keys, fn and
+  Spotlight stay with macOS, and no Accessibility permission is needed. Held `⌘` is then Alt
+  held over there, Shift walks back, and letting go picks the window. Leaving full screen,
+  clicking outside the desktop or swiping to another space with three fingers gives `⌘Tab` back;
+  and should the app ever end without doing so, its next start does
 - **Full screen hands the whole keyboard to the session.** Every shortcut this application owns
   stands down while a desktop is full screen — `⌘W`/`Ctrl+W`, the tab and workspace numbers, the
   snippet and host palettes, the vault lock, the zoom keys, and on a Mac the menu accelerators
@@ -320,7 +327,20 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   changes — the app's shortcuts still fire, so the tabs stay reachable from the keyboard
 - **Send ⌘ as Ctrl**, per host and off by default. Copy and paste then land where they do on
   Windows. ⌘Q and ⌘Tab still belong to macOS unless the session is full screen, where ⌘Q is
-  forwarded like anything else and ⌘Tab is held by the browser's keyboard lock
+  forwarded like anything else and ⌘Tab is the far side's Alt+Tab whichever way this is set
+- **Typed in this machine's layout**, per host and on by default: letters go over as the
+  characters typed here, so switching the layout on the Mac — fn, Ctrl+Space — is all it takes,
+  and the far side's own layout does not matter. Shortcuts, arrows, Space and the keypad still go
+  as keys, so Ctrl+C is Ctrl+C in any layout; turn it off for a game or a console that listens
+  for keys
+- **The far side's layout follows the Mac's.** A session starts in the layout the Mac has
+  selected, and each change of language under a focused desktop — or one found on coming back to
+  it — presses Alt+Shift over there, so the taskbar says the same language as the menu bar. It
+  waits for a pause in the typing to do it: Windows loses letters that arrive while it is
+  changing language under a program, and the letters never needed its layout anyway. RDP
+  has no message for a changed layout, so this is a remembered toggle rather than a known state:
+  exact with two languages each side, and put right with ⌥⇧ over there if the language is changed
+  there by hand
 - **The picture comes from a real RDP client, in a process of its own.** It is
   [FreeRDP](https://github.com/FreeRDP/FreeRDP) 3.31, built from source and shipped inside the
   application as a small program called `td-rdp`: it connects, decodes, and writes the

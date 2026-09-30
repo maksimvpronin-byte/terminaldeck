@@ -101,6 +101,8 @@ export const ru: Record<string, string> = {
     'Закрыть активную панель, а если она последняя — вкладку',
   'Jump to that tab within the current workspace':
     'Перейти к этой вкладке в текущей рабочей области',
+  'A click on a tab gives its pane the keyboard, a desktop too; a jump by number does not':
+    'Клик по вкладке отдаёт клавиатуру её панели, и рабочему столу тоже; переход по номеру — нет',
   'Split the pane to the right': 'Разделить панель вправо',
   'Drag a host or a whole tab onto a pane to place them side by side':
     'Перетащите хост или целую вкладку на панель, чтобы поставить их рядом',
@@ -244,10 +246,12 @@ export const ru: Record<string, string> = {
     'Или отметьте наборы в настройках хоста — или сразу всей группы',
   'Hosts and groups from git or an inventory tick them in their Local settings':
     'Хостам и группам из git или инвентаря наборы отмечают в их локальных настройках',
-  'A click on a host already open brings its pane forward':
-    'Клик по уже открытому хосту выводит вперёд его панель',
+  'A click on a host already open brings its pane forward, keyboard and all':
+    'Клик по уже открытому хосту выводит вперёд его панель и отдаёт ей клавиатуру',
   'A double-click still opens a new tab, where you were — in a collection too':
     'Двойной клик всё равно открывает новую вкладку — там, где вы были, и в наборе тоже',
+  'A desktop just opened takes the keyboard, as a new terminal does':
+    'Только что открытый рабочий стол сразу получает клавиатуру, как новый терминал',
   'Or drag a host, the ticked hosts, or a whole folder onto a set — one from git too':
     'Или перетащите на набор хост, отмеченные хосты или целую папку — в том числе из git',
   'Right-click to download, rename, delete, or make a folder':
@@ -592,8 +596,12 @@ export const ru: Record<string, string> = {
   'Copying files between the two sides is not back yet — see the release notes':
     'Обмен файлами между сторонами пока не вернулся — см. заметки к выпуску',
   'Send ⌘ as Ctrl': 'Отправлять ⌘ как Ctrl',
-  "Copy and paste then land where they do on Windows. While the desktop has the keyboard this app's own ⌘ shortcuts do not fire; ⌘Q and ⌘Tab still belong to macOS.":
-    'Тогда копирование и вставка окажутся там же, где в Windows. Пока клавиатура у рабочего стола, собственные сочетания приложения с ⌘ не срабатывают; ⌘Q и ⌘Tab по-прежнему принадлежат macOS.',
+  'Keyboard for the remote desktop': 'Клавиатура удалённого рабочего стола',
+  "Copy and paste then land where they do on Windows. While the desktop has the keyboard this app's own ⌘ shortcuts do not fire. ⌘Tab stays with macOS in a window; in full screen it is the far side's Alt+Tab either way.":
+    'Тогда копирование и вставка окажутся там же, где в Windows. Пока клавиатура у рабочего стола, собственные сочетания приложения с ⌘ не срабатывают. ⌘Tab в окне остаётся за macOS, а в полном экране в любом случае становится Alt+Tab той стороны.',
+  'Type in this machine’s layout': 'Печатать в раскладке этого компьютера',
+  'Letters go over as the characters typed here, so switching the layout on this side — fn on a Mac — is all it takes, and the far side’s own layout does not matter. Shortcuts, arrows, Space and the keypad still go as keys. Turn it off for a program that listens for keys rather than text, a game or a console inside the session.':
+    'Буквы уходят готовыми символами, набранными здесь: достаточно переключить раскладку на этой стороне — на маке кнопкой fn, — а раскладка той стороны не важна. Сочетания, стрелки, пробел и цифровой блок по-прежнему идут клавишами. Выключите для программы, которая слушает клавиши, а не текст, — игры или консоли внутри сеанса.',
   'Could not connect': 'Не удалось подключиться',
   'The host says': 'Хост сообщает',
   'Session ended': 'Сессия завершена',
@@ -1146,14 +1154,26 @@ export const ru: Record<string, string> = {
     'Щёлкните вне рабочего стола, и сочетания приложения снова работают',
   '⌘Q and ⌘Tab stay with macOS in a window, and go to the session in full screen':
     '⌘Q и ⌘Tab остаются за macOS в окне и уходят в сеанс в полном экране',
+  'Letters are typed in this machine’s layout: switch it here, with fn on a Mac':
+    'Буквы печатаются в раскладке этого компьютера: переключайте её здесь, на маке — fn',
+  'The far side’s language follows: it starts in this one and Alt+Shift keeps it level':
+    'Язык той стороны следует за этим: сеанс начинается с него, а Alt+Shift держит их вровень',
+  'Changed over there by hand, the two can swap round; ⌥⇧ there puts them back':
+    'Если сменить язык там вручную, они могут поменяться местами; ⌥⇧ там всё вернёт',
+  'Shortcuts, arrows and the keypad still go as keys; turn it off per host for games':
+    'Сочетания, стрелки и цифровой блок по-прежнему идут клавишами; для игр выключается на хосте',
   'The size this desktop asked for, and what the server gave back.':
     'Размер, который запросил этот рабочий стол, и то, что вернул сервер.',
   'The pane toolbar goes entirely, so the desktop is the size of the display':
     'Панель инструментов убирается совсем, и стол становится размером с экран',
   'There is nothing of this app over the picture — the top edge belongs to the far side':
     'Ничего от этого приложения поверх картинки нет — верхний край принадлежит той стороне',
-  'On a Mac that is ⌥Tab: ⌘Tab belongs to macOS and cannot be taken from it':
-    'На маке это ⌥Tab: ⌘Tab принадлежит macOS, и отобрать его нельзя',
+  'On a Mac ⌘Tab is the Alt+Tab over there in full screen, and ⌥Tab is too':
+    'На маке в полном экране Alt+Tab той стороны — это ⌘Tab, а также ⌥Tab',
+  'macOS gets its shortcuts back on leaving; a three-finger swipe still works':
+    'При выходе сочетания возвращаются к macOS; свайп тремя пальцами работает всегда',
+  'Only ⌘Tab is taken: screenshots, fn and Spotlight stay with macOS':
+    'Забирается только ⌘Tab: скриншоты, fn и Spotlight остаются за macOS',
   'Groups to take from the repository': 'Какие группы взять из репозитория',
   'Ticking a group takes its subgroups too. Only what is ticked appears in “{folder}” — anything untied here is left in the repository, not deleted from it.':
     'Отметка на группе берёт и её подгруппы. В «{folder}» попадает только отмеченное — снятое здесь остаётся в репозитории, а не удаляется из него.',

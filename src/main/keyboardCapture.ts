@@ -17,8 +17,22 @@ import { IPC } from '../shared/ipc-channels'
  */
 let held = false
 
+/** Told whenever the claim changes hands — see `systemHotkeys`. */
+const listeners = new Set<(held: boolean) => void>()
+
+function setHeld(value: boolean): void {
+  if (value === held) return
+  held = value
+  for (const listener of listeners) listener(held)
+}
+
 export function desktopHoldsKeyboard(): boolean {
   return held
+}
+
+export function onKeyboardCapture(listener: (held: boolean) => void): () => void {
+  listeners.add(listener)
+  return () => listeners.delete(listener)
 }
 
 /**
@@ -30,12 +44,12 @@ export function desktopHoldsKeyboard(): boolean {
  * shortcut that would fix it.
  */
 export function releaseKeyboard(): void {
-  held = false
+  setHeld(false)
 }
 
 export function registerKeyboardCapture(): void {
   ipcMain.on(IPC.uiKeyboardCapture, (_e, capture: boolean) => {
-    held = capture === true
+    setHeld(capture === true)
   })
 
   /**

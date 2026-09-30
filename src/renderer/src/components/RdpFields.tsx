@@ -319,7 +319,19 @@ export default function RdpFields({
         />
         <Hint label={t('Send ⌘ as Ctrl')}>
           {t(
-            "Copy and paste then land where they do on Windows. While the desktop has the keyboard this app's own ⌘ shortcuts do not fire; ⌘Q and ⌘Tab still belong to macOS."
+            "Copy and paste then land where they do on Windows. While the desktop has the keyboard this app's own ⌘ shortcuts do not fire. ⌘Tab stays with macOS in a window; in full screen it is the far side's Alt+Tab either way."
+          )}
+        </Hint>
+      </label>
+      <label className="checkbox-row" style={{ flexDirection: 'row' }}>
+        <input
+          type="checkbox"
+          checked={effective.typeAsText}
+          onChange={(e) => set('typeAsText', e.target.checked)}
+        />
+        <Hint label={t('Type in this machine’s layout')}>
+          {t(
+            'Letters go over as the characters typed here, so switching the layout on this side — fn on a Mac — is all it takes, and the far side’s own layout does not matter. Shortcuts, arrows, Space and the keypad still go as keys. Turn it off for a program that listens for keys rather than text, a game or a console inside the session.'
           )}
         </Hint>
       </label>

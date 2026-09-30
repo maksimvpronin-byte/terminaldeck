@@ -124,4 +124,26 @@ describe('modifierFixes with ⌘ standing in for Ctrl', () => {
       modifierFixes({ held: new Set(), down: keyboard('Meta'), commandAsControl: false })
     ).toEqual([{ code: 'MetaLeft', down: true }])
   })
+
+  it('holds Alt for ⌘ while ⌘Tab is switching windows, whatever ⌘ usually is', () => {
+    for (const commandAsControl of [false, true]) {
+      expect(
+        modifierFixes({
+          held: new Set(['AltLeft']),
+          down: keyboard('Meta', 'Shift'),
+          commandAsControl,
+          commandAsAlt: true
+        })
+      ).toEqual([{ code: 'ShiftLeft', down: true }])
+      // And never presses Win or Ctrl back while it lasts.
+      expect(
+        modifierFixes({
+          held: new Set(),
+          down: keyboard('Meta'),
+          commandAsControl,
+          commandAsAlt: true
+        })
+      ).toEqual([{ code: 'AltLeft', down: true }])
+    }
+  })
 })

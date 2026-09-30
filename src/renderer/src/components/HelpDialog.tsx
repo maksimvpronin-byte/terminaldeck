@@ -74,6 +74,9 @@ const SECTIONS: Section[] = [
       { keys: '⌘T', what: 'New tab with the same host as the focused pane' },
       { keys: '⌘W', what: 'Close the focused pane, or the tab when it is the last one' },
       { keys: '⌘1 … ⌘9', what: 'Jump to that tab within the current workspace' },
+      {
+        what: 'A click on a tab gives its pane the keyboard, a desktop too; a jump by number does not'
+      },
       { keys: '⌘D', what: 'Split the pane to the right' },
       { keys: '⌘⇧D', what: 'Split the pane downwards; Ctrl+Shift+E off a Mac' },
       { what: 'Drag a host or a whole tab onto a pane to place them side by side' },
@@ -108,7 +111,9 @@ const SECTIONS: Section[] = [
         what: 'Ctrl+Alt+Del on the far side; this machine keeps the real one'
       },
       { keys: 'F11', what: 'Full screen, which is the only way Alt+Tab reaches the far side' },
-      { what: 'On a Mac that is ⌥Tab: ⌘Tab belongs to macOS and cannot be taken from it' },
+      { what: 'On a Mac ⌘Tab is the Alt+Tab over there in full screen, and ⌥Tab is too' },
+      { what: 'macOS gets its shortcuts back on leaving; a three-finger swipe still works' },
+      { what: 'Only ⌘Tab is taken: screenshots, fn and Spotlight stay with macOS' },
       { what: 'Hold Escape to leave full screen: while there, it belongs to the session' },
       {
         what: 'In full screen, a bar at the top: minimise, leave full screen, close the session'
@@ -139,7 +144,15 @@ const SECTIONS: Section[] = [
       { what: 'How much larger is per host; nothing about the far machine is changed' },
       { what: 'Or tell the session the density and it draws itself larger, sharply' },
       { keys: '⌘ as Ctrl', what: 'Optional, per host: ⌘C and ⌘V then work as they do on Windows' },
-      { what: '⌘Q and ⌘Tab stay with macOS in a window, and go to the session in full screen' },
+      {
+        what: '⌘Q and ⌘Tab stay with macOS in a window, and go to the session in full screen'
+      },
+      { what: 'Letters are typed in this machine’s layout: switch it here, with fn on a Mac' },
+      {
+        what: 'The far side’s language follows: it starts in this one and Alt+Shift keeps it level'
+      },
+      { what: 'Changed over there by hand, the two can swap round; ⌥⇧ there puts them back' },
+      { what: 'Shortcuts, arrows and the keypad still go as keys; turn it off per host for games' },
       { what: 'A certificate the machine cannot verify is asked about once, then remembered' },
       { what: 'Settings → Security lists what was trusted by hand, and forgets it on request' },
       { what: 'The far end’s sound plays here, and can be turned off per host or group' },
@@ -182,8 +195,9 @@ const SECTIONS: Section[] = [
       { what: 'The edge stays while the row is selected, so the colour survives the click' },
       { what: 'An open host’s name is in bold as well, so it stands out on a coloured row' },
       { what: 'Settings → General → Host tree takes away the edge, or the bold' },
-      { what: 'A click on a host already open brings its pane forward' },
+      { what: 'A click on a host already open brings its pane forward, keyboard and all' },
       { what: 'A double-click still opens a new tab, where you were — in a collection too' },
+      { what: 'A desktop just opened takes the keyboard, as a new terminal does' },
       { what: 'Right-click for connect, split, duplicate, edit and delete' },
       { what: 'Deleting lives in that menu alone, behind a prompt — no button to misclick' },
       { keys: '⌘ click', what: 'Tick a host as well, to open several at once' },

@@ -45,6 +45,7 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
   broadcast: false,
   selectedHostIds: [],
   lastSelectedHostId: null,
+  focusRequest: 0,
 
   // --- selecting hosts in the tree ---
 
@@ -305,11 +306,15 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
     }))
   },
 
+  focusActivePane: () => set((s) => ({ focusRequest: s.focusRequest + 1 })),
+
   revealSession: (sessionId) => {
     const place = nextOpenPaneOf(get(), sessionId)
     if (!place) return false
     get().setActiveTab(place.tabId)
     get().setActivePane(place.tabId, place.paneId)
+    // Every caller is a click on a host, so the keyboard follows the eye.
+    get().focusActivePane()
     return true
   },
 

@@ -194,6 +194,7 @@ function validateDefaults(record: UnknownRecord, path: string): void {
     'consoleSession',
     'sendDensity',
     'commandAsControl',
+    'typeAsText',
     'inheritAppearance',
     'cursorBlink'
   ]) {

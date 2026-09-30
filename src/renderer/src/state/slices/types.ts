@@ -236,8 +236,23 @@ export interface WorkspaceSlice {
 
   setActivePane: (tabId: string, paneId: string) => void
   /**
+   * Bumped to ask the active pane to take the keyboard — see `focusActivePane`.
+   * A count rather than a flag, so asking twice for the same pane is heard twice.
+   */
+  focusRequest: number
+  /**
+   * The active pane takes the keyboard: the terminal, or the desktop.
+   *
+   * Only for a pane chosen with the mouse — a host clicked in a tree, a tab
+   * clicked in the bar. A tab reached with ⌘1…9 is left alone, because a
+   * focused desktop takes every key there is, those included, and the next ⌘2
+   * would go to Windows instead of moving on.
+   */
+  focusActivePane: () => void
+  /**
    * Brings forward a pane where this saved host is open, switching workspace
-   * and tab as needed. False when it is open nowhere, and nothing changes.
+   * and tab as needed, and gives it the keyboard. False when it is open
+   * nowhere, and nothing changes.
    */
   revealSession: (sessionId: string) => boolean
   /** A live shell, or undefined once it has closed. See `connectionId` on a leaf. */

@@ -61,6 +61,8 @@ if (typeof window !== 'undefined') {
       ui: stub({
         onZoom: () => () => undefined,
         onForwardKey: () => () => undefined,
+        inputLanguage: () => Promise.resolve(null),
+        onInputLanguage: () => () => undefined,
         refocus: () => undefined
       }),
       updates: stub({

@@ -30,6 +30,7 @@ export default function Workspace(): JSX.Element {
   const moveTabToWorkspace = useStore((s) => s.moveTabToWorkspace)
   const reorderTab = useStore((s) => s.reorderTab)
   const setActiveTab = useStore((s) => s.setActiveTab)
+  const focusActivePane = useStore((s) => s.focusActivePane)
   const closeTab = useStore((s) => s.closeTab)
   const toggleBroadcast = useStore((s) => s.toggleBroadcast)
   const broadcast = useStore((s) => s.broadcast)
@@ -275,7 +276,10 @@ export default function Workspace(): JSX.Element {
               onDragOver={(e) => allowTabReorder(e, tab.id)}
               onDragLeave={() => setTabGap((cur) => (cur?.id === tab.id ? null : cur))}
               onDrop={(e) => onTabDrop(e, tab.id)}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActiveTab(tab.id)
+                focusActivePane()
+              }}
             >
               {(() => {
                 const colour = collectLeaves(tab.root).find((l) => l.color)?.color

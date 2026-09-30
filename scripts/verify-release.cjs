@@ -243,7 +243,10 @@ function verifyPayload(directory, version) {
 const PACKAGED = {
   mac: {
     resources: 'mac-arm64/TerminalDeck.app/Contents/Resources',
-    carry: [{ file: 'freerdp/bin/td-rdp', what: 'the desktop client' }],
+    carry: [
+      { file: 'freerdp/bin/td-rdp', what: 'the desktop client' },
+      { file: 'hotkeys/td_hotkeys.node', what: 'the switch that lets ⌘Tab reach a desktop' }
+    ],
     // Copied in beside the client by bundle-macos.sh, which rewrites every
     // reference to @rpath. Without them the client loads nothing on a machine
     // that has never heard of Homebrew.

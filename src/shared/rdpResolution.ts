@@ -39,7 +39,11 @@ export const RDP_FALLBACK: ResolvedRdp = {
   magnification: 0,
   // The far end lays itself out as it always has unless a host asks otherwise.
   sendDensity: false,
-  commandAsControl: false
+  commandAsControl: false,
+  // On: a desktop that prints English while this Mac is set to Russian is the
+  // first thing anyone switching layouts runs into, and the switch itself —
+  // fn, Ctrl+Space — is taken by macOS and never reaches the far end.
+  typeAsText: true
 }
 
 const optedOut = (level: RdpDefaults): boolean => level.inheritRdp === false
@@ -104,7 +108,8 @@ export function resolveRdp(
     clipboard: firstDefined(chain, 'clipboard') ?? RDP_FALLBACK.clipboard,
     consoleSession: firstDefined(chain, 'consoleSession') ?? RDP_FALLBACK.consoleSession,
     sendDensity: firstDefined(chain, 'sendDensity') ?? RDP_FALLBACK.sendDensity,
-    commandAsControl: firstDefined(chain, 'commandAsControl') ?? RDP_FALLBACK.commandAsControl
+    commandAsControl: firstDefined(chain, 'commandAsControl') ?? RDP_FALLBACK.commandAsControl,
+    typeAsText: firstDefined(chain, 'typeAsText') ?? RDP_FALLBACK.typeAsText
   }
 }
 
