@@ -315,7 +315,9 @@ export function useZoom(): void {
       const own = focusedHostWithOwnFontSize()
       // Reset drops the host's own size so it follows the global default again.
       if (own) {
-        void zoomHost(own, direction)
+        void zoomHost(own, direction).catch((error: unknown) => {
+          console.error('[zoom] could not save the host font size', error)
+        })
         return
       }
       const { settings, updateSettings } = useStore.getState()

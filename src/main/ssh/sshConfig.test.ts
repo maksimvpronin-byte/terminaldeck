@@ -107,3 +107,24 @@ describe('parseSshConfig, as OpenSSH reads a config', () => {
     expect(hosts[0]).toMatchObject({ user: 'first', port: 2200 })
   })
 })
+
+it('strips inline comments while preserving hashes in quoted paths', () => {
+  const hosts = parseSshConfig(
+    'Host prod # production\n  User deploy # login\n  Port 2222 # alternate\n  IdentityFile "~/.ssh/key#prod" # key\n'
+  )
+  expect(hosts[0]).toMatchObject({
+    user: 'deploy',
+    port: 2222,
+    identityFile: join(homedir(), '.ssh/key#prod')
+  })
+})
+it('keeps a hash in the middle of an unquoted path, as OpenSSH does', () => {
+  const hosts = parseSshConfig('Host prod\n  IdentityFile ~/.ssh/key#prod #comment\n')
+  expect(hosts[0].identityFile).toBe(join(homedir(), '.ssh/key#prod'))
+})
+it.each(['-1', '65536', '22.5', 'Infinity', 'nonsense'])(
+  'reports invalid port %s instead of importing the wrong port',
+  (port) => {
+    expect(() => parseSshConfig(`Host prod\n  Port ${port}\n`)).toThrow('Invalid SSH port')
+  }
+)

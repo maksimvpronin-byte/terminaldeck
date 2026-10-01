@@ -105,3 +105,15 @@ describe('the reply', () => {
     expect(reply(0x05)).toHaveLength(10)
   })
 })
+
+it('never chooses an authentication method the client did not offer', () => {
+  expect(parseGreeting(Buffer.from([5, 0])).status).toBe('invalid')
+  expect(parseGreeting(Buffer.from([5, 1, 2])).status).toBe('invalid')
+  expect(parseGreeting(Buffer.from([5, 2, 2, 0])).status).toBe('ok')
+})
+it('rejects malformed request headers and empty destination names', () => {
+  const badReserved = Buffer.from(IPV4)
+  badReserved[2] = 1
+  expect(parseRequest(badReserved).status).toBe('invalid')
+  expect(parseRequest(Buffer.from([5, 1, 0, 3, 0, 0, 22])).status).toBe('invalid')
+})

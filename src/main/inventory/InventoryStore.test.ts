@@ -129,3 +129,19 @@ describe('a sync overtaken by an edit', () => {
     expect(inventoryStore.allTrees()).toHaveLength(1)
   })
 })
+
+it('applies saved source credentials to an already loaded tree without waiting for another sync', async () => {
+  inventoryStore.saveSource({ ...source, username: 'old-login' })
+  const syncing = inventoryStore.sync('src')
+  await parsing()
+  finishParse()
+  await syncing
+  const previous = inventoryStore.snapshot()
+  inventoryStore.saveSource({ ...source, username: 'new-login', name: 'renamed' })
+  expect(inventoryStore.allGroups()[0]).toMatchObject({ username: 'new-login', name: 'renamed' })
+  expect(inventoryStore.allTrees()[0].groups[0]).toMatchObject({ username: 'new-login' })
+  inventoryStore.restore(previous)
+  expect(inventoryStore.allGroups()[0].username).toBe('old-login')
+  inventoryStore.saveMany([{ ...source, username: 'imported-login' }], [])
+  expect(inventoryStore.allGroups()[0].username).toBe('imported-login')
+})

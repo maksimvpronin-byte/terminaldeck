@@ -7,6 +7,7 @@ import {
   THEMES,
   terminalDefaults,
   themeOf,
+  themeByName,
   treeRowHeightOf,
   treeTintOf
 } from './settings'
@@ -74,4 +75,9 @@ describe('how coloured rows are painted', () => {
     // A value from some other build is not trusted.
     expect(treeTintOf({ treeTint: 'stripes' as never })).toBe('fade')
   })
+})
+
+it('does not treat object prototype properties as themes', () => {
+  expect(themeByName('__proto__')).toBe(themeByName(DEFAULT_SETTINGS.themeName))
+  expect(themeByName('constructor')).toBe(themeByName(DEFAULT_SETTINGS.themeName))
 })

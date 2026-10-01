@@ -20,8 +20,8 @@ type Sender = IpcMainEvent | IpcMainInvokeEvent
  *
  * Installed once, before any handler is registered, by wrapping the three ways
  * a handler is added — so a channel added later is covered without anyone
- * having to remember. `removeListener` is wrapped with them, or a listener
- * added through the wrapper could never be taken off again.
+ * having to remember. Wrappers retain the original listener identity so the
+ * EventEmitter can remove each registration correctly.
  */
 export function installSenderCheck(isOwnPage: (url: string) => boolean): void {
   const trusted = (event: Sender): boolean => {
@@ -40,26 +40,26 @@ export function installSenderCheck(isOwnPage: (url: string) => boolean): void {
     })
 
   type Listener = Parameters<typeof ipcMain.on>[1]
-  const wrapped = new WeakMap<Listener, Listener>()
-  const wrap = (channel: string, listener: Listener): Listener => {
+  const originalOn = ipcMain.on.bind(ipcMain)
+  const originalRemove = ipcMain.removeListener.bind(ipcMain)
+  const wrap = (channel: string, listener: Listener, once = false): Listener => {
     const guarded: Listener = (event, ...args) => {
       if (!trusted(event)) {
         console.error(`[security] refused ${channel} from a page that is not TerminalDeck`)
         return
       }
+      if (once) originalRemove(channel, guarded)
       listener(event, ...args)
     }
-    wrapped.set(listener, guarded)
+    // EventEmitter.removeListener recognises this property, including when the
+    // same callback has registrations on several channels or more than once.
+    Object.defineProperty(guarded, 'listener', { value: listener })
     return guarded
   }
 
-  const originalOn = ipcMain.on.bind(ipcMain)
-  const originalOnce = ipcMain.once.bind(ipcMain)
-  const originalRemove = ipcMain.removeListener.bind(ipcMain)
   ipcMain.on = (channel, listener) => originalOn(channel, wrap(channel, listener))
-  ipcMain.once = (channel, listener) => originalOnce(channel, wrap(channel, listener))
-  ipcMain.removeListener = (channel, listener) =>
-    originalRemove(channel, wrapped.get(listener) ?? listener)
+  ipcMain.once = (channel, listener) => originalOn(channel, wrap(channel, listener, true))
+  ipcMain.removeListener = originalRemove
   ipcMain.off = ipcMain.removeListener
 }
 

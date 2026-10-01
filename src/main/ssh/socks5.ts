@@ -34,8 +34,12 @@ export function parseGreeting(buf: Buffer): Parsed {
   if (buf.length < 2) return { status: 'incomplete' }
   if (buf[0] !== 0x05) return { status: 'invalid', why: `not SOCKS5 (version ${buf[0]})` }
   const methods = buf[1]
+  if (methods === 0) return { status: 'invalid', why: 'no authentication methods offered' }
   const total = 2 + methods
   if (buf.length < total) return { status: 'incomplete' }
+  if (!buf.subarray(2, total).includes(0x00)) {
+    return { status: 'invalid', why: 'no supported authentication method offered' }
+  }
   return { status: 'ok', rest: buf.subarray(total) }
 }
 
@@ -55,6 +59,7 @@ export function parseRequest(buf: Buffer): Parsed<Socks5Request> {
   if (buf[0] !== 0x05) return { status: 'invalid', why: `not SOCKS5 (version ${buf[0]})` }
   if (buf[1] !== 0x01) return { status: 'invalid', why: `unsupported command ${buf[1]}` }
 
+  if (buf[2] !== 0x00) return { status: 'invalid', why: 'reserved byte is not zero' }
   const type = buf[3]
   let address: string
   let after: number
@@ -68,6 +73,7 @@ export function parseRequest(buf: Buffer): Parsed<Socks5Request> {
     // name before knowing it has arrived is what truncated it silently.
     if (buf.length < 5) return { status: 'incomplete' }
     const length = buf[4]
+    if (length === 0) return { status: 'invalid', why: 'empty destination name' }
     if (buf.length < 5 + length + 2) return { status: 'incomplete' }
     address = buf.subarray(5, 5 + length).toString('ascii')
     after = 5 + length

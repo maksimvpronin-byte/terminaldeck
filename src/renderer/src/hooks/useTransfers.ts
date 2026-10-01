@@ -65,6 +65,11 @@ export function useTransfers({
    */
   const connectionRef = useRef(connectionId)
   connectionRef.current = connectionId
+  const mountedRef = useRef(true)
+  const generationRef = useRef(0)
+  const finishedRef = useRef(onFinished)
+  finishedRef.current = onFinished
+  const pendingRef = useRef<PendingTransfer | null>(null)
   /** Ends the wait of the plan the conflict dialog is asking about. */
   const settleRef = useRef<(() => void) | null>(null)
   /** Plans run one after another, in the order they were asked for. */
@@ -83,9 +88,18 @@ export function useTransfers({
    * connection. The question goes, and so does the last transfer's message.
    */
   useEffect(() => {
+    mountedRef.current = true
+    pendingRef.current = null
     setPending(null)
     setOutcome(null)
+    setTransferring(false)
     settle()
+    return () => {
+      mountedRef.current = false
+      generationRef.current += 1
+      pendingRef.current = null
+      settle()
+    }
   }, [connectionId])
 
   /*
@@ -115,8 +129,11 @@ ${message}`
     source?: string
   ): Promise<void> {
     const connectionId = connectionRef.current
-    if (!connectionId) return
+    if (!connectionId || !mountedRef.current) return
+    const generation = generationRef.current
+    const isCurrent = (): boolean => mountedRef.current && generationRef.current === generation
     setPending(null)
+    setTransferring(true)
     try {
       const result = await window.td.sftp.runPlan(
         source ?? connectionId,
@@ -127,7 +144,7 @@ ${message}`
       // Something arrived at these after the check and before their turn, and
       // was not overwritten. Said, because a file that was not copied is a file
       // somebody will go looking for.
-      if (result?.changed?.length) {
+      if (isCurrent() && result?.changed?.length) {
         report(
           t('Left alone, because something appeared there after the check: {paths}', {
             paths: result.changed.join(', ')
@@ -135,11 +152,12 @@ ${message}`
         )
       }
     } catch (err) {
-      report((err as Error).message)
+      if (isCurrent()) report((err as Error).message)
     }
+    if (!isCurrent()) return
     setTransferring(false)
     setProgressKey((key) => key + 1)
-    onFinished(plan)
+    finishedRef.current(plan)
   }
 
   /**
@@ -148,7 +166,12 @@ ${message}`
    * in a hurry never governs a later copy.
    */
   function run(plan: TransferPlan, source?: string, madeOn?: string): Promise<void> {
-    const turn = queueRef.current.then(() => runOne(plan, source, madeOn))
+    const generation = generationRef.current
+    const origin = madeOn ?? connectionRef.current
+    const turn = queueRef.current.then(() => {
+      if (!mountedRef.current || generation !== generationRef.current) return
+      return runOne(plan, source, origin)
+    })
     queueRef.current = turn.catch(() => undefined)
     return turn
   }
@@ -169,20 +192,26 @@ ${message}`
     }
     await new Promise<void>((resolve) => {
       settleRef.current = resolve
-      setPending({ plan, source, connectionId })
+      const next = { plan, source, connectionId }
+      pendingRef.current = next
+      setPending(next)
     })
   }
 
   async function confirm(decisions: TransferDecisions): Promise<void> {
-    if (!pending) return
+    const waiting = pendingRef.current
+    if (!waiting) return
+    pendingRef.current = null
+    const done = settleRef.current
+    settleRef.current = null
     try {
-      if (pending.connectionId !== connectionRef.current) {
+      if (waiting.connectionId !== connectionRef.current) {
         setPending(null)
         return
       }
-      await execute(pending.plan, decisions, pending.source)
+      await execute(waiting.plan, decisions, waiting.source)
     } finally {
-      settle()
+      done?.()
     }
   }
 
@@ -197,6 +226,7 @@ ${message}`
     run,
     confirm,
     cancel: () => {
+      pendingRef.current = null
       setPending(null)
       settle()
     }

@@ -260,8 +260,12 @@ export class ClipboardDownload {
     this.advance()
   }
   private stalled(): void {
-    if (this.pending.length > 1) this.narrow()
-    else this.fail(new Error('RDP file transfer timed out'))
+    try {
+      if (this.pending.length > 1) this.narrow()
+      else this.fail(new Error('RDP file transfer timed out'))
+    } catch (error) {
+      this.fail(error)
+    }
   }
   private fail(error: unknown): void {
     this.cancel()

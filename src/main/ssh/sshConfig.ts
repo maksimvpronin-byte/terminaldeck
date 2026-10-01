@@ -14,6 +14,22 @@ function unquote(value: string): string {
   return value.replace(/^["']|["']$/g, '')
 }
 
+/**
+ * OpenSSH starts a comment only with a hash that begins a word, so a hash in a
+ * quoted key path, or in the middle of an unquoted one, is part of the path.
+ */
+function stripComment(line: string): string {
+  let quote: string | undefined
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i]
+    if (quote) {
+      if (char === quote) quote = undefined
+    } else if (char === '"' || char === "'") quote = char
+    else if (char === '#' && (i === 0 || /\s/.test(line[i - 1]))) return line.slice(0, i)
+  }
+  return line
+}
+
 function configPath(): string {
   return join(homedir(), '.ssh', 'config')
 }
@@ -46,7 +62,7 @@ export function parseSshConfig(text: string): SshConfigHost[] {
   }
 
   for (const rawLine of text.split(/\r?\n/)) {
-    const line = rawLine.trim()
+    const line = stripComment(rawLine).trim()
     if (line === '' || line.startsWith('#')) continue
 
     const match = line.match(/^([^\s=]+)\s*(?:=\s*|\s+)(.*)$/)
@@ -82,7 +98,11 @@ export function parseSshConfig(text: string): SshConfigHost[] {
         break
       case 'port':
         if (!portSet) {
-          host.port = Number(value) || 22
+          const port = Number(unquote(value))
+          if (!Number.isInteger(port) || port < 1 || port > 65535) {
+            throw new Error(`Invalid SSH port for ${host.alias}: ${value}`)
+          }
+          host.port = port
           portSet = true
         }
         break
@@ -107,7 +127,7 @@ export function readSshConfigHosts(): SshConfigHost[] {
   if (!existsSync(p)) return []
   try {
     return parseSshConfig(readFileSync(p, 'utf8'))
-  } catch {
-    return []
+  } catch (err) {
+    throw new Error(`Cannot read SSH configuration ${p}: ${(err as Error).message}`)
   }
 }

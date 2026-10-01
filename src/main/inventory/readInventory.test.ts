@@ -118,3 +118,40 @@ describe('reallyInsideCheckout', () => {
     }
   })
 })
+
+it('reports a broken vars file instead of silently dropping connection settings', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'td-vars-'))
+  try {
+    mkdirSync(join(dir, 'host_vars'))
+    writeFileSync(join(dir, 'hosts.yml'), 'all:\n  hosts:\n    web:\n')
+    writeFileSync(join(dir, 'host_vars/web.yml'), 'ansible_user: [unfinished')
+    expect(() =>
+      readInventory({ dir, paths: ['hosts.yml'], sourceId: 'repo', prefix: 'git', rootId: 'root' })
+    ).toThrow(/Cannot read inventory variables.*web.yml/)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+it('skips a vars file encrypted with ansible-vault and keeps syncing', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'td-vars-'))
+  try {
+    mkdirSync(join(dir, 'group_vars/all'), { recursive: true })
+    writeFileSync(join(dir, 'hosts.yml'), 'all:\n  hosts:\n    web:\n')
+    writeFileSync(join(dir, 'group_vars/all/main.yml'), 'ansible_user: deploy\n')
+    writeFileSync(
+      join(dir, 'group_vars/all/vault.yml'),
+      '$ANSIBLE_VAULT;1.1;AES256\n61626364656667686970\n6a6b6c6d6e6f70717273\n'
+    )
+    const result = readInventory({
+      dir,
+      paths: ['hosts.yml'],
+      sourceId: 'repo',
+      prefix: 'git',
+      rootId: 'root'
+    })
+    expect(result.hosts.map((h) => h.name)).toEqual(['web'])
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})

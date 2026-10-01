@@ -22,9 +22,29 @@ interface EditSession {
 
 /** Splits a command line into program and arguments, honouring quoted paths. */
 function parseCommand(input: string): { program: string; args: string[] } {
-  const tokens = input.match(/"[^"]*"|'[^']*'|\S+/g) ?? []
-  const clean = tokens.map((t) => t.replace(/^["']|["']$/g, ''))
-  return { program: clean[0] ?? '', args: clean.slice(1) }
+  const tokens: string[] = []
+  let token = ''
+  let quote: string | undefined
+  let started = false
+  for (const char of input) {
+    if (quote) {
+      if (char === quote) quote = undefined
+      else token += char
+    } else if (char === '"' || char === "'") {
+      quote = char
+      started = true
+    } else if (/\s/.test(char)) {
+      if (started) tokens.push(token)
+      token = ''
+      started = false
+    } else {
+      token += char
+      started = true
+    }
+  }
+  if (quote) throw new Error('Unclosed quote in the external editor setting')
+  if (started) tokens.push(token)
+  return { program: tokens[0] ?? '', args: tokens.slice(1) }
 }
 
 /**
@@ -79,7 +99,7 @@ export async function openInEditor(
   // string `$&` and `$'` are patterns, and a remote file may well have a
   // dollar sign in its name.
   const finalArgs = args.some((a) => a.includes('{file}'))
-    ? args.map((a) => a.replace('{file}', () => localPath))
+    ? args.map((a) => a.replaceAll('{file}', () => localPath))
     : [...args, localPath]
 
   await new Promise<void>((resolve, reject) => {
@@ -128,6 +148,7 @@ class RemoteEditManager {
    * the other one, so its edits never reached the server.
    */
   private opening = new Map<string, Promise<string>>()
+  private openingTokens = new Map<string, { connectionId: string; cancelled: boolean }>()
 
   private key(connectionId: string, remotePath: string): string {
     return `${connectionId}:${remotePath}`
@@ -143,15 +164,19 @@ class RemoteEditManager {
     const inFlight = this.opening.get(key)
     if (inFlight) {
       const localPath = await inFlight
+      if (!this.sessions.has(key)) throw new Error('SSH connection closed while opening the editor')
       await openInEditor(localPath, editorCommand)
       return localPath
     }
-    const opening = this.begin(win, key, connectionId, remotePath, editorCommand)
+    const token = { connectionId, cancelled: false }
+    this.openingTokens.set(key, token)
+    const opening = this.begin(win, key, connectionId, remotePath, token, editorCommand)
     this.opening.set(key, opening)
     try {
       return await opening
     } finally {
       if (this.opening.get(key) === opening) this.opening.delete(key)
+      if (this.openingTokens.get(key) === token) this.openingTokens.delete(key)
     }
   }
 
@@ -160,6 +185,7 @@ class RemoteEditManager {
     key: string,
     connectionId: string,
     remotePath: string,
+    token: { cancelled: boolean },
     editorCommand?: string
   ): Promise<string> {
     const existing = this.sessions.get(key)
@@ -181,6 +207,9 @@ class RemoteEditManager {
     const localPath = localChild(dir, name)
 
     await sftpManager.download(connectionId, remotePath, localPath)
+    if (token.cancelled || win.isDestroyed()) {
+      throw new Error('SSH connection closed while downloading the file for editing')
+    }
 
     const session: EditSession = {
       connectionId,
@@ -230,18 +259,19 @@ class RemoteEditManager {
 
     // Editors often touch the file several times per save; settle first.
     clearTimeout(session.timer)
-    session.timer = setTimeout(() => void this.upload(win, key), 300)
+    session.timer = setTimeout(() => {
+      void this.upload(win, key).catch((err) => console.error('[remote edit]', err))
+    }, 300)
   }
 
   private async upload(win: BrowserWindow, key: string): Promise<void> {
     const session = this.sessions.get(key)
     if (!session || !existsSync(session.localPath)) return
 
-    const mtimeMs = statSync(session.localPath).mtimeMs
-    if (mtimeMs === session.lastMtimeMs) return
-
-    session.uploading = true
     try {
+      const mtimeMs = statSync(session.localPath).mtimeMs
+      if (mtimeMs === session.lastMtimeMs) return
+      session.uploading = true
       await sftpManager.upload(session.connectionId, session.localPath, session.remotePath)
       session.lastMtimeMs = mtimeMs
       if (!win.isDestroyed()) {
@@ -271,6 +301,8 @@ class RemoteEditManager {
 
   stop(connectionId: string, remotePath: string): void {
     const key = this.key(connectionId, remotePath)
+    const token = this.openingTokens.get(key)
+    if (token) token.cancelled = true
     const session = this.sessions.get(key)
     if (!session) return
     clearTimeout(session.timer)
@@ -293,6 +325,7 @@ class RemoteEditManager {
    * stays is all cost and no use.
    */
   cleanUp(): void {
+    for (const token of this.openingTokens.values()) token.cancelled = true
     for (const session of this.sessions.values()) {
       clearTimeout(session.timer)
       session.watcher.close()
@@ -319,6 +352,9 @@ class RemoteEditManager {
 
   /** Called when a connection goes away: its watchers are pointless afterwards. */
   stopAllFor(connectionId: string): void {
+    for (const token of this.openingTokens.values()) {
+      if (token.connectionId === connectionId) token.cancelled = true
+    }
     for (const [key, session] of this.sessions) {
       if (session.connectionId !== connectionId) continue
       clearTimeout(session.timer)

@@ -1,3 +1,4 @@
+import { rereadOnFailure } from '../reconcile'
 import type { StateCreator } from 'zustand'
 import type { AppState, CredentialsSlice } from './types'
 
@@ -21,7 +22,10 @@ export const createCredentialsSlice: StateCreator<AppState, [], [], CredentialsS
   },
 
   removeCredential: async (id) => {
-    await window.td.credentials.remove(id)
+    await rereadOnFailure(
+      () => window.td.credentials.remove(id),
+      () => get().loadCredentials()
+    )
     await get().loadCredentials()
   }
 })

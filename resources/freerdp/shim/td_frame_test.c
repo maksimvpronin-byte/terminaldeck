@@ -6,6 +6,27 @@
 #undef main
 #include <assert.h>
 
+/* Both handshake fields must agree for the RU/EN layouts we request. */
+static void keyboard_language(void)
+{
+	const char* values[] = { "1033", "1049" };
+	const UINT32 layouts[] = { 0x0409, 0x0419 };
+	for (size_t i = 0; i < 2; i++)
+	{
+		tdContext td = { 0 };
+		rdpSettings* settings = freerdp_settings_new(0);
+		assert(settings);
+		td.common.context.settings = settings;
+		td_cmd start = { 0 };
+		start.fields[0] = (td_field){ "keyboardLayout", (char*)values[i] };
+		start.count = 1;
+		assert(configure(&td, &start));
+		assert(freerdp_settings_get_uint32(settings, FreeRDP_KeyboardLayout) == layouts[i]);
+		assert(freerdp_settings_get_uint32(settings, FreeRDP_KeyboardCodePage) == layouts[i]);
+		freerdp_settings_free(settings);
+	}
+}
+
 static int frames;
 static size_t last_length;
 static unsigned char last_pixels[64];
@@ -125,6 +146,7 @@ int main(void)
 	assert(frames == 4 && last_length == 24);
 
 	early_resize();
+	keyboard_language();
 
 	free(td.scratch);
 	DeleteCriticalSection(&td.paint);

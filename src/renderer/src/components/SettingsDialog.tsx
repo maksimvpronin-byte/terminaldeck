@@ -35,6 +35,20 @@ export default function SettingsDialog({
   const preview = themeOf(settings)
   const t = useT()
   const [tab, setTab] = useState<SettingsTab>(initialTab ?? 'general')
+  /*
+   * Typed, then taken on leaving the field. Taken keystroke by keystroke, the
+   * "5" of 5000 is out of range and settings put the default back under the
+   * caret — and the "500" on the way would cut every terminal's history short.
+   */
+  const [scrollbackDraft, setScrollbackDraft] = useState<string | null>(null)
+  function commitScrollback(): void {
+    if (scrollbackDraft === null) return
+    const lines = Number(scrollbackDraft)
+    if (Number.isInteger(lines) && lines >= 100 && lines <= 200000) {
+      updateSettings({ scrollback: lines })
+    }
+    setScrollbackDraft(null)
+  }
 
   async function pickEditor(): Promise<void> {
     const path = await window.td.dialogs.pickOpenPath()
@@ -243,8 +257,12 @@ export default function SettingsDialog({
                   min={100}
                   max={200000}
                   step={1000}
-                  value={settings.scrollback}
-                  onChange={(e) => updateSettings({ scrollback: Number(e.target.value) })}
+                  value={scrollbackDraft ?? settings.scrollback}
+                  onChange={(e) => setScrollbackDraft(e.target.value)}
+                  onBlur={commitScrollback}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') commitScrollback()
+                  }}
                 />
               </label>
             </div>

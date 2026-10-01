@@ -1097,7 +1097,11 @@ class SFTPManager {
         chunks.push(chunk)
       })
       stream.on('error', reject)
-      stream.on('close', () => resolve(Buffer.concat(chunks)))
+      stream.on('end', () => resolve(Buffer.concat(chunks)))
+      stream.on('close', () => {
+        if (!stream.readableEnded)
+          reject(new Error('The remote file closed before comparison completed'))
+      })
     })
   }
 

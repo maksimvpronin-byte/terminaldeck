@@ -112,3 +112,25 @@ describe('saving several new hosts at once', () => {
     expect(useStore.getState().sessions).toEqual(onDisk.sessions)
   })
 })
+
+it('rereads a single deleted host after password cleanup fails', async () => {
+  window.td.store.deleteSession = () => Promise.reject(new Error('vault write failed'))
+  window.td.store.load = () => Promise.resolve({ ...onDisk, sessions: [host('b', 'two')] })
+  await expect(useStore.getState().removeSession('a')).rejects.toThrow('vault write failed')
+  expect(useStore.getState().sessions.map((s) => s.id)).toEqual(['b'])
+})
+
+it('rereads a deleted group and its mirrored tree after cleanup fails', async () => {
+  window.td.store.deleteGroup = () => Promise.reject(new Error('cleanup failed'))
+  window.td.store.load = () =>
+    Promise.resolve({ ...onDisk, groups: [two], sessions: [host('a', 'two'), host('b', 'two')] })
+  let readTrees = false
+  useStore.setState({
+    loadGitFolders: async () => {
+      readTrees = true
+    }
+  })
+  await expect(useStore.getState().removeGroup('one')).rejects.toThrow('cleanup failed')
+  expect(useStore.getState().groups).toEqual([two])
+  expect(readTrees).toBe(true)
+})

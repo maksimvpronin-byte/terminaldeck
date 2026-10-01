@@ -2,6 +2,7 @@ import type { StateCreator } from 'zustand'
 import type { SessionStoreData } from '../../../../shared/types'
 import type { AppState, SessionsSlice } from './types'
 import { moveRelativeTo } from '../../../../shared/ordering'
+import { rereadOnFailure } from '../reconcile'
 import { descendsFrom } from '../../../../shared/groups'
 
 /**
@@ -14,14 +15,7 @@ import { descendsFrom } from '../../../../shared/groups'
  * caller; the tree just stops claiming something that was not kept.
  */
 async function settleOrRereadStore(get: () => AppState, save: () => Promise<void>): Promise<void> {
-  try {
-    await save()
-  } catch (err) {
-    await get()
-      .loadStore()
-      .catch(() => undefined)
-    throw err
-  }
+  await rereadOnFailure(save, () => get().loadStore())
 }
 
 export const createSessionsSlice: StateCreator<AppState, [], [], SessionsSlice> = (set, get) => ({
@@ -55,7 +49,7 @@ export const createSessionsSlice: StateCreator<AppState, [], [], SessionsSlice> 
   },
 
   removeSession: async (id) => {
-    await window.td.store.deleteSession(id)
+    await settleOrRereadStore(get, () => window.td.store.deleteSession(id))
     set((s) => ({ sessions: s.sessions.filter((x) => x.id !== id) }))
   },
 
@@ -76,7 +70,10 @@ export const createSessionsSlice: StateCreator<AppState, [], [], SessionsSlice> 
      * opened and searched until the application is next started.
      */
     const untied = Boolean(get().groups.find((x) => x.id === group.id)?.git) && !group.git
-    const saved = await window.td.store.saveGroup(group, secret, gatewaySecret, rdpSecret)
+    const saved = await rereadOnFailure(
+      () => window.td.store.saveGroup(group, secret, gatewaySecret, rdpSecret),
+      () => Promise.all([get().loadStore(), get().loadGitFolders()])
+    )
     set((s) => ({
       groups: s.groups.some((x) => x.id === saved.id)
         ? s.groups.map((x) => (x.id === saved.id ? saved : x))
@@ -88,7 +85,10 @@ export const createSessionsSlice: StateCreator<AppState, [], [], SessionsSlice> 
   removeGroup: async (id) => {
     // Deleting the folder takes its mirrored tree with it, for the same reason.
     const wasMirroring = Boolean(get().groups.find((g) => g.id === id)?.git)
-    await window.td.store.deleteGroup(id)
+    await rereadOnFailure(
+      () => window.td.store.deleteGroup(id),
+      () => Promise.all([get().loadStore(), get().loadGitFolders()])
+    )
     set((s) => {
       // Mirror SessionStore.deleteGroup: children are adopted, not orphaned.
       const newParent = s.groups.find((g) => g.id === id)?.parentId ?? null

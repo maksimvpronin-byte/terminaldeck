@@ -1,3 +1,4 @@
+import { rereadOnFailure } from '../reconcile'
 import type { StateCreator } from 'zustand'
 import type { AppState, InventorySlice } from './types'
 
@@ -55,7 +56,10 @@ export const createInventorySlice: StateCreator<AppState, [], [], InventorySlice
   },
 
   removeInventorySource: async (id) => {
-    await window.td.inventory.removeSource(id)
+    await rereadOnFailure(
+      () => window.td.inventory.removeSource(id),
+      () => get().loadInventory()
+    )
     await get().loadInventory()
   },
 
@@ -65,7 +69,10 @@ export const createInventorySlice: StateCreator<AppState, [], [], InventorySlice
   },
 
   clearInventoryOverride: async (nodeId) => {
-    await window.td.inventory.clearOverride(nodeId)
+    await rereadOnFailure(
+      () => window.td.inventory.clearOverride(nodeId),
+      () => get().loadInventory()
+    )
     await get().loadInventory()
   }
 })

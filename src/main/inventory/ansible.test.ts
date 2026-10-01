@@ -488,3 +488,56 @@ all:
     ).toEqual({ username: 'deploy' })
   })
 })
+
+describe('inherited desktop protocol', () => {
+  it('reads protocol and desktop port from ancestors of a host group', () => {
+    const result = parseAnsibleInventory(
+      parse(`
+all:
+  vars:
+    terminaldeck_protocol: rdp
+    terminaldeck_port: 3390
+  children:
+    windows:
+      children:
+        domain:
+          hosts:
+            dc1:
+`),
+      SRC
+    )
+    expect(result.hosts[0]).toMatchObject({ protocol: 'rdp', port: 3390 })
+  })
+  it('lets a nearer group override an ancestor protocol', () => {
+    const result = parseAnsibleInventory(
+      parse(`
+all:
+  vars:
+    terminaldeck_protocol: rdp
+  children:
+    linux:
+      vars:
+        terminaldeck_protocol: ssh
+      hosts:
+        web:
+`),
+      SRC
+    )
+    expect(result.hosts[0].protocol).toBe('ssh')
+  })
+  it.each(['{{ ssh_port }}', '$ANSIBLE_VAULT;1.1;AES256\n6162'])(
+    'leaves a port Ansible resolves at run time unset: %s',
+    (value) => {
+      expect(varsToAuth({ ansible_port: value })).toEqual({})
+    }
+  )
+  it.each(['Infinity', '-1', '0', '65536', '22.5', 'oops'])('refuses invalid port %s', (value) => {
+    expect(() => varsToAuth({ ansible_port: value })).toThrow('Inventory port')
+    expect(() =>
+      parseAnsibleInventory(
+        { all: { hosts: { desktop: { terminaldeck_protocol: 'rdp', terminaldeck_port: value } } } },
+        SRC
+      )
+    ).toThrow('Inventory port')
+  })
+})

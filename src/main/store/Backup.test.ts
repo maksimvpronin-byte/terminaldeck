@@ -184,6 +184,7 @@ beforeEach(async () => {
   vault.lock()
   rmSync(join(userData, 'vault.json'), { force: true })
   rmSync(FILE, { force: true })
+  rmSync(join(userData, 'import-journal.json'), { force: true })
   await vault.create(MASTER)
 })
 
@@ -567,4 +568,93 @@ describe('an import the application did not live through', () => {
     expect(vault.getSecret('secret-session')).toBeUndefined()
     expect(recoverInterruptedImport()).toBe('none')
   })
+})
+
+it('refuses duplicate accounts before changing any store', async () => {
+  writeFileSync(
+    FILE,
+    JSON.stringify({
+      format: 'terminaldeck-backup',
+      version: 1,
+      exportedAt: 1,
+      groups: [],
+      sessions: [session],
+      snippets: [],
+      collections: [],
+      inventorySources: [],
+      inventoryOverrides: [],
+      credentials: [credential, { ...credential, username: 'other' }]
+    })
+  )
+  openFrom = FILE
+  await expect(importFromFile(win)).rejects.toThrow('more than once')
+  expect(sessionStore.getAll().sessions).toEqual([])
+  expect(credentialStore.list()).toEqual([])
+})
+
+it('does not restore any file from an incomplete recovery journal', () => {
+  populate()
+  const before = clone(snapshot())
+  const path = join(userData, 'import-journal.json')
+  writeFileSync(
+    path,
+    JSON.stringify({ version: 1, startedAt: 1, sessions: { version: 1, groups: [], sessions: [] } })
+  )
+  expect(recoverInterruptedImport()).toBe('failed')
+  expect(clone(snapshot())).toEqual(before)
+  expect(existsSync(path)).toBe(true)
+})
+
+it('keeps the journal and stores when its vault belongs to a different master password', () => {
+  populate()
+  const before = clone(snapshot())
+  const path = join(userData, 'import-journal.json')
+  writeFileSync(
+    path,
+    JSON.stringify({
+      version: 1,
+      startedAt: 1,
+      vault: { ...vault.sealedSecrets(), salt: 'different-vault' },
+      sessions: { version: 1, groups: [], sessions: [] },
+      snippets: snippetStore.snapshot(),
+      collections: collectionStore.snapshot(),
+      inventory: inventoryStore.snapshot(),
+      gitFolders: { version: 1, trees: [], overrides: [], repos: [] },
+      credentials: credentialStore.snapshot()
+    })
+  )
+  expect(recoverInterruptedImport()).toBe('failed')
+  expect(clone(snapshot())).toEqual(before)
+  expect(existsSync(path)).toBe(true)
+})
+
+it('recovers mirrored groups whose derived ids contain inventory paths', async () => {
+  const { gitFolderStore } = await import('../gitFolders/GitFolderStore')
+  const previous = gitFolderStore.snapshot()
+  const path = join(userData, 'import-journal.json')
+  const mirrored = {
+    groupId: group.id,
+    groups: [{ id: `git:${group.id}:g:all/prod`, name: 'prod', parentId: group.id }],
+    sessions: [],
+    memberships: {}
+  }
+  writeFileSync(
+    path,
+    JSON.stringify({
+      version: 1,
+      startedAt: 1,
+      sessions: sessionStore.snapshot(),
+      snippets: snippetStore.snapshot(),
+      collections: collectionStore.snapshot(),
+      inventory: inventoryStore.snapshot(),
+      gitFolders: { version: 1, trees: [mirrored], overrides: [], repos: [] },
+      credentials: credentialStore.snapshot()
+    })
+  )
+  try {
+    expect(recoverInterruptedImport()).toBe('restored')
+    expect(gitFolderStore.trees()).toEqual([mirrored])
+  } finally {
+    gitFolderStore.restore(previous)
+  }
 })

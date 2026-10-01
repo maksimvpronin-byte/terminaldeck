@@ -129,3 +129,34 @@ describe('a desktop typed into Quick connect', () => {
     expect(() => checkQuickDesktop(null)).toThrow()
   })
 })
+
+describe('listener lifecycle', () => {
+  it('removes shared callbacks independently on each channel', () => {
+    const listener = vi.fn()
+    ipcMain.on('first', listener)
+    ipcMain.on('second', listener)
+    ipcMain.removeListener('first', listener)
+    emitter.emit('first', from('file:///app/renderer/index.html'))
+    emitter.emit('second', from('file:///app/renderer/index.html'))
+    expect(listener).toHaveBeenCalledTimes(1)
+    ipcMain.off('second', listener)
+    expect(emitter.listenerCount('second')).toBe(0)
+  })
+  it('can remove a once callback before it runs', () => {
+    const listener = vi.fn()
+    ipcMain.once('cancelled-once', listener)
+    ipcMain.removeListener('cancelled-once', listener)
+    emitter.emit('cancelled-once', from('file:///app/renderer/index.html'))
+    expect(listener).not.toHaveBeenCalled()
+  })
+  it('keeps a once callback after an untrusted message and removes it before invocation', () => {
+    const listener = vi.fn(() =>
+      emitter.emit('trusted-once', from('file:///app/renderer/index.html'))
+    )
+    ipcMain.once('trusted-once', listener)
+    emitter.emit('trusted-once', from('https://evil.example/'))
+    emitter.emit('trusted-once', from('file:///app/renderer/index.html'))
+    expect(listener).toHaveBeenCalledTimes(1)
+    expect(emitter.listenerCount('trusted-once')).toBe(0)
+  })
+})

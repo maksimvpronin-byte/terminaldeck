@@ -318,7 +318,7 @@ if (!primaryInstance) {
   })
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   if (!primaryInstance) return
   electronApp.setAppUserModelId('com.terminaldeck.app')
   /*
@@ -333,13 +333,18 @@ app.whenReady().then(() => {
   // through is put back first.
   const recovery = recoverInterruptedImport()
   if (recovery !== 'none') {
-    void dialog.showMessageBox({
+    await dialog.showMessageBox({
       type: recovery === 'restored' ? 'info' : 'error',
       message:
         recovery === 'restored'
           ? 'An import was interrupted, and everything it had changed has been put back.'
-          : 'An import was interrupted, and putting back what it had changed failed. Check your hosts before importing again.'
+          : 'An import was interrupted and could not be restored. The recovery journal has been kept in the TerminalDeck data folder. Restore that folder from a backup or repair the journal before starting again.'
     })
+  }
+
+  if (recovery === 'failed') {
+    app.quit()
+    return
   }
 
   // Before any handler exists, so that every one of them is behind it.

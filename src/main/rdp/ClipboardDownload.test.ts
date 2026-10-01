@@ -180,3 +180,21 @@ describe('RDP file clipboard', () => {
     if (how !== 'cancel') expect(status.mock.lastCall?.[2]).toBeTruthy()
   })
 })
+
+it('reports a failed retry from the timeout callback and cancels the download', () => {
+  vi.useFakeTimers()
+  let failed = false
+  const status = vi.fn()
+  const download = new ClipboardDownload(
+    () => {
+      if (failed) throw new Error('Client disconnected')
+    },
+    vi.fn(),
+    status
+  )
+  download.start(manifest([{ name: 'retry.bin', size: 200000 }]))
+  failed = true
+  expect(() => vi.advanceTimersByTime(30000)).not.toThrow()
+  expect(download.active).toBe(false)
+  expect(status).toHaveBeenLastCalledWith(0, 200000, 'Client disconnected')
+})

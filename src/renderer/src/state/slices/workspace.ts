@@ -135,7 +135,8 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
   moveTabToWorkspace: (tabId, workspaceId) => {
     set((s) => {
       const from = workspaceOfTab(s, tabId)
-      if (!from || from.id === workspaceId) return {}
+      if (!from || from.id === workspaceId || !s.workspaces.some((w) => w.id === workspaceId))
+        return {}
       const tab = from.tabs.find((t) => t.id === tabId)
       if (!tab) return {}
 
@@ -415,7 +416,7 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
 
       // The pane moves to a different tree, so React remounts it and the old
       // connection is torn down; the new one starts fresh.
-      const moved = makeTab(leaf.title, leaf.target, leaf.color)
+      const moved = makeTab(leaf.title, leaf.target, leaf.color, leaf.viaCollectionId)
       const leaves = collectLeaves(remaining)
       return {
         workspaces: s.workspaces.map((w) =>

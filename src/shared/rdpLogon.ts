@@ -18,8 +18,6 @@
 export const LOGON_FAILED_BAD_PASSWORD = 0x00000000
 export const LOGON_FAILED_UPDATE_PASSWORD = 0x00000001
 export const LOGON_FAILED_OTHER = 0x00000002
-/** A warning is a remark with a raised voice; the session carries on. */
-export const LOGON_WARNING = 0x00000003
 
 /** FreeRDP's `type`: what the host intends to do about it. */
 export const LOGON_MSG_SESSION_BUSY_OPTIONS = 0xfffffff8

@@ -41,19 +41,27 @@ export function readVarsFor(
   if (existsSync(flat) && inside(flat)) candidates.push(flat)
   if (existsSync(flatYaml) && inside(flatYaml)) candidates.push(flatYaml)
   if (existsSync(nested) && inside(nested) && statSync(nested).isDirectory()) {
-    for (const f of readdirSync(nested)) {
+    for (const f of readdirSync(nested).sort()) {
       const full = join(nested, f)
-      if (isYaml(f) && inside(full)) candidates.push(full)
+      if (isYaml(f) && inside(full) && statSync(full).isFile()) candidates.push(full)
     }
   }
 
   let vars: AnsibleVars = {}
   for (const file of candidates) {
     try {
-      const parsed = parse(readFileSync(file, 'utf8'))
-      if (parsed && typeof parsed === 'object') vars = { ...vars, ...(parsed as AnsibleVars) }
-    } catch {
-      // A broken vars file shouldn't sink the whole inventory.
+      const text = readFileSync(file, 'utf8')
+      // A file encrypted whole with ansible-vault: Ansible needs the vault
+      // password to read it, and so would we. Skipped, as before, rather than
+      // failing the sync of everything else.
+      if (text.trimStart().startsWith('$ANSIBLE_VAULT')) continue
+      const parsed = parse(text)
+      if (parsed !== null && (typeof parsed !== 'object' || Array.isArray(parsed))) {
+        throw new Error('variables must be a mapping')
+      }
+      if (parsed) vars = { ...vars, ...(parsed as AnsibleVars) }
+    } catch (err) {
+      throw new Error(`Cannot read inventory variables from ${file}: ${(err as Error).message}`)
     }
   }
   return vars
@@ -67,7 +75,7 @@ export function resolveInventoryFiles(repoDir: string, paths: string[]): string[
     if (!existsSync(target)) continue
     if (!reallyInsideCheckout(repoDir, target)) continue
     if (statSync(target).isDirectory()) {
-      for (const f of readdirSync(target)) {
+      for (const f of readdirSync(target).sort()) {
         const full = join(target, f)
         // Only the directory itself; group_vars/ and host_vars/ are read separately.
         if (isYaml(f) && reallyInsideCheckout(repoDir, full) && statSync(full).isFile()) {

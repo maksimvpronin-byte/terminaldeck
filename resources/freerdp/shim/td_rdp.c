@@ -1654,7 +1654,13 @@ static BOOL configure(tdContext* td, const td_cmd* start)
 	{
 		const UINT32 layout = (UINT32)td_cmd_int(start, "keyboardLayout", 0);
 		if (layout)
+		{
 			SET_U32(FreeRDP_KeyboardLayout, layout);
+			/* MS-RDPBCGR 4.10: the Info Packet carries the active LANGID
+			 * separately from the Core Data keyboard layout. Our mapped
+			 * layouts use their matching language in the low word. */
+			SET_U32(FreeRDP_KeyboardCodePage, layout & 0xFFFF);
+		}
 	}
 
 	SET_U32(FreeRDP_DesktopWidth, td_cmd_int(start, "width", 1280) & ~1);

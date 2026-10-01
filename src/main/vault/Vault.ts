@@ -283,7 +283,7 @@ class Vault {
      * copy of the file taken before it existed. `live`, not `file`: saving a
      * secret replaces the file object rather than changing the old one.
      */
-    const secrets: Record<string, EncryptedPayload> = {}
+    const secrets: Record<string, EncryptedPayload> = Object.create(null)
     for (const [ref, payload] of Object.entries(live.secrets)) {
       secrets[ref] = encrypt(key, decrypt(oldKey, payload))
     }
@@ -320,7 +320,10 @@ class Vault {
   /** Stores some secrets and forgets others, in one write. */
   changeSecrets(set: Record<string, string>, remove: string[]): void {
     const { key, file } = this.requireUnlocked()
-    const secrets = { ...file.secrets }
+    const secrets: Record<string, EncryptedPayload> = Object.assign(
+      Object.create(null),
+      file.secrets
+    )
     for (const ref of remove) delete secrets[ref]
     for (const [ref, plaintext] of Object.entries(set)) secrets[ref] = encrypt(key, plaintext)
     this.replaceFile({ ...file, secrets })
@@ -373,6 +376,7 @@ class Vault {
 
   getSecret(ref: string): string | undefined {
     const { key, file } = this.requireUnlocked()
+    if (!Object.hasOwn(file.secrets, ref)) return undefined
     const payload = file.secrets[ref]
     if (!payload) return undefined
     return decrypt(key, payload)
@@ -384,15 +388,18 @@ class Vault {
    */
   allSecrets(): Record<string, string> {
     const { key, file } = this.requireUnlocked()
-    const out: Record<string, string> = {}
+    const out: Record<string, string> = Object.create(null)
     for (const [ref, payload] of Object.entries(file.secrets)) out[ref] = decrypt(key, payload)
     return out
   }
 
   deleteSecret(ref: string): void {
     const { file } = this.requireUnlocked()
-    if (!(ref in file.secrets)) return
-    const secrets = { ...file.secrets }
+    if (!Object.hasOwn(file.secrets, ref)) return
+    const secrets: Record<string, EncryptedPayload> = Object.assign(
+      Object.create(null),
+      file.secrets
+    )
     delete secrets[ref]
     this.replaceFile({ ...file, secrets })
   }

@@ -1,6 +1,7 @@
 import { app } from 'electron'
 import { join } from 'path'
 import type { HostCollection } from '../../shared/types'
+import { applyOrder } from '../../shared/ordering'
 import { JsonDocument, hasLists, readJson } from './jsonFile'
 
 interface CollectionFile {
@@ -55,12 +56,7 @@ class CollectionStore {
    * accident of when each set happened to be created. */
   reorder(ids: string[]): void {
     this.doc.change((d) => {
-      const byId = new Map(d.collections.map((c) => [c.id, c]))
-      const next = ids.map((id) => byId.get(id)).filter((c): c is HostCollection => Boolean(c))
-      for (const c of d.collections) {
-        if (!next.includes(c)) next.push(c)
-      }
-      d.collections = next
+      d.collections = applyOrder(d.collections, ids)
     })
   }
 

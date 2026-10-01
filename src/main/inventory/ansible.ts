@@ -40,16 +40,33 @@ function str(value: unknown): string | undefined {
 
 function num(value: unknown): number | undefined {
   if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value === 'string' && value.trim() !== '' && !Number.isNaN(Number(value))) {
+  if (typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value))) {
     return Number(value)
   }
   return undefined
 }
 
+/**
+ * A Jinja template or an inline `!vault` value: Ansible resolves those at run
+ * time and we cannot, so they say nothing here rather than something wrong.
+ */
+function unresolved(value: unknown): boolean {
+  return typeof value === 'string' && (value.includes('{{') || value.startsWith('$ANSIBLE_VAULT'))
+}
+
+function inventoryPort(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === '' || unresolved(value)) return undefined
+  const port = num(value)
+  if (port === undefined || !Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error('Inventory port must be a whole number from 1 to 65535')
+  }
+  return port
+}
+
 /** Maps the Ansible connection vars we understand onto our own auth fields. */
 export function varsToAuth(vars: AnsibleVars): AuthDefaults {
   const username = str(vars.ansible_user) ?? str(vars.ansible_ssh_user)
-  const port = num(vars.ansible_port) ?? num(vars.ansible_ssh_port)
+  const port = inventoryPort(vars.ansible_port) ?? inventoryPort(vars.ansible_ssh_port)
   const key = str(vars.ansible_ssh_private_key_file) ?? str(vars.ansible_private_key_file)
   return {
     ...(username ? { username } : {}),
@@ -96,7 +113,7 @@ function portForProtocol(
   if (protocol !== 'rdp') return auth
   const withoutAnsiblePort: AuthDefaults = { ...auth }
   delete withoutAnsiblePort.port
-  const stated = num(vars.terminaldeck_port)
+  const stated = inventoryPort(vars.terminaldeck_port)
   return stated ? { ...withoutAnsiblePort, port: stated } : withoutAnsiblePort
 }
 
@@ -208,6 +225,7 @@ export function parseAnsibleInventory(
     }
   }
 
+  const groupById = new Map(groups.map((g) => [g.id, g]))
   for (const [key, entry] of seen) {
     // Ansible merges group vars parents-first and alphabetically within a level,
     // with the last one read winning. The same order picks the group whose
@@ -231,10 +249,19 @@ export function parseAnsibleInventory(
      */
     // Read once every mention of every group is in: a group's vars can arrive
     // in a later definition of it than the one that named this host.
-    const fromGroups = ordered.reduce<AnsibleVars>(
-      (acc, c) => ({ ...acc, ...groupVars.get(c.id) }),
-      {}
-    )
+    const ancestors = new Map<string, SessionGroup>()
+    for (const claim of ordered) {
+      let group = groupById.get(claim.id)
+      while (group && !ancestors.has(group.id)) {
+        ancestors.set(group.id, group)
+        group = group.parentId ? groupById.get(group.parentId) : undefined
+      }
+    }
+    const fromGroups = [...ancestors.values()]
+      .sort(
+        (a, b) => a.id.split('/').length - b.id.split('/').length || a.name.localeCompare(b.name)
+      )
+      .reduce<AnsibleVars>((acc, group) => ({ ...acc, ...groupVars.get(group.id) }), {})
     const protocol = protocolFromVars(hostVars) ?? protocolFromVars(fromGroups)
 
     hosts.push({

@@ -1004,3 +1004,24 @@ describe('searching below a folder over SFTP', () => {
     expect(found.truncated).toBe(true)
   })
 })
+
+describe('comparison interrupted while reading', () => {
+  it('rejects a prematurely closed stream rather than presenting a truncated diff', async () => {
+    const session = stubSession([], { '/srv/a': { size: 20 } })
+    session.createReadStream = (() => {
+      const stream = new PassThrough()
+      setImmediate(() => {
+        stream.write('partial')
+        stream.destroy()
+      })
+      return stream
+    }) as unknown as typeof session.createReadStream
+    attach('comparison', session)
+    mkdirSync(localDir, { recursive: true })
+    const path = join(localDir, 'compare.txt')
+    writeFileSync(path, 'complete')
+    await expect(sftpManager.compareWithLocal('comparison', '/srv/a', path)).rejects.toThrow(
+      'before comparison completed'
+    )
+  })
+})

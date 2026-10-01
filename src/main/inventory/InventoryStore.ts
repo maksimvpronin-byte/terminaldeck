@@ -86,7 +86,21 @@ class InventoryStore {
 
   saveSource(source: InventorySource): InventorySource {
     this.doc.change((d) => upsertBy(d.sources, source, (a, b) => a.id === b.id))
+    this.refreshRoot(source)
     return source
+  }
+
+  /** A saved login takes effect even when the repository cannot currently sync. */
+  private refreshRoot(source: InventorySource): void {
+    const tree = this.trees.get(source.id)
+    if (!tree) return
+    const rootId = `inv:${source.id}:root`
+    this.trees.set(source.id, {
+      ...tree,
+      groups: tree.groups.map((group) =>
+        group.id === rootId ? rootGroupOf(source, rootId) : group
+      )
+    })
   }
 
   removeSource(id: string): void {
@@ -110,6 +124,7 @@ class InventoryStore {
         upsertBy(d.overrides, override, (a, b) => a.nodeId === b.nodeId)
       }
     })
+    for (const source of sources) this.refreshRoot(source)
   }
 
   clearOverride(nodeId: string): void {
@@ -124,6 +139,7 @@ class InventoryStore {
 
   restore(previous: InventoryData): void {
     this.doc.restore(previous)
+    for (const source of previous.sources) this.refreshRoot(source)
   }
 
   allTrees(): InventoryTree[] {

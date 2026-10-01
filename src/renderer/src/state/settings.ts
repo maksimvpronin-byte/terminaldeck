@@ -515,12 +515,43 @@ export const FONT_CHOICES = [
 
 const KEY = 'terminaldeck.terminalSettings'
 
+/** Validate both persisted values and updates made during a running session. */
+export function normaliseSettings(parsed: unknown): TerminalSettings {
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed))
+    return DEFAULT_SETTINGS
+  const values = parsed as Record<string, unknown>
+  const result = { ...DEFAULT_SETTINGS }
+  for (const key of Object.keys(DEFAULT_SETTINGS) as Array<keyof TerminalSettings>) {
+    const value = values[key]
+    if (typeof value !== typeof DEFAULT_SETTINGS[key]) continue
+    if (typeof value === 'number' && !Number.isFinite(value)) continue
+    Object.assign(result, { [key]: value })
+  }
+  if (!['ru', 'en'].includes(result.language)) result.language = DEFAULT_SETTINGS.language
+  if (!['block', 'underline', 'bar'].includes(result.cursorStyle))
+    result.cursorStyle = DEFAULT_SETTINGS.cursorStyle
+  if (!['paste', 'menu'].includes(result.rightClick))
+    result.rightClick = DEFAULT_SETTINGS.rightClick
+  if (!['flat', 'fade'].includes(result.treeTint)) result.treeTint = DEFAULT_SETTINGS.treeTint
+  if (!Object.hasOwn(THEMES, result.themeName)) result.themeName = DEFAULT_SETTINGS.themeName
+  if (!Number.isInteger(result.fontSize) || result.fontSize < 8 || result.fontSize > 32)
+    result.fontSize = DEFAULT_SETTINGS.fontSize
+  if (!Number.isInteger(result.scrollback) || result.scrollback < 100 || result.scrollback > 200000)
+    result.scrollback = DEFAULT_SETTINGS.scrollback
+  if (
+    !Number.isInteger(result.lockAfterMinutes) ||
+    result.lockAfterMinutes < 0 ||
+    result.lockAfterMinutes > 480
+  )
+    result.lockAfterMinutes = DEFAULT_SETTINGS.lockAfterMinutes
+  result.treeRowHeight = treeRowHeightOf(result)
+  return result
+}
+
 export function loadSettings(): TerminalSettings {
   try {
     const raw = localStorage.getItem(KEY)
-    if (!raw) return DEFAULT_SETTINGS
-    // Merge so settings added in a later version get their defaults.
-    return { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<TerminalSettings>) }
+    return raw ? normaliseSettings(JSON.parse(raw)) : DEFAULT_SETTINGS
   } catch {
     return DEFAULT_SETTINGS
   }
@@ -532,7 +563,7 @@ export function saveSettings(settings: TerminalSettings): void {
 
 /** Looks a theme up by name, falling back when a saved name no longer exists. */
 export function themeByName(name: string): ThemeDef {
-  return THEMES[name] ?? THEMES[DEFAULT_THEME]
+  return Object.hasOwn(THEMES, name) ? THEMES[name] : THEMES[DEFAULT_THEME]
 }
 
 export function themeDefOf(settings: { themeName: string }): ThemeDef {

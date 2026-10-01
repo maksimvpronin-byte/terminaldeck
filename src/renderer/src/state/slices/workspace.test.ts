@@ -197,3 +197,26 @@ describe('revealSession', () => {
     expect(useStore.getState().focusRequest).toBe(2)
   })
 })
+
+it('preserves collection settings when a pane is detached', () => {
+  useStore.setState({ workspaces: [], activeWorkspaceId: null })
+  const paneId = useStore
+    .getState()
+    .openTab('host', { kind: 'session', sessionId: 'host' }, '#abcdef', 'collection')
+  const tabId = useStore.getState().workspaces[0].tabs[0].id
+  useStore.getState().splitPane(tabId, paneId, 'row')
+  useStore.getState().detachPane(tabId, paneId)
+  const moved = collectLeaves(useStore.getState().workspaces[0].tabs[1].root)[0]
+  expect(moved.viaCollectionId).toBe('collection')
+  expect(moved.color).toBe('#abcdef')
+})
+
+it('does not lose a tab moved to a workspace that no longer exists', () => {
+  useStore.setState({ workspaces: [], activeWorkspaceId: null })
+  useStore.getState().openTab('host', { kind: 'session', sessionId: 'host' })
+  const before = useStore.getState().workspaces
+  const tabId = before[0].tabs[0].id
+  useStore.getState().moveTabToWorkspace(tabId, 'deleted-workspace')
+  expect(useStore.getState().workspaces).toBe(before)
+  expect(useStore.getState().activeWorkspaceId).toBe(before[0].id)
+})

@@ -1,5 +1,5 @@
 import type { StateCreator } from 'zustand'
-import { loadSettings, saveSettings } from '../settings'
+import { loadSettings, normaliseSettings, saveSettings } from '../settings'
 import type { AppState, SettingsSlice } from './types'
 
 export const createSettingsSlice: StateCreator<AppState, [], [], SettingsSlice> = (set) => ({
@@ -7,7 +7,7 @@ export const createSettingsSlice: StateCreator<AppState, [], [], SettingsSlice> 
 
   updateSettings: (patch) =>
     set((s) => {
-      const settings = { ...s.settings, ...patch }
+      const settings = normaliseSettings({ ...s.settings, ...patch })
       saveSettings(settings)
       return { settings }
     })

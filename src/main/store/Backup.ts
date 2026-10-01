@@ -1,5 +1,5 @@
 import { app, dialog, type BrowserWindow } from 'electron'
-import { existsSync, readFileSync, renameSync, rmSync } from 'fs'
+import { existsSync, readFileSync, rmSync } from 'fs'
 import { join } from 'path'
 import { deriveKey, newSalt, encrypt, decrypt, wipe, type EncryptedPayload } from '../vault/crypto'
 import { vault, type SealedSecrets } from '../vault/Vault'
@@ -229,10 +229,13 @@ function validatePortForward(value: unknown, path: string): void {
   optionalNumber(record, 'dstPort', path)
 }
 
-function validateSessionGroup(value: unknown, path: string): SessionGroup {
+function validateSessionGroup(value: unknown, path: string, derived = false): SessionGroup {
   const record = asRecord(value, path)
   const id = requiredString(record, 'id', path)
-  if (id.length === 0 || id.length > 128 || id === '.' || id === '..' || /[\\/\0]/.test(id)) {
+  if (
+    !derived &&
+    (id.length === 0 || id.length > 128 || id === '.' || id === '..' || /[\\/\0]/.test(id))
+  ) {
     invalid(`${path}.id is not a safe identifier`)
   }
   requiredString(record, 'name', path)
@@ -646,6 +649,58 @@ interface ImportJournal {
   credentials: ReturnType<typeof credentialStore.snapshot>
 }
 
+/** Validate every snapshot before recovery writes its first file. */
+function checkJournal(value: unknown): ImportJournal {
+  const journal = asRecord(value, 'import journal')
+  if (journal.version !== 1) invalid('import journal version')
+  requiredNumber(journal, 'startedAt', 'import journal')
+  const lists = (
+    key: string,
+    fields: Record<string, (value: unknown, path: string) => unknown>
+  ): void => {
+    const snapshot = asRecord(journal[key], `journal.${key}`)
+    for (const [field, validate] of Object.entries(fields)) {
+      validatedArray(snapshot[field], `journal.${key}.${field}`, validate)
+    }
+  }
+  lists('sessions', { groups: validateSessionGroup, sessions: validateSessionProfile })
+  lists('snippets', { snippets: validateSnippet })
+  lists('collections', { collections: validateCollection })
+  lists('inventory', { sources: validateInventorySource, overrides: validateInventoryOverride })
+  lists('credentials', { credentials: validateCredential })
+  lists('gitFolders', {
+    overrides: validateInventoryOverride,
+    trees: (value, path) => {
+      const tree = asRecord(value, path)
+      requiredString(tree, 'groupId', path)
+      validatedArray(tree.groups, `${path}.groups`, (group, groupPath) =>
+        validateSessionGroup(group, groupPath, true)
+      )
+      validatedArray(tree.sessions, `${path}.sessions`, validateSessionProfile)
+      const memberships = asRecord(tree.memberships, `${path}.memberships`)
+      for (const [host, groups] of Object.entries(memberships))
+        stringArray(groups, `${path}.memberships.${host}`)
+      return tree
+    }
+  })
+  const folders = asRecord(journal.gitFolders, 'journal.gitFolders')
+  if (folders.repos !== undefined)
+    validatedArray(folders.repos, 'journal.gitFolders.repos', (value, path) => {
+      const repo = asRecord(value, path)
+      requiredString(repo, 'url', path)
+      optionalString(repo, 'branch', path)
+      return repo
+    })
+  if (journal.vault !== undefined) {
+    const sealed = asRecord(journal.vault, 'journal.vault')
+    requiredString(sealed, 'salt', 'journal.vault')
+    const secrets = asRecord(sealed.secrets, 'journal.vault.secrets')
+    for (const [ref, payload] of Object.entries(secrets))
+      validateEncryptedPayload(payload, `journal.vault.secrets.${ref}`)
+  }
+  return journal as unknown as ImportJournal
+}
+
 /**
  * Finishes undoing an import the application did not live through.
  *
@@ -658,22 +713,18 @@ export function recoverInterruptedImport(): 'none' | 'restored' | 'failed' {
   if (!existsSync(path)) return 'none'
   let journal: ImportJournal
   try {
-    journal = JSON.parse(readFileSync(path, 'utf8')) as ImportJournal
-    if (journal.version !== 1) throw new Error('unknown journal version')
+    journal = checkJournal(JSON.parse(readFileSync(path, 'utf8')))
   } catch {
-    // Written through a temporary name, so a damaged one was never finished —
-    // and an import never starts writing before its journal is whole.
-    renameSync(path, `${path}.damaged-${Date.now()}`)
-    return 'none'
+    return 'failed'
   }
   try {
+    if (journal.vault && !vault.restoreSealedSecrets(journal.vault)) return 'failed'
     sessionStore.restore(journal.sessions)
     snippetStore.restore(journal.snippets)
     collectionStore.restore(journal.collections)
     inventoryStore.restore(journal.inventory)
     gitFolderStore.restore(journal.gitFolders)
     credentialStore.restore(journal.credentials)
-    if (journal.vault) vault.restoreSealedSecrets(journal.vault)
   } catch {
     return 'failed'
   }
@@ -713,6 +764,25 @@ function checkRelations(parsed: BackupFile): {
     parsed.sessions.map((s) => s.id),
     'backup.sessions'
   )
+
+  for (const [name, items] of Object.entries({
+    snippets: parsed.snippets,
+    collections: parsed.collections,
+    inventorySources: parsed.inventorySources,
+    credentials: parsed.credentials ?? []
+  }))
+    duplicate(
+      items.map((item) => item.id),
+      `backup.${name}`
+    )
+  for (const [name, items] of Object.entries({
+    inventoryOverrides: parsed.inventoryOverrides,
+    gitFolderOverrides: parsed.gitFolderOverrides ?? []
+  }))
+    duplicate(
+      items.map((item) => item.nodeId),
+      `backup.${name}`
+    )
 
   const merged = new Map(sessionStore.getAll().groups.map((g) => [g.id, g] as const))
   for (const group of parsed.groups) merged.set(group.id, group)

@@ -35,3 +35,58 @@ describe('a layout saved and read back', () => {
     expect(tab.hasActivity).toBeUndefined()
   })
 })
+
+describe('invalid saved layouts', () => {
+  const put = (root: unknown) =>
+    localStorage.setItem(
+      'terminaldeck.layout',
+      JSON.stringify({
+        version: 2,
+        workspaces: [
+          {
+            id: 'w',
+            title: 'work',
+            activeTabId: 't',
+            tabs: [{ id: 't', title: 'host', root, activePaneId: 'p' }]
+          }
+        ],
+        activeWorkspaceId: 'w'
+      })
+    )
+  it.each([
+    null,
+    {},
+    { type: 'split', id: 'p', children: [] },
+    { type: 'leaf', id: 'p', title: 'host', target: null }
+  ])('does not restore a broken pane tree %j', (root) => {
+    put(root)
+    expect(loadLayout().workspaces).toEqual([])
+  })
+  it('normalizes missing active references and strips stale live handles at read time', () => {
+    const root = {
+      ...makeLeaf('host', { kind: 'session', sessionId: 'host' }),
+      connectionId: 'stale',
+      desktopId: 'stale-desktop'
+    }
+    put(root)
+    const stored = JSON.parse(localStorage.getItem('terminaldeck.layout')!)
+    stored.activeWorkspaceId = 'missing'
+    stored.workspaces[0].activeTabId = 'missing'
+    localStorage.setItem('terminaldeck.layout', JSON.stringify(stored))
+    const layout = loadLayout()
+    expect(layout.activeWorkspaceId).toBe('w')
+    expect(layout.workspaces[0].activeTabId).toBe('t')
+    expect(layout.workspaces[0].tabs[0].activePaneId).toBe(root.id)
+    const restored = layout.workspaces[0].tabs[0].root as LeafNode
+    expect(restored.connectionId).toBeUndefined()
+    expect(restored.desktopId).toBeUndefined()
+    expect(restored.restored).toBe(true)
+  })
+  it('rejects duplicate ids across workspaces', () => {
+    put(makeLeaf('host', { kind: 'session', sessionId: 'host' }))
+    const stored = JSON.parse(localStorage.getItem('terminaldeck.layout')!)
+    stored.workspaces.push({ ...stored.workspaces[0], id: 'other' })
+    localStorage.setItem('terminaldeck.layout', JSON.stringify(stored))
+    expect(loadLayout().workspaces).toEqual([])
+  })
+})

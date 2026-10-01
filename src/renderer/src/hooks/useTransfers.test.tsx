@@ -134,3 +134,69 @@ describe('running a transfer from a file panel', () => {
     })
   })
 })
+
+describe('transfer lifecycle', () => {
+  it('settles a pending conflict and drops queued files on unmount', async () => {
+    const runPlan = vi.fn()
+    window.td.sftp = { runPlan } as unknown as typeof window.td.sftp
+    const { result, unmount } = renderHook(() =>
+      useTransfers({ connectionId: 'c1', onFinished: vi.fn() })
+    )
+    let first!: Promise<void>
+    let second!: Promise<void>
+    act(() => {
+      first = result.current.run(plan(true))
+      second = result.current.run(plan())
+    })
+    await act(() => Promise.resolve())
+    unmount()
+    await expect(Promise.all([first, second])).resolves.toEqual([undefined, undefined])
+    expect(runPlan).not.toHaveBeenCalled()
+  })
+  it('does not publish an old transfer error or refresh after switching connections', async () => {
+    let fail!: (err: Error) => void
+    window.td.sftp = {
+      runPlan: vi.fn(
+        () =>
+          new Promise((_r, reject) => {
+            fail = reject
+          })
+      )
+    } as unknown as typeof window.td.sftp
+    const refreshed = vi.fn()
+    const { result, rerender } = renderHook(
+      ({ connectionId }) => useTransfers({ connectionId, onFinished: refreshed }),
+      { initialProps: { connectionId: 'c1' } }
+    )
+    let running!: Promise<void>
+    act(() => {
+      running = result.current.run(plan())
+    })
+    await act(() => Promise.resolve())
+    expect(result.current.transferring).toBe(true)
+    rerender({ connectionId: 'c2' })
+    await act(async () => {
+      fail(new Error('old connection failed'))
+      await running
+    })
+    expect(result.current.outcome).toBeNull()
+    expect(result.current.transferring).toBe(false)
+    expect(refreshed).not.toHaveBeenCalled()
+  })
+  it('executes a conflict only once when confirm is called twice before a render', async () => {
+    const runPlan = vi.fn().mockResolvedValue({ written: 1, skipped: 0, changed: [] })
+    window.td.sftp = { runPlan } as unknown as typeof window.td.sftp
+    const { result } = renderHook(() => useTransfers({ connectionId: 'c1', onFinished: vi.fn() }))
+    let running!: Promise<void>
+    act(() => {
+      running = result.current.run(plan(true))
+    })
+    await act(() => Promise.resolve())
+    const confirm = result.current.confirm
+    await act(async () => {
+      await Promise.all([confirm({}), confirm({})])
+      await running
+    })
+    expect(runPlan).toHaveBeenCalledTimes(1)
+  })
+})

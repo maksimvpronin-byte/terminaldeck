@@ -1,3 +1,4 @@
+import { rereadOnFailure } from '../reconcile'
 import type { StateCreator } from 'zustand'
 import type { AppState, GitFoldersSlice } from './types'
 
@@ -52,7 +53,10 @@ export const createGitFoldersSlice: StateCreator<AppState, [], [], GitFoldersSli
   },
 
   applyGitFolder: async (groupId, includedGroups, options) => {
-    await window.td.gitFolder.apply(groupId, includedGroups, options)
+    await rereadOnFailure(
+      () => window.td.gitFolder.apply(groupId, includedGroups, options),
+      () => Promise.all([get().loadGitFolders(), get().loadStore()])
+    )
     await Promise.all([get().loadGitFolders(), get().loadStore()])
   },
 
@@ -62,7 +66,10 @@ export const createGitFoldersSlice: StateCreator<AppState, [], [], GitFoldersSli
   },
 
   clearGitFolderOverride: async (nodeId) => {
-    await window.td.gitFolder.clearOverride(nodeId)
+    await rereadOnFailure(
+      () => window.td.gitFolder.clearOverride(nodeId),
+      () => get().loadGitFolders()
+    )
     await get().loadGitFolders()
   },
 

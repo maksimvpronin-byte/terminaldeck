@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { existsSync, writeFileSync } from 'fs'
 import { basename, dirname } from 'path'
 import type { BrowserWindow } from 'electron'
@@ -14,6 +14,17 @@ import type { BrowserWindow } from 'electron'
  * files happens long before the application exits.
  */
 
+const fileState = vi.hoisted(() => ({ statError: false }))
+vi.mock('fs', async (original) => {
+  const actual = await original<typeof import('fs')>()
+  return {
+    ...actual,
+    statSync: (...args: Parameters<typeof actual.statSync>) => {
+      if (fileState.statError) throw new Error('EACCES: file became unreadable')
+      return actual.statSync(...args)
+    }
+  }
+})
 const openPath = vi.fn(async (_path: string): Promise<string> => '')
 const spawned: { program: string; args: string[] }[] = []
 
@@ -40,9 +51,9 @@ vi.mock('child_process', () => ({
 vi.mock('./SFTPManager', () => ({
   sftpManager: {
     // "Downloading" is writing the file the manager expects to find.
-    download: async (_id: string, _remote: string, local: string): Promise<void> => {
+    download: vi.fn(async (_id: string, _remote: string, local: string): Promise<void> => {
       writeFileSync(local, 'contents', 'utf8')
-    },
+    }),
     upload: async (): Promise<void> => undefined
   }
 }))
@@ -161,4 +172,67 @@ describe('a path with a dollar sign in it', () => {
     await openInEditor("/tmp/cost$&$'.txt", 'myeditor --file={file}')
     expect(spawned.at(-1)?.args).toEqual(["--file=/tmp/cost$&$'.txt"])
   })
+})
+
+const { sftpManager } = await import('./SFTPManager')
+afterEach(() => {
+  fileState.statError = false
+  remoteEdit.cleanUp()
+})
+
+describe('editor arguments', () => {
+  it('handles quotes within arguments, empty arguments and Windows backslashes', async () => {
+    await openInEditor('C:\\My Files\\a.txt', '"C:\\Program Files\\editor.exe" --file="{file}" ""')
+    expect(spawned.at(-1)).toEqual({
+      program: 'C:\\Program Files\\editor.exe',
+      args: ['--file=C:\\My Files\\a.txt', '']
+    })
+  })
+  it('refuses an unfinished quote before launching anything', async () => {
+    const count = spawned.length
+    await expect(openInEditor('/tmp/a', 'editor "{file}')).rejects.toThrow('Unclosed quote')
+    expect(spawned).toHaveLength(count)
+  })
+  it('replaces every placeholder without interpreting dollar signs', async () => {
+    await openInEditor('/tmp/$&', 'editor {file}:{file}')
+    expect(spawned.at(-1)?.args).toEqual(['/tmp/$&:/tmp/$&'])
+  })
+})
+
+describe('closing a connection during a download', () => {
+  it('does not launch the editor or revive the watch after disconnect', async () => {
+    let finish!: () => void
+    vi.mocked(sftpManager.download).mockImplementationOnce(async (_id, _remote, local) => {
+      await new Promise<void>((r) => {
+        finish = r
+      })
+      writeFileSync(local, 'contents')
+    })
+    const count = spawned.length
+    const opening = remoteEdit.open(win, 'closing', '/etc/hosts', 'editor')
+    const rejected = expect(opening).rejects.toThrow('SSH connection closed')
+    remoteEdit.stopAllFor('closing')
+    finish()
+    await rejected
+    expect(remoteEdit.list('closing')).toEqual([])
+    expect(spawned).toHaveLength(count)
+  })
+})
+
+it('reports stat errors through the edit event instead of rejecting the timer task', async () => {
+  await remoteEdit.open(win, 'stat-error', '/etc/hosts', 'editor')
+  const send = vi.fn()
+  const reportingWin = {
+    isDestroyed: () => false,
+    webContents: { send }
+  } as unknown as BrowserWindow
+  fileState.statError = true
+  const internals = remoteEdit as unknown as {
+    upload: (win: BrowserWindow, key: string) => Promise<void>
+  }
+  await expect(internals.upload(reportingWin, 'stat-error:/etc/hosts')).resolves.toBeUndefined()
+  expect(send).toHaveBeenCalledWith(
+    expect.any(String),
+    expect.objectContaining({ error: expect.stringContaining('EACCES') })
+  )
 })
