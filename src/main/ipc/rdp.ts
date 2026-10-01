@@ -156,8 +156,17 @@ export function registerRdpHandlers(): void {
         credentialId?: string
         /** The administrative session for this one connection, whatever the host says. */
         admin?: boolean
+        /**
+         * The input language, as the window worked it out where this process
+         * cannot — off a Mac. Two lowercase letters, or ignored.
+         */
+        language?: unknown
       }
     ) => {
+      const language =
+        typeof request.language === 'string' && /^[a-z]{2}$/.test(request.language)
+          ? request.language
+          : undefined
       const win = focusedWin()
       if (!win) throw new Error('No window to draw into')
 
@@ -182,7 +191,9 @@ export function registerRdpHandlers(): void {
             scale: RDP_FALLBACK.sendDensity ? request.scale : undefined,
             sound: RDP_FALLBACK.sound,
             clipboard: RDP_FALLBACK.clipboard,
-            admin: request.admin || RDP_FALLBACK.consoleSession
+            drives: RDP_FALLBACK.drives,
+            admin: request.admin || RDP_FALLBACK.consoleSession,
+            language
           },
           {
             username: login.username,
@@ -212,9 +223,11 @@ export function registerRdpHandlers(): void {
         scale: rdp.sendDensity ? request.scale : undefined,
         sound: rdp.sound,
         clipboard: rdp.clipboard,
+        drives: rdp.drives,
         // Asked for from the host menu it holds for that pane alone; otherwise
         // the host's own setting decides.
-        admin: request.admin || rdp.consoleSession
+        admin: request.admin || rdp.consoleSession,
+        language
       }
 
       return freeRdpBridge.start(

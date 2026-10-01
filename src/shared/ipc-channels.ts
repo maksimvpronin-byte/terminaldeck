@@ -68,6 +68,12 @@ export const IPC = {
   collectionsDelete: 'collections:delete',
   collectionsReorder: 'collections:reorder',
 
+  // Multi-windows: tabs kept by name, panes and all
+  multiWindowsList: 'multiWindows:list',
+  multiWindowsSave: 'multiWindows:save',
+  multiWindowsDelete: 'multiWindows:delete',
+  multiWindowsReorder: 'multiWindows:reorder',
+
   // SSH connection lifecycle
   sshConnect: 'ssh:connect',
   sshQuickConnect: 'ssh:quickConnect',

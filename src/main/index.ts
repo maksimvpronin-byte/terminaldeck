@@ -16,6 +16,10 @@ import { remoteMonitor } from './ssh/RemoteMonitor'
 import { sshManager } from './ssh/SSHManager'
 import { registerUpdater } from './updater'
 import { IPC } from '../shared/ipc-channels'
+import { rememberWindowPlacement, savedWindowPlacement } from './windowState'
+
+/** The smallest the window may be made, and the smallest it is restored at. */
+const MIN_WINDOW = { width: 900, height: 560 }
 
 /**
  * The stock menu binds Cmd/Ctrl +, - and 0 to page zoom, and menu accelerators
@@ -93,11 +97,14 @@ function isOwnPage(url: string): boolean {
 }
 
 function createWindow(): void {
+  const placement = savedWindowPlacement(MIN_WINDOW)
   const mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
-    minWidth: 900,
-    minHeight: 560,
+    // Where it was last time, if that is still somewhere on a screen.
+    ...placement.bounds,
+    minWidth: MIN_WINDOW.width,
+    minHeight: MIN_WINDOW.height,
     show: false,
     autoHideMenuBar: true,
     backgroundColor: '#1e1e1e',
@@ -124,8 +131,10 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => {
+    if (placement.maximized) mainWindow.maximize()
     mainWindow.show()
   })
+  rememberWindowPlacement(mainWindow)
 
   // A window that has just loaded is holding no session, whatever the one
   // before it was doing. See releaseKeyboard.

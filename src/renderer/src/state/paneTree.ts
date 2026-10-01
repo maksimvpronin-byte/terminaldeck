@@ -38,6 +38,12 @@ export type PaneNode =
       sftpOpen: boolean
       tunnelsOpen: boolean
       monitorOpen: boolean
+      /**
+       * Closed by hand while the monitor is shown in every SSH pane — see
+       * `monitorForAll` and `monitorShown`. Kept apart from `monitorOpen`, so
+       * turning that setting off brings back each pane as it was asked for.
+       */
+      monitorClosed?: boolean
       /** Whether this terminal takes part in broadcast input. */
       broadcastEnabled: boolean
       /**
@@ -217,4 +223,12 @@ export function setAllBroadcast(node: PaneNode, enabled: boolean): PaneNode {
           setAllBroadcast(node.children[1], enabled)
         ]
       }
+}
+
+/** Whether a pane's monitor strip is shown: by its own toggle, or by the setting for all. */
+export function monitorShown(
+  leaf: Pick<LeafNode, 'monitorOpen' | 'monitorClosed'>,
+  forAll: boolean
+): boolean {
+  return forAll ? !leaf.monitorClosed : leaf.monitorOpen
 }

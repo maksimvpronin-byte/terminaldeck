@@ -76,3 +76,37 @@ describe('a terminal pane whose session ends', () => {
     expect(onConnected).toHaveBeenLastCalledWith(undefined)
   })
 })
+
+describe('a terminal opened again from the tree', () => {
+  it('connects a restored pane on a new request, and leaves a live one alone', async () => {
+    const connect = vi.fn().mockResolvedValue({ connectionId: 'c2' })
+    window.td.ssh.connect = connect
+    window.td.ssh.onStatus = () => () => undefined
+    window.td.ssh.onData = () => () => undefined
+    window.td.ssh.onError = () => () => undefined
+    window.td.ssh.ready = vi.fn()
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe(): void {}
+        disconnect(): void {}
+      }
+    )
+    const props = {
+      target: { kind: 'session', sessionId: 'h2' } as const,
+      active: false,
+      restored: true,
+      onConnected: vi.fn(),
+      onFocus: () => undefined,
+      resolveWriteTargets: (own: string) => [own]
+    }
+    const view = render(<TerminalHost {...props} wake={5} />)
+    // Restored panes wait, and a request from before this pane existed is not new.
+    expect(connect).not.toHaveBeenCalled()
+    view.rerender(<TerminalHost {...props} wake={6} />)
+    await waitFor(() => expect(connect).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(props.onConnected).toHaveBeenCalledWith('c2'))
+    view.rerender(<TerminalHost {...props} wake={7} />)
+    expect(connect).toHaveBeenCalledTimes(1)
+  })
+})

@@ -7,6 +7,7 @@ import type {
   GitFolderTree,
   GitRepo,
   HostCollection,
+  MultiWindow,
   InventoryOverride,
   InventorySource,
   InventoryTree,
@@ -168,6 +169,37 @@ export interface GitFoldersSlice {
   forgetGitRepo: (url: string, branch?: string) => Promise<void>
 }
 
+/** A host's menu asked for from elsewhere; see `hostMenuRequest`. */
+export interface HostMenuRequest {
+  hostId: string
+  x: number
+  y: number
+  /** The tab it was asked for from, whose own items join the host's. */
+  tabId?: string
+}
+
+export interface MultiWindowsSlice {
+  /**
+   * A tab waiting to be named as a multi-window, from its right-click menu.
+   * The dialog for it lives with the tab bar, which is always there.
+   */
+  multiWindowDraft: { tabId: string; name: string } | null
+  draftMultiWindow: (draft: { tabId: string; name: string } | null) => void
+  /** Tabs kept by name, panes and all; see MultiWindow. */
+  multiWindows: MultiWindow[]
+  loadMultiWindows: () => Promise<void>
+  /**
+   * Keeps a tab's panes as a multi-window — a new one, or in place of
+   * `replaceId`. False when the tab has no saved host in it to keep.
+   */
+  saveTabAsMultiWindow: (tabId: string, name: string, replaceId?: string) => Promise<boolean>
+  renameMultiWindow: (id: string, name: string) => Promise<void>
+  removeMultiWindow: (id: string) => Promise<void>
+  moveMultiWindow: (id: string, delta: -1 | 1) => Promise<void>
+  /** Opens it as a new tab in the workspace in front, every pane connecting. */
+  openMultiWindow: (id: string) => void
+}
+
 export interface CollectionsSlice {
   collections: HostCollection[]
   loadCollections: () => Promise<void>
@@ -227,6 +259,37 @@ export interface WorkspaceSlice {
 
   /** Opens a tab in the current workspace, creating one if there is none. */
   openTab: (title: string, target: PaneTarget, color?: string, viaCollectionId?: string) => string
+  /**
+   * Opens a host the way a double-click does, which is not always a new tab.
+   *
+   * A desktop is never opened twice for one account: Windows keeps one
+   * session per user, so a second tab took the session from the first and
+   * left it showing an error. Its existing pane is brought forward instead,
+   * and reconnected if it had dropped. A terminal goes the same way while
+   * `reuseOpenHost` is on, unless an account was chosen for it. `again` asks
+   * for a new tab whatever the setting — a desktop still never gets one.
+   * Returns the pane the host is in.
+   */
+  openHost: (
+    title: string,
+    target: PaneTarget,
+    color?: string,
+    viaCollectionId?: string,
+    again?: boolean
+  ) => string
+  /**
+   * Bumped for one pane: connect it if it is not connected. See `openHost`;
+   * a pane that is connecting or connected ignores it.
+   */
+  wakeRequest: { paneId: string; n: number } | null
+  /**
+   * A host's own menu, asked for from somewhere that has none — a tab. The
+   * tree that holds the host shows it and clears this. See `Workspace`.
+   */
+  hostMenuRequest: HostMenuRequest | null
+  requestHostMenu: (request: HostMenuRequest | null) => void
+  /** Opens a tab of ready-made panes in the workspace in front; returns its id. */
+  openPanes: (title: string, root: PaneNode) => string
   /** Opens several hosts at once — see OpenMode. */
   openMany: (items: OpenRequest[], mode: OpenMode, workspaceTitle?: string) => void
   closeTab: (tabId: string) => void
@@ -304,5 +367,6 @@ export type AppState = VaultSlice &
   GitFoldersSlice &
   SnippetsSlice &
   CollectionsSlice &
+  MultiWindowsSlice &
   CredentialsSlice &
   WorkspaceSlice

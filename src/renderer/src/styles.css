@@ -88,6 +88,37 @@ label {
   color: var(--text-dim);
 }
 
+/* A password field with its eye inside the right end: the field keeps its
+   full width, and the text stops short of the eye rather than under it. */
+.password-input {
+  position: relative;
+  display: flex;
+}
+.password-input input {
+  flex: 1;
+  min-width: 0;
+  padding-right: 28px;
+}
+.password-input .password-eye {
+  position: absolute;
+  top: 50%;
+  right: 3px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  color: var(--text-dim);
+  background: transparent;
+  border: 0;
+}
+.password-input .password-eye:hover {
+  color: var(--text);
+  background: transparent;
+}
+
 /* --- gate screens --- */
 .gate {
   height: 100%;
@@ -1225,7 +1256,15 @@ label {
   flex: 1;
   min-width: 0;
   min-height: 0;
-  padding: 4px;
+  /* A little more below than around: the last line stands clear of the edge
+     of the window, and of a taskbar right under it, rather than on it. */
+  padding: 4px 4px 8px;
+  /* Measured inside its padding, which is what the fit addon assumes: it
+     takes this box's computed height as the room for rows and subtracts only
+     the padding of the terminal inside it. Under the border-box everything
+     else here uses, that height included this padding, so a row more than
+     fitted was laid out and the last one sat on the bottom edge, cut short. */
+  box-sizing: content-box;
 }
 .terminal-search {
   display: flex;

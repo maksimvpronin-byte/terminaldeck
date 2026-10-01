@@ -302,6 +302,18 @@ export default function RdpFields({
       <label className="checkbox-row" style={{ flexDirection: 'row' }}>
         <input
           type="checkbox"
+          checked={effective.drives}
+          onChange={(e) => set('drives', e.target.checked)}
+        />
+        <Hint label={t('Share this computer’s disks with this host')}>
+          {t(
+            'Every disk here appears under This PC over there, as “name on this computer” — on a Mac the system disk and whatever is plugged in, coming and going as it is. Off unless turned on: anything running over there can read and change every file you can. Takes effect on the next connection.'
+          )}
+        </Hint>
+      </label>
+      <label className="checkbox-row" style={{ flexDirection: 'row' }}>
+        <input
+          type="checkbox"
           checked={effective.consoleSession}
           onChange={(e) => set('consoleSession', e.target.checked)}
         />

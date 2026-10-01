@@ -1741,6 +1741,17 @@ static BOOL configure(tdContext* td, const td_cmd* start)
 			return FALSE;
 	}
 
+	/* This machine's disks, offered to the far end as mRemoteNG and mstsc do.
+	 * `RedirectDrives` is what FreeRDP's add-in loader turns into a drive
+	 * device for every volume — /Volumes here, the drive letters on Windows —
+	 * watched for ones plugged in or out while the session runs, and into
+	 * the rdpdr channel that carries them. */
+	if (td_cmd_bool(start, "drives", 0))
+	{
+		SET_BOOL(FreeRDP_RedirectDrives, TRUE);
+		SET_BOOL(FreeRDP_DeviceRedirection, TRUE);
+	}
+
 	/* What the far end may spend effort on. Off by default in RDP and worth
 	 * having on a link that can carry it; the caller decides. */
 	SET_BOOL(FreeRDP_AllowFontSmoothing, td_cmd_bool(start, "fontSmoothing", 1));

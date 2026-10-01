@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest'
-import { createEvent, fireEvent, render, screen } from '@testing-library/react'
+import { act, createEvent, fireEvent, render, screen } from '@testing-library/react'
 import Sidebar from './Sidebar'
 import { useStore } from '../state/store'
 import type { SessionGroup, SessionProfile } from '../../../shared/types'
@@ -445,4 +445,55 @@ describe('dragging into a collection', () => {
     expect(over.defaultPrevented).toBe(false)
     expect(screen.queryByText('Move to top level')).toBeNull()
   })
+})
+
+describe('a host’s menu asked for from its tab', () => {
+  it('shows that host’s own menu, for it alone, and answers the request', () => {
+    useStore.setState({
+      sessions: [host({ id: 'h1', name: 'linux-box' }), host({ id: 'h2', name: 'other' })],
+      groups: [],
+      inventoryTrees: [],
+      gitFolderTrees: [],
+      gitFolderOverrides: [],
+      inventoryOverrides: [],
+      // A selection in the tree is not what a tab is about.
+      selectedHostIds: ['h1', 'h2'],
+      hostMenuRequest: null
+    })
+    render(<Sidebar onOpenSnippets={() => {}} onOpenHelp={() => {}} />)
+    act(() => useStore.getState().requestHostMenu({ hostId: 'h1', x: 10, y: 20 }))
+    expect(screen.getByText('Connect')).toBeTruthy()
+    expect(screen.getByText('Add to collection…')).toBeTruthy()
+    expect(useStore.getState().hostMenuRequest).toBeNull()
+  })
+})
+
+it('turns to the Inventory tab for an inventory host, whose tree then shows its menu', () => {
+  const root = 'inv:src:root'
+  useStore.setState({
+    sessions: [],
+    groups: [],
+    gitFolderTrees: [],
+    gitFolderOverrides: [],
+    inventorySources: [{ id: 'src', name: 'Repo', repoUrl: 'git@example.com:x.git', paths: [] }],
+    inventoryTrees: [
+      {
+        sourceId: 'src',
+        groups: [{ id: root, name: 'Repo', parentId: null }],
+        sessions: [host({ id: 'inv:src:h:db1', name: 'db1', groupId: root })],
+        memberships: {}
+      }
+    ],
+    inventoryOverrides: [],
+    inventorySyncing: [],
+    inventorySyncErrors: {},
+    selectedHostIds: [],
+    hostMenuRequest: null
+  })
+  render(<Sidebar onOpenSnippets={() => {}} onOpenHelp={() => {}} />)
+  expect(screen.queryByText('db1')).toBeNull()
+  act(() => useStore.getState().requestHostMenu({ hostId: 'inv:src:h:db1', x: 1, y: 2 }))
+  expect(screen.getByText('db1')).toBeTruthy()
+  expect(screen.getByText('Override locally…')).toBeTruthy()
+  expect(useStore.getState().hostMenuRequest).toBeNull()
 })

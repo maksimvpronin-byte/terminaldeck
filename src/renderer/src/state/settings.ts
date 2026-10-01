@@ -1,6 +1,7 @@
 import type { ITheme } from '@xterm/xterm'
 import type { CursorStyle, ResolvedAppearance } from '../../../shared/types'
 import { preferredLanguage, type Language } from '../i18n/language'
+import { PUTTY_SCHEMES, type PuttyScheme } from './puttySchemes'
 
 /**
  * The application-wide defaults. The appearance half doubles as the bottom of
@@ -47,6 +48,17 @@ export interface TerminalSettings extends ResolvedAppearance {
    * looking at.
    */
   revealActiveHost: boolean
+  /**
+   * A double-click on a host that is already open brings its tab forward
+   * instead of opening another; "Open another tab" in its menu still does.
+   * A desktop is never opened twice either way — see `openHost`.
+   */
+  reuseOpenHost: boolean
+  /**
+   * The monitor strip — load, memory, disks — under every SSH pane, without
+   * pressing Monitor in each. Its button then closes it for one pane alone.
+   */
+  monitorForAll: boolean
   /**
    * How tall a row of the host tree is, in pixels — hosts, folders and
    * collections alike. 32 is what it always was; a long inventory reads better
@@ -112,6 +124,12 @@ export interface UiPalette {
  * pastel, with the file names all but gone. A theme now decides the background,
  * the text, the cursor and the selection; what a program asked to be blue stays
  * blue.
+ *
+ * Except under the PuTTY schemes, which are chosen for their palettes and would
+ * be little more than a background colour without them. They bring their own
+ * sixteen, as PuTTY gives them, and sit in a group of their own in the picker,
+ * so nobody arrives at one by accident. `MIN_CONTRAST_RATIO` still lifts any
+ * text they make too faint to read.
  */
 export const ANSI_PALETTE = {
   black: '#2e3436',
@@ -146,6 +164,8 @@ export const MIN_CONTRAST_RATIO = 4.5
 export interface ThemeDef {
   /** No ANSI colours here, deliberately — see ANSI_PALETTE. */
   terminal: Pick<ITheme, 'background' | 'foreground' | 'cursor' | 'selectionBackground'>
+  /** The sixteen, for a PuTTY scheme alone; see ANSI_PALETTE for why only there. */
+  ansi?: Partial<ITheme>
   ui: UiPalette
   /**
    * Light themes have to say so rather than be guessed at from their name:
@@ -434,13 +454,97 @@ export const THEMES: Record<string, ThemeDef> = {
   }
 }
 
+/** `a` moved towards `b` by `share` (0–1), as hex. */
+function mix(a: string, b: string, share: number): string {
+  const channels = (hex: string): number[] =>
+    [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
+  const from = channels(a)
+  const to = channels(b)
+  return (
+    '#' +
+    from
+      .map((c, i) => Math.round(c + (to[i] - c) * share))
+      .map((c) => c.toString(16).padStart(2, '0'))
+      .join('')
+  )
+}
+
+/** Relative luminance, 0 (black) to 1 (white), as WCAG reckons it. */
+function luminance(hex: string): number {
+  const [r, g, b] = [1, 3, 5].map((i) => {
+    const c = parseInt(hex.slice(i, i + 2), 16) / 255
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+  })
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+/** The eight ANSI names, in the order PuTTY and every other terminal list them. */
+const ANSI_NAMES = ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white'] as const
+
 /**
- * The theme list split for the pickers, so thirteen entries stay browsable and
- * a light theme is not stumbled into by accident.
+ * A whole theme out of a PuTTY scheme, which states the terminal and nothing
+ * else: the interface around it is mixed from its own background and text,
+ * so the window wears the scheme rather than sitting beside it, and its accent
+ * is the scheme's bright blue — the colour PuTTY users know it by.
  */
+export function puttyThemeDef(scheme: PuttyScheme): ThemeDef {
+  const { background: bg, foreground: fg, cursor, ansi: c } = scheme
+  const light = luminance(bg) > 0.5
+  const ansi: Partial<ITheme> = {}
+  ANSI_NAMES.forEach((name, i) => {
+    Object.assign(ansi, {
+      [name]: c[i],
+      [`bright${name[0].toUpperCase()}${name.slice(1)}`]: c[i + 8]
+    })
+  })
+  const accent = c[12]
+  return {
+    terminal: {
+      background: bg,
+      foreground: fg,
+      cursor,
+      selectionBackground: mix(bg, accent, 0.35)
+    },
+    ansi,
+    ui: {
+      bg0: bg,
+      bg1: mix(bg, fg, 0.04),
+      bg2: mix(bg, fg, 0.08),
+      bg3: mix(bg, fg, 0.13),
+      border: mix(bg, fg, 0.18),
+      text: fg,
+      textDim: mix(fg, bg, 0.4),
+      accent,
+      accentDim: mix(bg, accent, 0.35),
+      danger: c[9],
+      success: c[10]
+    },
+    ...(light ? { light: true } : {})
+  }
+}
+
+/**
+ * The PuTTY schemes under their own names — or, where one of ours already has
+ * that name, under theirs with "(PuTTY)" after it, so a saved choice of either
+ * still means the one it meant.
+ */
+const PUTTY_NAMES: string[] = []
+for (const scheme of PUTTY_SCHEMES) {
+  const name = Object.hasOwn(THEMES, scheme.name) ? `${scheme.name} (PuTTY)` : scheme.name
+  THEMES[name] = puttyThemeDef(scheme)
+  PUTTY_NAMES.push(name)
+}
+
+/**
+ * The theme list split for the pickers, so the entries stay browsable and a
+ * light theme is not stumbled into by accident — and the PuTTY schemes, which
+ * bring palettes of their own, are kept apart from ours.
+ */
+const OURS = Object.keys(THEMES).filter((n) => !PUTTY_NAMES.includes(n))
 export const THEME_GROUPS: Array<{ label: string; names: string[] }> = [
-  { label: 'Dark', names: Object.keys(THEMES).filter((n) => !THEMES[n].light) },
-  { label: 'Light', names: Object.keys(THEMES).filter((n) => THEMES[n].light) }
+  { label: 'Dark', names: OURS.filter((n) => !THEMES[n].light) },
+  { label: 'Light', names: OURS.filter((n) => THEMES[n].light) },
+  { label: 'PuTTY', names: PUTTY_NAMES }
 ]
 
 export const DEFAULT_THEME = 'TerminalDeck Dark'
@@ -461,6 +565,8 @@ export const DEFAULT_SETTINGS: TerminalSettings = {
   lockAfterMinutes: 15,
   expandOnArrowOnly: false,
   revealActiveHost: true,
+  reuseOpenHost: true,
+  monitorForAll: false,
   treeRowHeight: 32,
   treeTint: 'fade',
   treeEdge: true,
@@ -494,6 +600,8 @@ export const OTHER_KEYS = [
   'lockAfterMinutes',
   'expandOnArrowOnly',
   'revealActiveHost',
+  'reuseOpenHost',
+  'monitorForAll',
   'treeRowHeight',
   'treeTint',
   'treeEdge',
@@ -510,6 +618,10 @@ export const FONT_CHOICES = [
   'SF Mono, Menlo, monospace',
   'JetBrains Mono, Menlo, monospace',
   'Fira Code, Menlo, monospace',
+  // Windows' own two, as PuTTY and mRemoteNG users have them. Neither ships
+  // with macOS: there they fall back to the next name rather than to nothing.
+  'Consolas, Menlo, monospace',
+  'Lucida Console, Monaco, monospace',
   'Courier New, monospace'
 ]
 
@@ -571,7 +683,8 @@ export function themeDefOf(settings: { themeName: string }): ThemeDef {
 }
 
 export function themeOf(settings: { themeName: string }): ITheme {
-  return { ...ANSI_PALETTE, ...themeDefOf(settings).terminal }
+  const def = themeDefOf(settings)
+  return { ...ANSI_PALETTE, ...def.ansi, ...def.terminal }
 }
 
 /**

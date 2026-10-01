@@ -27,6 +27,29 @@ static void keyboard_language(void)
 	}
 }
 
+/* Disks are offered only when asked for, and then through rdpdr. */
+static void drives_on_request(void)
+{
+	for (int asked = 0; asked < 2; asked++)
+	{
+		tdContext td = { 0 };
+		rdpSettings* settings = freerdp_settings_new(0);
+		assert(settings);
+		td.common.context.settings = settings;
+		td_cmd start = { 0 };
+		if (asked)
+		{
+			start.fields[0] = (td_field){ "drives", (char*)"1" };
+			start.count = 1;
+		}
+		assert(configure(&td, &start));
+		assert(freerdp_settings_get_bool(settings, FreeRDP_RedirectDrives) == (asked ? TRUE : FALSE));
+		assert(freerdp_settings_get_bool(settings, FreeRDP_DeviceRedirection) ==
+		       (asked ? TRUE : FALSE));
+		freerdp_settings_free(settings);
+	}
+}
+
 static int frames;
 static size_t last_length;
 static unsigned char last_pixels[64];
@@ -147,6 +170,7 @@ int main(void)
 
 	early_resize();
 	keyboard_language();
+	drives_on_request();
 
 	free(td.scratch);
 	DeleteCriticalSection(&td.paint);

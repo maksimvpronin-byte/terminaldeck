@@ -174,6 +174,17 @@ export interface RdpDefaults {
    */
   clipboard?: boolean
   /**
+   * Whether this machine's disks are offered to the far end, as mRemoteNG's
+   * "Disks" and mstsc's "Local resources → Drives" do: every volume — on a Mac
+   * the system disk and whatever is plugged in, appearing and going as it is
+   * — shows under This PC there, as "<name> on <this machine>".
+   *
+   * Off unless asked for. Unlike the clipboard, which carries what you chose
+   * to copy, this hands over every file you can read, to anything running
+   * over there; it is for a host or a group you trust with that.
+   */
+  drives?: boolean
+  /**
    * Whether to sign in to the administrative session — `mstsc /admin`, which
    * was `/console` before Windows Server 2008.
    *
@@ -286,6 +297,8 @@ export interface ResolvedRdp {
   sound: boolean
   /** Whether what is copied on either side reaches the other. */
   clipboard: boolean
+  /** Whether this machine's disks are offered to the far end. */
+  drives: boolean
   /** Whether the administrative session is asked for (`/admin`). */
   consoleSession: boolean
   resolution: RdpResolution
@@ -649,6 +662,8 @@ export interface ImportSummary {
   sessions: number
   snippets: number
   collections: number
+  /** Tabs kept by name; see MultiWindow. */
+  multiWindows: number
   inventorySources: number
   inventoryOverrides: number
   /** Local settings for hosts mirrored into a Sessions folder from git. */
@@ -676,6 +691,49 @@ export interface HostCollection extends AppearanceDefaults {
   color?: string
   /** Session or inventory host ids, in the order the user arranged them. */
   hostIds: string[]
+  createdAt: number
+  updatedAt: number
+}
+
+/**
+ * One pane of a saved multi-window: a host, or two halves side by side.
+ *
+ * What a pane of a tab is, less everything that belongs to a live session —
+ * no connection, no desktop, and never a Quick connect target, which can carry
+ * a typed password and names no saved host to come back to.
+ */
+export type SavedPane =
+  | {
+      type: 'leaf'
+      /** A saved, inventory or mirrored host. */
+      sessionId: string
+      title: string
+      color?: string
+      /** A stored account this pane signs in as, instead of the host's own. */
+      credentialId?: string
+      /** Console mode (`/admin`) for a desktop. */
+      admin?: boolean
+      sftpOpen?: boolean
+      tunnelsOpen?: boolean
+      monitorOpen?: boolean
+    }
+  | {
+      type: 'split'
+      dir: 'row' | 'col'
+      /** The two halves' shares, as the split had them. */
+      sizes: [number, number]
+      children: [SavedPane, SavedPane]
+    }
+
+/**
+ * A tab's panes kept by name, to be opened again as they stood: which hosts,
+ * split which way, how large each part. Like a collection it holds references
+ * and no credentials, and unlike one it remembers the arrangement.
+ */
+export interface MultiWindow {
+  id: string
+  name: string
+  root: SavedPane
   createdAt: number
   updatedAt: number
 }

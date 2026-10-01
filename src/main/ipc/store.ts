@@ -9,6 +9,8 @@ import type {
 } from '../../shared/types'
 import { exportToFile, importFromFile } from '../store/Backup'
 import { collectionStore } from '../store/CollectionStore'
+import { multiWindowStore } from '../store/MultiWindowStore'
+import { validateMultiWindow } from '../store/Backup'
 import { credentialStore } from '../store/CredentialStore'
 import { sessionStore } from '../store/SessionStore'
 import { snippetStore } from '../store/SnippetStore'
@@ -180,4 +182,12 @@ export function registerStoreHandlers(): void {
   )
   ipcMain.handle(IPC.collectionsDelete, (_e, id: string) => collectionStore.remove(id))
   ipcMain.handle(IPC.collectionsReorder, (_e, ids: string[]) => collectionStore.reorder(ids))
+
+  ipcMain.handle(IPC.multiWindowsList, () => multiWindowStore.list())
+  // Checked as an import is: what is kept here is opened, pane by pane, later.
+  ipcMain.handle(IPC.multiWindowsSave, (_e, window: unknown) =>
+    multiWindowStore.save(validateMultiWindow(window, 'multi-window'))
+  )
+  ipcMain.handle(IPC.multiWindowsDelete, (_e, id: string) => multiWindowStore.remove(id))
+  ipcMain.handle(IPC.multiWindowsReorder, (_e, ids: string[]) => multiWindowStore.reorder(ids))
 }

@@ -7,6 +7,7 @@ import { writeJson } from './jsonFile'
 import { sessionStore } from './SessionStore'
 import { snippetStore } from './SnippetStore'
 import { collectionStore } from './CollectionStore'
+import { multiWindowStore } from './MultiWindowStore'
 import { credentialStore } from './CredentialStore'
 import { gitFolderStore } from '../gitFolders/GitFolderStore'
 import { inventoryStore } from '../inventory/InventoryStore'
@@ -18,7 +19,9 @@ import type {
   SessionGroup,
   SessionProfile,
   Snippet,
-  HostCollection
+  HostCollection,
+  MultiWindow,
+  SavedPane
 } from '../../shared/types'
 
 interface BackupFile {
@@ -29,6 +32,8 @@ interface BackupFile {
   sessions: SessionProfile[]
   snippets: Snippet[]
   collections: HostCollection[]
+  /** Tabs kept by name. Absent from a file written before they existed. */
+  multiWindows?: MultiWindow[]
   inventorySources: InventorySource[]
   inventoryOverrides: InventoryOverride[]
   /**
@@ -191,6 +196,8 @@ function validateDefaults(record: UnknownRecord, path: string): void {
     'inheritRdp',
     'gatewayBypassLocal',
     'sound',
+    'clipboard',
+    'drives',
     'consoleSession',
     'sendDensity',
     'commandAsControl',
@@ -327,6 +334,47 @@ function validateCollection(value: unknown, path: string): HostCollection {
   return record as unknown as HostCollection
 }
 
+/** Two halves at most this deep: a tab split further than this is no tab anyone uses. */
+const MAX_PANE_DEPTH = 16
+
+function validateSavedPane(value: unknown, path: string, depth = 0): SavedPane {
+  if (depth > MAX_PANE_DEPTH) invalid(`${path} is nested too deeply`)
+  const record = asRecord(value, path)
+  if (record.type === 'leaf') {
+    requiredString(record, 'sessionId', path)
+    requiredString(record, 'title', path)
+    optionalString(record, 'color', path)
+    optionalString(record, 'credentialId', path)
+    for (const key of ['admin', 'sftpOpen', 'tunnelsOpen', 'monitorOpen'])
+      optionalBoolean(record, key, path)
+    return record as unknown as SavedPane
+  }
+  if (record.type !== 'split') invalid(`${path}.type is not a pane`)
+  enumField(record, 'dir', path, ['row', 'col'])
+  const sizes = record.sizes
+  if (
+    !Array.isArray(sizes) ||
+    sizes.length !== 2 ||
+    !sizes.every((n) => typeof n === 'number' && Number.isFinite(n) && n > 0)
+  )
+    invalid(`${path}.sizes must be two positive numbers`)
+  const children = record.children
+  if (!Array.isArray(children) || children.length !== 2) invalid(`${path}.children must be two`)
+  children.forEach((child, i) => validateSavedPane(child, `${path}.children[${i}]`, depth + 1))
+  return record as unknown as SavedPane
+}
+
+/** Exported for the window's own saves, which are checked as an import is. */
+export function validateMultiWindow(value: unknown, path: string): MultiWindow {
+  const record = asRecord(value, path)
+  requiredString(record, 'id', path)
+  requiredString(record, 'name', path)
+  requiredNumber(record, 'createdAt', path)
+  requiredNumber(record, 'updatedAt', path)
+  validateSavedPane(record.root, `${path}.root`)
+  return record as unknown as MultiWindow
+}
+
 function validateEncryptedPayload(value: unknown, path: string): EncryptedPayload {
   const record = asRecord(value, path)
   return {
@@ -360,6 +408,10 @@ function validateBackupFile(value: unknown): BackupFile {
     sessions: validatedArray(record.sessions, 'backup.sessions', validateSessionProfile),
     snippets: validatedArray(record.snippets, 'backup.snippets', validateSnippet),
     collections: validatedArray(record.collections, 'backup.collections', validateCollection),
+    multiWindows:
+      record.multiWindows === undefined
+        ? undefined
+        : validatedArray(record.multiWindows, 'backup.multiWindows', validateMultiWindow),
     inventorySources: validatedArray(
       record.inventorySources,
       'backup.inventorySources',
@@ -419,6 +471,7 @@ export async function exportToFile(
     sessions: store.sessions,
     snippets: snippetStore.list(),
     collections: collectionStore.list(),
+    multiWindows: multiWindowStore.list(),
     inventorySources: inventoryStore.sources(),
     inventoryOverrides: inventoryStore.overrides(),
     gitFolderOverrides: gitFolderStore.overrides(),
@@ -519,6 +572,7 @@ export async function importFromFile(
   const { groups, sessions } = checkRelations(parsed)
   const snippets = parsed.snippets ?? []
   const collections = parsed.collections ?? []
+  const multiWindows = parsed.multiWindows ?? []
   const sources = parsed.inventorySources ?? []
   const inventoryOverrides = parsed.inventoryOverrides ?? []
   const gitFolderOverrides = parsed.gitFolderOverrides ?? []
@@ -549,6 +603,7 @@ export async function importFromFile(
     sessions: sessionStore.snapshot(),
     snippets: snippetStore.snapshot(),
     collections: collectionStore.snapshot(),
+    multiWindows: multiWindowStore.snapshot(),
     inventory: inventoryStore.snapshot(),
     gitFolders: gitFolderStore.snapshot(),
     credentials: credentialStore.snapshot()
@@ -583,6 +638,11 @@ export async function importFromFile(
       () => collectionStore.snapshot(),
       (previous) => collectionStore.restore(previous),
       () => collectionStore.saveMany(collections)
+    )
+    step(
+      () => multiWindowStore.snapshot(),
+      (previous) => multiWindowStore.restore(previous),
+      () => multiWindowStore.saveMany(multiWindows)
     )
     step(
       () => inventoryStore.snapshot(),
@@ -624,6 +684,7 @@ export async function importFromFile(
     sessions: sessions.length,
     snippets: snippets.length,
     collections: collections.length,
+    multiWindows: multiWindows.length,
     inventorySources: sources.length,
     inventoryOverrides: inventoryOverrides.length,
     gitFolderOverrides: gitFolderOverrides.length,
@@ -644,6 +705,8 @@ interface ImportJournal {
   sessions: ReturnType<typeof sessionStore.snapshot>
   snippets: ReturnType<typeof snippetStore.snapshot>
   collections: ReturnType<typeof collectionStore.snapshot>
+  /** Absent from a journal written before multi-windows existed. */
+  multiWindows?: ReturnType<typeof multiWindowStore.snapshot>
   inventory: ReturnType<typeof inventoryStore.snapshot>
   gitFolders: ReturnType<typeof gitFolderStore.snapshot>
   credentials: ReturnType<typeof credentialStore.snapshot>
@@ -666,6 +729,8 @@ function checkJournal(value: unknown): ImportJournal {
   lists('sessions', { groups: validateSessionGroup, sessions: validateSessionProfile })
   lists('snippets', { snippets: validateSnippet })
   lists('collections', { collections: validateCollection })
+  if (journal.multiWindows !== undefined)
+    lists('multiWindows', { multiWindows: validateMultiWindow })
   lists('inventory', { sources: validateInventorySource, overrides: validateInventoryOverride })
   lists('credentials', { credentials: validateCredential })
   lists('gitFolders', {
@@ -722,6 +787,7 @@ export function recoverInterruptedImport(): 'none' | 'restored' | 'failed' {
     sessionStore.restore(journal.sessions)
     snippetStore.restore(journal.snippets)
     collectionStore.restore(journal.collections)
+    if (journal.multiWindows) multiWindowStore.restore(journal.multiWindows)
     inventoryStore.restore(journal.inventory)
     gitFolderStore.restore(journal.gitFolders)
     credentialStore.restore(journal.credentials)
@@ -768,6 +834,7 @@ function checkRelations(parsed: BackupFile): {
   for (const [name, items] of Object.entries({
     snippets: parsed.snippets,
     collections: parsed.collections,
+    multiWindows: parsed.multiWindows ?? [],
     inventorySources: parsed.inventorySources,
     credentials: parsed.credentials ?? []
   }))

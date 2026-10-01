@@ -33,6 +33,8 @@ import GitFolderSyncDialog from './GitFolderSyncDialog'
 import InventoryOverrideDialog from './InventoryOverrideDialog'
 import InventoryTree from './InventoryTree'
 import CollectionsPanel from './CollectionsPanel'
+import MultiWindowsPanel from './MultiWindowsPanel'
+import { tabMenuItems } from './tabMenu'
 import CollectionDialog from './CollectionDialog'
 import SettingsDialog, { type SettingsTab } from './SettingsDialog'
 import MultiConnectDialog from './MultiConnectDialog'
@@ -40,7 +42,7 @@ import ContextMenu, { type MenuItem } from './ContextMenu'
 import { collectionItems, connectMenuItems } from './connectMenu'
 import { morphOpen } from './hostMorph'
 import { paneTitle } from '../state/connect'
-import { overridesByNode } from '../state/hosts'
+import { findHost, overridesByNode } from '../state/hosts'
 import { keyHint } from '../state/keys'
 import { ago } from '../state/syncStatus'
 import { useT } from '../i18n'
@@ -104,7 +106,7 @@ export default function Sidebar({
   const removeGroup = useStore((s) => s.removeGroup)
   const removeSessions = useStore((s) => s.removeSessions)
   const upsertSession = useStore((s) => s.upsertSession)
-  const openTab = useStore((s) => s.openTab)
+  const openHost = useStore((s) => s.openHost)
   const lockVault = useStore((s) => s.lockVault)
   const moveSession = useStore((s) => s.moveSession)
   const reorderSession = useStore((s) => s.reorderSession)
@@ -323,13 +325,21 @@ export default function Sidebar({
    * it travels on the pane, so a reconnect keeps it, and the saved host is not
    * touched by any of it.
    */
-  function connect(session: SessionProfile, credentialId?: string, admin?: boolean): void {
+  function connect(
+    session: SessionProfile,
+    credentialId?: string,
+    admin?: boolean,
+    again = false
+  ): void {
     const credential = credentials.find((c) => c.id === credentialId)
     const title = paneTitle(session.name, credential)
-    openTab(
+    // Not always a new tab: see `openHost`.
+    openHost(
       admin ? `${title} · ${t('console')}` : title,
       { kind: 'session', sessionId: session.id, credentialId, admin },
-      colourFor(session)
+      colourFor(session),
+      undefined,
+      again
     )
   }
 
@@ -664,20 +674,61 @@ export default function Sidebar({
     else if (item.kind === 'group') await moveGroup(item.id, targetGroupId)
   }
 
-  function sessionMenu(s: SessionProfile, atX: number, atY: number): MenuItem[] {
+  /*
+   * A tab's right-click, which asks for its host's menu. This tree holds the
+   * saved hosts and those mirrored from git; an inventory host's menu belongs
+   * to the Inventory tree, which is mounted only while its tab is shown — so
+   * that tab is brought forward, and the tree takes the request from there.
+   */
+  const hostMenuRequest = useStore((st) => st.hostMenuRequest)
+  useEffect(() => {
+    if (!hostMenuRequest) return
+    const { hostId, x, y, tabId } = hostMenuRequest
+    const state = useStore.getState()
+    const host = sessions.find((h) => h.id === hostId)
+    if (host) {
+      state.requestHostMenu(null)
+      setMenu({
+        x,
+        y,
+        items: [...sessionMenu(host, x, y, true), ...tabMenuItems(t, tabId)],
+        forId: host.id
+      })
+    } else if (findHost(state, hostId)?.fromInventory) {
+      setTab('inventory')
+    } else {
+      state.requestHostMenu(null)
+    }
+    // The request is what this answers; the rest is read as it stands then.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hostMenuRequest])
+
+  function sessionMenu(
+    s: SessionProfile,
+    atX: number,
+    atY: number,
+    /** Asked for from a tab, which is about this host and no selection. */
+    alone = false
+  ): MenuItem[] {
     const state = useStore.getState()
     const activeTab = currentTab(state)
     // Right-clicking inside a selection acts on the whole of it; right-clicking
     // outside one acts on that row alone, whatever else happens to be ticked.
-    const targets = selectedHostIds.includes(s.id)
-      ? selectedHostIds.filter((id) => sessions.some((x) => x.id === id))
-      : [s.id]
+    const targets =
+      !alone && selectedHostIds.includes(s.id)
+        ? selectedHostIds.filter((id) => sessions.some((x) => x.id === id))
+        : [s.id]
     // A host the repository describes is not edited in place: what is set on it
     // is kept here, outside the repository, and re-applied after every sync.
     const mirrored = isGitNode(s.id)
     const deletable = targets.filter((id) => !isGitNode(id))
     return [
       { label: t('Connect'), onSelect: () => connect(s) },
+      // While a click brings an open host forward, this is how to get a second
+      // one. Never for a desktop: a second tab would end the first's session.
+      ...(settings.reuseOpenHost && protocolOf(s) !== 'rdp'
+        ? [{ label: t('Open another tab'), onSelect: () => connect(s, undefined, false, true) }]
+        : []),
       {
         label: t('Connect in split'),
         disabled: !activeTab,
@@ -1227,6 +1278,7 @@ export default function Sidebar({
             {/* Custom sets live in the same tree as the groups, below them: they are
             another way of grouping the very same hosts, not a separate place. */}
             <CollectionsPanel query={query} fold={fold} />
+            <MultiWindowsPanel query={query} />
           </div>
         </>
       )}

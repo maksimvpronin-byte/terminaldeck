@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest'
 import { useStore } from '../store'
-import { collectLeaves, makeLeaf } from '../paneTree'
+import { collectLeaves, makeLeaf, monitorShown } from '../paneTree'
+import type { SessionProfile } from '../../../../shared/types'
 
 describe('reorderTab', () => {
   function seed(): void {
@@ -219,4 +220,138 @@ it('does not lose a tab moved to a workspace that no longer exists', () => {
   useStore.getState().moveTabToWorkspace(tabId, 'deleted-workspace')
   expect(useStore.getState().workspaces).toBe(before)
   expect(useStore.getState().activeWorkspaceId).toBe(before[0].id)
+})
+
+describe('openHost: an open host is brought forward rather than opened again', () => {
+  const host = (id: string, protocol?: 'rdp'): SessionProfile => ({
+    id,
+    name: id,
+    host: `${id}.example`,
+    groupId: null,
+    tags: [],
+    logToFile: false,
+    portForwards: [],
+    createdAt: 0,
+    updatedAt: 0,
+    ...(protocol ? { protocol } : {})
+  })
+  function seed(reuseOpenHost = true): void {
+    useStore.setState((s) => ({
+      workspaces: [],
+      activeWorkspaceId: null,
+      wakeRequest: null,
+      sessions: [host('web'), host('dc', 'rdp')],
+      settings: { ...s.settings, reuseOpenHost }
+    }))
+  }
+  const tabCount = (): number =>
+    useStore.getState().workspaces.reduce((n, w) => n + w.tabs.length, 0)
+  const open = (id: string, extra: Record<string, unknown> = {}, again = false): string =>
+    useStore
+      .getState()
+      .openHost(id, { kind: 'session', sessionId: id, ...extra }, undefined, undefined, again)
+
+  it('goes to the tab a terminal is already in, and asks it to connect if it has dropped', () => {
+    seed()
+    const first = open('web')
+    open('dc')
+    expect(open('web')).toBe(first)
+    expect(tabCount()).toBe(2)
+    expect(useStore.getState().wakeRequest).toEqual({ paneId: first, n: 1 })
+    const tab = useStore.getState().workspaces[0].tabs.find((t) => t.activePaneId === first)
+    expect(useStore.getState().workspaces[0].activeTabId).toBe(tab?.id)
+  })
+
+  it('opens another terminal when asked, when an account is chosen, or with the setting off', () => {
+    seed()
+    open('web')
+    open('web', {}, true)
+    open('web', { credentialId: 'admin' })
+    expect(tabCount()).toBe(3)
+    seed(false)
+    open('web')
+    open('web')
+    expect(tabCount()).toBe(2)
+  })
+
+  it('never opens a second desktop for one account, setting or not, again or not', () => {
+    seed(false)
+    const first = open('dc')
+    expect(open('dc')).toBe(first)
+    expect(open('dc', {}, true)).toBe(first)
+    expect(tabCount()).toBe(1)
+    // Another account is another Windows session, and stands beside it.
+    const other = open('dc', { credentialId: 'admin' })
+    expect(other).not.toBe(first)
+    expect(open('dc', { credentialId: 'admin' })).toBe(other)
+    expect(tabCount()).toBe(2)
+  })
+
+  it('finds the host in another workspace and brings that workspace forward', () => {
+    seed()
+    const first = open('web')
+    useStore.getState().openWorkspace('second')
+    open('dc')
+    expect(open('web')).toBe(first)
+    const state = useStore.getState()
+    expect(state.workspaces.find((w) => w.id === state.activeWorkspaceId)?.title).not.toBe('second')
+  })
+})
+
+describe('multi-windows', () => {
+  it('keeps a tab and opens it again as a new tab laid out the same', async () => {
+    const saved: unknown[] = []
+    window.td.multiWindows = {
+      list: async () => saved as never,
+      save: async (w) => {
+        saved.splice(0, saved.length, w)
+        return w
+      },
+      remove: async () => undefined,
+      reorder: async () => undefined
+    }
+    useStore.setState({ workspaces: [], activeWorkspaceId: null, multiWindows: [] })
+    useStore.getState().openTab('a', { kind: 'session', sessionId: 'a' })
+    const tab = useStore.getState().workspaces[0].tabs[0]
+    useStore.getState().splitPane(tab.id, tab.activePaneId, 'row')
+    expect(await useStore.getState().saveTabAsMultiWindow(tab.id, 'Desk')).toBe(true)
+    const kept = useStore.getState().multiWindows[0]
+    expect(kept).toMatchObject({ name: 'Desk', root: { type: 'split', dir: 'row' } })
+
+    useStore.getState().openMultiWindow(kept.id)
+    const tabs = useStore.getState().workspaces[0].tabs
+    expect(tabs).toHaveLength(2)
+    expect(tabs[1].title).toBe('Desk')
+    expect(collectLeaves(tabs[1].root).map((l) => l.target)).toEqual([
+      { kind: 'session', sessionId: 'a' },
+      { kind: 'session', sessionId: 'a' }
+    ])
+    expect(useStore.getState().workspaces[0].activeTabId).toBe(tabs[1].id)
+
+    // Saved again under the same id: the old one is replaced, not added to.
+    expect(await useStore.getState().saveTabAsMultiWindow(tabs[0].id, 'Desk 2', kept.id)).toBe(true)
+    expect(useStore.getState().multiWindows).toHaveLength(1)
+    expect(useStore.getState().multiWindows[0]).toMatchObject({ id: kept.id, name: 'Desk 2' })
+  })
+})
+
+describe('the monitor under every SSH pane', () => {
+  it('shows by the setting, closes for one pane by its button, and gives each back as it was', () => {
+    useStore.setState((s) => ({
+      workspaces: [],
+      activeWorkspaceId: null,
+      settings: { ...s.settings, monitorForAll: true }
+    }))
+    useStore.getState().openTab('a', { kind: 'session', sessionId: 'a' })
+    const tab = () => useStore.getState().workspaces[0].tabs[0]
+    const leaf = () => collectLeaves(tab().root)[0]
+    expect(monitorShown(leaf(), true)).toBe(true)
+    useStore.getState().toggleMonitor(tab().id, leaf().id)
+    expect(monitorShown(leaf(), true)).toBe(false)
+    // Off again: the pane is back to its own choice, which was closed.
+    useStore.setState((s) => ({ settings: { ...s.settings, monitorForAll: false } }))
+    expect(monitorShown(leaf(), false)).toBe(false)
+    useStore.getState().toggleMonitor(tab().id, leaf().id)
+    expect(monitorShown(leaf(), false)).toBe(true)
+  })
 })

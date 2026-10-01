@@ -7,13 +7,14 @@ import {
   allTabs as selectAllTabs,
   workspaceHasActivity
 } from '../state/store'
-import { sessionIdsOf } from '../state/workspaces'
+import { sessionIdsOf, tabLabels } from '../state/workspaces'
 import { desktopPanesOf, protocolIn, signOutWorkspace } from '../state/rdpLogoff'
 import { DRAG_MIME, type DragItem } from '../state/dnd'
 import { dropSide } from '../state/dropZone'
 import SplitContainer from './SplitContainer'
 import ContextMenu, { type MenuItem } from './ContextMenu'
 import CollectionDialog from './CollectionDialog'
+import MultiWindowDialog from './MultiWindowDialog'
 import { hostOfTab, morphClose, tabElement } from './hostMorph'
 import { CloseIcon } from './icons'
 import { useT } from '../i18n'
@@ -30,6 +31,9 @@ export default function Workspace(): JSX.Element {
   const moveTabToWorkspace = useStore((s) => s.moveTabToWorkspace)
   const reorderTab = useStore((s) => s.reorderTab)
   const setActiveTab = useStore((s) => s.setActiveTab)
+  const requestHostMenu = useStore((s) => s.requestHostMenu)
+  const multiWindowDraft = useStore((s) => s.multiWindowDraft)
+  const draftMultiWindow = useStore((s) => s.draftMultiWindow)
   const focusActivePane = useStore((s) => s.focusActivePane)
   const closeTab = useStore((s) => s.closeTab)
   const toggleBroadcast = useStore((s) => s.toggleBroadcast)
@@ -51,6 +55,8 @@ export default function Workspace(): JSX.Element {
 
   const view = { workspaces, activeWorkspaceId }
   const current = selectActiveWorkspace(view)
+  /** Two tabs of one name in this row are numbered, so they can be told apart. */
+  const labels = tabLabels(current?.tabs ?? [])
   const everyTab = selectAllTabs(view)
   const allLeaves = everyTab.flatMap((tab) => collectLeaves(tab.root))
   const includedCount = allLeaves.filter((l) => l.broadcastEnabled).length
@@ -280,6 +286,21 @@ export default function Workspace(): JSX.Element {
                 setActiveTab(tab.id)
                 focusActivePane()
               }}
+              // The host's own menu, as its row in the tree has it: the tab is
+              // that host, and connecting again, as another account, or into a
+              // collection is asked for from here as often as from the tree.
+              onContextMenu={(e) => {
+                const leaf = collectLeaves(tab.root).find((l) => l.id === tab.activePaneId)
+                if (leaf?.target.kind !== 'session') return
+                e.preventDefault()
+                e.stopPropagation()
+                requestHostMenu({
+                  hostId: leaf.target.sessionId,
+                  x: e.clientX,
+                  y: e.clientY,
+                  tabId: tab.id
+                })
+              }}
             >
               {(() => {
                 const colour = collectLeaves(tab.root).find((l) => l.color)?.color
@@ -290,7 +311,7 @@ export default function Workspace(): JSX.Element {
               {tab.hasActivity && tab.id !== current.activeTabId && (
                 <span className="activity-dot" title={t('New output since you last looked')} />
               )}
-              <span>{tab.title}</span>
+              <span>{labels.get(tab.id) ?? tab.title}</span>
               {broadcast && collectLeaves(tab.root).some((l) => l.broadcastEnabled) && (
                 <span className="tab-badge">⇉</span>
               )}
@@ -359,6 +380,13 @@ export default function Workspace(): JSX.Element {
           defaultName={savingWorkspace.title}
           defaultColor={savingWorkspace.color}
           onClose={() => setSaving(null)}
+        />
+      )}
+      {multiWindowDraft && (
+        <MultiWindowDialog
+          tabId={multiWindowDraft.tabId}
+          defaultName={multiWindowDraft.name}
+          onClose={() => draftMultiWindow(null)}
         />
       )}
     </div>

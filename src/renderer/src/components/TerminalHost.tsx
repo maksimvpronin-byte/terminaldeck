@@ -33,6 +33,11 @@ interface Props {
   onOutput?: () => void
   /** Returns every connection that should receive this pane's keystrokes. */
   resolveWriteTargets: (ownConnectionId: string) => string[]
+  /**
+   * Bumped when the host was opened again and this pane was brought forward
+   * instead: if it is not connected, it connects, as its button would.
+   */
+  wake?: number
 }
 
 /**
@@ -70,7 +75,8 @@ export default function TerminalHost({
   onConnected,
   onFocus,
   onOutput,
-  resolveWriteTargets
+  resolveWriteTargets,
+  wake = 0
 }: Props): JSX.Element {
   const t = useT()
   const hostRef = useRef<HTMLDivElement | null>(null)
@@ -101,6 +107,8 @@ export default function TerminalHost({
   appearanceRef.current = appearance
 
   const [closed, setClosed] = useState(false)
+  const closedRef = useRef(closed)
+  closedRef.current = closed
   const [searchOpen, setSearchOpen] = useState(false)
   const [needle, setNeedle] = useState('')
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
@@ -385,6 +393,17 @@ export default function TerminalHost({
     searchRef.current?.clearDecorations()
     termRef.current?.focus()
   }
+
+  // Opened again from the tree: a pane that has dropped, or was restored idle,
+  // connects; one that is connected or connecting is left as it is.
+  // Only a request made while mounted: one left in the store from before
+  // would otherwise dial out from a pane that was merely moved.
+  const wakeSeen = useRef(wake)
+  useEffect(() => {
+    if (wake === wakeSeen.current) return
+    wakeSeen.current = wake
+    if (closedRef.current) void connect(generationRef.current)
+  }, [wake, connect])
 
   return (
     <div className="terminal-wrap">

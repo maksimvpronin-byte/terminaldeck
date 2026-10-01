@@ -133,6 +133,20 @@ export default function SettingsDialog({
               </select>
             </label>
 
+            <label className="checkbox-row" style={{ flexDirection: 'row' }}>
+              <input
+                type="checkbox"
+                checked={settings.monitorForAll}
+                onChange={(e) => updateSettings({ monitorForAll: e.target.checked })}
+              />
+              {t('Show the monitor under every SSH session')}
+              <Hint>
+                {t(
+                  'The strip the Monitor button opens — load, memory, disks — under every terminal, without pressing it in each. The button then closes it for that pane alone.'
+                )}
+              </Hint>
+            </label>
+
             <h3 className="settings-heading">{t('Host tree')}</h3>
             <label className="checkbox-row" style={{ flexDirection: 'row' }}>
               <input
@@ -149,6 +163,19 @@ export default function SettingsDialog({
                 onChange={(e) => updateSettings({ revealActiveHost: e.target.checked })}
               />
               {t('Select the host of the tab in front, and scroll the tree to it')}
+            </label>
+            <label className="checkbox-row" style={{ flexDirection: 'row' }}>
+              <input
+                type="checkbox"
+                checked={settings.reuseOpenHost}
+                onChange={(e) => updateSettings({ reuseOpenHost: e.target.checked })}
+              />
+              {t('Double-click on a host that is open goes to its tab instead of opening another')}
+              <Hint>
+                {t(
+                  '“Open another tab” in the host’s menu still opens a second one. A desktop is never opened twice for one account, whatever this says: Windows keeps one session per user, and a second tab would take it from the first.'
+                )}
+              </Hint>
             </label>
             <label>
               {t('Colour of coloured rows')}

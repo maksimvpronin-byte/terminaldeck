@@ -38,11 +38,15 @@ export interface DesktopRequest {
   sound?: boolean
   /** Whether this desktop shares its clipboard with this machine. */
   clipboard?: boolean
+  /** Whether this machine's disks are offered to the desktop. */
+  drives?: boolean
   fontSmoothing?: boolean
   composition?: boolean
   noWallpaper?: boolean
   /** The administrative session rather than an ordinary one (`/admin`). */
   admin?: boolean
+  /** The input language as the window found it, for where this process cannot. */
+  language?: string
 }
 
 /** Who to be. Never sent to the renderer, and never in an argument list. */
@@ -292,12 +296,14 @@ class FreeRdpBridge {
       scale: request.scale,
       sound: request.sound,
       clipboard: request.clipboard,
+      drives: request.drives,
       fontSmoothing: request.fontSmoothing,
       composition: request.composition,
       noWallpaper: request.noWallpaper,
       admin: request.admin,
-      // The layout the session starts in: this Mac's, as it stands now.
-      keyboardLayout: keyboardLayoutFor(currentInputLanguage()),
+      // The layout the session starts in: this machine's, as it stands now —
+      // known here on a Mac, and told by the window anywhere else.
+      keyboardLayout: keyboardLayoutFor(currentInputLanguage() ?? request.language),
       gatewayHost: gateway?.host,
       gatewayPort: gateway?.port,
       // Stated rather than inferred: on most deployments the gateway takes the

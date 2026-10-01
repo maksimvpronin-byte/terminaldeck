@@ -642,3 +642,105 @@ describe('a file copy that failed', () => {
     expect(shown).toContain('Cannot open the copied files on this computer')
   })
 })
+
+describe('this machine’s language switch, off a Mac', () => {
+  const ALT = { code: 0x38, ext: false }
+  const SHIFT = { code: 0x2a, ext: false }
+  const CTRL = { code: 0x1d, ext: false }
+  const press = (key: { code: number; ext: boolean }, down: boolean) => ({
+    a: 'key',
+    ...key,
+    down
+  })
+  const keys = (): unknown[] =>
+    desktopSend.mock.calls.filter(([, fields]) => fields.a === 'key').map(([, fields]) => fields)
+
+  beforeEach(async () => {
+    const { resetInputLanguage } = await import('../state/inputLanguage')
+    resetInputLanguage()
+    window.td.ui.inputLanguage = async () => null
+    window.td.ui.onInputLanguage = () => () => undefined
+  })
+
+  async function open(): Promise<HTMLElement> {
+    const view = render(
+      <RemoteScreen
+        sessionId="host"
+        look={null}
+        visible
+        active
+        onPhase={vi.fn()}
+        onNotice={vi.fn()}
+        onMeasured={vi.fn()}
+      />
+    )
+    await act(async () => {})
+    const screen = view.container.querySelector<HTMLElement>('.graphical-screen')!
+    act(() => screen.focus())
+    await act(async () => {})
+    desktopSend.mockClear()
+    return screen
+  }
+
+  it('keeps Alt+Shift and Ctrl+Shift pressed alone from reaching the desktop', async () => {
+    const screen = await open()
+    fireEvent.keyDown(screen, { code: 'AltLeft', key: 'Alt', altKey: true })
+    fireEvent.keyDown(screen, { code: 'ShiftLeft', key: 'Shift', altKey: true, shiftKey: true })
+    fireEvent.keyUp(screen, { code: 'ShiftLeft', key: 'Shift', altKey: true })
+    fireEvent.keyUp(screen, { code: 'AltLeft', key: 'Alt' })
+    fireEvent.keyDown(screen, { code: 'ControlLeft', key: 'Control', ctrlKey: true })
+    fireEvent.keyDown(screen, { code: 'ShiftLeft', key: 'Shift', ctrlKey: true, shiftKey: true })
+    fireEvent.keyUp(screen, { code: 'ControlLeft', key: 'Control', shiftKey: true })
+    fireEvent.keyUp(screen, { code: 'ShiftLeft', key: 'Shift' })
+    expect(keys()).toEqual([])
+  })
+
+  it('still sends a held modifier ahead of the key it was for, and a lone Alt', async () => {
+    const screen = await open()
+    fireEvent.keyDown(screen, { code: 'ControlLeft', key: 'Control', ctrlKey: true })
+    fireEvent.keyDown(screen, { code: 'ShiftLeft', key: 'Shift', ctrlKey: true, shiftKey: true })
+    fireEvent.keyDown(screen, { code: 'Escape', key: 'Escape', ctrlKey: true, shiftKey: true })
+    expect(keys().slice(0, 2)).toEqual(
+      expect.arrayContaining([press(CTRL, true), press(SHIFT, true)])
+    )
+    fireEvent.keyUp(screen, { code: 'Escape', key: 'Escape', ctrlKey: true, shiftKey: true })
+    fireEvent.keyUp(screen, { code: 'ShiftLeft', key: 'Shift', ctrlKey: true })
+    fireEvent.keyUp(screen, { code: 'ControlLeft', key: 'Control' })
+    expect(keys().slice(-2)).toEqual([press(SHIFT, false), press(CTRL, false)])
+
+    desktopSend.mockClear()
+    fireEvent.keyDown(screen, { code: 'AltLeft', key: 'Alt', altKey: true })
+    expect(keys()).toEqual([])
+    fireEvent.keyUp(screen, { code: 'AltLeft', key: 'Alt' })
+    expect(keys()).toEqual([press(ALT, true), press(ALT, false)])
+  })
+
+  it('follows the language letters are typed in with Alt+Shift there, once the keys are still', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
+    try {
+      const screen = await open()
+      const type = (key: string): void => {
+        fireEvent.keyDown(screen, { code: 'KeyQ', key })
+        fireEvent.keyUp(screen, { code: 'KeyQ', key })
+      }
+      type('q')
+      act(() => {
+        vi.advanceTimersByTime(1000)
+      })
+      desktopSend.mockClear()
+      type('й')
+      expect(keys()).toEqual([])
+      act(() => {
+        vi.advanceTimersByTime(1000)
+      })
+      expect(keys()).toEqual([
+        press(ALT, true),
+        press(SHIFT, true),
+        press(SHIFT, false),
+        press(ALT, false)
+      ])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})

@@ -21,7 +21,8 @@ import { colourOf } from '../../../shared/hostColour'
 import { findPane } from '../state/paneTree'
 import { morphOpen } from './hostMorph'
 import { paneTitle } from '../state/connect'
-import { overridesByNode } from '../state/hosts'
+import { hostColour, overridesByNode } from '../state/hosts'
+import { tabMenuItems } from './tabMenu'
 import { useT } from '../i18n'
 import { ago } from '../state/syncStatus'
 import { DesktopIcon, RefreshIcon, TerminalIcon } from './icons'
@@ -52,7 +53,7 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
   const syncInventory = useStore((s) => s.syncInventory)
   const removeInventorySource = useStore((s) => s.removeInventorySource)
   const clearInventoryOverride = useStore((s) => s.clearInventoryOverride)
-  const openTab = useStore((s) => s.openTab)
+  const openHost = useStore((s) => s.openHost)
   const splitPaneWith = useStore((s) => s.splitPaneWith)
   const selectedHostIds = useStore((s) => s.selectedHostIds)
   const toggleHostSelection = useStore((s) => s.toggleHostSelection)
@@ -260,18 +261,53 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
     host: SessionProfile,
     colour?: string,
     credentialId?: string,
-    admin?: boolean
+    admin?: boolean,
+    again = false
   ): void {
     const credential = credentials.find((c) => c.id === credentialId)
     const title = paneTitle(host.name, credential)
-    openTab(
+    // Not always a new tab: see `openHost`.
+    openHost(
       admin ? `${title} · ${t('console')}` : title,
       { kind: 'session', sessionId: host.id, credentialId, admin },
-      colour
+      colour,
+      undefined,
+      again
     )
   }
 
-  function hostMenu(host: SessionProfile, atX: number, atY: number, colour?: string): MenuItem[] {
+  /*
+   * A tab's right-click asking for its host's menu — see the Sessions tree,
+   * which brings this tab forward for an inventory host. Taken on mounting
+   * too, since that is how such a request arrives here.
+   */
+  const hostMenuRequest = useStore((s) => s.hostMenuRequest)
+  useEffect(() => {
+    if (!hostMenuRequest) return
+    const { hostId, x, y, tabId } = hostMenuRequest
+    const raw = trees.flatMap((tree) => tree.sessions).find((h) => h.id === hostId)
+    if (!raw) return
+    const state = useStore.getState()
+    state.requestHostMenu(null)
+    const host = withOverride(raw)
+    setMenu({
+      x,
+      y,
+      items: [...hostMenu(host, x, y, hostColour(state, hostId), true), ...tabMenuItems(t, tabId)],
+      forId: hostId
+    })
+    // The request is what this answers; the rest is read as it stands then.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hostMenuRequest])
+
+  function hostMenu(
+    host: SessionProfile,
+    atX: number,
+    atY: number,
+    colour?: string,
+    /** Asked for from a tab, which is about this host and no selection. */
+    alone = false
+  ): MenuItem[] {
     const state = useStore.getState()
     const activeTab = currentTab(state)
     const auth = resolveAuth(host, host.groupId, allGroups, {
@@ -279,10 +315,18 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
       credentials
     })
     // Inside a selection the menu acts on all of it, as in the Sessions tree.
-    const targets = selectedHostIds.includes(host.id) ? [...selectedHostIds] : [host.id]
+    const targets = !alone && selectedHostIds.includes(host.id) ? [...selectedHostIds] : [host.id]
     const overridden = overrides.some((o) => o.nodeId === host.id)
     return [
       { label: t('Connect'), onSelect: () => connect(host, colour) },
+      ...(settings.reuseOpenHost && protocolOf(host) !== 'rdp'
+        ? [
+            {
+              label: t('Open another tab'),
+              onSelect: () => connect(host, colour, undefined, false, true)
+            }
+          ]
+        : []),
       {
         label: t('Connect in split'),
         disabled: !activeTab,

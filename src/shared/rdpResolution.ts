@@ -28,6 +28,9 @@ export const RDP_FALLBACK: ResolvedRdp = {
   // worth turning off per host — a machine you do not trust with what you
   // copied should not be given it.
   clipboard: true,
+  // Off, unlike the clipboard: it hands over every file this machine's user
+  // can read, rather than what was chosen to be copied.
+  drives: false,
   // The ordinary session, as every Windows client connects unless told /admin.
   consoleSession: false,
   resolution: 'fit',
@@ -106,6 +109,7 @@ export function resolveRdp(
     // Booleans can be legitimately false, so they take the first explicit value.
     sound: firstDefined(chain, 'sound') ?? RDP_FALLBACK.sound,
     clipboard: firstDefined(chain, 'clipboard') ?? RDP_FALLBACK.clipboard,
+    drives: firstDefined(chain, 'drives') ?? RDP_FALLBACK.drives,
     consoleSession: firstDefined(chain, 'consoleSession') ?? RDP_FALLBACK.consoleSession,
     sendDensity: firstDefined(chain, 'sendDensity') ?? RDP_FALLBACK.sendDensity,
     commandAsControl: firstDefined(chain, 'commandAsControl') ?? RDP_FALLBACK.commandAsControl,

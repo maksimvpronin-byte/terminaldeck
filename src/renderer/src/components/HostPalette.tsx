@@ -15,7 +15,7 @@ export default function HostPalette({ onClose }: { onClose: () => void }): JSX.E
   const overrides = useStore((s) => s.inventoryOverrides)
   const gitTrees = useStore((s) => s.gitFolderTrees)
   const gitOverrides = useStore((s) => s.gitFolderOverrides)
-  const openTab = useStore((s) => s.openTab)
+  const openHost = useStore((s) => s.openHost)
   const openMany = useStore((s) => s.openMany)
 
   const credentials = useStore((s) => s.credentials)
@@ -63,7 +63,7 @@ export default function HostPalette({ onClose }: { onClose: () => void }): JSX.E
     const list = chosen()
     if (list.length === 0) return
     if (list.length === 1 && mode === 'tabs') {
-      openTab(list[0].title, list[0].target, list[0].color)
+      openHost(list[0].title, list[0].target, list[0].color)
     } else {
       openMany(
         list.map((e) => ({ title: e.title, target: e.target, color: e.color })),

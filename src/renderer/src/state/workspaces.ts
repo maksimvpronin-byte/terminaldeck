@@ -107,6 +107,68 @@ export function nextOpenPaneOf(
   return places.find((p) => p.tabId === current?.id) ?? places[0]
 }
 
+/**
+ * The pane a host should be brought forward in rather than opened again.
+ *
+ * The one in front if it is that host, else the first in the workspace in
+ * front, else the first anywhere — "first" in the order the tabs are laid out,
+ * so the same click lands in the same place every time. Any pane of the host
+ * counts, live or not: one that has dropped is reconnected where it stands.
+ *
+ * `account` narrows it to panes signed in as that account (undefined being the
+ * host's own login) — for a desktop, where another account is another Windows
+ * session and may stand beside this one.
+ */
+export function paneToReuse(
+  state: HasWorkspaces,
+  sessionId: string,
+  account?: { credentialId: string | undefined }
+): { tabId: string; paneId: string } | undefined {
+  const fits = (leaf: ReturnType<typeof collectLeaves>[number]): boolean =>
+    leaf.target.kind === 'session' &&
+    leaf.target.sessionId === sessionId &&
+    (!account || leaf.target.credentialId === account.credentialId)
+  const current = activeTab(state)
+  const front = current && collectLeaves(current.root).find((l) => l.id === current.activePaneId)
+  if (current && front && fits(front)) return { tabId: current.id, paneId: front.id }
+  const tabs = [
+    ...(activeWorkspace(state)?.tabs ?? []),
+    ...state.workspaces.filter((w) => w.id !== state.activeWorkspaceId).flatMap((w) => w.tabs)
+  ]
+  for (const tab of tabs) {
+    const leaf = collectLeaves(tab.root).find(fits)
+    if (leaf) return { tabId: tab.id, paneId: leaf.id }
+  }
+  return undefined
+}
+
+/**
+ * What each tab of a row is called on screen: its title, numbered — "web #1",
+ * "web #2" — where the row holds more than one by that name, so two tabs of
+ * one host can be told apart at a glance.
+ *
+ * Counted in the order the row shows them and only when drawn, so closing one
+ * renumbers the rest and a lone tab loses its number; the title kept with the
+ * tab is never changed. Titles that already differ — the "#n" of "Connect
+ * several times…", or an account's name after the host's — are left alone.
+ */
+export function tabLabels(tabs: Pick<WorkspaceTab, 'id' | 'title'>[]): Map<string, string> {
+  const total = new Map<string, number>()
+  for (const tab of tabs) total.set(tab.title, (total.get(tab.title) ?? 0) + 1)
+  const seen = new Map<string, number>()
+  const labels = new Map<string, string>()
+  for (const tab of tabs) {
+    if ((total.get(tab.title) ?? 0) < 2) {
+      labels.set(tab.id, tab.title)
+      continue
+    }
+    const n = (seen.get(tab.title) ?? 0) + 1
+    seen.set(tab.title, n)
+    labels.set(tab.id, `${tab.title} #${n}`)
+  }
+  return labels
+}
+
 /** A background workspace is flagged when any of its tabs has unread output. */
 export function workspaceHasActivity(workspace: Workspace): boolean {
   return workspace.tabs.some((t) => t.hasActivity)

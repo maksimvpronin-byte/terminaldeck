@@ -42,7 +42,7 @@ export default function CollectionsPanel({
   const removeFromCollection = useStore((s) => s.removeFromCollection)
   const addToCollection = useStore((s) => s.addToCollection)
   const openCollection = useStore((s) => s.openCollection)
-  const openTab = useStore((s) => s.openTab)
+  const openHost = useStore((s) => s.openHost)
   const revealSession = useStore((s) => s.revealSession)
   const openMany = useStore((s) => s.openMany)
   const workspaces = useStore((s) => s.workspaces)
@@ -316,8 +316,9 @@ export default function CollectionsPanel({
                       onDoubleClick={() => {
                         if (!m.missing) {
                           returnTo(clickedFrom.current)
-                          // Opened from here, so this set lends its look.
-                          openTab(
+                          // Opened from here, so this set lends its look. Not
+                          // always a new tab: see `openHost`.
+                          openHost(
                             m.name,
                             { kind: 'session', sessionId: m.id },
                             m.color,

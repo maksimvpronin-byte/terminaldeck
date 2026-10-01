@@ -107,6 +107,10 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
 
 ### Credentials
 
+- An **eye in every master password field** — creating the vault, unlocking it, changing the
+  password — shows what was typed, so a long password typed blind can be checked rather than
+  cleared and typed again. It is reached with the mouse, not Tab, so Tab still goes straight to
+  the button
 - Encrypted local vault (AES-256-GCM, master password via scrypt), with a lock button, `⌘L`,
   and an idle auto-lock whose delay is set in Settings → Security — fifteen minutes by default,
   anything from a minute to eight hours, and able to be turned off entirely, since the right
@@ -163,6 +167,14 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   Membership is also ticked in a host's own settings, under **Collections** — or in a group's,
   which puts every host it holds (subgroups included) into a set, or takes them out. Hosts and
   groups from git or an inventory have the same ticks in their **Local settings**
+- **Multi-windows**: a tab kept by name with its panes — which hosts, split which way, how
+  large — listed under the collections and opened again in one go as a new tab, every pane
+  connecting. Save the tab in front with **+** under Multi-windows, or **Save tab as
+  multi-window…** in its right-click menu; replace, rename, reorder or delete from the entry's
+  own menu. A collection says which hosts; this says how they stood. Only references are kept,
+  as in a collection: the account and console mode a pane was opened with, and whether its SFTP,
+  tunnels or monitor panel was open — no password, and no Quick connect pane, which can carry one.
+  Multi-windows travel in a backup
 - **Drag onto a collection** to fill it: a host, the ticked hosts it is one of, or a whole folder
   with everything inside. Hosts and folders a repository mirrors drag too — into a collection or a
   pane, though never to another folder, since where they sit is the repository's decision
@@ -180,9 +192,20 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   cannot open a terminal. A single click on a host that is already open brings its pane forward
   and hands it the keyboard, a remote desktop included — as does a click on a tab (`⌘1`…`⌘9` do
   not, since a focused desktop would take the next one too);
-  a double-click, in the tree or in a collection, still opens a new tab where you were, and a
-  desktop opened that way takes the keyboard as a new terminal does — and deleting a host or a group lives in the right-click menu behind a
+  a double-click on a host that is **already open** goes to its tab — the one in front, else the
+  first in this workspace, else the first anywhere — and reconnects it if it has dropped, instead
+  of opening another. **Open another tab** in the host's menu makes a second one, and Settings →
+  General → Host tree turns the whole of this off. A **desktop** is never opened twice for one
+  account, whatever that setting says: Windows keeps one session per user, and a second tab took
+  the session from the first and left it showing an error. Another account (Connect as…) is
+  another session and opens beside it. A desktop opened by double-click takes the keyboard as a
+  new terminal does — and deleting a host or a group lives in the right-click menu behind a
   prompt, never as a button on the row
+- **Right-click a tab** for its host's menu, the same one its row in the tree has
+- **Two tabs of one host are numbered** in the tab row — `web #1`, `web #2` — in the order they
+  stand; closing one renumbers the rest, and a lone tab carries no number
+- **The window opens where it was left**, at the size it was and maximised if it was; one left on
+  a display that is no longer attached opens in the middle of the main one
 - Hosts are **sorted by hand**: drag one onto the upper or lower edge of another to drop it into
   that gap, in its group or into a different one, and the order is kept between launches
 - **Connect several times…** in the same right-click menu opens one host in as many windows as
@@ -196,6 +219,12 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   control says what it would inherit and from where, and inheritance can be switched off per
   host or group, independently of the credential inheritance. A host's theme recolours its own
   terminal, not the app
+- **The PuTTY colour schemes** — the 51 of putty.org.ru/themes, from the iTerm2-Color-Schemes
+  collection (MIT) — in a group of their own in the theme picker. Unlike ours, which keep the
+  sixteen ANSI colours fixed so full-screen programs stay legible, these bring their own palettes
+  as PuTTY does; text they would make too faint is still lifted to a readable contrast. A scheme
+  that shares a name with one of ours is listed as "(PuTTY)". **Consolas** and **Lucida Console**
+  are among the fonts, falling back to Menlo and Monaco where they are not installed
 - Search (`⌘F`), zoom (`⌘+` / `⌘−` / `⌘0`, moving the host's own size when it has one),
   copy-on-select, right-click paste
 - **`Ctrl` belongs to the shell, on every platform.** Every shortcut here is on `⌘` on a Mac and
@@ -347,6 +376,12 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   In full screen the menu bar is hidden and the far taskbar, the one indicator left, is a guess:
   this one is not. If the taskbar shows the other language, a click on the mark presses Alt+Shift
   over there and the two agree again. Hidden when keys go as keys, where Windows' layout decides
+- **The same on a Windows client.** There the language is read from Chromium's keyboard map and
+  from the letters themselves, and the far side follows it with Alt+Shift once the keys are still,
+  as on a Mac; the mark and the large label work there too. Alt+Shift or Ctrl+Shift pressed alone
+  — this machine's own language switch — is no longer passed to the desktop as keys, where it
+  changed the language only sometimes and left the taskbar wrong: a modifier is held back until
+  another key shows what it was for, and a lone Alt still reaches the far menus
 - **The picture comes from a real RDP client, in a process of its own.** It is
   [FreeRDP](https://github.com/FreeRDP/FreeRDP) 3.31, built from source and shipped inside the
   application as a small program called `td-rdp`: it connects, decodes, and writes the
@@ -366,6 +401,12 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
 - **Sound**, played by the client itself through the platform's own audio, and switchable per
   host or group. It travels on its own channel, so it costs this side nothing and the link
   something — worth turning off where the line should be spent on the picture
+- **This computer's disks**, offered to the far end as mRemoteNG's "Disks" and mstsc's "Local
+  resources → Drives" do, per host or group and off by default. Every volume shows under This PC
+  over there as "*name* on *this computer*" — on a Mac the system disk and whatever is plugged in,
+  appearing and going while the session runs. It hands over every file you can read to anything
+  running there, which is why it is never on unless asked for. macOS may ask once whether
+  TerminalDeck may reach Documents, Desktop or a removable disk when the far side first opens them
 - **Console mode** — the administrative session, `mstsc /admin` (`/console` before Windows
   Server 2008). On a Session Host it takes no client access licence, so it still lets somebody
   in once licensing has run out, and no Connection Broker redirects it to another server.
@@ -438,7 +479,9 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
 - **Remote monitoring**: a strip under the pane with processor load and a short history of it,
   memory in use, network throughput, uptime, the logged-in user, and how full each mounted disk
   is, with a warning colour past 75% and an alarm past 90%. It polls on its own channel, so
-  nothing is typed into your shell, and only while the strip is open
+  nothing is typed into your shell, and only while the strip is open. **Settings → General →
+  Show the monitor under every SSH session** opens it in every terminal at once; its button then
+  closes it for that pane alone
 - **Follow the terminal**, optionally: the `⇉` button in the path bar makes the panel track the
   shell's `cd`, and switches it back off, on the live connection — no dialog, no reconnect. It
   watches for the `OSC 7` sequence a shell prints on each prompt and types a one-line setup into

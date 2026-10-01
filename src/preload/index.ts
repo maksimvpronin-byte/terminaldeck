@@ -13,6 +13,7 @@ import type {
   UpdateState,
   Snippet,
   HostCollection,
+  MultiWindow,
   Credential,
   AuthPromptRequest,
   InventorySource,
@@ -180,6 +181,13 @@ const api = {
     remove: (id: string): Promise<void> => ipcRenderer.invoke(IPC.collectionsDelete, id),
     reorder: (ids: string[]): Promise<void> => ipcRenderer.invoke(IPC.collectionsReorder, ids)
   },
+  multiWindows: {
+    list: (): Promise<MultiWindow[]> => ipcRenderer.invoke(IPC.multiWindowsList),
+    save: (window: MultiWindow): Promise<MultiWindow> =>
+      ipcRenderer.invoke(IPC.multiWindowsSave, window),
+    remove: (id: string): Promise<void> => ipcRenderer.invoke(IPC.multiWindowsDelete, id),
+    reorder: (ids: string[]): Promise<void> => ipcRenderer.invoke(IPC.multiWindowsReorder, ids)
+  },
   ssh: {
     /**
      * Opens a shell on a saved host. `credentialId` names a stored login to use
@@ -292,6 +300,8 @@ const api = {
       credentialId?: string
       /** The administrative session (`/admin`) for this connection. */
       admin?: boolean
+      /** This machine's input language, where only the window can tell it. */
+      language?: string
     }): Promise<string> => ipcRenderer.invoke(IPC.desktopStart, request),
     /**
      * Anything the pane has to say to a running desktop: a key, the mouse, a

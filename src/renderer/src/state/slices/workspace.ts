@@ -13,9 +13,17 @@ import {
   collectBroadcastTargets,
   type PaneTarget
 } from '../paneTree'
-import { activeTab, allTabs, mapTab, nextOpenPaneOf, workspaceOfTab } from '../workspaces'
+import {
+  activeTab,
+  allTabs,
+  mapTab,
+  nextOpenPaneOf,
+  paneToReuse,
+  workspaceOfTab
+} from '../workspaces'
 import { loadLayout } from '../layout'
 import { findHost, hostColour } from '../hosts'
+import { protocolOf } from '../../../../shared/protocols'
 import type { AppState, OpenRequest, Workspace, WorkspaceSlice, WorkspaceTab } from './types'
 
 const restored = loadLayout()
@@ -46,6 +54,8 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
   selectedHostIds: [],
   lastSelectedHostId: null,
   focusRequest: 0,
+  wakeRequest: null,
+  hostMenuRequest: null,
 
   // --- selecting hosts in the tree ---
 
@@ -191,6 +201,47 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
       )
     }))
     return tab.activePaneId
+  },
+
+  openHost: (title, target, color, viaCollectionId, again = false) => {
+    const s = get()
+    if (target.kind === 'session') {
+      const desktop = protocolOf(findHost(s, target.sessionId)?.host) === 'rdp'
+      const account = target.credentialId !== undefined || target.admin === true
+      const reuse = desktop || (!again && !account && s.settings.reuseOpenHost)
+      const place =
+        reuse &&
+        paneToReuse(
+          s,
+          target.sessionId,
+          desktop ? { credentialId: target.credentialId } : undefined
+        )
+      if (place) {
+        get().setActiveTab(place.tabId)
+        get().setActivePane(place.tabId, place.paneId)
+        get().focusActivePane()
+        set((st) => ({
+          wakeRequest: { paneId: place.paneId, n: (st.wakeRequest?.n ?? 0) + 1 }
+        }))
+        return place.paneId
+      }
+    }
+    return get().openTab(title, target, color, viaCollectionId)
+  },
+
+  requestHostMenu: (request) => set({ hostMenuRequest: request }),
+
+  openPanes: (title, root) => {
+    if (!get().workspaces.some((w) => w.id === get().activeWorkspaceId)) get().openWorkspace()
+    const first = collectLeaves(root)[0]
+    const tab: WorkspaceTab = { id: nanoid(), title, root, activePaneId: first.id }
+    const workspaceId = get().activeWorkspaceId
+    set((s) => ({
+      workspaces: s.workspaces.map((w) =>
+        w.id === workspaceId ? { ...w, tabs: [...w.tabs, tab], activeTabId: tab.id } : w
+      )
+    }))
+    return tab.id
   },
 
   openMany: (items, mode, workspaceTitle) => {
@@ -467,7 +518,13 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
     set((s) => ({
       workspaces: mapTab(s.workspaces, tabId, (t) => ({
         ...t,
-        root: mapPane(t.root, paneId, (leaf) => ({ ...leaf, monitorOpen: !leaf.monitorOpen }))
+        // With the monitor on everywhere, the toggle closes or reopens it for
+        // this pane alone; otherwise it is the pane's own switch, as before.
+        root: mapPane(t.root, paneId, (leaf) =>
+          s.settings.monitorForAll
+            ? { ...leaf, monitorClosed: !leaf.monitorClosed }
+            : { ...leaf, monitorOpen: !leaf.monitorOpen }
+        )
       }))
     }))
   },

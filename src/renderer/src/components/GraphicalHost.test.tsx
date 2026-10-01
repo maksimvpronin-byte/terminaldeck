@@ -115,3 +115,38 @@ describe('a desktop from Quick connect', () => {
     expect(screen.queryByText(/Save one in its dialog/)).toBeNull()
   })
 })
+
+describe('a desktop opened again from the tree', () => {
+  it('tries again when its session had failed, and only on a new request', async () => {
+    window.td.rdp.login = vi.fn(async () => ({ username: 'admin', hasPassword: true }))
+    window.td.rdp.settings = vi.fn(async () => {
+      throw new Error('nothing stated')
+    })
+    const view = render(
+      <GraphicalHost protocol="rdp" host="win" sessionId="h" paneVisible wake={3} />
+    )
+    await act(async () => {})
+    // Started by itself, failed; the request standing from before is not a new one.
+    expect(attempts).toEqual([undefined])
+    view.rerender(<GraphicalHost protocol="rdp" host="win" sessionId="h" paneVisible wake={4} />)
+    await act(async () => {})
+    expect(attempts).toEqual([undefined, undefined])
+  })
+
+  it('starts a restored desktop that was waiting to be started', async () => {
+    window.td.rdp.login = vi.fn(async () => ({ username: 'admin', hasPassword: true }))
+    window.td.rdp.settings = vi.fn(async () => {
+      throw new Error('nothing stated')
+    })
+    const view = render(
+      <GraphicalHost protocol="rdp" host="win" sessionId="h" paneVisible restored />
+    )
+    await act(async () => {})
+    expect(attempts).toEqual([])
+    view.rerender(
+      <GraphicalHost protocol="rdp" host="win" sessionId="h" paneVisible restored wake={1} />
+    )
+    await act(async () => {})
+    expect(attempts).toEqual([undefined])
+  })
+})

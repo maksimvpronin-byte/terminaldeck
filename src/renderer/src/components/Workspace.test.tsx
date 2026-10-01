@@ -49,3 +49,39 @@ it('reorders tabs by dragging one into the gap beside another', () => {
   expect(tabs().map((el) => el.textContent)).toEqual(['c✕', 'a✕', 'b✕'])
   expect(view.container.querySelector('.drop-before, .drop-after, .dragging')).toBeNull()
 })
+
+it('asks for the host’s menu on a right-click on its tab, and for none on a quick one', () => {
+  const tab = (id: string, target: Parameters<typeof makeLeaf>[1]) => {
+    const root = makeLeaf(id, target)
+    return { id, title: id, root, activePaneId: root.id }
+  }
+  useStore.setState({
+    activeWorkspaceId: 'w',
+    hostMenuRequest: null,
+    workspaces: [
+      {
+        id: 'w',
+        title: 'work',
+        activeTabId: 'a',
+        tabs: [
+          tab('a', { kind: 'session', sessionId: 'host-a' }),
+          tab('q', {
+            kind: 'quick',
+            params: { host: 'q', port: 22, username: 'u', authMethod: 'password' }
+          })
+        ]
+      }
+    ]
+  })
+  const view = render(<Workspace />)
+  const tabs = view.container.querySelectorAll<HTMLElement>('.tab')
+  fireEvent.contextMenu(tabs[1], { clientX: 5, clientY: 6 })
+  expect(useStore.getState().hostMenuRequest).toBeNull()
+  fireEvent.contextMenu(tabs[0], { clientX: 30, clientY: 40 })
+  expect(useStore.getState().hostMenuRequest).toEqual({
+    hostId: 'host-a',
+    x: 30,
+    y: 40,
+    tabId: 'a'
+  })
+})

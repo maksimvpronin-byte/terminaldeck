@@ -8,6 +8,7 @@ import { createInventorySlice } from './slices/inventory'
 import { createGitFoldersSlice } from './slices/gitFolders'
 import { createSnippetsSlice } from './slices/snippets'
 import { createCollectionsSlice } from './slices/collections'
+import { createMultiWindowsSlice } from './slices/multiWindows'
 import { createCredentialsSlice } from './slices/credentials'
 import { createWorkspaceSlice } from './slices/workspace'
 import type { AppState } from './slices/types'
@@ -43,6 +44,7 @@ export const useStore = create<AppState>()((...a) => ({
   ...createGitFoldersSlice(...a),
   ...createSnippetsSlice(...a),
   ...createCollectionsSlice(...a),
+  ...createMultiWindowsSlice(...a),
   ...createCredentialsSlice(...a),
   ...createWorkspaceSlice(...a)
 }))

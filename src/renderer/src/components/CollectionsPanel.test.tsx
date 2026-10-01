@@ -20,11 +20,12 @@ const web: SessionProfile = {
 
 /**
  * A host of a set that is already open somewhere else. One click shows the
- * copy that is running; a double-click opens another, in its own tab, where
- * the window was — not in the workspace its first click jumped to.
+ * copy that is running; a double-click goes to it too, unless the setting to
+ * do that is off — then it opens another, in its own tab, where the window was
+ * and not in the workspace its first click jumped to.
  */
 describe('a host opened from a collection', () => {
-  function setUp(): void {
+  function setUp(reuseOpenHost = true): void {
     localStorage.clear()
     // Connected: only a live pane counts as the host being open.
     const running = {
@@ -34,6 +35,8 @@ describe('a host opened from a collection', () => {
     const other = makeLeaf('db', { kind: 'session', sessionId: 'h9' })
     useStore.setState({
       sessions: [web],
+      settings: { ...useStore.getState().settings, reuseOpenHost },
+      wakeRequest: null,
       collections: [{ id: 'rel', name: 'Release', hostIds: ['h1'], createdAt: 0, updatedAt: 0 }],
       loadCollections: async () => {},
       inventoryTrees: [],
@@ -63,8 +66,23 @@ describe('a host opened from a collection', () => {
     expect(useStore.getState().activeWorkspaceId).toBe('there')
   })
 
-  it('opens a new tab where the window was on a double-click', () => {
+  it('goes to the running copy on a double-click, leaving the tabs as they were', () => {
     setUp()
+    const row = screen.getByText('web-1')
+    fireEvent.click(row, { detail: 1 })
+    fireEvent.click(row, { detail: 2 })
+    fireEvent.doubleClick(row)
+
+    const state = useStore.getState()
+    expect(state.activeWorkspaceId).toBe('there')
+    expect(state.workspaces.find((w) => w.id === 'here')!.tabs).toHaveLength(1)
+    expect(state.wakeRequest?.paneId).toBe(
+      state.workspaces.find((w) => w.id === 'there')!.tabs[0].activePaneId
+    )
+  })
+
+  it('opens a new tab where the window was on a double-click, with that setting off', () => {
+    setUp(false)
     const row = screen.getByText('web-1')
     fireEvent.click(row, { detail: 1 })
     fireEvent.click(row, { detail: 2 })

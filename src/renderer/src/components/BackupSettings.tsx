@@ -106,6 +106,9 @@ export default function BackupSettings(): JSX.Element {
           // Two clauses of their own rather than more placeholders in the
           // sentence above: both are regularly zero, and "0 saved accounts" is
           // a line about something that did not happen.
+          (summary.multiWindows > 0
+            ? t(', {windows} multi-windows', { windows: summary.multiWindows })
+            : '') +
           (summary.credentials > 0
             ? t(', {accounts} saved accounts', { accounts: summary.credentials })
             : '') +

@@ -166,3 +166,12 @@ describe('sharing the clipboard', () => {
     expect(resolveRdp({ clipboard: true }, 'g', [group]).clipboard).toBe(true)
   })
 })
+
+describe('sharing this computer’s disks', () => {
+  it('is off unless a host or a group turns it on, and the nearer one wins', () => {
+    expect(resolveRdp({}, null, []).drives).toBe(false)
+    const group = { id: 'g', name: 'win', parentId: null, drives: true }
+    expect(resolveRdp({ groupId: 'g' } as never, 'g', [group]).drives).toBe(true)
+    expect(resolveRdp({ drives: false }, 'g', [group]).drives).toBe(false)
+  })
+})

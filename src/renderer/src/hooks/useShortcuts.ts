@@ -177,13 +177,14 @@ export function useShortcuts(actions: {
 
       switch (key) {
         case 't': {
-          // Duplicate the active pane into a fresh tab, looking as it does.
+          // Duplicate the active pane into a fresh tab, looking as it does —
+          // a terminal, that is: a desktop stays the one it is, see `openHost`.
           if (!current) return
           const leaf = findLeaf(current.root, current.activePaneId)
           if (!leaf) return
           e.preventDefault()
           e.stopPropagation()
-          state.openTab(leaf.title, leaf.target, leaf.color, leaf.viaCollectionId)
+          state.openHost(leaf.title, leaf.target, leaf.color, leaf.viaCollectionId, true)
           break
         }
         case 'w': {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import Hint from './Hint'
+import PasswordInput from './PasswordInput'
 import { useStore } from '../state/store'
 import { useT } from '../i18n'
 import ModalBackdrop from './ModalBackdrop'
@@ -217,16 +218,16 @@ export default function SecuritySettings(): JSX.Element {
       </h3>
       <label>
         {t('Current password')}
-        <input type="password" value={current} onChange={(e) => setCurrent(e.target.value)} />
+        <PasswordInput value={current} onChange={(e) => setCurrent(e.target.value)} />
       </label>
       <div className="form-row">
         <label>
           {t('New password')}
-          <input type="password" value={next} onChange={(e) => setNext(e.target.value)} />
+          <PasswordInput value={next} onChange={(e) => setNext(e.target.value)} />
         </label>
         <label>
           {t('Confirm')}
-          <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+          <PasswordInput value={confirm} onChange={(e) => setConfirm(e.target.value)} />
         </label>
       </div>
       {pwError && <span className="error-text">{pwError}</span>}

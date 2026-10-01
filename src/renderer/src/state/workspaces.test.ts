@@ -9,7 +9,8 @@ import {
   mapTab,
   nextOpenPaneOf,
   workspaceHasActivity,
-  workspaceOfTab
+  workspaceOfTab,
+  tabLabels
 } from './workspaces'
 import type { Workspace, WorkspaceTab } from './slices/types'
 
@@ -150,5 +151,23 @@ describe('nextOpenPaneOf', () => {
   it('ignores a pane that is not connected, and hosts open nowhere', () => {
     expect(nextOpenPaneOf(state('w1', 'a'), 'idle')).toBeUndefined()
     expect(nextOpenPaneOf(state('w1', 'a'), 'nowhere')).toBeUndefined()
+  })
+})
+
+describe('tabLabels', () => {
+  const tab = (id: string, title: string) => ({ id, title })
+
+  it('numbers tabs of one name in the order they stand, and leaves the rest as they are', () => {
+    const labels = tabLabels([
+      tab('a', 'Amnezia'),
+      tab('b', 'db'),
+      tab('c', 'Amnezia'),
+      tab('d', 'web #1')
+    ])
+    expect([...labels.values()]).toEqual(['Amnezia #1', 'db', 'Amnezia #2', 'web #1'])
+  })
+
+  it('drops the number once only one is left', () => {
+    expect(tabLabels([tab('c', 'Amnezia')]).get('c')).toBe('Amnezia')
   })
 })

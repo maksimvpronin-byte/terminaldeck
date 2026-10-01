@@ -27,6 +27,7 @@ export default function MainLayout(): JSX.Element {
   // Needed from the Inventory tab too, where the collections section is not on
   // screen but the selection bar still offers to add hosts to an existing one.
   const loadCollections = useStore((s) => s.loadCollections)
+  const loadMultiWindows = useStore((s) => s.loadMultiWindows)
   // Wanted by the host menus in both trees, so they are here rather than read
   // when a menu opens: a menu that has to wait on a round trip cannot list them.
   const loadCredentials = useStore((s) => s.loadCredentials)
@@ -44,8 +45,16 @@ export default function MainLayout(): JSX.Element {
     loadInventory()
     loadGitFolders()
     loadCollections()
+    loadMultiWindows()
     loadCredentials()
-  }, [loadSnippets, loadInventory, loadGitFolders, loadCollections, loadCredentials])
+  }, [
+    loadSnippets,
+    loadInventory,
+    loadGitFolders,
+    loadCollections,
+    loadMultiWindows,
+    loadCredentials
+  ])
 
   return (
     <div className="app-root">

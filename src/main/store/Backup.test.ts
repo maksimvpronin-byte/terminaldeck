@@ -5,6 +5,7 @@ import { join } from 'path'
 import type { BrowserWindow } from 'electron'
 import { deriveKey, decrypt, type EncryptedPayload } from '../vault/crypto'
 import type {
+  MultiWindow,
   Credential,
   HostCollection,
   InventoryOverride,
@@ -43,6 +44,7 @@ const { vault } = await import('../vault/Vault')
 const { sessionStore } = await import('./SessionStore')
 const { snippetStore } = await import('./SnippetStore')
 const { collectionStore } = await import('./CollectionStore')
+const { multiWindowStore } = await import('./MultiWindowStore')
 const { credentialStore } = await import('./CredentialStore')
 const { inventoryStore } = await import('../inventory/InventoryStore')
 const { exportToFile, importFromFile, recoverInterruptedImport } = await import('./Backup')
@@ -130,11 +132,34 @@ const SECRETS = {
   'secret-credential': 'the administrator password'
 }
 
+const desk: MultiWindow = {
+  id: 'desk-1',
+  name: 'Release desk',
+  root: {
+    type: 'split',
+    dir: 'row',
+    sizes: [40, 60],
+    children: [
+      { type: 'leaf', sessionId: 'session-1', title: 'web-1' },
+      {
+        type: 'leaf',
+        sessionId: 'session-1',
+        title: 'web-1',
+        credentialId: 'credential-1',
+        sftpOpen: true
+      }
+    ]
+  },
+  createdAt: 1,
+  updatedAt: 2
+}
+
 function populate(): void {
   sessionStore.saveGroup(group)
   sessionStore.saveSession(session)
   snippetStore.save(snippet)
   collectionStore.save(collection)
+  multiWindowStore.save(desk)
   inventoryStore.saveSource(source)
   inventoryStore.saveOverride(override)
   credentialStore.save(credential)
@@ -146,6 +171,7 @@ function clearStores(): void {
   for (const g of [...sessionStore.getAll().groups]) sessionStore.deleteGroup(g.id)
   for (const s of [...snippetStore.list()]) snippetStore.remove(s.id)
   for (const c of [...collectionStore.list()]) collectionStore.remove(c.id)
+  for (const w of [...multiWindowStore.list()]) multiWindowStore.remove(w.id)
   for (const s of [...inventoryStore.sources()]) inventoryStore.removeSource(s.id)
   for (const o of [...inventoryStore.overrides()]) inventoryStore.clearOverride(o.nodeId)
   for (const c of [...credentialStore.list()]) credentialStore.remove(c.id)
@@ -163,6 +189,7 @@ function snapshot(): Record<string, unknown> {
     sessions: sessionStore.getAll().sessions,
     snippets: snippetStore.list(),
     collections: collectionStore.list(),
+    multiWindows: multiWindowStore.list(),
     sources: inventoryStore.sources(),
     overrides: inventoryStore.overrides(),
     credentials: credentialStore.list()
@@ -299,6 +326,7 @@ describe('backup import', () => {
       sessions: 1,
       snippets: 1,
       collections: 1,
+      multiWindows: 1,
       inventorySources: 1,
       inventoryOverrides: 1,
       gitFolderOverrides: 0,
@@ -657,4 +685,46 @@ it('recovers mirrored groups whose derived ids contain inventory paths', async (
   } finally {
     gitFolderStore.restore(previous)
   }
+})
+
+describe('multi-windows in a backup', () => {
+  it('refuses one whose panes are not panes, before changing any store', async () => {
+    writeFileSync(
+      FILE,
+      JSON.stringify({
+        format: 'terminaldeck-backup',
+        version: 1,
+        exportedAt: 1,
+        groups: [],
+        sessions: [],
+        snippets: [],
+        collections: [],
+        inventorySources: [],
+        inventoryOverrides: [],
+        multiWindows: [{ ...desk, root: { type: 'split', dir: 'row', sizes: [1], children: [] } }]
+      })
+    )
+    openFrom = FILE
+    await expect(importFromFile(win)).rejects.toThrow('sizes')
+    expect(multiWindowStore.list()).toEqual([])
+  })
+
+  it('reads a file and a journal written before they existed', async () => {
+    writeFileSync(
+      FILE,
+      JSON.stringify({
+        format: 'terminaldeck-backup',
+        version: 1,
+        exportedAt: 1,
+        groups: [],
+        sessions: [],
+        snippets: [],
+        collections: [],
+        inventorySources: [],
+        inventoryOverrides: []
+      })
+    )
+    openFrom = FILE
+    await expect(importFromFile(win)).resolves.toMatchObject({ multiWindows: 0 })
+  })
 })

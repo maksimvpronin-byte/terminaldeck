@@ -36,7 +36,8 @@ export default function GraphicalHost({
   layoutFix,
   paneVisible,
   active,
-  restored
+  restored,
+  wake = 0
 }: {
   protocol: Protocol
   host?: string
@@ -89,6 +90,12 @@ export default function GraphicalHost({
    * saved host at launch would be surprising, and the vault may be locked.
    */
   restored?: boolean
+  /**
+   * Bumped when the host was opened again and this pane was brought forward
+   * instead of a second desktop: one that has ended, failed or is waiting to
+   * be started connects, as its own button would.
+   */
+  wake?: number
 }): JSX.Element {
   const [phase, setPhase] = useState<Phase>({ at: 'loading' })
   const focusRequest = useStore((s) => s.focusRequest)
@@ -261,6 +268,14 @@ export default function GraphicalHost({
     else setPhase({ at: 'password' })
   }
 
+  /** What "Try again" does: the same login as last time, asked for only if there is none. */
+  function tryAgain(): void {
+    // The stored password is used again without ever being shown here; only a
+    // host with nothing saved is asked.
+    if (hasStoredPassword || lastTyped.current) start(lastTyped.current)
+    else setPhase({ at: 'password' })
+  }
+
   function start(typed: string | undefined): void {
     lastTyped.current = typed
     setAttempt((n) => n + 1)
@@ -282,6 +297,17 @@ export default function GraphicalHost({
     // arrives together with the phase this waits for.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase.at, lookSettled, restored])
+
+  // Only a request made while mounted, as in TerminalHost.
+  const wakeSeen = useRef(wake)
+  useEffect(() => {
+    if (wake === wakeSeen.current) return
+    wakeSeen.current = wake
+    if (phase.at === 'failed' || phase.at === 'closed') tryAgain()
+    else if (phase.at === 'choosing' && lookSettled) connectFresh()
+    // Read at the moment of the request, which is what these are.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wake])
 
   if (protocol === 'ssh') {
     return (
@@ -398,16 +424,7 @@ export default function GraphicalHost({
                 {notice && phase.reason !== notice && (
                   <p className="settings-note">{`${t('The host says')}: ${notice}`}</p>
                 )}
-                <button
-                  onClick={() => {
-                    // The stored password is used again without ever being
-                    // shown here; only a host with nothing saved is asked.
-                    if (hasStoredPassword || lastTyped.current) start(lastTyped.current)
-                    else setPhase({ at: 'password' })
-                  }}
-                >
-                  {t('Try again')}
-                </button>
+                <button onClick={tryAgain}>{t('Try again')}</button>
                 {/* "Try again" repeats what was used, which is right for a
                     network that failed and wrong for a password that did: the
                     same mistyped password went round again with no way to

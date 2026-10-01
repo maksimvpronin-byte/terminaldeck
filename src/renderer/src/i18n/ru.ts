@@ -95,8 +95,14 @@ export const ru: Record<string, string> = {
     'Открывает отмеченные хосты плиткой в одной вкладке, а не по отдельности',
   'Opens the marked hosts in a workspace of their own':
     'Открывает отмеченные хосты в отдельной рабочей области',
-  'New tab with the same host as the focused pane':
-    'Новая вкладка с тем же хостом, что и в активной панели',
+  'New tab with the same host as the focused pane — a terminal, not a desktop':
+    'Новая вкладка с тем же хостом, что в активной панели, — для терминала, не для рабочего стола',
+  'Right-click a tab for its host’s menu, as in the tree':
+    'Правый клик по вкладке — меню её хоста, как в дереве',
+  'Two tabs of one host in a row are numbered #1, #2 to tell them apart':
+    'Две вкладки одного хоста в строке нумеруются — #1, #2, — чтобы их различать',
+  'The window opens where it was left, at the size it was, maximised if it was':
+    'Окно открывается там, где его оставили, того же размера и развёрнутым, если было развёрнуто',
   'Close the focused pane, or the tab when it is the last one':
     'Закрыть активную панель, а если она последняя — вкладку',
   'Jump to that tab within the current workspace':
@@ -248,8 +254,12 @@ export const ru: Record<string, string> = {
     'Хостам и группам из git или инвентаря наборы отмечают в их локальных настройках',
   'A click on a host already open brings its pane forward, keyboard and all':
     'Клик по уже открытому хосту выводит вперёд его панель и отдаёт ей клавиатуру',
-  'A double-click still opens a new tab, where you were — in a collection too':
-    'Двойной клик всё равно открывает новую вкладку — там, где вы были, и в наборе тоже',
+  'A double-click on a host already open goes to its tab and reconnects it if dropped':
+    'Двойной клик по уже открытому хосту переходит на его вкладку и переподключает её, если связь оборвалась',
+  '“Open another tab” in its menu makes a second; Settings → General turns this off':
+    '«Открыть ещё одну вкладку» в его меню открывает вторую; выключается в Настройки → Общие',
+  'A desktop is never opened twice for one account: Windows keeps one session per user':
+    'Рабочий стол под одной учётной записью дважды не открывается: в Windows у пользователя один сеанс',
   'A desktop just opened takes the keyboard, as a new terminal does':
     'Только что открытый рабочий стол сразу получает клавиатуру, как новый терминал',
   'Or drag a host, the ticked hosts, or a whole folder onto a set — one from git too':
@@ -393,7 +403,48 @@ export const ru: Record<string, string> = {
   'Unpin: hide until the pointer reaches the top edge':
     'Открепить: прятать, пока указатель не дойдёт до верхнего края',
   'Pin: keep the bar on screen': 'Закрепить: панель всегда на экране',
+  ', {windows} multi-windows': ', мульти-окон: {windows}',
+  'This tab has no saved host to keep — Quick connect panes are not kept.':
+    'В этой вкладке нет сохранённого хоста — панели быстрого подключения не сохраняются.',
+  'Rename multi-window': 'Переименовать мульти-окно',
+  'Save as multi-window': 'Сохранить как мульти-окно',
+  'The tab’s panes are kept as they stand — which hosts, split which way, how large — and open again in one go, as a new tab. Only references are kept: no passwords, and nothing that is connected now.':
+    'Панели вкладки сохраняются как есть — какие хосты, как разделены, какого размера — и открываются заново разом, новой вкладкой. Хранятся только ссылки: никаких паролей и ничего из того, что подключено сейчас.',
+  '“{name}” already exists; saving puts this tab in its place.':
+    '«{name}» уже есть; сохранение заменит его этой вкладкой.',
+  'Another multi-window has this name.': 'Мульти-окно с таким именем уже есть.',
+  Replace: 'Заменить',
+  'Replace with the tab in front': 'Заменить текущей вкладкой',
+  'Delete multi-window': 'Удалить мульти-окно',
+  'Delete the multi-window “{name}”? Its hosts stay.':
+    'Удалить мульти-окно «{name}»? Хосты останутся.',
+  'Multi-windows': 'Мульти-окна',
+  'Save the tab in front as a multi-window': 'Сохранить текущую вкладку как мульти-окно',
+  'A tab kept by name, panes and all. Split a tab into the hosts you want, then press + here or right-click its tab.':
+    'Вкладка, сохранённая под именем вместе со всеми панелями. Разделите вкладку на нужные хосты, затем нажмите + здесь или правый клик по вкладке.',
+  'Double-click to open it as a new tab, laid out as it was kept':
+    'Двойной клик открывает его новой вкладкой, в той же раскладке',
+  'Open it as a new tab': 'Открыть новой вкладкой',
+  'Panes: {count}': 'Панелей: {count}',
+  'Save tab as multi-window…': 'Сохранить вкладку как мульти-окно…',
+  'A tab kept by name with its panes: which hosts, split which way, how large':
+    'Вкладка, сохранённая под именем вместе с панелями: какие хосты, как разделены, какого размера',
+  'Save one with + under Multi-windows, or right-click its tab':
+    'Сохраняется кнопкой + в разделе «Мульти-окна» или правым кликом по вкладке',
+  'Double-click it to open it again as a new tab, every pane connecting':
+    'Двойной клик открывает его снова новой вкладкой, и все панели подключаются',
+  'Only references are kept: no passwords, and Quick connect panes are left out':
+    'Хранятся только ссылки: никаких паролей, панели быстрого подключения не сохраняются',
+  'Right-click to replace it with the tab in front, rename, reorder or delete':
+    'Правый клик — заменить текущей вкладкой, переименовать, переставить или удалить',
+  'Settings → General can show it under every SSH session; its button closes one':
+    'В Настройки → Общие его можно показывать во всех SSH-сессиях; кнопка закрывает его в одной',
+  'Show the monitor under every SSH session': 'Показывать монитор во всех SSH-сессиях',
+  'The strip the Monitor button opens — load, memory, disks — under every terminal, without pressing it in each. The button then closes it for that pane alone.':
+    'Полоса, которую открывает кнопка «Монитор», — нагрузка, память, диски — под каждым терминалом, без нажатия в каждом. Кнопка тогда закрывает её только в своей панели.',
   'Let go to move to that display': 'Отпустите — окно переедет на этот экран',
+  'Letters go to this desktop in {language}, this computer’s layout. If Windows over there shows the other language, click to put it right.':
+    'Буквы уходят на этот стол в раскладке {language} — раскладке этого компьютера. Если Windows на той стороне показывает другой язык, нажмите, чтобы выровнять.',
   'Letters go to this desktop in {language}, this Mac’s layout — fn switches it. If Windows shows the other language, click to put it right.':
     'Буквы уходят на этот стол в раскладке {language} — раскладке мака, её переключает fn. Если Windows показывает другой язык, нажмите, чтобы выровнять.',
   Minimize: 'Свернуть',
@@ -571,6 +622,11 @@ export const ru: Record<string, string> = {
   'Connect in console mode (/admin)': 'Подключаться в режиме консоли (/admin)',
   'The administrative session. On a Session Host it takes no client access licence, so it still lets you in once licensing has run out, and a Connection Broker does not send it to another server. To use it once without saving it, right-click the host.':
     'Административная сессия. На сервере узла сеансов она не занимает клиентскую лицензию — пустит, даже когда лицензии закончились, — и посредник подключений не перенаправит её на другой сервер. Чтобы подключиться так один раз, не меняя хост, нажмите на него правой кнопкой.',
+  'Share this computer’s disks with this host': 'Пробрасывать диски этого компьютера',
+  'This computer’s disks can be shared with a desktop, per host or group — off by default':
+    'Диски этого компьютера можно пробросить на рабочий стол — для хоста или группы, по умолчанию выключено',
+  'Every disk here appears under This PC over there, as “name on this computer” — on a Mac the system disk and whatever is plugged in, coming and going as it is. Off unless turned on: anything running over there can read and change every file you can. Takes effect on the next connection.':
+    'Все диски этого компьютера появятся там в «Этот компьютер» как «имя on имя-компьютера» — на маке системный диск и всё подключённое, по мере подключения и отключения. По умолчанию выключено: всё, что запущено на той стороне, сможет читать и менять любые ваши файлы. Действует со следующего подключения.',
   'Share the clipboard with this host': 'Делить буфер обмена с этим хостом',
   'What you copy here can be pasted there and back again, as every Windows client does it. Turn it off for a host you would rather not hand what you copied: anything running over there can read the clipboard, not only what you paste into.':
     'Скопированное здесь можно вставить там и наоборот — так же, как в любом клиенте Windows. Выключите для хоста, которому не хотите отдавать скопированное: прочитать буфер может всё, что на той машине работает, а не только то, куда вы вставляете.',
@@ -713,6 +769,10 @@ export const ru: Record<string, string> = {
   hours: 'ч',
   'Untouched means no typing, no pointer and no scrolling anywhere in the window, a terminal included. Locking closes nothing: sessions stay open and keep running, and the vault stops answering for stored passwords until the master password is given again.':
     'Бездействие — это отсутствие набора, движения мыши и прокрутки во всём окне, включая терминал. Блокировка ничего не закрывает: сессии остаются открытыми и продолжают работать, а хранилище перестаёт выдавать сохранённые пароли, пока не введён мастер-пароль.',
+  'Show password': 'Показать пароль',
+  'The eye in a master password field shows what was typed, until pressed again':
+    'Глаз в поле мастер-пароля показывает набранное, пока его не нажмут ещё раз',
+  'Hide password': 'Скрыть пароль',
   'Master password': 'Мастер-пароль',
   'Every stored secret is re-encrypted under the new password. Nothing is lost, and the password itself is never written to disk.':
     'Все хранимые секреты перешифровываются под новый пароль. Ничего не теряется, а сам пароль никогда не пишется на диск.',
@@ -1162,6 +1222,8 @@ export const ru: Record<string, string> = {
     'Язык той стороны следует за этим: сеанс начинается с него, а Alt+Shift держит их вровень',
   'The mark on a desktop’s bar is the language letters go in; click it if Windows disagrees':
     'Метка на панели стола — язык, на котором уходят буквы; нажмите её, если Windows показывает другой',
+  'On Windows too: switch with Alt+Shift or Ctrl+Shift here, and the desktop follows':
+    'На Windows тоже: переключайте Alt+Shift или Ctrl+Shift здесь, и стол последует',
   'The same language shows large over the desktop on fn and on coming back to it':
     'Тот же язык крупно появляется поверх стола при нажатии fn и при возвращении в стол',
   'Changed over there by hand, the two can swap round; ⌥⇧ there puts them back':
@@ -1346,6 +1408,11 @@ export const ru: Record<string, string> = {
   'Host tree': 'Дерево хостов',
   'Open and close a group only with the arrow beside its name':
     'Раскрывать и сворачивать группу только стрелкой слева от имени',
+  'Double-click on a host that is open goes to its tab instead of opening another':
+    'Двойной клик по уже открытому хосту переходит на его вкладку, а не открывает новую',
+  '“Open another tab” in the host’s menu still opens a second one. A desktop is never opened twice for one account, whatever this says: Windows keeps one session per user, and a second tab would take it from the first.':
+    '«Открыть ещё одну вкладку» в меню хоста по-прежнему открывает вторую. Рабочий стол под одной учётной записью дважды не открывается в любом случае: в Windows у пользователя один сеанс, и вторая вкладка отобрала бы его у первой.',
+  'Open another tab': 'Открыть ещё одну вкладку',
   'Select the host of the tab in front, and scroll the tree to it':
     'При переключении вкладки выделять её хост в дереве и прокручивать к нему',
   'Row height: {px} px': 'Высота строки: {px} px',

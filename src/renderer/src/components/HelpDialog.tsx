@@ -52,6 +52,16 @@ const SECTIONS: Section[] = [
     ]
   },
   {
+    title: 'Multi-windows',
+    rows: [
+      { what: 'A tab kept by name with its panes: which hosts, split which way, how large' },
+      { what: 'Save one with + under Multi-windows, or right-click its tab' },
+      { what: 'Double-click it to open it again as a new tab, every pane connecting' },
+      { what: 'Only references are kept: no passwords, and Quick connect panes are left out' },
+      { what: 'Right-click to replace it with the tab in front, rename, reorder or delete' }
+    ]
+  },
+  {
     title: 'Workspaces',
     rows: [
       { what: 'The top strip holds workspaces; each has its own row of tabs beneath it' },
@@ -71,7 +81,13 @@ const SECTIONS: Section[] = [
       { keys: 'Tab', what: 'In that list, mark several hosts to open at once' },
       { keys: '⇧⏎', what: 'Opens the marked hosts tiled in one tab instead of separate tabs' },
       { keys: '⌥⏎', what: 'Opens the marked hosts in a workspace of their own' },
-      { keys: '⌘T', what: 'New tab with the same host as the focused pane' },
+      {
+        keys: '⌘T',
+        what: 'New tab with the same host as the focused pane — a terminal, not a desktop'
+      },
+      { what: 'Right-click a tab for its host’s menu, as in the tree' },
+      { what: 'Two tabs of one host in a row are numbered #1, #2 to tell them apart' },
+      { what: 'The window opens where it was left, at the size it was, maximised if it was' },
       { keys: '⌘W', what: 'Close the focused pane, or the tab when it is the last one' },
       { keys: '⌘1 … ⌘9', what: 'Jump to that tab within the current workspace' },
       {
@@ -156,10 +172,16 @@ const SECTIONS: Section[] = [
         what: 'The mark on a desktop’s bar is the language letters go in; click it if Windows disagrees'
       },
       { what: 'The same language shows large over the desktop on fn and on coming back to it' },
+      {
+        what: 'On Windows too: switch with Alt+Shift or Ctrl+Shift here, and the desktop follows'
+      },
       { what: 'Shortcuts, arrows and the keypad still go as keys; turn it off per host for games' },
       { what: 'A certificate the machine cannot verify is asked about once, then remembered' },
       { what: 'Settings → Security lists what was trusted by hand, and forgets it on request' },
       { what: 'The far end’s sound plays here, and can be turned off per host or group' },
+      {
+        what: 'This computer’s disks can be shared with a desktop, per host or group — off by default'
+      },
       {
         what: 'Right-click a Windows host and choose “Connect in console mode” for the /admin session'
       },
@@ -200,7 +222,13 @@ const SECTIONS: Section[] = [
       { what: 'An open host’s name is in bold as well, so it stands out on a coloured row' },
       { what: 'Settings → General → Host tree takes away the edge, or the bold' },
       { what: 'A click on a host already open brings its pane forward, keyboard and all' },
-      { what: 'A double-click still opens a new tab, where you were — in a collection too' },
+      {
+        what: 'A double-click on a host already open goes to its tab and reconnects it if dropped'
+      },
+      { what: '“Open another tab” in its menu makes a second; Settings → General turns this off' },
+      {
+        what: 'A desktop is never opened twice for one account: Windows keeps one session per user'
+      },
       { what: 'A desktop just opened takes the keyboard, as a new terminal does' },
       { what: 'Right-click for connect, split, duplicate, edit and delete' },
       { what: 'Deleting lives in that menu alone, behind a prompt — no button to misclick' },
@@ -234,6 +262,7 @@ const SECTIONS: Section[] = [
         keys: '⌘L',
         what: 'Lock the vault; it also locks itself after the delay set in Settings → Security'
       },
+      { what: 'The eye in a master password field shows what was typed, until pressed again' },
       { what: 'A locked app opens nothing new: no session, no desktop, no remote file listing' },
       { what: 'Open sessions stay connected behind the lock, and the keyboard cannot reach them' },
       { what: 'Settings → Backup moves everything to another machine, credentials optional' },
@@ -289,6 +318,7 @@ const SECTIONS: Section[] = [
       { what: 'A rule saved on a session starts by itself whenever that session connects' },
       { what: '"Ad-hoc tunnel" runs one for this connection only and is not saved' },
       { what: 'Monitor in the same toolbar shows load, memory, network, uptime and disks' },
+      { what: 'Settings → General can show it under every SSH session; its button closes one' },
       { what: 'It asks the host every three seconds and stops after three failures in a row' },
       { what: 'It stops asking while its tab is in the background, and picks up on return' },
       { what: 'Nothing is installed there: it is one command on a channel of its own' }

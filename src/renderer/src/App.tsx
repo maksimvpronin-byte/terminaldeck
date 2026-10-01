@@ -4,6 +4,7 @@ import { useStore } from './state/store'
 import { applyUiPalette } from './state/settings'
 import { useT } from './i18n'
 import MainLayout from './components/MainLayout'
+import PasswordInput from './components/PasswordInput'
 
 function CreateVaultScreen({ onCreated }: { onCreated: () => void }): JSX.Element {
   const [password, setPassword] = useState('')
@@ -44,16 +45,11 @@ function CreateVaultScreen({ onCreated }: { onCreated: () => void }): JSX.Elemen
         </p>
         <label>
           {t('Master password')}
-          <input
-            type="password"
-            value={password}
-            autoFocus
-            onChange={(e) => setPassword(e.target.value)}
-          />
+          <PasswordInput value={password} autoFocus onChange={(e) => setPassword(e.target.value)} />
         </label>
         <label>
           {t('Confirm password')}
-          <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+          <PasswordInput value={confirm} onChange={(e) => setConfirm(e.target.value)} />
         </label>
         {error && <span className="error-text">{error}</span>}
         <button className="primary" onClick={submit} disabled={busy}>
@@ -99,8 +95,7 @@ function UnlockScreen({ onUnlocked }: { onUnlocked: () => void }): JSX.Element {
         <p>{t('Enter your master password to unlock saved sessions.')}</p>
         <label>
           {t('Master password')}
-          <input
-            type="password"
+          <PasswordInput
             value={password}
             autoFocus
             onChange={(e) => setPassword(e.target.value)}

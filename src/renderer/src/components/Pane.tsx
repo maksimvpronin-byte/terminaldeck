@@ -1,6 +1,7 @@
 import { memo, useEffect, useRef, useState } from 'react'
 import type { DragEvent as ReactDragEvent } from 'react'
 import type { PaneNode, PaneTarget } from '../state/store'
+import { monitorShown } from '../state/paneTree'
 import { useStore, collectBroadcastTargets, activeTab, allTabs, findTab } from '../state/store'
 import { DRAG_MIME, edgeFromPoint, edgeToSplit, type DragItem, type DropEdge } from '../state/dnd'
 import { findHost } from '../state/hosts'
@@ -15,7 +16,7 @@ import { protocolOf, traitsOf } from '../../../shared/protocols'
 import { SplitRightIcon, SplitDownIcon, CloseIcon, DetachIcon } from './icons'
 import Hint from './Hint'
 import { hostOfLeaf, morphClose } from './hostMorph'
-import { keyHint } from '../state/keys'
+import { IS_MAC, keyHint } from '../state/keys'
 import { useT } from '../i18n'
 
 function Pane({
@@ -45,6 +46,8 @@ function Pane({
 
   const splitPaneWith = useStore((s) => s.splitPaneWith)
   const mergeTabInto = useStore((s) => s.mergeTabInto)
+  /** The host was opened again and this pane was chosen for it: see `openHost`. */
+  const wake = useStore((s) => (s.wakeRequest?.paneId === node.id ? s.wakeRequest.n : 0))
 
   // Read from the profile rather than copied onto the leaf: changing a host's
   // protocol should take effect in its open panes, not only in the next one.
@@ -99,12 +102,20 @@ function Pane({
   /** Counted up by a click on that mark; the desktop turns its layout round. */
   const [layoutFix, setLayoutFix] = useState(0)
   const typingLabel = typing && node.desktopId ? typing.toUpperCase() : null
-  const typingTip = typingLabel
-    ? t(
-        'Letters go to this desktop in {language}, this Mac’s layout — fn switches it. If Windows shows the other language, click to put it right.',
-        { language: typingLabel }
-      )
-    : ''
+  /** The monitor strip: this pane's own toggle, or every SSH pane's by setting. */
+  const monitorForAll = useStore((s) => s.settings.monitorForAll)
+  const monitor = monitorShown(node, monitorForAll)
+  const typingTip = !typingLabel
+    ? ''
+    : IS_MAC
+      ? t(
+          'Letters go to this desktop in {language}, this Mac’s layout — fn switches it. If Windows shows the other language, click to put it right.',
+          { language: typingLabel }
+        )
+      : t(
+          'Letters go to this desktop in {language}, this computer’s layout. If Windows over there shows the other language, click to put it right.',
+          { language: typingLabel }
+        )
   const fixLayout = (): void => setLayoutFix((n) => n + 1)
 
   /**
@@ -262,8 +273,8 @@ function Pane({
           )}
           {traits.monitor && (
             <button
-              className={node.monitorOpen ? 'active' : ''}
-              aria-pressed={Boolean(node.monitorOpen)}
+              className={monitor ? 'active' : ''}
+              aria-pressed={monitor}
               disabled={!node.connectionId}
               title={t('Toggle remote monitoring')}
               onClick={() => toggleMonitor(tabId, node.id)}
@@ -312,6 +323,7 @@ function Pane({
             onFocus={() => setActivePane(tabId, node.id)}
             onOutput={() => markActivity(tabId)}
             onConnected={(connectionId) => setPaneConnection(tabId, node.id, connectionId)}
+            wake={wake}
             resolveWriteTargets={(own) => {
               const state = useStore.getState()
               // A terminal excluded from broadcast keeps its own input to itself.
@@ -339,6 +351,7 @@ function Pane({
             paneVisible={visible}
             active={isActive}
             restored={node.restored}
+            wake={wake}
           />
         )}
         {traits.files && node.sftpOpen && (
@@ -353,7 +366,7 @@ function Pane({
       </div>
       {/* Below the body, not inside it: the strip is about the host, so it
           spans the terminal and any panel open beside it. */}
-      {traits.monitor && node.monitorOpen && (
+      {traits.monitor && monitor && (
         <MonitorBar connectionId={node.connectionId} visible={visible} />
       )}
     </div>
