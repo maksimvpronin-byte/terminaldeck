@@ -6,6 +6,46 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.23.2
+
+### Fixed
+
+- **An import cut short by a crash** is put back only from a recovery journal
+  that checks out whole, stored passwords included. One that does not is left
+  in the data folder and TerminalDeck says so and closes, rather than starting
+  over hosts it could not restore.
+- **Inventories from git.** A protocol and a desktop port set on a parent group
+  now reach the hosts in its child groups. A broken vars file or an impossible
+  port is a sync error instead of settings silently dropped; files encrypted
+  with ansible-vault and templated values are still passed over. A renamed
+  inventory or a changed login takes effect at once, without waiting for the
+  next sync to succeed.
+- **Importing `~/.ssh/config`** understands a comment at the end of a line and
+  reports a port it cannot read instead of importing port 22.
+- **Comparing a remote file** whose connection broke halfway reports the error
+  instead of a diff against half the file.
+- **Editing a remote file.** Closing the connection while the file is still
+  downloading no longer opens the editor afterwards. The external editor
+  setting takes quotes inside an argument and empty arguments, replaces every
+  `{file}`, and says so when a quote is left open.
+- **Copying files.** Closing a file panel or switching its connection answers a
+  waiting conflict question and drops the copies queued behind it; confirming
+  twice in a hurry runs the copy once.
+- **Remote desktops** are told the keyboard language at logon as well as the
+  layout, so the two agree from the start. A copy from the remote clipboard
+  that fails on its retry is reported and cancelled.
+- **Collections** given the same one twice in a reorder are no longer
+  duplicated on disk. A pane detached into its own tab keeps its collection's
+  colour, and a tab moved to a workspace that has just been closed stays where
+  it was.
+- **Scrollback** is taken when you leave the field or press Enter, so typing a
+  number no longer cuts every terminal's history short at each digit on the way.
+- **Saved state.** A damaged tab layout or an out-of-range setting falls back to
+  the defaults instead of breaking the window, and a failed deletion of a host,
+  folder, account or inventory rereads what was actually kept.
+- **The SOCKS proxy** of a dynamic forward refuses a client that offers no
+  method it supports, instead of answering with one the client never offered.
+
 ## 0.23.1
 
 ### Added
