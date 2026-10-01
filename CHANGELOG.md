@@ -6,6 +6,25 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.24.0
+
+### Added
+
+- **The language a desktop types in is on screen.** The desktop's toolbar,
+  and the bar over a full-screen desktop, carry a mark — RU, EN — for the
+  language letters go in, which is the Mac's; the same shows large over the
+  desktop for a moment on fn and on coming back to it. In full screen the
+  menu bar is hidden and the Windows taskbar, the one indicator left, can be
+  wrong: this one is not, which matters most when typing a password. If the
+  taskbar shows the other language, a click on the mark switches it over
+  there and the two agree again. There is no mark on a host that sends keys
+  as keys, where Windows' own layout decides.
+
+### Fixed
+
+- **A layout switch put off by a held Shift or Alt** is made as soon as the
+  key is let go, rather than waiting for the next change of language.
+
 ## 0.23.2
 
 ### Fixed
