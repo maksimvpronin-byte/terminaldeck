@@ -32,6 +32,8 @@ export default function GraphicalHost({
   onMeasured,
   onSession,
   onSignedOut,
+  onTypingLanguage,
+  layoutFix,
   paneVisible,
   active,
   restored
@@ -72,6 +74,10 @@ export default function GraphicalHost({
   /** The Windows session was signed out of, so the pane has nothing left to
    *  show and closes. Passed straight through to the screen. */
   onSignedOut?: () => void
+  /** Passed straight through to the screen: the language letters go in. */
+  onTypingLanguage?: (language: string | null) => void
+  /** Passed straight through to the screen: the pane's language mark was clicked. */
+  layoutFix?: number
   /** False while another tab is in front: a pane nobody is looking at is not
    *  sent any pixels until it comes back. */
   paneVisible: boolean
@@ -314,6 +320,8 @@ export default function GraphicalHost({
           onSession={onSession}
           onNotice={setNotice}
           onSignedOut={onSignedOut}
+          onTypingLanguage={onTypingLanguage}
+          layoutFix={layoutFix}
           onMeasured={(text) => {
             setAsked(text)
             onMeasured?.(text)

@@ -341,6 +341,12 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   has no message for a changed layout, so this is a remembered toggle rather than a known state:
   exact with two languages each side, and put right with ⌥⇧ over there if the language is changed
   there by hand
+- **The language letters go in is on screen.** The desktop's toolbar, and the bar over a
+  full-screen desktop, carry a mark — `RU`, `EN` — for the language typed letters go in, which is
+  the Mac's; the same shows large over the desktop for a moment on fn and on coming back to it.
+  In full screen the menu bar is hidden and the far taskbar, the one indicator left, is a guess:
+  this one is not. If the taskbar shows the other language, a click on the mark presses Alt+Shift
+  over there and the two agree again. Hidden when keys go as keys, where Windows' layout decides
 - **The picture comes from a real RDP client, in a process of its own.** It is
   [FreeRDP](https://github.com/FreeRDP/FreeRDP) 3.31, built from source and shipped inside the
   application as a small program called `td-rdp`: it connects, decodes, and writes the

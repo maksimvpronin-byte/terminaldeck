@@ -87,11 +87,11 @@ function commandTab(shift = false): void {
   })
 }
 
-async function open(look: RdpView | null): Promise<HTMLElement> {
+async function open(rdpLook: RdpView | null): Promise<HTMLElement> {
   const view = render(
     <RemoteScreen
       sessionId="host"
-      look={look}
+      look={rdpLook}
       visible
       active
       onPhase={vi.fn()}
@@ -161,6 +161,30 @@ describe('⌘Tab on a Mac', () => {
     fireEvent.keyDown(screen, { code: 'MetaLeft', key: 'Meta', metaKey: true })
     fireEvent.keyUp(screen, { code: 'MetaLeft', key: 'Meta' })
     expect(keys()).toEqual([press(WIN, true), press(WIN, false)])
+  })
+})
+
+describe('Mac copy and paste', () => {
+  it('keeps Command+C and Command+V as Control shortcuts in the remote desktop', async () => {
+    const screen = await open(look(true))
+    for (const [code, key] of [
+      ['KeyC', 'с'],
+      ['KeyV', 'м']
+    ]) {
+      fireEvent.keyDown(screen, { code: 'MetaLeft', key: 'Meta', metaKey: true })
+      fireEvent.keyDown(screen, { code, key, metaKey: true })
+      fireEvent.keyUp(screen, { code, key, metaKey: true })
+      fireEvent.keyUp(screen, { code: 'MetaLeft', key: 'Meta' })
+    }
+    expect(keys()).toEqual(
+      [0x2e, 0x2f].flatMap((code) => [
+        press(CTRL, true),
+        press({ code, ext: false }, true),
+        press({ code, ext: false }, false),
+        press(CTRL, false)
+      ])
+    )
+    expect(desktopSend.mock.calls.some(([, fields]) => fields.a === 'unicode')).toBe(false)
   })
 })
 
@@ -252,5 +276,94 @@ describe('the far side’s layout, following the Mac’s', () => {
     switchMacLanguage('ru')
     settle()
     expect(keys()).toEqual([])
+  })
+  it('retries alignment after releasing a modifier held through the idle timeout', async () => {
+    const screen = await open(null)
+    fireEvent.keyDown(screen, { code: 'ShiftLeft', key: 'Shift', shiftKey: true })
+    switchMacLanguage('ru')
+    settle()
+    desktopSend.mockClear()
+    fireEvent.keyUp(screen, { code: 'ShiftLeft', key: 'Shift' })
+    desktopSend.mockClear()
+    settle()
+    expect(keys()).toEqual(altShift)
+  })
+})
+
+describe('the language letters go in, shown and put right from the pane', () => {
+  const SHIFT = { code: 0x2a, ext: false }
+  const altShift = [press(ALT, true), press(SHIFT, true), press(SHIFT, false), press(ALT, false)]
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+  const wait = (ms: number): void =>
+    act(() => {
+      vi.advanceTimersByTime(ms)
+    })
+
+  async function mount(rdpLook: RdpView | null, onTypingLanguage = vi.fn()) {
+    const props = {
+      sessionId: 'host',
+      visible: true,
+      active: true,
+      onPhase: vi.fn(),
+      onNotice: vi.fn(),
+      onMeasured: vi.fn(),
+      onTypingLanguage
+    }
+    const view = render(<RemoteScreen {...props} look={rdpLook} />)
+    await act(async () => {})
+    const screen = view.container.querySelector<HTMLElement>('.graphical-screen')!
+    act(() => screen.focus())
+    await act(async () => {})
+    desktopSend.mockClear()
+    const fix = (n: number): void =>
+      view.rerender(<RemoteScreen {...props} look={rdpLook} layoutFix={n} />)
+    const label = (): string | null =>
+      view.container.querySelector('.graphical-language')?.textContent ?? null
+    return { screen, fix, label }
+  }
+
+  it('tells the pane the Mac’s language, and nothing when keys go as keys', async () => {
+    const typing = vi.fn()
+    await mount(look(false), typing)
+    expect(typing).toHaveBeenLastCalledWith('en')
+    switchMacLanguage('ru')
+    expect(typing).toHaveBeenLastCalledWith('ru')
+
+    const physical = vi.fn()
+    await mount({ ...look(false), typeAsText: false }, physical)
+    expect(physical).toHaveBeenLastCalledWith(null)
+  })
+
+  it('shows the language large on fn and on coming back, then lets it go', async () => {
+    const { label } = await mount(null)
+    // Coming to the desktop says what letters will be typed in.
+    expect(label()).toBe('EN')
+    wait(1000)
+    expect(label()).toBeNull()
+    switchMacLanguage('ru')
+    expect(label()).toBe('RU')
+    wait(1000)
+    expect(label()).toBeNull()
+  })
+
+  it('turns the far layout round once on a click, and keeps following fn after', async () => {
+    const { fix } = await mount(null)
+    fix(1)
+    wait(100)
+    expect(keys()).toEqual(altShift)
+    // Believed level now, so the same language again presses nothing…
+    switchMacLanguage('en')
+    wait(1000)
+    expect(keys()).toEqual(altShift)
+    // …and a real change presses it once more.
+    switchMacLanguage('ru')
+    wait(1000)
+    expect(keys()).toEqual([...altShift, ...altShift])
   })
 })

@@ -152,6 +152,10 @@ const SECTIONS: Section[] = [
         what: 'The far side’s language follows: it starts in this one and Alt+Shift keeps it level'
       },
       { what: 'Changed over there by hand, the two can swap round; ⌥⇧ there puts them back' },
+      {
+        what: 'The mark on a desktop’s bar is the language letters go in; click it if Windows disagrees'
+      },
+      { what: 'The same language shows large over the desktop on fn and on coming back to it' },
       { what: 'Shortcuts, arrows and the keypad still go as keys; turn it off per host for games' },
       { what: 'A certificate the machine cannot verify is asked about once, then remembered' },
       { what: 'Settings → Security lists what was trusted by hand, and forgets it on request' },

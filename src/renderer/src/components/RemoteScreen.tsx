@@ -94,6 +94,20 @@ interface Props {
    * "Session ended" over, and the pane goes. See `endedBySignOut`.
    */
   onSignedOut?: () => void
+  /**
+   * The language letters are typed in right now — this Mac's, since they go
+   * over as its characters — or null when that is not what decides them: keys
+   * sent as keys, or no Mac language to read. For the pane to show, because in
+   * full screen the menu bar that says it is gone and the far taskbar, the one
+   * indicator left on screen, is only ever a guess. See `alignLanguage`.
+   */
+  onTypingLanguage?: (language: string | null) => void
+  /**
+   * Raised by the pane when its language mark is clicked: the far side shows
+   * the other language, so Alt+Shift is pressed there once and this end
+   * believes the two agree again.
+   */
+  layoutFix?: number
 }
 
 /** How long to let a drag settle before asking the far end to resize. */
@@ -113,6 +127,9 @@ const LANGUAGE_KEY_GAP = 15
  * has caught up by the time anyone looks at it. See `alignLanguage`.
  */
 const LANGUAGE_IDLE = 600
+
+/** How long the language shown over the desktop stays before it fades. */
+const LANGUAGE_HUD = 900
 
 /**
  * The bytes that arrived, in the form `ImageData` takes, without copying them.
@@ -184,9 +201,17 @@ export default function RemoteScreen({
   onSession,
   onNotice,
   onMeasured,
-  onSignedOut
+  onSignedOut,
+  onTypingLanguage,
+  layoutFix = 0
 }: Props): JSX.Element {
   const [clipboardStatus, setClipboardStatus] = useState('')
+  /** This Mac's input language, kept for the pane's mark. */
+  const [macLanguage, setMacLanguage] = useState<string | null>(null)
+  /** The language shown large over the desktop for a moment; `at` restarts it. */
+  const [hud, setHud] = useState<{ language: string; at: number } | null>(null)
+  /** Set by the keyboard: Alt+Shift over there, on the pane's say-so. */
+  const fixLayoutRef = useRef<(() => void) | null>(null)
   const t = useT()
   const visibleRef = useRef(visible)
   visibleRef.current = visible
@@ -250,6 +275,37 @@ export default function RemoteScreen({
   onNoticeRef.current = onNotice
   const onSignedOutRef = useRef(onSignedOut)
   onSignedOutRef.current = onSignedOut
+  const onTypingLanguageRef = useRef(onTypingLanguage)
+  onTypingLanguageRef.current = onTypingLanguage
+
+  useEffect(() => {
+    let alive = true
+    void window.td.ui.inputLanguage().then((language) => {
+      if (alive) setMacLanguage(language)
+    })
+    const stop = window.td.ui.onInputLanguage(setMacLanguage)
+    return () => {
+      alive = false
+      stop()
+    }
+  }, [])
+
+  // Letters follow this Mac only while they go over as its characters.
+  const typesAsText = look?.typeAsText !== false
+  useEffect(() => {
+    onTypingLanguageRef.current?.(typesAsText ? macLanguage : null)
+  }, [typesAsText, macLanguage])
+  useEffect(() => () => onTypingLanguageRef.current?.(null), [])
+
+  useEffect(() => {
+    if (!hud) return
+    const timer = window.setTimeout(() => setHud(null), LANGUAGE_HUD)
+    return () => window.clearTimeout(timer)
+  }, [hud])
+
+  useEffect(() => {
+    if (layoutFix > 0) fixLayoutRef.current?.()
+  }, [layoutFix])
   /* Through a ref like the two above: the session's subscriptions are set up
      once, and a function captured there would go on wording the tooltip with
      whatever the density was when the pane opened. */
@@ -1134,6 +1190,13 @@ export default function RemoteScreen({
       syncModifiers(event, { ignore: code })
       // After the release a lock key's state has settled, so it is read here.
       syncLocks(event)
+      // A held modifier postponed alignment. Its release must retry it even
+      // if the language notification's original idle timer has already fired.
+      if (
+        languageWanted !== null &&
+        ['AltLeft', 'AltRight', 'ShiftLeft', 'ShiftRight'].includes(code)
+      )
+        alignWhenIdle()
     }
 
     /** Everything still down goes up, because nothing else will report it. */
@@ -1185,14 +1248,21 @@ export default function RemoteScreen({
      * has is remembered here rather than known. With the usual two languages on
      * each side that is the same thing. A language changed over there by hand
      * — from its language bar, or its own shortcut — is not seen, and the two
-     * then run the wrong way round until ⌥⇧ over there puts them back; what is
-     * typed stays right throughout.
+     * then run the wrong way round until ⌥⇧ over there, or a click on the
+     * pane's language mark, puts them back; what is typed stays right
+     * throughout, and the mark says what that is.
      */
     let farLanguage: string | null = null
+    /** This Mac's language as last heard, for the fix and the large label. */
+    let macNow: string | null = null
     void window.td.ui.inputLanguage().then((language) => {
       farLanguage ??= language
+      macNow ??= language
     })
     const switchTimers = new Set<number>()
+    /** Not over a hand already holding either key: the press would be its own. */
+    const handOnAltShift = (): boolean =>
+      ['AltLeft', 'AltRight', 'ShiftLeft', 'ShiftRight'].some((code) => held.has(code))
     const alignLanguage = (language: string | null): void => {
       if (!language || language === farLanguage) return
       if (farLanguage === null) {
@@ -1203,9 +1273,13 @@ export default function RemoteScreen({
       // is not there yet: the press would be lost and the memory of it kept.
       if (!visibleRef.current || !container.contains(document.activeElement)) return
       if (!idRef.current) return
-      // Nor over a hand already holding either key: the press would be its own.
-      if (['AltLeft', 'AltRight', 'ShiftLeft', 'ShiftRight'].some((code) => held.has(code))) return
+      if (handOnAltShift()) return
       diag('rdp', `layout ${farLanguage} → ${language}: Alt+Shift over there`)
+      pressAltShift()
+      farLanguage = language
+    }
+    /** The far side's own language hotkey, at a hand's pace, keys held back meanwhile. */
+    const pressAltShift = (): void => {
       const presses: Array<[string, boolean]> = [
         ['AltLeft', true],
         ['ShiftLeft', true],
@@ -1224,7 +1298,27 @@ export default function RemoteScreen({
         }, step * LANGUAGE_KEY_GAP)
         switchTimers.add(timer)
       })
-      farLanguage = language
+    }
+    /**
+     * The pane's mark was clicked: the far taskbar shows the other language.
+     *
+     * Nothing over there can be read, so it is taken on the word of whoever
+     * is looking at both. One Alt+Shift turns it round, and from then on the
+     * far side is believed to have what this Mac has.
+     */
+    fixLayoutRef.current = (): void => {
+      if (!idRef.current || switchingLayout || handOnAltShift()) return
+      window.clearTimeout(languageTimer)
+      languageTimer = undefined
+      diag('rdp', 'layout put right by hand: Alt+Shift over there')
+      pressAltShift()
+      farLanguage = macNow ?? farLanguage
+    }
+    /** The language letters go in, large over the desktop for a moment. */
+    const showLanguage = (): void => {
+      if (!macNow || lookRef.current?.typeAsText === false) return
+      if (!visibleRef.current || !container.contains(document.activeElement)) return
+      setHud({ language: macNow, at: performance.now() })
     }
     /** Matches the far layout once the keys have been still for a while. */
     const alignWhenIdle = (language: string | null = languageWanted): void => {
@@ -1237,23 +1331,39 @@ export default function RemoteScreen({
     }
     const stopLanguage = window.td.ui.onInputLanguage((language) => {
       languageChangedAt = performance.now()
+      macNow = language
+      showLanguage()
       alignWhenIdle(language)
     })
 
+    /** Whether the keys are already here, so coming back is told from moving inside. */
+    let holdingKeys = false
     const onFocus = (): void => {
       captureFor(document.activeElement)
       // The layout may have changed while another application had the keys.
       if (container.contains(document.activeElement)) {
-        void window.td.ui.inputLanguage().then((language) => alignWhenIdle(language))
+        void window.td.ui.inputLanguage().then((language) => {
+          macNow = language ?? macNow
+          // Said on arriving, before the first key: a password typed in the
+          // wrong language is typed blind, and nothing else on screen tells.
+          if (!holdingKeys) {
+            holdingKeys = true
+            showLanguage()
+          }
+          alignWhenIdle(language)
+        })
       }
     }
     const onBlur = (event: FocusEvent): void => {
       releaseAll()
       captureFor(event.relatedTarget)
+      if (!(event.relatedTarget instanceof Node && container.contains(event.relatedTarget)))
+        holdingKeys = false
     }
     const onWindowBlur = (): void => {
       releaseAll()
       window.td.ui.setKeyboardCapture(false)
+      holdingKeys = false
     }
 
     /**
@@ -1313,6 +1423,7 @@ export default function RemoteScreen({
     document.addEventListener('fullscreenchange', onFocus)
 
     return () => {
+      fixLayoutRef.current = null
       stopForwarded()
       stopLanguage()
       window.clearTimeout(languageTimer)
@@ -1518,6 +1629,11 @@ export default function RemoteScreen({
         onCompositionEnd={(e) => sendComposed(e.currentTarget)}
       />
       <canvas ref={canvasRef} className="graphical-canvas" />
+      {hud && (
+        <div key={hud.at} className="graphical-language" aria-hidden="true">
+          {hud.language.toUpperCase()}
+        </div>
+      )}
       {clipboardStatus && (
         <div
           role="status"

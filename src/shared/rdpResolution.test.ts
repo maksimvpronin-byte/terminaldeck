@@ -95,8 +95,9 @@ describe('resolveRdp', () => {
     expect(resolveRdp({}, 'work', groups).commandAsControl).toBe(true)
   })
 
-  it('types letters as text unless a host or group turns it off', () => {
+  it('uses local text input by default while preserving an explicit remote-layout setting', () => {
     expect(resolveRdp({}, null, groups).typeAsText).toBe(true)
+    expect(resolveRdp({ typeAsText: true }, null, groups).typeAsText).toBe(true)
     expect(resolveRdp({ typeAsText: false }, 'work', groups).typeAsText).toBe(false)
   })
 

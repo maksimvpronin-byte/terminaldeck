@@ -90,6 +90,22 @@ function Pane({
    * for what that cost. Empty for a terminal, which has no such thing.
    */
   const [measured, setMeasured] = useState('')
+  /**
+   * The language a desktop's letters go in, shown on this toolbar and on the
+   * full-screen bar: the far taskbar can disagree, and in full screen nothing
+   * else on the screen says which one is true. Null for a terminal.
+   */
+  const [typing, setTyping] = useState<string | null>(null)
+  /** Counted up by a click on that mark; the desktop turns its layout round. */
+  const [layoutFix, setLayoutFix] = useState(0)
+  const typingLabel = typing && node.desktopId ? typing.toUpperCase() : null
+  const typingTip = typingLabel
+    ? t(
+        'Letters go to this desktop in {language}, this Mac’s layout — fn switches it. If Windows shows the other language, click to put it right.',
+        { language: typingLabel }
+      )
+    : ''
+  const fixLayout = (): void => setLayoutFix((n) => n + 1)
 
   /**
    * Whether this pane is the one holding the screen — the bar over a
@@ -161,7 +177,15 @@ function Pane({
     >
       {dropEdge && <div className={`pane-drop-hint ${dropEdge}`} />}
       {fullscreen && rootRef.current && (
-        <FullscreenBar paneId={node.id} title={node.title} pane={rootRef.current} onClose={close} />
+        <FullscreenBar
+          paneId={node.id}
+          title={node.title}
+          pane={rootRef.current}
+          onClose={close}
+          language={typingLabel}
+          languageTip={typingTip}
+          onFixLanguage={fixLayout}
+        />
       )}
       <div
         className={`pane-toolbar ${broadcast && node.broadcastEnabled ? 'broadcasting' : ''}`}
@@ -179,6 +203,17 @@ function Pane({
           )}
         </span>
         <div className="actions">
+          {typingLabel && (
+            <button
+              className="language-mark"
+              title={typingTip}
+              // The desktop keeps the keyboard: the next key goes where it was.
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={fixLayout}
+            >
+              {typingLabel}
+            </button>
+          )}
           {broadcast && traits.broadcast && (
             <label className="broadcast-check" title={t('Include this terminal in broadcast')}>
               <input
@@ -299,6 +334,8 @@ function Pane({
             // As if its close button had been pressed: the session it held is
             // gone from the host, and the tab goes with its last pane.
             onSignedOut={close}
+            onTypingLanguage={setTyping}
+            layoutFix={layoutFix}
             paneVisible={visible}
             active={isActive}
             restored={node.restored}

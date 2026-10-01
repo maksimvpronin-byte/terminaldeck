@@ -1001,6 +1001,15 @@ label {
   padding: 2px 6px;
   font-size: 11px;
 }
+/* The language a desktop's letters go in. A label first and a button second:
+   it is read far more often than it is clicked. */
+.pane-toolbar button.language-mark {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--border);
+}
 /* SFTP, Tunnels and Monitor lit while their panel is open, so which of them
    are on reads from the toolbar and not only from the pane below it. */
 .pane-toolbar button.active {
@@ -1171,6 +1180,23 @@ label {
 }
 .fullscreen-bar.dragging .fullscreen-bar-button::after {
   display: none;
+}
+/* The language letters go in: a word, not an icon, so the button grows to it,
+   and its label is a sentence, so that one wraps. */
+.fullscreen-bar-button.language {
+  width: auto;
+  padding: 0 6px;
+}
+.fullscreen-bar-language {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: normal;
+  letter-spacing: 0.04em;
+  color: var(--text);
+}
+.fullscreen-bar-button.language[data-tip]:hover::after {
+  width: 260px;
+  white-space: normal;
 }
 
 .pane-body {
@@ -1680,6 +1706,33 @@ label {
      desktop reads as part of the desktop. The pane's own border already says
      which one is active. */
   outline: none;
+}
+/* The language letters go in, shown large for a moment on fn and on coming
+   back to the desktop — where the Mac's own indicator would be, were the menu
+   bar not hidden by full screen. Over the picture, never in the mouse's way. */
+.graphical-language {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 14px 28px;
+  font-size: 44px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 14px;
+  pointer-events: none;
+  animation: graphical-language 900ms ease-out forwards;
+}
+@keyframes graphical-language {
+  0%,
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 /* The field the keyboard really goes to — see `keysRef` in RemoteScreen. Kept
    in the layout, since a field that is not rendered cannot be focused, and
@@ -2665,6 +2718,11 @@ button,
     animation-duration: 1ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 1ms !important;
+  }
+  /* Its fade ends invisible, so cut short it would never be seen: shown still
+     instead, for as long as it would have faded. */
+  .graphical-language {
+    animation-name: none !important;
   }
 }
 

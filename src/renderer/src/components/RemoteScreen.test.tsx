@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render } from '@testing-library/react'
 import RemoteScreen from './RemoteScreen'
+import { RDP_FALLBACK } from '../../../shared/rdpResolution'
 import { PTR } from '../../../shared/rdpInput'
 import type { ForwardedKey } from '../../../shared/types'
 import { useShortcuts } from '../hooks/useShortcuts'
@@ -184,8 +185,10 @@ describe('desktop shortcuts', () => {
     expect(forwarded.size).toBe(0)
   })
 
-  it('types in this layout, and keeps commands as keys', async () => {
-    const view = render(<RemoteScreen {...props} visible active />)
+  it('types in the explicitly selected local layout, and keeps commands as keys', async () => {
+    const view = render(
+      <RemoteScreen {...props} look={{ ...RDP_FALLBACK, typeAsText: true }} visible active />
+    )
     await act(async () => {})
     const screen = view.container.querySelector<HTMLElement>('.graphical-screen')!
     const unicode = (): unknown[] =>
@@ -235,6 +238,44 @@ describe('desktop shortcuts', () => {
     expect(keys()).toEqual([
       { a: 'key', code: 0x20, down: true, ext: false },
       { a: 'key', code: 0x20, down: false, ext: false }
+    ])
+  })
+
+  it('keeps local-layout typing by default for saved and quick desktops', async () => {
+    const view = render(<RemoteScreen {...props} visible active />)
+    await act(async () => {})
+    const screen = view.container.querySelector<HTMLElement>('.graphical-screen')!
+    desktopSend.mockClear()
+    for (const [code, key] of [
+      ['KeyQ', 'q'],
+      ['KeyW', 'w'],
+      ['KeyE', 'e']
+    ]) {
+      fireEvent.keyDown(screen, { code, key })
+      fireEvent.keyUp(screen, { code, key })
+    }
+    expect(keys()).toEqual([])
+    expect(desktopSend.mock.calls.filter(([, f]) => f.a === 'unicode').map(([, f]) => f)).toEqual(
+      [0x71, 0x77, 0x65].flatMap((code) => [
+        { a: 'unicode', code, down: true },
+        { a: 'unicode', code, down: false }
+      ])
+    )
+    view.rerender(
+      <RemoteScreen
+        {...props}
+        sessionId={undefined}
+        quick={{ host: 'host', port: 3389, username: 'user' }}
+        visible
+        active
+      />
+    )
+    desktopSend.mockClear()
+    fireEvent.keyDown(screen, { code: 'KeyQ', key: 'й' })
+    expect(keys()).toEqual([])
+    expect(desktopSend.mock.calls.filter(([, f]) => f.a === 'unicode').map(([, f]) => f)).toEqual([
+      { a: 'unicode', code: 0x439, down: true },
+      { a: 'unicode', code: 0x439, down: false }
     ])
   })
 

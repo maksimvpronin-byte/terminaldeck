@@ -36,13 +36,24 @@ export default function FullscreenBar({
   paneId,
   title,
   pane,
-  onClose
+  onClose,
+  language,
+  languageTip = '',
+  onFixLanguage
 }: {
   paneId: string
   title: string
   /** The element that is full screen; its width is the screen's. */
   pane: HTMLElement
   onClose: () => void
+  /**
+   * The language letters go in, as the pane's toolbar shows it — here because
+   * in full screen the Mac's menu bar is gone and the far taskbar may be wrong.
+   */
+  language?: string | null
+  languageTip?: string
+  /** The far side shows the other language: turn it round. */
+  onFixLanguage?: () => void
 }): JSX.Element {
   const t = useT()
   const barRef = useRef<HTMLDivElement | null>(null)
@@ -217,6 +228,14 @@ export default function FullscreenBar({
       <span className="fullscreen-bar-title">
         {away ? t('Let go to move to that display') : title}
       </span>
+      {language &&
+        onFixLanguage &&
+        button(
+          languageTip,
+          onFixLanguage,
+          <span className="fullscreen-bar-language">{language}</span>,
+          'language'
+        )}
       {button(t('Minimize'), () => void window.td.ui.minimizeFullscreen(paneId), <MinimizeIcon />)}
       {button(t('Leave full screen (F11)'), () => toggleFullscreen(pane), <LeaveFullscreenIcon />)}
       {button(t('Close this session'), onClose, <CloseIcon />, 'danger')}

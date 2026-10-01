@@ -394,6 +394,8 @@ export const ru: Record<string, string> = {
     'Открепить: прятать, пока указатель не дойдёт до верхнего края',
   'Pin: keep the bar on screen': 'Закрепить: панель всегда на экране',
   'Let go to move to that display': 'Отпустите — окно переедет на этот экран',
+  'Letters go to this desktop in {language}, this Mac’s layout — fn switches it. If Windows shows the other language, click to put it right.':
+    'Буквы уходят на этот стол в раскладке {language} — раскладке мака, её переключает fn. Если Windows показывает другой язык, нажмите, чтобы выровнять.',
   Minimize: 'Свернуть',
   'Leave full screen (F11)': 'Выйти из полноэкранного режима (F11)',
   'Close this session': 'Закрыть сессию',
@@ -1158,6 +1160,10 @@ export const ru: Record<string, string> = {
     'Буквы печатаются в раскладке этого компьютера: переключайте её здесь, на маке — fn',
   'The far side’s language follows: it starts in this one and Alt+Shift keeps it level':
     'Язык той стороны следует за этим: сеанс начинается с него, а Alt+Shift держит их вровень',
+  'The mark on a desktop’s bar is the language letters go in; click it if Windows disagrees':
+    'Метка на панели стола — язык, на котором уходят буквы; нажмите её, если Windows показывает другой',
+  'The same language shows large over the desktop on fn and on coming back to it':
+    'Тот же язык крупно появляется поверх стола при нажатии fn и при возвращении в стол',
   'Changed over there by hand, the two can swap round; ⌥⇧ there puts them back':
     'Если сменить язык там вручную, они могут поменяться местами; ⌥⇧ там всё вернёт',
   'Shortcuts, arrows and the keypad still go as keys; turn it off per host for games':

@@ -92,4 +92,23 @@ describe('FullscreenBar', () => {
       vi.useRealTimers()
     }
   })
+
+  it('shows the language letters go in, and asks for it to be put right on a click', async () => {
+    const fix = vi.fn()
+    const { container } = render(
+      <FullscreenBar
+        paneId="pane1"
+        title="dc1.example"
+        pane={document.body}
+        onClose={() => undefined}
+        language="RU"
+        languageTip="Letters go in RU"
+        onFixLanguage={fix}
+      />
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Letters go in RU' }))
+    expect(screen.getByText('RU')).toBeInTheDocument()
+    expect(fix).toHaveBeenCalledTimes(1)
+    expect(container.querySelector('[title]')).toBeNull()
+  })
 })
