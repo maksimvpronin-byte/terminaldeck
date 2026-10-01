@@ -6,6 +6,48 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.25.0
+
+### Added
+
+- **Multi-windows.** A tab kept by name with its panes — which hosts, split
+  which way, how large — under the collections in the Sessions tab. Save the
+  tab in front with + there, or Save tab as multi-window… from its right-click
+  menu; a double-click opens it again as a new tab, every pane connecting.
+  Only references are kept, and multi-windows travel in a backup.
+- **The PuTTY colour schemes**, all 51 of putty.org.ru/themes, in a group of
+  their own. Unlike ours they bring their own sixteen colours, as PuTTY does.
+  **Consolas** and **Lucida Console** are among the fonts.
+- **This computer's disks on a desktop**, per host or group and off by default:
+  every disk appears under This PC over there, as mRemoteNG's "Disks" does.
+- **Right-click a tab** for its host's menu, as in the tree.
+- **Show the monitor under every SSH session**, in Settings → General; its
+  button then closes it for one pane.
+- **The window opens where it was left**, at the size it was, maximised if it
+  was.
+- **An eye in the master password fields** shows what was typed.
+- **Two tabs of one host are numbered** in the tab row, #1 and #2.
+- **On Windows the far side's language follows too**, as on a Mac: Alt+Shift or
+  Ctrl+Shift here, and after a pause the desktop's taskbar agrees. The RU/EN
+  mark and the large label work there as well.
+
+### Changed
+
+- **A double-click on a host already open goes to its tab** instead of opening
+  another, and reconnects it if it has dropped; Open another tab in its menu
+  makes a second, and Settings → General turns this off.
+- **A desktop is never opened twice for one account**, whatever that setting
+  says: Windows keeps one session per user, and a second tab took it from the
+  first and left it showing an error.
+- **On Windows, Alt+Shift and Ctrl+Shift pressed alone stay here**: they are
+  this machine's language switch, and sent over there they changed the far
+  language only sometimes.
+
+### Fixed
+
+- **A terminal's last line** sat on the bottom edge of the window, cut short —
+  one row more was laid out than there was room for.
+
 ## 0.24.0
 
 ### Added
