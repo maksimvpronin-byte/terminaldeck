@@ -50,6 +50,7 @@ if (typeof window !== 'undefined') {
         gitAvailable: () => Promise.resolve(true)
       }),
       collections: stub({ list: () => Promise.resolve([]) }),
+      multiWindows: stub({ list: () => Promise.resolve([]) }),
       credentials: stub({ list: () => Promise.resolve([]) }),
       snippets: stub({ list: () => Promise.resolve([]) }),
       vault: stub({ status: () => Promise.resolve({ exists: false, unlocked: false }) }),
