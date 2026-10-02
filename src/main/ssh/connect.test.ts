@@ -47,7 +47,8 @@ class FakeClient extends EventEmitter {
   }
 }
 
-vi.mock('ssh2', () => ({ Client: FakeClient }))
+// PageantAgent only so `./pageant` can extend it; no test here reaches Pageant.
+vi.mock('ssh2', () => ({ Client: FakeClient, PageantAgent: class {} }))
 vi.mock('electron', () => ({
   app: { getPath: (): string => '' },
   BrowserWindow: { getAllWindows: () => [] },

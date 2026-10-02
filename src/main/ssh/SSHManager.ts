@@ -1,4 +1,4 @@
-import { Client, type ConnectConfig, type ClientChannel } from 'ssh2'
+import { Client, type BaseAgent, type ConnectConfig, type ClientChannel } from 'ssh2'
 import { randomUUID } from 'crypto'
 import { createWriteStream, existsSync, mkdirSync, type WriteStream } from 'fs'
 import { userInfo } from 'os'
@@ -25,6 +25,7 @@ import { makeHostVerifier } from './hostVerifier'
 import { requireUnlocked } from '../vault/locked'
 import { requestAuth } from './authPrompt'
 import { readPrivateKey } from './ppk'
+import { AnsweringPageant } from './pageant'
 import { diag } from '../diagnostics'
 import { describeInput } from '../../shared/diagnostics'
 
@@ -170,6 +171,12 @@ function agentSockForPlatform(): string | undefined {
   if (process.env.SSH_AUTH_SOCK) return process.env.SSH_AUTH_SOCK
   if (process.platform !== 'win32') return undefined
   return existsSync(OPENSSH_PIPE) ? OPENSSH_PIPE : 'pageant'
+}
+
+/** The agent to hand ssh2: Pageant as one that always answers — see `AnsweringPageant`. */
+function localAgent(): string | BaseAgent | undefined {
+  const sock = agentSockForPlatform()
+  return sock === 'pageant' ? new AnsweringPageant() : sock
 }
 
 /**
@@ -337,7 +344,7 @@ async function buildAuthConfig(
     return { ...(await readPrivateKey(auth.privateKeyPath, passphrase)), ...forwarding(auth) }
   }
   // agent
-  return { agent: agentSockForPlatform(), agentForward: auth.agentForward }
+  return { agent: localAgent(), agentForward: auth.agentForward }
 }
 
 /**
@@ -355,9 +362,12 @@ async function buildAuthConfig(
  * also what `ssh` does with an agent loaded — and only for hosts where somebody
  * asked for this.
  */
-export function forwarding(auth: ResolvedAuth): { agent?: string; agentForward?: boolean } {
+export function forwarding(auth: ResolvedAuth): {
+  agent?: string | BaseAgent
+  agentForward?: boolean
+} {
   if (!auth.agentForward) return {}
-  const agent = agentSockForPlatform()
+  const agent = localAgent()
   return agent ? { agent, agentForward: true } : {}
 }
 
@@ -877,7 +887,7 @@ class SSHManager {
             ? params.privateKeyPath
               ? await readPrivateKey(params.privateKeyPath, params.passphrase)
               : { passphrase: params.passphrase }
-            : { agent: agentSockForPlatform() }
+            : { agent: localAgent() }
 
       wireKeyboardInteractive(win, client, `${params.username}@${params.host}`, signal)
       const methods = methodWatcher(`sign-in ${params.username}@${params.host}:`)
