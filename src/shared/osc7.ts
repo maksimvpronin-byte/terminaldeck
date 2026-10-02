@@ -116,13 +116,30 @@ export function scanOsc7(chunk: string): Osc7Scan {
  * of function definitions. It prepends rather than replaces `PROMPT_COMMAND`,
  * so an existing prompt setup keeps working.
  *
- * Every dollar in it belongs to the remote shell, not to JavaScript. The one in
- * `\${PROMPT_COMMAND:+` is escaped only because a template literal would
- * otherwise interpolate it; the others take no backslash and must not be given
- * one for symmetry, since an escape JavaScript does not need is an escape a
- * reader has to think about twice.
+ * It is typed into an interactive shell, so the shell files it in the user's
+ * history like anything else they typed — one copy per connection, between
+ * their own commands. The leading space keeps it out wherever the shell is
+ * told to ignore such lines: bash with `HISTCONTROL=ignorespace` or
+ * `ignoreboth` (Debian, Ubuntu), zsh with `HIST_IGNORE_SPACE` (oh-my-zsh). Bash
+ * on RHEL and its kin has only `ignoredups`, so there the line also takes
+ * itself back out: it reads the newest entry, and deletes it by its number
+ * only if that entry is this line. Where the line was not filed at all, or
+ * history is off, the newest entry is the user's, and it is left alone.
+ * Plain zsh without the option keeps its copy; nothing removes an entry there.
+ *
+ * There is no `!` anywhere in it. An interactive zsh expands history on the
+ * whole line before running any of it, the bash branch included, and an event
+ * it cannot find throws the line away.
+ *
+ * Every dollar in it belongs to the remote shell, not to JavaScript. The ones
+ * before a brace are escaped only because a template literal would otherwise
+ * interpolate them; the others take no backslash and must not be given one for
+ * symmetry, since an escape JavaScript does not need is an escape a reader has
+ * to think about twice.
  */
 export const OSC7_SHELL_SETUP =
-  `__td7(){ printf '\\033]7;file://%s%s\\033\\\\' "\${HOSTNAME:-}" "$PWD"; }; ` +
+  ` __td7(){ printf '\\033]7;file://%s%s\\033\\\\' "\${HOSTNAME:-}" "$PWD"; }; ` +
   `if [ -n "$ZSH_VERSION" ]; then autoload -Uz add-zsh-hook 2>/dev/null && add-zsh-hook precmd __td7; ` +
-  `elif [ -n "$BASH_VERSION" ]; then PROMPT_COMMAND="__td7\${PROMPT_COMMAND:+;$PROMPT_COMMAND}"; fi; __td7`
+  `elif [ -n "$BASH_VERSION" ]; then PROMPT_COMMAND="__td7\${PROMPT_COMMAND:+;$PROMPT_COMMAND}"; ` +
+  `__td7h=$(history 1); case $__td7h in *__td7*) __td7h=\${__td7h#"\${__td7h%%[0-9]*}"}; ` +
+  `history -d "\${__td7h%%[^0-9]*}";; esac; unset __td7h; fi; __td7`

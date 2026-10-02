@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { SetupGate, looksLikePrompt } from './setupGate'
+import { OSC7_SHELL_SETUP } from '../../shared/osc7'
 
 const buf = (s: string): Buffer => Buffer.from(s, 'utf8')
 const text = (b: Buffer): string => b.toString('utf8')
@@ -15,6 +16,12 @@ describe('SetupGate', () => {
     expect(out).toBe(`\r\u001b[K${OSC7}[max@box ~]$ `)
     expect(g.done).toBe(true)
     expect(g.answered).toBe(true)
+  })
+
+  it('cuts the real line, leading space and all', () => {
+    const g = new SetupGate(buf(OSC7_SHELL_SETUP))
+    const out = text(g.push(buf(`${OSC7_SHELL_SETUP}\r\n${OSC7}[max@box ~]$ `)))
+    expect(out).toBe(`\r\u001b[K${OSC7}[max@box ~]$ `)
   })
 
   it('cuts an echo however the line editor drew it', () => {

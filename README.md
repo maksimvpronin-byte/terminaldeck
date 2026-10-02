@@ -486,7 +486,9 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   shell's `cd`, and switches it back off, on the live connection — no dialog, no reconnect. It
   watches for the `OSC 7` sequence a shell prints on each prompt and types a one-line setup into
   the shell so hosts that aren't configured for it report it too — the echo of that line is taken
-  back out of the stream, so it never reaches the screen. Off by default, since it lets the remote
+  back out of the stream, so it never reaches the screen, and in bash the line deletes itself from
+  the shell's history, so it never turns up in `history` either. Zsh skips it only with
+  `HIST_IGNORE_SPACE` set, as oh-my-zsh does. Off by default, since it lets the remote
   host move the file browser. The host or group setting decides only how a new connection starts
 - **Overwrite confirmation, in both directions.** A transfer is planned before a byte moves, and
   anything it would replace is listed with the size and date on each side. Every clash starts on

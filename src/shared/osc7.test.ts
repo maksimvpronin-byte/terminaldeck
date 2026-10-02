@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { MAX_OSC7, scanOsc7 } from './osc7'
+import { spawnSync } from 'child_process'
+import { existsSync } from 'fs'
+import { MAX_OSC7, OSC7_SHELL_SETUP, scanOsc7 } from './osc7'
 
 const ESC = '\u001b'
 const BEL = '\u0007'
@@ -96,5 +98,67 @@ describe('scanOsc7', () => {
     const first = scanOsc7(`${ESC}]7;file://box${long}`)
     expect(first.rest.length).toBeGreaterThan(4000)
     expect(scanOsc7(`${first.rest}${BEL}`).path).toBe(long)
+  })
+})
+
+describe('OSC7_SHELL_SETUP', () => {
+  it('starts with a space, so a shell told to skip such lines does not file it', () => {
+    expect(OSC7_SHELL_SETUP.startsWith(' ')).toBe(true)
+  })
+
+  it('has no ! for an interactive zsh to expand', () => {
+    expect(OSC7_SHELL_SETUP).not.toContain('!')
+  })
+
+  it('is one line', () => {
+    expect(OSC7_SHELL_SETUP).not.toMatch(/[\r\n]/)
+  })
+
+  /**
+   * Types the line into a real interactive bash between two commands of the
+   * user's, and returns what `history` lists afterwards, one command a line.
+   */
+  const historyAround = (env: Record<string, string>, before = 'echo before'): string[] => {
+    const input = `${before}\n${OSC7_SHELL_SETUP}\necho after\nhistory\n`
+    const run = spawnSync('/bin/bash', ['--norc', '--noprofile', '-i'], {
+      input,
+      encoding: 'utf8',
+      env: { PATH: process.env.PATH ?? '', HOME: '/nonexistent', HISTFILE: '/dev/null', ...env }
+    })
+    // Each prompt is preceded by the line's own OSC 7, with no newline after it.
+    return (
+      run.stdout
+        // eslint-disable-next-line no-control-regex
+        .replace(/\u001b\][^\u0007\u001b]*(\u0007|\u001b\\)/g, '')
+        .split('\n')
+        .filter((line) => /^ +\d+ {2}/.test(line))
+        .map((line) => line.replace(/^ +\d+ {2}/, ''))
+    )
+  }
+
+  describe.skipIf(!existsSync('/bin/bash'))('in bash', () => {
+    it.each(['', 'ignoredups', 'ignorespace', 'ignoreboth'])(
+      'takes itself out of the history with HISTCONTROL=%j',
+      (histcontrol) => {
+        expect(historyAround({ HISTCONTROL: histcontrol })).toEqual([
+          'echo before',
+          'echo after',
+          'history'
+        ])
+      }
+    )
+
+    it("leaves the user's newest command alone when history is off", () => {
+      expect(historyAround({ HISTCONTROL: '' }, 'set +o history')).toEqual(['set +o history'])
+    })
+
+    it('still reports the directory', () => {
+      const run = spawnSync('/bin/bash', ['--norc', '--noprofile', '-i'], {
+        input: `${OSC7_SHELL_SETUP}\ncd /\n`,
+        encoding: 'utf8',
+        env: { PATH: process.env.PATH ?? '', HOME: '/nonexistent', HISTFILE: '/dev/null' }
+      })
+      expect(scanOsc7(run.stdout + run.stderr).path).toBe('/')
+    })
   })
 })
