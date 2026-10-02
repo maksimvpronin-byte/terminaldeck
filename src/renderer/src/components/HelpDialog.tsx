@@ -40,6 +40,7 @@ const SECTIONS: Section[] = [
         what: 'Or drag a host, the ticked hosts, or a whole folder onto a set — one from git too'
       },
       { what: 'Close the workspace freely — Open brings the whole set back' },
+      { what: 'A host double-clicked under a set opens in that set’s workspace, or a new one' },
       { what: 'Saving under a name that already exists offers to add to it or replace it' },
       { what: 'Independent of groups: one host can sit in as many collections as you like' },
       { what: 'A collection carries a colour and a terminal theme for the hosts in it' },

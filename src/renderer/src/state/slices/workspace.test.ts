@@ -296,6 +296,67 @@ describe('openHost: an open host is brought forward rather than opened again', (
     const state = useStore.getState()
     expect(state.workspaces.find((w) => w.id === state.activeWorkspaceId)?.title).not.toBe('second')
   })
+
+  describe('from a collection', () => {
+    const set = {
+      id: 'set',
+      name: 'Set',
+      hostIds: ['web', 'db'],
+      createdAt: 0,
+      updatedAt: 0
+    }
+    const fromSet = (id: string, again = false): string =>
+      useStore.getState().openHost(id, { kind: 'session', sessionId: id }, '#f00', 'set', again)
+    const titleOfActive = (): string | undefined => {
+      const state = useStore.getState()
+      return state.workspaces.find((w) => w.id === state.activeWorkspaceId)?.title
+    }
+
+    it("joins the set's workspace rather than the one in front", () => {
+      seed(false)
+      useStore.setState({ collections: [set], sessions: [host('web'), host('db')] })
+      useStore.getState().openCollection('set')
+      useStore.getState().openWorkspace('elsewhere')
+      fromSet('web')
+      expect(titleOfActive()).toBe('Set')
+      const own = useStore.getState().workspaces.find((w) => w.title === 'Set')
+      expect(own?.tabs).toHaveLength(3)
+      expect(useStore.getState().workspaces.find((w) => w.title === 'elsewhere')?.tabs).toEqual([])
+    })
+
+    it('opens a workspace for the set when none is open, and reuses it after', () => {
+      seed(false)
+      useStore.setState({ collections: [set] })
+      useStore.getState().openWorkspace('elsewhere')
+      fromSet('web')
+      fromSet('web')
+      const own = useStore.getState().workspaces.filter((w) => w.collectionId === 'set')
+      expect(own).toHaveLength(1)
+      expect(own[0]).toMatchObject({ title: 'Set', color: '#f00' })
+      expect(own[0].tabs).toHaveLength(2)
+    })
+
+    it('keeps a duplicate beside its original', () => {
+      seed(false)
+      useStore.setState({ collections: [set] })
+      fromSet('web')
+      useStore.getState().openWorkspace('elsewhere')
+      fromSet('web', true)
+      expect(titleOfActive()).toBe('elsewhere')
+    })
+
+    it('makes a workspace saved as the set its own, and only that one', () => {
+      seed(false)
+      useStore.setState({ collections: [set] })
+      fromSet('web')
+      const saved = useStore.getState().openWorkspace('saved')
+      useStore.getState().setWorkspaceCollection(saved, 'set')
+      useStore.getState().openWorkspace('elsewhere')
+      fromSet('web')
+      expect(titleOfActive()).toBe('saved')
+      expect(useStore.getState().workspaces.filter((w) => w.collectionId === 'set')).toHaveLength(1)
+    })
+  })
 })
 
 describe('multi-windows', () => {

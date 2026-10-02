@@ -34,6 +34,11 @@ describe('a layout saved and read back', () => {
     const [tab] = loadLayout().workspaces[0].tabs
     expect(tab.hasActivity).toBeUndefined()
   })
+
+  it("still knows which collection a workspace is, so the set's hosts go back to it", () => {
+    saveLayout([{ ...workspace(), collectionId: 'set' }], 'w')
+    expect(loadLayout().workspaces[0].collectionId).toBe('set')
+  })
 })
 
 describe('invalid saved layouts', () => {

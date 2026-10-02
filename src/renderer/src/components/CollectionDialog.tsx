@@ -17,6 +17,8 @@ interface Props {
   /** Prefilled name, e.g. the workspace this is being saved from. */
   defaultName?: string
   defaultColor?: string
+  /** The collection the hosts went into, new or merged into. */
+  onSaved?: (collectionId: string) => void
   onClose: () => void
 }
 
@@ -25,6 +27,7 @@ export default function CollectionDialog({
   hostIds,
   defaultName,
   defaultColor,
+  onSaved,
   onClose
 }: Props): JSX.Element {
   const t = useT()
@@ -61,12 +64,13 @@ export default function CollectionDialog({
   async function submit(): Promise<void> {
     if (!name.trim() || merging) return
     const now = Date.now()
+    const id = initial?.id ?? nanoid()
     await upsertCollection(
       initial
         ? { ...initial, ...look, name: name.trim(), color }
         : {
             ...look,
-            id: nanoid(),
+            id,
             name: name.trim(),
             color,
             hostIds: hostIds ?? [],
@@ -74,6 +78,7 @@ export default function CollectionDialog({
             updatedAt: now
           }
     )
+    onSaved?.(id)
     onClose()
   }
 
@@ -90,6 +95,7 @@ export default function CollectionDialog({
       color: color ?? clash.color,
       hostIds: mode === 'add' ? [...new Set([...clash.hostIds, ...incoming])] : incoming
     })
+    onSaved?.(clash.id)
     onClose()
   }
 

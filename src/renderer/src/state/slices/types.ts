@@ -39,6 +39,11 @@ export interface Workspace {
   id: string
   title: string
   color?: string
+  /**
+   * The collection this workspace is: opened from it, or saved as it. A host
+   * opened from that collection later joins this workspace, not the one in front.
+   */
+  collectionId?: string
   tabs: WorkspaceTab[]
   activeTabId: string | null
 }
@@ -210,7 +215,10 @@ export interface CollectionsSlice {
   /** Appends hosts, keeping the existing order and ignoring ones already in. */
   addToCollection: (id: string, hostIds: string[]) => Promise<void>
   removeFromCollection: (id: string, hostId: string) => Promise<void>
-  /** Reopens a collection: a workspace of its own, one tab per host. */
+  /**
+   * Reopens a collection: a workspace of its own, one tab per host. It becomes
+   * the collection's workspace, taking that over from any opened before.
+   */
   openCollection: (id: string) => void
 }
 
@@ -248,7 +256,9 @@ export interface WorkspaceSlice {
   openSelectedHosts: (mode: OpenMode) => void
 
   /** Creates an empty workspace and makes it current; returns its id. */
-  openWorkspace: (title?: string, color?: string) => string
+  openWorkspace: (title?: string, color?: string, collectionId?: string) => string
+  /** Marks a workspace as a collection's own, as `Workspace.collectionId` has it. */
+  setWorkspaceCollection: (workspaceId: string, collectionId: string) => void
   closeWorkspace: (workspaceId: string) => void
   setActiveWorkspace: (workspaceId: string) => void
   renameWorkspace: (workspaceId: string, title: string) => void
@@ -268,7 +278,9 @@ export interface WorkspaceSlice {
    * and reconnected if it had dropped. A terminal goes the same way while
    * `reuseOpenHost` is on, unless an account was chosen for it. `again` asks
    * for a new tab whatever the setting — a desktop still never gets one.
-   * Returns the pane the host is in.
+   * A new tab for a host opened from a collection goes into that collection's
+   * workspace — a new one if none is open — unless `again` duplicates a pane
+   * where it stands. Returns the pane the host is in.
    */
   openHost: (
     title: string,
@@ -291,7 +303,13 @@ export interface WorkspaceSlice {
   /** Opens a tab of ready-made panes in the workspace in front; returns its id. */
   openPanes: (title: string, root: PaneNode) => string
   /** Opens several hosts at once — see OpenMode. */
-  openMany: (items: OpenRequest[], mode: OpenMode, workspaceTitle?: string) => void
+  openMany: (
+    items: OpenRequest[],
+    mode: OpenMode,
+    workspaceTitle?: string,
+    /** With mode 'workspace': the collection the new workspace is. */
+    collectionId?: string
+  ) => void
   closeTab: (tabId: string) => void
   setActiveTab: (tabId: string) => void
   /** Flags a background tab that produced output, so the tab bar can show it. */

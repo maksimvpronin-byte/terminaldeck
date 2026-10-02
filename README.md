@@ -164,6 +164,8 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   reopened as a workspace whenever you want them back. Unlike a group, a host can be in any
   number of them, membership has no effect on credentials, and a workspace can be saved as one
   before you close it. Hosts that later vanish are flagged rather than quietly dropped.
+  A host double-clicked under a set opens in that set's workspace — the one it was opened as or
+  saved from — rather than the one in front, and in a new workspace for the set if none is open.
   Membership is also ticked in a host's own settings, under **Collections** — or in a group's,
   which puts every host it holds (subgroups included) into a set, or takes them out. Hosts and
   groups from git or an inventory have the same ticks in their **Local settings**

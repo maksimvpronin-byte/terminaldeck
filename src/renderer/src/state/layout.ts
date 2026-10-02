@@ -197,6 +197,8 @@ export function loadLayout(): { workspaces: Workspace[]; activeWorkspaceId: stri
         id: workspace.id,
         title: workspace.title,
         color: typeof workspace.color === 'string' ? workspace.color : undefined,
+        collectionId:
+          typeof workspace.collectionId === 'string' ? workspace.collectionId : undefined,
         tabs,
         activeTabId: tabs.some((tab) => tab.id === workspace.activeTabId)
           ? (workspace.activeTabId as string)

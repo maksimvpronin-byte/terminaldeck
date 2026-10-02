@@ -54,6 +54,8 @@ export const ru: Record<string, string> = {
     'Или правый клик по рабочей области сверху и «Сохранить как набор…»',
   'Close the workspace freely — Open brings the whole set back':
     'Рабочую область можно спокойно закрывать — «Открыть» вернёт весь набор',
+  'A host double-clicked under a set opens in that set’s workspace, or a new one':
+    'Двойной клик по хосту в наборе открывает его в области этого набора или в новой',
   'Saving under a name that already exists offers to add to it or replace it':
     'Сохранение под существующим именем предложит дополнить набор или заменить его',
   'Independent of groups: one host can sit in as many collections as you like':

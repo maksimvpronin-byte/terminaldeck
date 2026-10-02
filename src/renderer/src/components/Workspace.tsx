@@ -25,6 +25,7 @@ export default function Workspace(): JSX.Element {
   const workspaces = useStore((s) => s.workspaces)
   const activeWorkspaceId = useStore((s) => s.activeWorkspaceId)
   const setActiveWorkspace = useStore((s) => s.setActiveWorkspace)
+  const setWorkspaceCollection = useStore((s) => s.setWorkspaceCollection)
   const openWorkspace = useStore((s) => s.openWorkspace)
   const closeWorkspace = useStore((s) => s.closeWorkspace)
   const renameWorkspace = useStore((s) => s.renameWorkspace)
@@ -379,6 +380,8 @@ export default function Workspace(): JSX.Element {
           hostIds={sessionIdsOf(savingWorkspace)}
           defaultName={savingWorkspace.title}
           defaultColor={savingWorkspace.color}
+          // Saved as the set, it is the set's: its hosts open here from now on.
+          onSaved={(id) => setWorkspaceCollection(savingWorkspace.id, id)}
           onClose={() => setSaving(null)}
         />
       )}

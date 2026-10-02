@@ -21,11 +21,11 @@ const web: SessionProfile = {
 /**
  * A host of a set that is already open somewhere else. One click shows the
  * copy that is running; a double-click goes to it too, unless the setting to
- * do that is off — then it opens another, in its own tab, where the window was
- * and not in the workspace its first click jumped to.
+ * do that is off — then it opens another, in its own tab, in the set's own
+ * workspace: not the one in front, nor the one its first click jumped to.
  */
 describe('a host opened from a collection', () => {
-  function setUp(reuseOpenHost = true): void {
+  function setUp(reuseOpenHost = true, setsOwn?: 'here' | 'there'): void {
     localStorage.clear()
     // Connected: only a live pane counts as the host being open.
     const running = {
@@ -55,7 +55,7 @@ describe('a host opened from a collection', () => {
           activeTabId: 't-there',
           tabs: [{ id: 't-there', title: 'web-1', root: running, activePaneId: running.id }]
         }
-      ]
+      ].map((w) => (w.id === setsOwn ? { ...w, collectionId: 'rel' } : w))
     })
     render(<CollectionsPanel query="" />)
   }
@@ -81,12 +81,16 @@ describe('a host opened from a collection', () => {
     )
   })
 
-  it('opens a new tab where the window was on a double-click, with that setting off', () => {
-    setUp(false)
+  function doubleClick(): void {
     const row = screen.getByText('web-1')
     fireEvent.click(row, { detail: 1 })
     fireEvent.click(row, { detail: 2 })
     fireEvent.doubleClick(row)
+  }
+
+  it("opens a new tab in the set's workspace on a double-click, with that setting off", () => {
+    setUp(false, 'here')
+    doubleClick()
 
     const state = useStore.getState()
     expect(state.activeWorkspaceId).toBe('here')
@@ -94,6 +98,18 @@ describe('a host opened from a collection', () => {
     expect(here.tabs.map((t) => t.title)).toEqual(['db', 'web-1'])
     expect(here.activeTabId).toBe(here.tabs[1].id)
     // The running copy is left as it was.
+    expect(state.workspaces.find((w) => w.id === 'there')!.tabs).toHaveLength(1)
+  })
+
+  it('opens a workspace for the set when it has none, leaving the one in front alone', () => {
+    setUp(false)
+    doubleClick()
+
+    const state = useStore.getState()
+    const own = state.workspaces.find((w) => w.id === state.activeWorkspaceId)!
+    expect(own).toMatchObject({ title: 'Release', collectionId: 'rel' })
+    expect(own.tabs.map((t) => t.title)).toEqual(['web-1'])
+    expect(state.workspaces.find((w) => w.id === 'here')!.tabs).toHaveLength(1)
     expect(state.workspaces.find((w) => w.id === 'there')!.tabs).toHaveLength(1)
   })
 })

@@ -106,16 +106,23 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
 
   // --- workspaces (the top strip) ---
 
-  openWorkspace: (title, color) => {
+  openWorkspace: (title, color, collectionId) => {
     const workspace: Workspace = {
       id: nanoid(),
       title: title?.trim() || nextTitle(get().workspaces),
       color,
+      collectionId,
       tabs: [],
       activeTabId: null
     }
     set((s) => ({
-      workspaces: [...s.workspaces, workspace],
+      workspaces: [
+        // One workspace per collection: the newest one is where its hosts go.
+        ...s.workspaces.map((w) =>
+          collectionId && w.collectionId === collectionId ? { ...w, collectionId: undefined } : w
+        ),
+        workspace
+      ],
       activeWorkspaceId: workspace.id
     }))
     return workspace.id
@@ -133,6 +140,18 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
   },
 
   setActiveWorkspace: (workspaceId) => set({ activeWorkspaceId: workspaceId }),
+
+  setWorkspaceCollection: (workspaceId, collectionId) =>
+    set((s) => ({
+      workspaces: s.workspaces.map((w) =>
+        w.id === workspaceId
+          ? { ...w, collectionId }
+          : // One workspace per collection, so a host knows where to go.
+            w.collectionId === collectionId
+            ? { ...w, collectionId: undefined }
+            : w
+      )
+    })),
 
   renameWorkspace: (workspaceId, title) => {
     const trimmed = title.trim()
@@ -226,6 +245,15 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
         return place.paneId
       }
     }
+    // Opened from a set, it goes where that set is open, not into whatever
+    // workspace happens to be in front. A duplicate stays beside its original.
+    const collection =
+      viaCollectionId && !again ? s.collections.find((c) => c.id === viaCollectionId) : undefined
+    if (collection) {
+      const own = s.workspaces.find((w) => w.collectionId === collection.id)
+      if (own) get().setActiveWorkspace(own.id)
+      else get().openWorkspace(collection.name, color, collection.id)
+    }
     return get().openTab(title, target, color, viaCollectionId)
   },
 
@@ -244,11 +272,11 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
     return tab.id
   },
 
-  openMany: (items, mode, workspaceTitle) => {
+  openMany: (items, mode, workspaceTitle, collectionId) => {
     if (items.length === 0) return
     if (mode === 'workspace') {
       // The group's own colour rides along, so the whole strip entry is tinted.
-      get().openWorkspace(workspaceTitle, items.find((i) => i.color)?.color)
+      get().openWorkspace(workspaceTitle, items.find((i) => i.color)?.color, collectionId)
       for (const item of items) {
         get().openTab(item.title, item.target, item.color, item.viaCollectionId)
       }
