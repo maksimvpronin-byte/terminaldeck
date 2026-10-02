@@ -6,6 +6,24 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.25.1
+
+### Changed
+
+- **A host opened from a collection goes to that collection's workspace** —
+  the one opened from it or saved as it — instead of the workspace in front,
+  and into a new workspace for the set when none is open.
+
+### Fixed
+
+- **`ssh` on a remote host no longer hangs on Windows without an agent.** With
+  agent forwarding on and neither the OpenSSH agent nor Pageant running, it
+  stopped right after adding the host key and never asked for a password; it
+  is now told the agent has nothing and goes on.
+- **The line that sets up directory following stays out of the shell's
+  history**: a leading space keeps it out where the shell ignores such lines,
+  and bash otherwise deletes its own entry.
+
 ## 0.25.0
 
 ### Added
