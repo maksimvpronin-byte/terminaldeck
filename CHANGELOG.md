@@ -6,6 +6,17 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.25.2
+
+### Fixed
+
+- **The language switch works on a desktop opened from Windows**, as it does
+  in mstsc. Keys go as keys there, so the far layout decides the letters and
+  its taskbar says what is typed; Alt+Shift, Ctrl+Shift or whatever the far
+  side uses reaches it as pressed — in full screen too, where it went nowhere
+  at all. The session still starts in this computer's layout. Typing in the
+  Mac's layout, the language mark and the far-side Alt+Shift stay on the Mac.
+
 ## 0.25.1
 
 ### Changed
