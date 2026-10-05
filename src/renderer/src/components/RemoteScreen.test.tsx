@@ -185,98 +185,22 @@ describe('desktop shortcuts', () => {
     expect(forwarded.size).toBe(0)
   })
 
-  it('types in the explicitly selected local layout, and keeps commands as keys', async () => {
-    const view = render(
-      <RemoteScreen {...props} look={{ ...RDP_FALLBACK, typeAsText: true }} visible active />
-    )
-    await act(async () => {})
-    const screen = view.container.querySelector<HTMLElement>('.graphical-screen')!
-    const unicode = (): unknown[] =>
-      desktopSend.mock.calls
-        .filter(([, fields]) => fields.a === 'unicode')
-        .map(([, fields]) => fields)
-    desktopSend.mockClear()
-
-    // "d" on a Mac switched to Russian with fn.
-    fireEvent.keyDown(screen, { code: 'KeyD', key: 'в' })
-    fireEvent.keyUp(screen, { code: 'KeyD', key: 'в' })
-    expect(unicode()).toEqual([
-      { a: 'unicode', code: 0x432, down: true },
-      { a: 'unicode', code: 0x432, down: false }
-    ])
-    expect(keys()).toEqual([])
-
-    desktopSend.mockClear()
-    fireEvent.keyDown(screen, { code: 'ControlLeft', key: 'Control', ctrlKey: true })
-    fireEvent.keyDown(screen, { code: 'KeyC', key: 'с', ctrlKey: true })
-    fireEvent.keyUp(screen, { code: 'KeyC', key: 'с', ctrlKey: true })
-    expect(unicode()).toEqual([])
-    expect(keys()).toEqual([
-      { a: 'key', code: 0x1d, down: true, ext: false },
-      { a: 'key', code: 0x2e, down: true, ext: false },
-      { a: 'key', code: 0x2e, down: false, ext: false }
-    ])
-  })
-
-  it('types keys, as before, for a host that turned text off', async () => {
-    const look = {
-      resolution: 'fit' as const,
-      desktopWidth: 1920,
-      desktopHeight: 1080,
-      pixelBudget: 3.5,
-      magnification: 0,
-      sendDensity: false,
-      commandAsControl: false,
-      typeAsText: false
-    }
-    const view = render(<RemoteScreen {...props} look={look} visible active />)
-    await act(async () => {})
-    const screen = view.container.querySelector<HTMLElement>('.graphical-screen')!
-    desktopSend.mockClear()
-    fireEvent.keyDown(screen, { code: 'KeyD', key: 'в' })
-    fireEvent.keyUp(screen, { code: 'KeyD', key: 'в' })
-    expect(keys()).toEqual([
-      { a: 'key', code: 0x20, down: true, ext: false },
-      { a: 'key', code: 0x20, down: false, ext: false }
-    ])
-  })
-
-  it('keeps local-layout typing by default for saved and quick desktops', async () => {
-    const view = render(<RemoteScreen {...props} visible active />)
-    await act(async () => {})
-    const screen = view.container.querySelector<HTMLElement>('.graphical-screen')!
-    desktopSend.mockClear()
-    for (const [code, key] of [
-      ['KeyQ', 'q'],
-      ['KeyW', 'w'],
-      ['KeyE', 'e']
-    ]) {
-      fireEvent.keyDown(screen, { code, key })
-      fireEvent.keyUp(screen, { code, key })
-    }
-    expect(keys()).toEqual([])
-    expect(desktopSend.mock.calls.filter(([, f]) => f.a === 'unicode').map(([, f]) => f)).toEqual(
-      [0x71, 0x77, 0x65].flatMap((code) => [
-        { a: 'unicode', code, down: true },
-        { a: 'unicode', code, down: false }
+  it('types keys off a Mac, whatever the host says about text, as mstsc does', async () => {
+    // The far layout decides the letters, so its taskbar says what is typed.
+    for (const look of [null, { ...RDP_FALLBACK, typeAsText: true }]) {
+      const view = render(<RemoteScreen {...props} look={look} visible active />)
+      await act(async () => {})
+      const screen = view.container.querySelector<HTMLElement>('.graphical-screen')!
+      desktopSend.mockClear()
+      fireEvent.keyDown(screen, { code: 'KeyD', key: 'в' })
+      fireEvent.keyUp(screen, { code: 'KeyD', key: 'в' })
+      expect(desktopSend.mock.calls.filter(([, f]) => f.a === 'unicode')).toEqual([])
+      expect(keys()).toEqual([
+        { a: 'key', code: 0x20, down: true, ext: false },
+        { a: 'key', code: 0x20, down: false, ext: false }
       ])
-    )
-    view.rerender(
-      <RemoteScreen
-        {...props}
-        sessionId={undefined}
-        quick={{ host: 'host', port: 3389, username: 'user' }}
-        visible
-        active
-      />
-    )
-    desktopSend.mockClear()
-    fireEvent.keyDown(screen, { code: 'KeyQ', key: 'й' })
-    expect(keys()).toEqual([])
-    expect(desktopSend.mock.calls.filter(([, f]) => f.a === 'unicode').map(([, f]) => f)).toEqual([
-      { a: 'unicode', code: 0x439, down: true },
-      { a: 'unicode', code: 0x439, down: false }
-    ])
+      view.unmount()
+    }
   })
 
   it('takes the keyboard when its host or tab is clicked, not merely by becoming active', async () => {
@@ -682,63 +606,61 @@ describe('this machine’s language switch, off a Mac', () => {
     return screen
   }
 
-  it('keeps Alt+Shift and Ctrl+Shift pressed alone from reaching the desktop', async () => {
+  it('reaches the desktop as the keys pressed, Alt+Shift and Ctrl+Shift alike', async () => {
     const screen = await open()
     fireEvent.keyDown(screen, { code: 'AltLeft', key: 'Alt', altKey: true })
     fireEvent.keyDown(screen, { code: 'ShiftLeft', key: 'Shift', altKey: true, shiftKey: true })
     fireEvent.keyUp(screen, { code: 'ShiftLeft', key: 'Shift', altKey: true })
     fireEvent.keyUp(screen, { code: 'AltLeft', key: 'Alt' })
+    expect(keys()).toEqual([
+      press(ALT, true),
+      press(SHIFT, true),
+      press(SHIFT, false),
+      press(ALT, false)
+    ])
+
+    desktopSend.mockClear()
     fireEvent.keyDown(screen, { code: 'ControlLeft', key: 'Control', ctrlKey: true })
     fireEvent.keyDown(screen, { code: 'ShiftLeft', key: 'Shift', ctrlKey: true, shiftKey: true })
     fireEvent.keyUp(screen, { code: 'ControlLeft', key: 'Control', shiftKey: true })
     fireEvent.keyUp(screen, { code: 'ShiftLeft', key: 'Shift' })
-    expect(keys()).toEqual([])
+    expect(keys()).toEqual([
+      press(CTRL, true),
+      press(SHIFT, true),
+      press(CTRL, false),
+      press(SHIFT, false)
+    ])
   })
 
-  it('still sends a held modifier ahead of the key it was for, and a lone Alt', async () => {
+  it('does not let go over there of a modifier it never pressed there', async () => {
     const screen = await open()
-    fireEvent.keyDown(screen, { code: 'ControlLeft', key: 'Control', ctrlKey: true })
-    fireEvent.keyDown(screen, { code: 'ShiftLeft', key: 'Shift', ctrlKey: true, shiftKey: true })
-    fireEvent.keyDown(screen, { code: 'Escape', key: 'Escape', ctrlKey: true, shiftKey: true })
-    expect(keys().slice(0, 2)).toEqual(
-      expect.arrayContaining([press(CTRL, true), press(SHIFT, true)])
-    )
-    fireEvent.keyUp(screen, { code: 'Escape', key: 'Escape', ctrlKey: true, shiftKey: true })
-    fireEvent.keyUp(screen, { code: 'ShiftLeft', key: 'Shift', ctrlKey: true })
-    fireEvent.keyUp(screen, { code: 'ControlLeft', key: 'Control' })
-    expect(keys().slice(-2)).toEqual([press(SHIFT, false), press(CTRL, false)])
-
-    desktopSend.mockClear()
     fireEvent.keyDown(screen, { code: 'AltLeft', key: 'Alt', altKey: true })
-    expect(keys()).toEqual([])
+    fireEvent.keyDown(screen, { code: 'ShiftLeft', key: 'Shift', altKey: true, shiftKey: true })
+    fireEvent.keyUp(screen, { code: 'ShiftLeft', key: 'Shift', altKey: true })
+    // What Windows slips in during its own Alt+Shift.
+    fireEvent.keyUp(screen, { code: 'ControlLeft', key: 'Control', altKey: true })
     fireEvent.keyUp(screen, { code: 'AltLeft', key: 'Alt' })
-    expect(keys()).toEqual([press(ALT, true), press(ALT, false)])
+    expect(keys()).toEqual([
+      press(ALT, true),
+      press(SHIFT, true),
+      press(SHIFT, false),
+      press(ALT, false)
+    ])
   })
 
-  it('follows the language letters are typed in with Alt+Shift there, once the keys are still', async () => {
+  it('leaves the far layout to the far side: no Alt+Shift of its own', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
     try {
       const screen = await open()
-      const type = (key: string): void => {
+      for (const key of ['q', 'й']) {
         fireEvent.keyDown(screen, { code: 'KeyQ', key })
         fireEvent.keyUp(screen, { code: 'KeyQ', key })
+        act(() => {
+          vi.advanceTimersByTime(1000)
+        })
       }
-      type('q')
-      act(() => {
-        vi.advanceTimersByTime(1000)
-      })
-      desktopSend.mockClear()
-      type('й')
-      expect(keys()).toEqual([])
-      act(() => {
-        vi.advanceTimersByTime(1000)
-      })
-      expect(keys()).toEqual([
-        press(ALT, true),
-        press(SHIFT, true),
-        press(SHIFT, false),
-        press(ALT, false)
-      ])
+      const Q = { code: 0x10, ext: false }
+      expect(keys()).toEqual([press(Q, true), press(Q, false), press(Q, true), press(Q, false)])
     } finally {
       vi.useRealTimers()
     }

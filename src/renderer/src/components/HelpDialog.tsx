@@ -174,7 +174,7 @@ const SECTIONS: Section[] = [
       },
       { what: 'The same language shows large over the desktop on fn and on coming back to it' },
       {
-        what: 'On Windows too: switch with Alt+Shift or Ctrl+Shift here, and the desktop follows'
+        what: 'On Windows keys go as keys, as in mstsc: Alt+Shift or Ctrl+Shift switches the desktop itself'
       },
       { what: 'Shortcuts, arrows and the keypad still go as keys; turn it off per host for games' },
       { what: 'A certificate the machine cannot verify is asked about once, then remembered' },

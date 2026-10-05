@@ -117,6 +117,45 @@ const look = (commandAsControl: boolean): RdpView => ({
   typeAsText: true
 })
 
+describe('letters on a Mac', () => {
+  const unicode = (): unknown[] =>
+    desktopSend.mock.calls.filter(([, fields]) => fields.a === 'unicode').map(([, f]) => f)
+
+  it('go as the characters the Mac typed, by default, with commands still as keys', async () => {
+    const screen = await open(null)
+    // "d" on a Mac switched to Russian with fn.
+    fireEvent.keyDown(screen, { code: 'KeyD', key: 'в' })
+    fireEvent.keyUp(screen, { code: 'KeyD', key: 'в' })
+    expect(unicode()).toEqual([
+      { a: 'unicode', code: 0x432, down: true },
+      { a: 'unicode', code: 0x432, down: false }
+    ])
+    expect(keys()).toEqual([])
+
+    desktopSend.mockClear()
+    fireEvent.keyDown(screen, { code: 'ControlLeft', key: 'Control', ctrlKey: true })
+    fireEvent.keyDown(screen, { code: 'KeyC', key: 'с', ctrlKey: true })
+    fireEvent.keyUp(screen, { code: 'KeyC', key: 'с', ctrlKey: true })
+    expect(unicode()).toEqual([])
+    expect(keys()).toEqual([
+      press(CTRL, true),
+      press({ code: 0x2e, ext: false }, true),
+      press({ code: 0x2e, ext: false }, false)
+    ])
+  })
+
+  it('go as keys for a host that turned text off', async () => {
+    const screen = await open({ ...look(false), typeAsText: false })
+    fireEvent.keyDown(screen, { code: 'KeyD', key: 'в' })
+    fireEvent.keyUp(screen, { code: 'KeyD', key: 'в' })
+    expect(unicode()).toEqual([])
+    expect(keys()).toEqual([
+      press({ code: 0x20, ext: false }, true),
+      press({ code: 0x20, ext: false }, false)
+    ])
+  })
+})
+
 describe('⌘Tab on a Mac', () => {
   it('switches windows as Alt+Tab, holding Alt for as long as ⌘ is held', async () => {
     const screen = await open(null)

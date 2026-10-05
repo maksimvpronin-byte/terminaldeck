@@ -660,8 +660,8 @@ export const ru: Record<string, string> = {
   "Copy and paste then land where they do on Windows. While the desktop has the keyboard this app's own ⌘ shortcuts do not fire. ⌘Tab stays with macOS in a window; in full screen it is the far side's Alt+Tab either way.":
     'Тогда копирование и вставка окажутся там же, где в Windows. Пока клавиатура у рабочего стола, собственные сочетания приложения с ⌘ не срабатывают. ⌘Tab в окне остаётся за macOS, а в полном экране в любом случае становится Alt+Tab той стороны.',
   'Type in this machine’s layout': 'Печатать в раскладке этого компьютера',
-  'Letters go over as the characters typed here, so switching the layout on this side — fn on a Mac — is all it takes, and the far side’s own layout does not matter. Shortcuts, arrows, Space and the keypad still go as keys. Turn it off for a program that listens for keys rather than text, a game or a console inside the session.':
-    'Буквы уходят готовыми символами, набранными здесь: достаточно переключить раскладку на этой стороне — на маке кнопкой fn, — а раскладка той стороны не важна. Сочетания, стрелки, пробел и цифровой блок по-прежнему идут клавишами. Выключите для программы, которая слушает клавиши, а не текст, — игры или консоли внутри сеанса.',
+  'On a Mac letters go over as the characters typed here, so fn is all it takes and the far side’s own layout does not matter. Shortcuts, arrows, Space and the keypad still go as keys. Turn it off for a program that listens for keys rather than text, a game or a console inside the session. Elsewhere keys always go as keys, as in mstsc: Alt+Shift or Ctrl+Shift switches the language over there.':
+    'На маке буквы уходят готовыми символами, набранными здесь: достаточно нажать fn, а раскладка той стороны не важна. Сочетания, стрелки, пробел и цифровой блок по-прежнему идут клавишами. Выключите для программы, которая слушает клавиши, а не текст, — игры или консоли внутри сеанса. На других системах клавиши всегда идут клавишами, как в mstsc: язык на той стороне переключает Alt+Shift или Ctrl+Shift.',
   'Could not connect': 'Не удалось подключиться',
   'The host says': 'Хост сообщает',
   'Session ended': 'Сессия завершена',
@@ -1224,8 +1224,8 @@ export const ru: Record<string, string> = {
     'Язык той стороны следует за этим: сеанс начинается с него, а Alt+Shift держит их вровень',
   'The mark on a desktop’s bar is the language letters go in; click it if Windows disagrees':
     'Метка на панели стола — язык, на котором уходят буквы; нажмите её, если Windows показывает другой',
-  'On Windows too: switch with Alt+Shift or Ctrl+Shift here, and the desktop follows':
-    'На Windows тоже: переключайте Alt+Shift или Ctrl+Shift здесь, и стол последует',
+  'On Windows keys go as keys, as in mstsc: Alt+Shift or Ctrl+Shift switches the desktop itself':
+    'На Windows клавиши идут клавишами, как в mstsc: Alt+Shift или Ctrl+Shift переключает язык на самом столе',
   'The same language shows large over the desktop on fn and on coming back to it':
     'Тот же язык крупно появляется поверх стола при нажатии fn и при возвращении в стол',
   'Changed over there by hand, the two can swap round; ⌥⇧ there puts them back':

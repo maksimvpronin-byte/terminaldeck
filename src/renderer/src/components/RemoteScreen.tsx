@@ -6,12 +6,12 @@ import { rdpKeyFor, substituteCommand, textKey, unicodeKey } from '../../../shar
 import { modifierFixes } from '../../../shared/modifierSync'
 import { isLockKey, lockFlags } from '../../../shared/lockSync'
 import { IS_MAC } from '../state/keys'
-import { inputLanguage, noteTyped, onInputLanguage } from '../state/inputLanguage'
+import { inputLanguage, onInputLanguage } from '../state/inputLanguage'
 import type { ForwardedKey, RdpView } from '../../../shared/types'
 import { isRefusal } from '../../../shared/rdpLogon'
 import { endedBySignOut } from '../../../shared/rdpLogoff'
 import { diag, diagKey } from '../diag'
-import { describeModifiers } from '../../../shared/diagnostics'
+import { describeModifiers, isModifierCode } from '../../../shared/diagnostics'
 
 /**
  * A desktop, drawn from the pixels a client in another process decoded.
@@ -184,6 +184,18 @@ function scriptOf(key: string): string {
   return 'another character'
 }
 
+/**
+ * Whether letters go over as the characters this machine typed. On a Mac only,
+ * where fn changes the language and never reaches the far side, and where the
+ * Mac's own layout is the point. Anywhere else the keyboard is a Windows one
+ * already, so keys go as keys, as mstsc sends them: the far layout decides the
+ * letters, the language switch pressed here switches it, and the far taskbar
+ * says what is being typed. See `textKey`.
+ */
+function typesAsText(look: RdpView | null | undefined): boolean {
+  return IS_MAC && look?.typeAsText !== false
+}
+
 function asPixels(bytes: Uint8Array): Uint8ClampedArray<ArrayBuffer> {
   return new Uint8ClampedArray(bytes.buffer as ArrayBuffer, bytes.byteOffset, bytes.byteLength)
 }
@@ -280,6 +292,7 @@ export default function RemoteScreen({
   onTypingLanguageRef.current = onTypingLanguage
 
   useEffect(() => {
+    if (!IS_MAC) return
     let alive = true
     void inputLanguage().then((language) => {
       if (alive) setMacLanguage(language)
@@ -292,10 +305,10 @@ export default function RemoteScreen({
   }, [])
 
   // Letters follow this Mac only while they go over as its characters.
-  const typesAsText = look?.typeAsText !== false
+  const asText = typesAsText(look)
   useEffect(() => {
-    onTypingLanguageRef.current?.(typesAsText ? macLanguage : null)
-  }, [typesAsText, macLanguage])
+    onTypingLanguageRef.current?.(asText ? macLanguage : null)
+  }, [asText, macLanguage])
   useEffect(() => () => onTypingLanguageRef.current?.(null), [])
 
   useEffect(() => {
@@ -1023,30 +1036,6 @@ export default function RemoteScreen({
      */
     let languageWanted: string | null = null
     let languageTimer: number | undefined
-    /**
-     * Off a Mac: Alt, Ctrl and Shift pressed while nothing else is, not yet
-     * sent — and every one of them pressed since that began.
-     *
-     * Windows changes language on Alt+Shift or Ctrl+Shift, and those reached
-     * the desktop as keys as well as changing it here. Over there Alt+Shift
-     * changed language too, sometimes, and Ctrl+Shift — a change of layout
-     * within one language, by Windows' defaults — never did; the far taskbar
-     * drifted from what was being typed either way. So a modifier is held back
-     * until it turns out what it was for: the next key sends it first, as any
-     * shortcut needs, and two let go of with nothing between them were this
-     * machine's language switch and go nowhere. The far side then follows the
-     * language as a Mac's does, with its own Alt+Shift once the keys are still.
-     */
-    const chord = new Set<string>()
-    const chordKeys = new Set<string>()
-    const CHORD_KEYS = new Set([
-      'ShiftLeft',
-      'ShiftRight',
-      'AltLeft',
-      'AltRight',
-      'ControlLeft',
-      'ControlRight'
-    ])
 
     /**
      * ⌘Tab, as the Alt+Tab it is on Windows.
@@ -1099,19 +1088,9 @@ export default function RemoteScreen({
       }
       const code = substituteCommand(event.code, lookRef.current?.commandAsControl === true)
       diagKey('rdp', event, `held=${[...held].join(',') || '-'}`)
-      if (!IS_MAC && CHORD_KEYS.has(code) && !held.has(code)) {
-        event.preventDefault()
-        event.stopPropagation()
-        chord.add(code)
-        chordKeys.add(code)
-        return
-      }
       // Every key carries the truth about every modifier, so the one this event
-      // is about is left alone and the rest are made to agree — which is also
-      // what sends a modifier held back above, ahead of the key it was for.
+      // is about is left alone and the rest are made to agree.
       syncModifiers(event, { ignore: code })
-      chord.clear()
-      chordKeys.clear()
       syncLocks(event, event.code)
 
       // Full screen belongs to the pane, and the toolbar button means the same
@@ -1162,12 +1141,8 @@ export default function RemoteScreen({
       event.preventDefault()
       event.stopPropagation()
 
-      // What was typed says which language this machine is in, where nothing
-      // else does — see state/inputLanguage.
-      if (!event.ctrlKey && !event.altKey && !event.metaKey) noteTyped(event.key)
-
       // A quick desktop has no saved look, and takes the default with it.
-      const asText = lookRef.current?.typeAsText !== false
+      const asText = typesAsText(lookRef.current)
       const text = textKey(event, asText)
       const sinceChange = performance.now() - languageChangedAt
       if (sinceChange < LANGUAGE_WATCH) {
@@ -1218,26 +1193,11 @@ export default function RemoteScreen({
         stopSwitching(event)
         return
       }
-      if (chord.has(code) && !held.has(code)) {
-        chord.delete(code)
-        if (chord.size === 0) {
-          const pressed = [...chordKeys]
-          chordKeys.clear()
-          // A lone Alt is the menu key over there, and goes now, late but whole.
-          // A lone Shift or Ctrl means nothing by itself; two together were
-          // this machine's language switch.
-          if (pressed.length === 1 && pressed[0].startsWith('Alt')) {
-            sendKey(pressed[0], true)
-            sendKey(pressed[0], false)
-          }
-        }
-        // Anything a click pressed meanwhile is let go if the hand has.
-        syncModifiers(event, { press: false })
-        return
-      }
-      chord.delete(code)
-      held.delete(code)
-      if (!typed.delete(event.code)) sendKey(code, false)
+      const wasHeld = held.delete(code)
+      // A modifier is let go of only where it was pressed. On Windows a Ctrl
+      // release nobody pressed turns up in the middle of Alt+Shift, and over
+      // there it would be one key too many for the language switch.
+      if (!typed.delete(event.code) && (wasHeld || !isModifierCode(code))) sendKey(code, false)
       /*
        * And again afterwards, because a release can be the thing that puts the
        * two ends out of step rather than the thing that fixes it. With ⌘ acting
@@ -1263,8 +1223,6 @@ export default function RemoteScreen({
       for (const code of held) sendKey(code, false)
       held.clear()
       typed.clear()
-      chord.clear()
-      chordKeys.clear()
       switchingRef.current = false
       releaseButtonsRef.current()
       focusIn()
@@ -1376,7 +1334,7 @@ export default function RemoteScreen({
     }
     /** The language letters go in, large over the desktop for a moment. */
     const showLanguage = (): void => {
-      if (!macNow || lookRef.current?.typeAsText === false) return
+      if (!macNow || !typesAsText(lookRef.current)) return
       if (!visibleRef.current || !container.contains(document.activeElement)) return
       setHud({ language: macNow, at: performance.now() })
     }
@@ -1401,7 +1359,8 @@ export default function RemoteScreen({
     const onFocus = (): void => {
       captureFor(document.activeElement)
       // The layout may have changed while another application had the keys.
-      if (container.contains(document.activeElement)) {
+      // A Mac's only: anywhere else the far side switches language itself.
+      if (IS_MAC && container.contains(document.activeElement)) {
         void inputLanguage().then((language) => {
           macNow = language ?? macNow
           // Said on arriving, before the first key: a password typed in the
@@ -1469,8 +1428,6 @@ export default function RemoteScreen({
         return
       }
       syncModifiers(modifierStateOf(key), { ignore: key.code })
-      chord.clear()
-      chordKeys.clear()
       sendKey(key.code, true)
       sendKey(key.code, false)
     }

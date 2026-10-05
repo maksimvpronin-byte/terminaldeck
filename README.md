@@ -359,7 +359,7 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
 - **Send ⌘ as Ctrl**, per host and off by default. Copy and paste then land where they do on
   Windows. ⌘Q and ⌘Tab still belong to macOS unless the session is full screen, where ⌘Q is
   forwarded like anything else and ⌘Tab is the far side's Alt+Tab whichever way this is set
-- **Typed in this machine's layout**, per host and on by default: letters go over as the
+- **Typed in the Mac's layout**, per host and on by default on a Mac: letters go over as the
   characters typed here, so switching the layout on the Mac — fn, Ctrl+Space — is all it takes,
   and the far side's own layout does not matter. Shortcuts, arrows, Space and the keypad still go
   as keys, so Ctrl+C is Ctrl+C in any layout; turn it off for a game or a console that listens
@@ -378,12 +378,12 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   In full screen the menu bar is hidden and the far taskbar, the one indicator left, is a guess:
   this one is not. If the taskbar shows the other language, a click on the mark presses Alt+Shift
   over there and the two agree again. Hidden when keys go as keys, where Windows' layout decides
-- **The same on a Windows client.** There the language is read from Chromium's keyboard map and
-  from the letters themselves, and the far side follows it with Alt+Shift once the keys are still,
-  as on a Mac; the mark and the large label work there too. Alt+Shift or Ctrl+Shift pressed alone
-  — this machine's own language switch — is no longer passed to the desktop as keys, where it
-  changed the language only sometimes and left the taskbar wrong: a modifier is held back until
-  another key shows what it was for, and a lone Alt still reaches the far menus
+- **On a Windows or Linux client, keys go as keys, as mstsc sends them.** The keyboard there is
+  a Windows one already, so the far layout decides the letters and its taskbar says what is
+  typed. Alt+Shift, Ctrl+Shift or whatever the far side uses to change language reaches it as
+  pressed — in full screen too, where this machine never sees Alt — and the far side switches
+  itself. A session starts in the layout this machine has at connect. No language mark there,
+  and the "Typed in the Mac's layout" setting does not apply
 - **The picture comes from a real RDP client, in a process of its own.** It is
   [FreeRDP](https://github.com/FreeRDP/FreeRDP) 3.31, built from source and shipped inside the
   application as a small program called `td-rdp`: it connects, decodes, and writes the

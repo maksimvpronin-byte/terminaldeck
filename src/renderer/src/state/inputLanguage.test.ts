@@ -1,13 +1,6 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  inputLanguage,
-  languageOfKey,
-  languageOfLayout,
-  noteTyped,
-  onInputLanguage,
-  resetInputLanguage
-} from './inputLanguage'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { inputLanguage, languageOfKey, languageOfLayout, resetInputLanguage } from './inputLanguage'
 
 describe('telling the language from what the keyboard does', () => {
   it('reads a letter by its alphabet, and nothing else', () => {
@@ -28,46 +21,20 @@ describe('off a Mac', () => {
     resetInputLanguage()
     layout = 'q'
     window.td.ui.inputLanguage = async () => null
-    window.td.ui.onInputLanguage = () => () => undefined
     Object.defineProperty(navigator, 'keyboard', {
       configurable: true,
       value: { getLayoutMap: async () => new Map([['KeyQ', layout]]) }
     })
-    vi.spyOn(document, 'hasFocus').mockReturnValue(true)
   })
 
-  it('starts from the keyboard map, and hears a letter typed in another language', async () => {
+  it('reads the keyboard map whenever it is asked, for a desktop about to connect', async () => {
     expect(await inputLanguage()).toBe('en')
-    const heard = vi.fn()
-    const stop = onInputLanguage(heard)
-    await Promise.resolve()
-    noteTyped('ж')
-    expect(heard).toHaveBeenLastCalledWith('ru')
-    noteTyped('ш')
-    expect(heard).toHaveBeenCalledTimes(1)
-    stop()
+    layout = 'й'
+    expect(await inputLanguage()).toBe('ru')
   })
 
-  it('believes the map when it changes, and not when it only repeats itself', async () => {
-    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
-    try {
-      expect(await inputLanguage()).toBe('en')
-      const heard = vi.fn()
-      const stop = onInputLanguage(heard)
-      await vi.waitFor(() => expect(vi.getTimerCount()).toBe(1))
-      // A letter proves Russian; the map saying English again changes nothing.
-      noteTyped('я')
-      await vi.advanceTimersByTimeAsync(400)
-      expect(heard).toHaveBeenLastCalledWith('ru')
-      // The map moving is news, and is heard.
-      layout = 'й'
-      await vi.advanceTimersByTimeAsync(400)
-      layout = 'q'
-      await vi.advanceTimersByTimeAsync(400)
-      expect(heard).toHaveBeenLastCalledWith('en')
-      stop()
-    } finally {
-      vi.useRealTimers()
-    }
+  it('says nothing when there is no keyboard map to read', async () => {
+    Object.defineProperty(navigator, 'keyboard', { configurable: true, value: undefined })
+    expect(await inputLanguage()).toBeNull()
   })
 })

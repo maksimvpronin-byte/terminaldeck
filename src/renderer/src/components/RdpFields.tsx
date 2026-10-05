@@ -343,7 +343,7 @@ export default function RdpFields({
         />
         <Hint label={t('Type in this machine’s layout')}>
           {t(
-            'Letters go over as the characters typed here, so switching the layout on this side — fn on a Mac — is all it takes, and the far side’s own layout does not matter. Shortcuts, arrows, Space and the keypad still go as keys. Turn it off for a program that listens for keys rather than text, a game or a console inside the session.'
+            'On a Mac letters go over as the characters typed here, so fn is all it takes and the far side’s own layout does not matter. Shortcuts, arrows, Space and the keypad still go as keys. Turn it off for a program that listens for keys rather than text, a game or a console inside the session. Elsewhere keys always go as keys, as in mstsc: Alt+Shift or Ctrl+Shift switches the language over there.'
           )}
         </Hint>
       </label>
