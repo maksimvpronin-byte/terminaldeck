@@ -127,6 +127,18 @@ export function scanOsc7(chunk: string): Osc7Scan {
  * history is off, the newest entry is the user's, and it is left alone.
  * Plain zsh without the option keeps its copy; nothing removes an entry there.
  *
+ * Some hosts file the line only after it has run — a hook that records
+ * commands at the prompt, or a bash patched for auditing; one such kept a copy
+ * with the leading space gone. By then the line has looked and found nothing of
+ * its own. So the same look is taken once more at the first prompt, last in
+ * `PROMPT_COMMAND`, after whatever the host runs there, and then taken back out
+ * of it. It is joined on with a newline rather than a semicolon: a host's
+ * `PROMPT_COMMAND` that already ends in one would make `;;`, which bash refuses.
+ * Either look deletes only the newest entry, and only when it is this line —
+ * never older copies read from the history file: bash counts a deletion
+ * against the lines it will append on exit, so taking out an old one would
+ * cost the user one of their own.
+ *
  * There is no `!` anywhere in it. An interactive zsh expands history on the
  * whole line before running any of it, the bash branch included, and an event
  * it cannot find throws the line away.
@@ -140,6 +152,7 @@ export function scanOsc7(chunk: string): Osc7Scan {
 export const OSC7_SHELL_SETUP =
   ` __td7(){ printf '\\033]7;file://%s%s\\033\\\\' "\${HOSTNAME:-}" "$PWD"; }; ` +
   `if [ -n "$ZSH_VERSION" ]; then autoload -Uz add-zsh-hook 2>/dev/null && add-zsh-hook precmd __td7; ` +
-  `elif [ -n "$BASH_VERSION" ]; then PROMPT_COMMAND="__td7\${PROMPT_COMMAND:+;$PROMPT_COMMAND}"; ` +
-  `__td7h=$(history 1); case $__td7h in *__td7*) __td7h=\${__td7h#"\${__td7h%%[0-9]*}"}; ` +
-  `history -d "\${__td7h%%[^0-9]*}";; esac; unset __td7h; fi; __td7`
+  `elif [ -n "$BASH_VERSION" ]; then __td7d(){ local h; h=$(history 1); ` +
+  `case $h in *__td7*) h=\${h#"\${h%%[0-9]*}"}; history -d "\${h%%[^0-9]*}";; esac; ` +
+  `PROMPT_COMMAND=\${PROMPT_COMMAND%$'\\n'__td7d}; }; __td7d; ` +
+  `PROMPT_COMMAND="__td7\${PROMPT_COMMAND:+;$PROMPT_COMMAND}"$'\\n'__td7d; fi; __td7`

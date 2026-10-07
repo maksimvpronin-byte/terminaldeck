@@ -152,6 +152,25 @@ describe('OSC7_SHELL_SETUP', () => {
       expect(historyAround({ HISTCONTROL: '' }, 'set +o history')).toEqual(['set +o history'])
     })
 
+    it('takes out a copy the host files only at the prompt after it ran', () => {
+      // A host hook that files the line once it has run, its leading space
+      // gone, from a PROMPT_COMMAND that ends in a semicolon. The hook's own
+      // line spells the name in two halves, so it is not mistaken for the copy.
+      const hook =
+        't=$(mktemp); echo "__td""7(){ copy" >"$t"; c=0; ' +
+        'f(){ c=$((c+1)); if [ $c = 2 ]; then history -r "$t"; rm -f "$t"; fi; }; PROMPT_COMMAND="f;"'
+      expect(historyAround({ HISTCONTROL: '' }, hook)).toEqual([hook, 'echo after', 'history'])
+    })
+
+    it('looks the second time only once, and keeps the prompt setup it found', () => {
+      const run = spawnSync('/bin/bash', ['--norc', '--noprofile', '-i'], {
+        input: `PROMPT_COMMAND='echo mine'\n${OSC7_SHELL_SETUP}\necho "[$PROMPT_COMMAND]"\n`,
+        encoding: 'utf8',
+        env: { PATH: process.env.PATH ?? '', HOME: '/nonexistent', HISTFILE: '/dev/null' }
+      })
+      expect(run.stdout).toContain('[__td7;echo mine]')
+    })
+
     it('still reports the directory', () => {
       const run = spawnSync('/bin/bash', ['--norc', '--noprofile', '-i'], {
         input: `${OSC7_SHELL_SETUP}\ncd /\n`,
