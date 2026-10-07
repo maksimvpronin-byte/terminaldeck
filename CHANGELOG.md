@@ -6,6 +6,16 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.26.5
+
+### Fixed
+
+- **A desktop that will not give up a copied file says so at once.** Some
+  hosts announce a file on the clipboard and then refuse every request for
+  it — mstsc gets "Unspecified error" from them. The copy no longer waits at
+  0% for a minute: it ends straight away, saying the host refused and that
+  its policy may forbid copying files out.
+
 ## 0.26.4
 
 ### Fixed
