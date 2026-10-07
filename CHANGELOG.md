@@ -6,6 +6,16 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.26.2
+
+### Fixed
+
+- **A desktop that breaks while copying says what broke it.** Copying a file
+  on a Windows desktop can still end the session; the pane now shows what the
+  host sent on the clipboard channel instead of "checkChannelErrorEvent()
+  failed", and the client's log, with `TERMINALDECK_RDP_TRACE=1`, lists the
+  pieces that led up to it, in the order they came.
+
 ## 0.26.1
 
 ### Fixed
