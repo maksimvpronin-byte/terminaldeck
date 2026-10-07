@@ -6,6 +6,15 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.25.3
+
+### Fixed
+
+- **The directory-following line stays out of history on hosts that file a
+  command only after it has run** — a prompt hook that records commands, or a
+  bash patched for auditing. bash looks for the line once more at the first
+  prompt, after the host's own prompt commands, and deletes it then.
+
 ## 0.25.2
 
 ### Fixed
