@@ -35,8 +35,7 @@ export default function FileAccessFields({
   const inheriting = canInherit && !value
   const effective = value ?? inherited
   return (
-    <fieldset>
-      <legend>{t('File access')}</legend>
+    <>
       <label>
         {t('File transfer method')}
         <select
@@ -81,6 +80,6 @@ export default function FileAccessFields({
           </p>
         </>
       )}
-    </fieldset>
+    </>
   )
 }

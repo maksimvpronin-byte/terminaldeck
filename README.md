@@ -250,6 +250,13 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   Settings → Tree and tabs chooses how a coloured row is filled (fading from the edge, or
   even across it), whether it keeps the coloured stripe down its left edge, whether open hosts
   are named in bold, and the height of a row
+- **The dialogs of a host, a group, a repository and a host's local settings** are laid out
+  the same way: what is being edited named at the top of a list of pages, and the page beside
+  it in titled cards. A host has General — everything a new host needs: name, group, protocol,
+  address, port, collections, colour and tags — then Sign-in, and Terminal, Files and Tunnels for
+  a shell or Desktop for a desktop; a page the protocol cannot honour is not offered. A group has
+  General, SSH, Desktop, Appearance and Git. The list says which pages inherit from the group and
+  how many tunnels there are, and a refused save turns to the page it is about
 - **Settings** in one window with its pages listed down the side — General, Tree and tabs,
   Terminal, Files, then Accounts, Security and Backup, and About at the foot with the version and
   the update check. Each page is laid out in titled cards, yes-or-no settings are switches, and
@@ -269,7 +276,7 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   marked RDP in its own dialog and opens as a desktop; the login comes from the host or the
   group above it, like every other credential here, and a domain travels in the username as
   `DOMAIN\user`
-- **A Desktop section on the host, the group and an inventory override**: the RD Gateway to
+- **A Desktop page on the host, the group and an inventory override**: the RD Gateway to
   reach the machine through, the resolution, whether the far end's sound plays here, and
   whether ⌘ is sent as Ctrl. It inherits along
   the same chain the login does, so a gateway shared by a floor of machines is stated once on
@@ -448,11 +455,11 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
 
 ### Files and networking
 
-- **SCP/Shell as another user (Linux servers):** in the host's settings, under
+- **SCP/Shell as another user (Linux servers):** in the host's dialog, on its **Files** page under
   **File access**, select **SCP / Shell** and set **Shell launch command** to
   `sudo -n -i -u postgres` (replace `postgres` with the intended account).
-  Reconnect for the change to apply. A **group** carries the same setting under its SSH
-  half, inherited by every host inside, which can in turn choose **Inherit** or a method
+  Reconnect for the change to apply. A **group** carries the same setting on its SSH
+  page, inherited by every host inside, which can in turn choose **Inherit** or a method
   of its own. Git inventory hosts support the same setting
   in their local overrides; repositories cannot supply this command. The file
   panel displays the configured command, while the terminal keeps its own login.

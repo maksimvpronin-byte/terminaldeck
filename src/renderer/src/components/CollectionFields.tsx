@@ -1,7 +1,7 @@
 import type { HostCollection } from '../../../shared/types'
 import type { Membership } from '../state/membership'
 import { useT } from '../i18n'
-import Hint from './Hint'
+import { SettingsGroup } from './SettingsGroup'
 
 /**
  * The collections a host is in, or every host in a group — ticked here rather
@@ -23,26 +23,25 @@ export default function CollectionFields({
   forGroup?: boolean
 }): JSX.Element {
   const t = useT()
-  const ticked = Object.values(value).filter((m) => m !== 'none').length
   return (
-    <details className="settings-section" open={ticked > 0}>
-      <summary>
-        <Hint label={t('Collections')}>
-          {forGroup
-            ? t(
-                'Puts every host now in this group, subgroups included, into the ticked collections — or takes them out. A host added to the group later is not added on its own.'
-              )
-            : t(
-                'The collections this host is in. A host lives in one group but can be in any number of collections; being in one changes nothing about how it connects.'
-              )}
-        </Hint>
-      </summary>
+    <SettingsGroup
+      title={t('Collections')}
+      hint={
+        forGroup
+          ? t(
+              'Puts every host now in this group, subgroups included, into the ticked collections — or takes them out. A host added to the group later is not added on its own.'
+            )
+          : t(
+              'The collections this host is in. A host lives in one group but can be in any number of collections; being in one changes nothing about how it connects.'
+            )
+      }
+    >
       {collections.length === 0 ? (
         <p className="settings-note">
           {t('No collections yet. Make one with “+” beside Collections in the host tree.')}
         </p>
       ) : (
-        <div className="collection-checks">
+        <div className="collection-checks settings-group-form">
           {collections.map((c) => {
             const state = value[c.id] ?? 'none'
             return (
@@ -69,6 +68,6 @@ export default function CollectionFields({
           })}
         </div>
       )}
-    </details>
+    </SettingsGroup>
   )
 }

@@ -9,7 +9,6 @@ import type {
 } from '../../../shared/types'
 import { authFieldsState, secretToSave } from '../../../shared/authFields'
 import { inheritedFrom, resolveAuth } from '../../../shared/authResolution'
-import { SESSION_COLOURS } from '../state/colours'
 import AccountSelect from './AccountSelect'
 import { isSet } from '../../../shared/overrides'
 import {
@@ -26,9 +25,14 @@ import FileAccessFields from './FileAccessFields'
 import CollectionFields from './CollectionFields'
 import { changedCollections, membershipsOf, type Membership } from '../state/membership'
 import { descendsFrom } from '../../../shared/groups'
-import ModalBackdrop from './ModalBackdrop'
+import PagedDialog, { type DialogPage } from './PagedDialog'
+import ColourField from './ColourField'
+import { SettingsGroup, SwitchRow } from './SettingsGroup'
 import { useT } from '../i18n'
 import Hint from './Hint'
+
+/** The pages of the group dialog. */
+type GroupPage = 'general' | 'ssh' | 'desktop' | 'appearance' | 'git'
 
 interface Props {
   /** Existing group to edit, or the parent id for a new one. */
@@ -83,6 +87,7 @@ export default function GroupDialog({
   const [rdpSecret, setRdpSecret] = useState('')
   const [forgetRdpSecret, setForgetRdpSecret] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [page, setPage] = useState<GroupPage>('general')
   /**
    * Every host in this group as it stands, subgroups and what folders inside
    * mirror from git included — what ticking a collection below puts into it.
@@ -202,6 +207,7 @@ export default function GroupDialog({
   async function submit(): Promise<void> {
     if (!group.name.trim()) {
       setError(t('Name is required'))
+      setPage('general')
       return
     }
     if (
@@ -209,10 +215,12 @@ export default function GroupDialog({
       (!group.fileAccess.shell?.trim() || /[\r\n\0]/.test(group.fileAccess.shell))
     ) {
       setError(t('Enter a single-line shell launch command.'))
+      setPage('ssh')
       return
     }
     if (linked && !link?.repoUrl.trim()) {
       setError(t('A repository address is required'))
+      setPage('git')
       return
     }
     const paths = pathsInput
@@ -281,262 +289,272 @@ export default function GroupDialog({
     return true
   })
 
+  const parentName = groups.find((g) => g.id === group.parentId)?.name
+  const pages: DialogPage<GroupPage>[] = [
+    { id: 'general', label: t('General'), icon: 'host' },
+    /* Two pages for signing in, because a folder holds Linux and Windows
+       machines alike and they share neither a port nor, usually, an account.
+       Each host takes the one that matches the protocol it is saved with. */
+    { id: 'ssh', label: 'SSH', icon: 'login' },
+    { id: 'desktop', label: t('Desktop'), icon: 'desktop' },
+    { id: 'appearance', label: t('Appearance'), icon: 'appearance' },
+    { id: 'git', label: 'Git', icon: 'git', badge: linked ? t('on') : undefined }
+  ]
+
   return (
-    <ModalBackdrop onClose={onClose}>
-      <div className="modal-card">
-        <h2>
-          {initial ? t('Edit group') : t('New group')}
-          <Hint>
+    <PagedDialog
+      title={initial ? group.name || t('Edit group') : t('New group')}
+      subtitle={parentName ? t('in {name}', { name: parentName }) : t('(top level)')}
+      pages={pages}
+      page={page}
+      onPage={setPage}
+      error={error}
+      onClose={onClose}
+      actions={
+        <>
+          <button onClick={onClose}>{t('Cancel')}</button>
+          <button className="primary" onClick={submit} disabled={!group.name.trim()}>
+            {t('Save')}
+          </button>
+        </>
+      }
+    >
+      {page === 'general' && (
+        <>
+          <p className="settings-note">
             {t(
               'Anything left blank is inherited from the parent group. Sessions inside inherit whatever this group ends up with, so a shared login can be set once here.'
             )}
-          </Hint>
-        </h2>
-
-        <label>
-          {t('Name')}
-          <input autoFocus value={group.name} onChange={(e) => set('name', e.target.value)} />
-        </label>
-
-        <label>
-          {t('Parent group')}
-          <select
-            value={group.parentId ?? ''}
-            onChange={(e) => set('parentId', e.target.value || null)}
-          >
-            <option value="">{t('(top level)')}</option>
-            {candidateParents.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.name}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        {group.parentId && (
-          <label className="checkbox-row" style={{ flexDirection: 'row' }}>
-            <input
-              type="checkbox"
-              checked={group.inheritAuth !== false}
-              onChange={(e) => {
-                set('inheritAuth', e.target.checked ? undefined : false)
-                chooseInheritance(e.target.checked)
-              }}
-            />
-            {t('Inherit connection settings from the parent group')}
-          </label>
-        )}
-
-        {/* Under the parent, as the other place its hosts belong to. */}
-        {hostIds.length > 0 && (
-          <CollectionFields
-            collections={collections}
-            value={memberOf}
-            onChange={setMemberOf}
-            forGroup
-          />
-        )}
-
-        <label>
-          {t('Colour')}
-          <div className="colour-row">
-            <button
-              type="button"
-              className={`swatch none ${!group.color ? 'selected' : ''}`}
-              title={t('No colour')}
-              onClick={() => set('color', undefined)}
-            />
-            {SESSION_COLOURS.map((c) => (
-              <button
-                type="button"
-                key={c.value}
-                className={`swatch ${group.color === c.value ? 'selected' : ''}`}
-                style={{ background: c.value }}
-                title={c.name}
-                onClick={() => set('color', c.value)}
+          </p>
+          <SettingsGroup>
+            <div className="settings-group-form">
+              <label>
+                {t('Name')}
+                <input autoFocus value={group.name} onChange={(e) => set('name', e.target.value)} />
+              </label>
+              <label>
+                {t('Parent group')}
+                <select
+                  value={group.parentId ?? ''}
+                  onChange={(e) => set('parentId', e.target.value || null)}
+                >
+                  <option value="">{t('(top level)')}</option>
+                  {candidateParents.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            {group.parentId && (
+              <SwitchRow
+                label={t('Inherit connection settings from the parent group')}
+                checked={group.inheritAuth !== false}
+                onChange={(on) => {
+                  set('inheritAuth', on ? undefined : false)
+                  chooseInheritance(on)
+                }}
               />
-            ))}
-          </div>
-        </label>
+            )}
+          </SettingsGroup>
 
-        {/* Two halves, because a folder holds Linux and Windows machines alike
-            and they share neither a port nor, usually, an account. Each host
-            takes the half that matches the protocol it is saved with. */}
-        <details className="settings-section" open>
-          <summary>
-            <Hint label="SSH">
-              {t(
-                'Used by the SSH hosts in this group. Anything left blank is inherited from the parent group.'
-              )}
-            </Hint>
-          </summary>
-
-          <div className="form-row">
-            <label style={{ flex: 3 }}>
-              {t('Username')}
-              <input
-                value={group.username ?? ''}
-                disabled={ownAccount}
-                placeholder={
-                  auth.account
-                    ? t('from the account {name}', { name: auth.account.credential.name })
-                    : from('username') || effective.username || t('not set')
-                }
-                onChange={(e) => set('username', e.target.value)}
-              />
-            </label>
-            <label style={{ flex: 1 }}>
-              {t('Port')}
-              <input
-                type="number"
-                value={group.port ?? ''}
-                placeholder={String(effective.port)}
-                onChange={(e) => set('port', e.target.value ? Number(e.target.value) : undefined)}
-              />
-            </label>
-          </div>
-
-          <AccountSelect
-            value={group.credentialId}
-            onChange={(id) => set('credentialId', id)}
-            credentials={credentials}
-            inherited={ownAccount ? undefined : auth.account}
-          />
-
-          {!ownAccount && (
-            <AuthFields
-              value={group}
-              set={setAuth}
-              state={auth}
-              secret={secret}
-              onSecret={setSecret}
-              forgetSecret={forgetSecret}
-              onForgetSecret={setForgetSecret}
-              onPickKey={pickKey}
-              words={authWords}
+          {/* Under the parent, as the other place its hosts belong to. */}
+          {hostIds.length > 0 && (
+            <CollectionFields
+              collections={collections}
+              value={memberOf}
+              onChange={setMemberOf}
+              forGroup
             />
           )}
 
-          <label>
-            <Hint label={t('On connect')}>
-              {t('Run in the shell of every host in this group, one command per line.')}
-            </Hint>
-            <textarea
-              rows={2}
-              value={group.onConnectCommand ?? ''}
-              placeholder={from('onConnectCommand') || t('e.g. sudo -i')}
-              onChange={(e) => set('onConnectCommand', e.target.value)}
-            />
-          </label>
+          <SettingsGroup title={t('In the tree')}>
+            <ColourField value={group.color} onChange={(colour) => set('color', colour)} />
+          </SettingsGroup>
+        </>
+      )}
 
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={effective.followTerminalCwd}
-              onChange={(e) => set('followTerminalCwd', e.target.checked)}
-            />
-            {t('SFTP panel follows the terminal’s directory')}
-          </label>
+      {page === 'ssh' && (
+        <>
+          <SettingsGroup
+            title={t('Who signs in')}
+            hint={t(
+              'Used by the SSH hosts in this group. Anything left blank is inherited from the parent group.'
+            )}
+          >
+            <div className="settings-group-form">
+              <div className="form-row">
+                <label style={{ flex: 3 }}>
+                  {t('Username')}
+                  <input
+                    value={group.username ?? ''}
+                    disabled={ownAccount}
+                    placeholder={
+                      auth.account
+                        ? t('from the account {name}', { name: auth.account.credential.name })
+                        : from('username') || effective.username || t('not set')
+                    }
+                    onChange={(e) => set('username', e.target.value)}
+                  />
+                </label>
+                <label style={{ flex: 1 }}>
+                  {t('Port')}
+                  <input
+                    type="number"
+                    value={group.port ?? ''}
+                    placeholder={String(effective.port)}
+                    onChange={(e) =>
+                      set('port', e.target.value ? Number(e.target.value) : undefined)
+                    }
+                  />
+                </label>
+              </div>
+
+              <AccountSelect
+                value={group.credentialId}
+                onChange={(id) => set('credentialId', id)}
+                credentials={credentials}
+                inherited={ownAccount ? undefined : auth.account}
+              />
+
+              {!ownAccount && (
+                <AuthFields
+                  value={group}
+                  set={setAuth}
+                  state={auth}
+                  secret={secret}
+                  onSecret={setSecret}
+                  forgetSecret={forgetSecret}
+                  onForgetSecret={setForgetSecret}
+                  onPickKey={pickKey}
+                  words={authWords}
+                />
+              )}
+            </div>
+          </SettingsGroup>
+
+          <SettingsGroup title={t('On connect')}>
+            <div className="settings-group-form">
+              <label>
+                <Hint label={t('Commands')}>
+                  {t('Run in the shell of every host in this group, one command per line.')}
+                </Hint>
+                <textarea
+                  rows={3}
+                  value={group.onConnectCommand ?? ''}
+                  placeholder={from('onConnectCommand') || t('e.g. sudo -i')}
+                  onChange={(e) => set('onConnectCommand', e.target.value)}
+                />
+              </label>
+            </div>
+          </SettingsGroup>
 
           {/* The file panel's way in, for every SSH host inside: a folder of
               database servers all reached through `sudo -u postgres` says so
               once, here, instead of on each host. */}
-          <FileAccessFields
-            value={group.fileAccess}
-            inherited={
-              resolveAuth({}, standsAlone ? null : group.parentId, groups, { credentials })
-                .fileAccess
-            }
-            canInherit={Boolean(group.parentId) && !standsAlone}
-            inheritedFrom={from('fileAccess')}
-            onChange={(value) => set('fileAccess', value)}
-          />
-        </details>
-
-        <details
-          className="settings-section"
-          open={
-            isSet(group.rdpUsername) ||
-            ownRdpSecret ||
-            isSet(group.rdpPort) ||
-            isSet(group.rdpCredentialId)
-          }
-        >
-          <summary>
-            <Hint label="RDP">
-              {t(
-                'Used by the RDP hosts in this group. With no login of its own here, an RDP host signs in with the SSH login above, as it always has.'
-              )}
-            </Hint>
-          </summary>
-
-          <div className="form-row">
-            <label style={{ flex: 3 }}>
-              {t('Username')}
-              <input
-                value={group.rdpUsername ?? ''}
-                disabled={isSet(group.rdpCredentialId)}
-                placeholder={
-                  isSet(group.rdpCredentialId)
-                    ? t('from the account {name}', {
-                        name: rdpAccount?.name ?? t('(deleted account)')
-                      })
-                    : rdpAccountAbove
-                      ? t('from the account {name}', { name: rdpAccountAbove.credential.name })
-                      : rdpFrom('username') ||
-                        (effective.username
-                          ? t('as for SSH: {user}', { user: effective.username })
-                          : t('not set'))
+          <SettingsGroup title={t('File access')}>
+            <div className="settings-group-form">
+              <FileAccessFields
+                value={group.fileAccess}
+                inherited={
+                  resolveAuth({}, standsAlone ? null : group.parentId, groups, { credentials })
+                    .fileAccess
                 }
-                onChange={(e) => set('rdpUsername', e.target.value || undefined)}
+                canInherit={Boolean(group.parentId) && !standsAlone}
+                inheritedFrom={from('fileAccess')}
+                onChange={(value) => set('fileAccess', value)}
               />
-            </label>
-            <label style={{ flex: 1 }}>
-              {t('Port')}
-              <input
-                type="number"
-                value={group.rdpPort ?? ''}
-                placeholder={String(rdpAbove.port)}
-                title={rdpFrom('port') || undefined}
-                onChange={(e) =>
-                  set('rdpPort', e.target.value ? Number(e.target.value) : undefined)
-                }
+            </div>
+            <SwitchRow
+              label={t('SFTP panel follows the terminal’s directory')}
+              checked={effective.followTerminalCwd}
+              onChange={(on) => set('followTerminalCwd', on)}
+            />
+          </SettingsGroup>
+        </>
+      )}
+
+      {page === 'desktop' && (
+        <>
+          <SettingsGroup
+            title={t('Who signs in')}
+            hint={t(
+              'Used by the RDP hosts in this group. With no login of its own here, an RDP host signs in with the SSH login above, as it always has.'
+            )}
+          >
+            <div className="settings-group-form">
+              <div className="form-row">
+                <label style={{ flex: 3 }}>
+                  {t('Username')}
+                  <input
+                    value={group.rdpUsername ?? ''}
+                    disabled={isSet(group.rdpCredentialId)}
+                    placeholder={
+                      isSet(group.rdpCredentialId)
+                        ? t('from the account {name}', {
+                            name: rdpAccount?.name ?? t('(deleted account)')
+                          })
+                        : rdpAccountAbove
+                          ? t('from the account {name}', {
+                              name: rdpAccountAbove.credential.name
+                            })
+                          : rdpFrom('username') ||
+                            (effective.username
+                              ? t('as for SSH: {user}', { user: effective.username })
+                              : t('not set'))
+                    }
+                    onChange={(e) => set('rdpUsername', e.target.value || undefined)}
+                  />
+                </label>
+                <label style={{ flex: 1 }}>
+                  {t('Port')}
+                  <input
+                    type="number"
+                    value={group.rdpPort ?? ''}
+                    placeholder={String(rdpAbove.port)}
+                    title={rdpFrom('port') || undefined}
+                    onChange={(e) =>
+                      set('rdpPort', e.target.value ? Number(e.target.value) : undefined)
+                    }
+                  />
+                </label>
+              </div>
+
+              <AccountSelect
+                value={group.rdpCredentialId}
+                onChange={(id) => set('rdpCredentialId', id)}
+                credentials={credentials}
+                inherited={rdpAccountAbove}
               />
-            </label>
-          </div>
 
-          <AccountSelect
-            value={group.rdpCredentialId}
-            onChange={(id) => set('rdpCredentialId', id)}
-            credentials={credentials}
-            inherited={rdpAccountAbove}
-          />
-
-          {!isSet(group.rdpCredentialId) && (
-            <>
-              <label>
-                {t('Password')}
-                <input
-                  type="password"
-                  value={rdpSecret}
-                  placeholder={
-                    ownRdpSecret && !forgetRdpSecret
-                      ? t('(saved on this group)')
-                      : t('(leave blank to keep or inherit)')
-                  }
-                  onChange={(e) => setRdpSecret(e.target.value)}
-                />
-              </label>
-              {ownRdpSecret && (
-                <p className="settings-note action-note">
-                  {forgetRdpSecret ? t('Will be forgotten on save') : t('Saved on this group')}
-                  <button type="button" onClick={() => setForgetRdpSecret(!forgetRdpSecret)}>
-                    {forgetRdpSecret ? t('Keep it') : t('Forget it')}
-                  </button>
-                </p>
+              {!isSet(group.rdpCredentialId) && (
+                <>
+                  <label>
+                    {t('Password')}
+                    <input
+                      type="password"
+                      value={rdpSecret}
+                      placeholder={
+                        ownRdpSecret && !forgetRdpSecret
+                          ? t('(saved on this group)')
+                          : t('(leave blank to keep or inherit)')
+                      }
+                      onChange={(e) => setRdpSecret(e.target.value)}
+                    />
+                  </label>
+                  {ownRdpSecret && (
+                    <p className="settings-note action-note">
+                      {forgetRdpSecret ? t('Will be forgotten on save') : t('Saved on this group')}
+                      <button type="button" onClick={() => setForgetRdpSecret(!forgetRdpSecret)}>
+                        {forgetRdpSecret ? t('Keep it') : t('Forget it')}
+                      </button>
+                    </p>
+                  )}
+                </>
               )}
-            </>
-          )}
+            </div>
+          </SettingsGroup>
 
           <RdpFields
             value={group}
@@ -556,15 +574,42 @@ export default function GroupDialog({
               onForget: setForgetGatewaySecret
             }}
           />
-        </details>
+        </>
+      )}
 
-        <details className="settings-section" open={linked && !initial}>
-          <summary>
-            <Hint label={t('Inventory from git')}>
-              {/* Every word about this lives here rather than under the fields.
-                  It is worth having and worth reading once; left on the page it
-                  was two paragraphs of grey text between the address and the
-                  next section, which is most of what the dialog showed. */}
+      {page === 'appearance' && (
+        <SettingsGroup
+          title={t('Terminals')}
+          hint={t(
+            'Everything in this group inherits what you set here, so a whole environment can be given its own colours in one place.'
+          )}
+        >
+          <div className="settings-group-form">
+            <AppearanceFields
+              value={group}
+              set={setLook}
+              effective={appearance}
+              inherited={inheritedLook}
+              inheritedFrom={appearanceFrom}
+              inheritToggle={
+                group.parentId
+                  ? { label: t('Inherit appearance from the parent group') }
+                  : undefined
+              }
+            />
+          </div>
+        </SettingsGroup>
+      )}
+
+      {page === 'git' && (
+        <SettingsGroup
+          title={t('Inventory from git')}
+          hint={
+            /* Every word about this lives here rather than under the fields.
+               It is worth having and worth reading once; left on the page it
+               was two paragraphs of grey text between the address and the next
+               section. */
+            <>
               <p>
                 {t(
                   'This folder can mirror an Ansible inventory out of a repository. The hosts it brings in are shown alongside anything you put in the folder yourself, and are refreshed only when you ask for it.'
@@ -585,16 +630,17 @@ export default function GroupDialog({
                   'Several folders can read one repository: it is cloned once, and each folder takes its own paths out of it — production from one inventory file, staging from another. A repository is offered in the list here after its first successful sync.'
                 )}
               </p>
-            </Hint>
-          </summary>
-
-          <label className="checkbox-row" style={{ flexDirection: 'row' }}>
-            <input type="checkbox" checked={linked} onChange={(e) => setLinked(e.target.checked)} />
-            {t('Mirror an inventory from a git repository')}
-          </label>
+            </>
+          }
+        >
+          <SwitchRow
+            label={t('Mirror an inventory from a git repository')}
+            checked={linked}
+            onChange={setLinked}
+          />
 
           {linked && (
-            <>
+            <div className="settings-group-form">
               {gitRepos.length > 0 && (
                 <label>
                   {t('Repository')}
@@ -660,7 +706,7 @@ export default function GroupDialog({
                   />
                 </label>
               </div>
-            </>
+            </div>
           )}
           {!linked && initial?.git && (
             <p className="settings-note">
@@ -669,37 +715,8 @@ export default function GroupDialog({
               )}
             </p>
           )}
-        </details>
-
-        <details className="settings-section">
-          <summary>
-            <Hint label={t('Appearance')}>
-              {t(
-                'Everything in this group inherits what you set here, so a whole environment can be given its own colours in one place.'
-              )}
-            </Hint>
-          </summary>
-          <AppearanceFields
-            value={group}
-            set={setLook}
-            effective={appearance}
-            inherited={inheritedLook}
-            inheritedFrom={appearanceFrom}
-            inheritToggle={
-              group.parentId ? { label: t('Inherit appearance from the parent group') } : undefined
-            }
-          />
-        </details>
-
-        {error && <span className="error-text">{error}</span>}
-
-        <div className="modal-actions">
-          <button onClick={onClose}>{t('Cancel')}</button>
-          <button className="primary" onClick={submit} disabled={!group.name.trim()}>
-            {t('Save')}
-          </button>
-        </div>
-      </div>
-    </ModalBackdrop>
+        </SettingsGroup>
+      )}
+    </PagedDialog>
   )
 }

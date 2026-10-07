@@ -146,8 +146,8 @@ export const ru: Record<string, string> = {
     'Удерживайте Escape для выхода из полного экрана: там он принадлежит сессии',
   'The desktop takes the size of the pane, so dragging a split resizes it':
     'Рабочий стол принимает размер панели, поэтому перетаскивание разделителя меняет его',
-  'A host’s dialog holds a Desktop section: gateway, size, and the ⌘ key':
-    'В диалоге хоста есть раздел «Рабочий стол»: шлюз, размер и клавиша ⌘',
+  'A host’s dialog has a Desktop page: gateway, screen, keyboard, clipboard and disks':
+    'Диалог хоста держит страницу «Рабочий стол»: шлюз, экран, клавиатура, буфер обмена и диски',
   'Set the gateway on the group and every RDP host in it goes through it':
     'Задайте шлюз на группе — и все RDP-хосты внутри пойдут через него',
   'Fixed resolution pins the far end and scales it into the pane instead':
@@ -1121,8 +1121,6 @@ export const ru: Record<string, string> = {
     'Относится только к терминалам этого хоста. Всё, оставленное на «наследовать», следует за группой, а затем за настройками, — так что покрасив один боевой сервер в красный, вы не измените ничего больше.',
 
   // Local settings on an inventory node
-  'Local settings for {name}': 'Локальные настройки для {name}',
-  'Local settings for group {name}': 'Локальные настройки для группы {name}',
   'Kept outside the repository and re-applied after every sync, so pulling never discards them. Leave a field blank to keep what the inventory says.':
     'Хранятся вне репозитория и применяются заново после каждой синхронизации, так что обновление их не теряет. Оставьте поле пустым, чтобы сохранить то, что говорит инвентарь.',
   'Everything in this group inherits what you set here.':
@@ -1500,5 +1498,42 @@ export const ru: Record<string, string> = {
   'The repository': 'Репозиторий',
   'Desktops from an inventory': 'Рабочие столы из инвентаря',
   'Linking a folder': 'Привязка папки',
-  Syncing: 'Синхронизация'
+  Syncing: 'Синхронизация',
+  // Paged host, group and repository dialogs
+  'A host’s dialog is in pages: General holds all a new host needs, Sign-in the login':
+    'Диалог хоста разложен по страницам: в «Основном» всё, что нужно новому хосту, во «Входе» — логин',
+  'Terminal, Files and Tunnels for a shell, Desktop for a desktop — never both':
+    '«Терминал», «Файлы» и «Туннели» — у оболочки, «Рабочий стол» — у рабочего стола, но не всё сразу',
+  'The list marks a page that inherits from the group, and counts the tunnels':
+    'Список страниц отмечает ту, что наследуется от группы, и считает туннели',
+  on: 'вкл',
+  'in {name}': 'в «{name}»',
+  'In the tree': 'В дереве',
+  'Who signs in': 'Кто входит',
+  Commands: 'Команды',
+  Terminals: 'Терминалы',
+  'Sign-in': 'Вход',
+  'Local settings': 'Локальные настройки',
+  'Local settings for the group': 'Локальные настройки группы',
+  'Reach it through': 'Подключаться через',
+  'Reach them through': 'Подключаться через',
+  Gateway: 'Шлюз',
+  Screen: 'Экран',
+  Session: 'Сеанс',
+  group: 'группа',
+  'The filter above the tree finds a host by its tags too.':
+    'Фильтр над деревом находит хост и по меткам.',
+  'Anything left blank on this page comes from “{name}”.':
+    'Всё, что на этой странице оставлено пустым, берётся из «{name}».',
+  'Another saved host, as ssh -J does; nothing runs on it.':
+    'Другой сохранённый хост, как в ssh -J; на нём ничего не запускается.',
+  'Inherit ({name})': 'Наследовать ({name})',
+  'Started by themselves every time this host connects. Tunnels in the pane toolbar starts and stops them, and adds one for that connection alone.':
+    'Запускаются сами при каждом подключении к хосту. Кнопка «Туннели» на панели запускает и останавливает их и добавляет разовые — только для этого подключения.',
+  'No port forwards yet.': 'Пробросов портов пока нет.',
+  Type: 'Тип',
+  From: 'Откуда',
+  To: 'Куда',
+  'wherever the client asks': 'куда попросит клиент',
+  Remove: 'Удалить'
 }

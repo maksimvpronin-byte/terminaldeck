@@ -28,6 +28,7 @@ describe('host file access settings', () => {
     const save = vi.fn().mockResolvedValue(undefined)
     useStore.setState({ upsertSession: save })
     render(<SessionDialog initial={host} onClose={() => {}} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Files' }))
     await userEvent.selectOptions(screen.getByLabelText('File transfer method'), 'scp')
     expect(screen.getByLabelText('Shell launch command')).toHaveValue('sudo -n -i -u postgres')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -60,6 +61,7 @@ describe('host file access settings', () => {
       ]
     })
     render(<InventoryOverrideDialog node={host} groups={[]} scope="gitFolder" onClose={() => {}} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Files' }))
     expect(screen.getByLabelText('File transfer method')).toHaveValue('scp')
     await userEvent.selectOptions(screen.getByLabelText('File transfer method'), 'sftp')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -74,6 +76,7 @@ describe('file access set on a group', () => {
     const save = vi.fn().mockResolvedValue(undefined)
     useStore.setState({ upsertGroup: save, groups: [folder], sessions: [], collections: [] })
     render(<GroupDialog initial={folder} onClose={() => {}} />)
+    await userEvent.click(screen.getByRole('button', { name: 'SSH' }))
     await userEvent.selectOptions(screen.getByLabelText('File transfer method'), 'scp')
     await userEvent.clear(screen.getByLabelText('Shell launch command'))
     await userEvent.type(screen.getByLabelText('Shell launch command'), 'sudo -n -i -u root')
@@ -93,6 +96,7 @@ describe('file access set on a group', () => {
         onClose={() => {}}
       />
     )
+    await userEvent.click(screen.getByRole('button', { name: 'Files' }))
     await userEvent.selectOptions(screen.getByLabelText('File transfer method'), '')
     expect(screen.getByLabelText('Shell launch command')).toHaveValue('sudo -u pg')
     expect(screen.getByLabelText('Shell launch command')).toBeDisabled()
@@ -146,5 +150,45 @@ describe('collections chosen in the dialogs', () => {
     await userEvent.click(screen.getByLabelText('Release'))
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     expect(saveCollection).toHaveBeenCalledWith({ ...release, hostIds: ['other'] })
+  })
+})
+
+/**
+ * The host dialog is laid out in pages now, one subject to each. A new host
+ * has to be possible from the first of them alone, and a page has to belong
+ * to the protocol it is offered for.
+ */
+describe('the pages of the host dialog', () => {
+  it('makes a new host from the first page alone', async () => {
+    const save = vi.fn().mockResolvedValue(undefined)
+    useStore.setState({ upsertSession: save, groups: [], collections: [] })
+    render(<SessionDialog onClose={() => {}} />)
+    await userEvent.type(screen.getByLabelText('Name'), 'web-1')
+    await userEvent.type(screen.getByLabelText('Host'), 'web-1.internal')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(save.mock.calls[0][0]).toMatchObject({ name: 'web-1', host: 'web-1.internal' })
+  })
+
+  it('offers a shell its pages and a desktop its own', () => {
+    useStore.setState({ groups: [], collections: [] })
+    const { unmount } = render(<SessionDialog initial={host} onClose={() => {}} />)
+    for (const page of ['Terminal', 'Files', 'Tunnels'])
+      expect(screen.getByRole('button', { name: page })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Desktop' })).toBeNull()
+    unmount()
+
+    render(<SessionDialog initial={{ ...host, protocol: 'rdp' }} onClose={() => {}} />)
+    expect(screen.getByRole('button', { name: 'Desktop' })).toBeInTheDocument()
+    for (const page of ['Terminal', 'Files', 'Tunnels'])
+      expect(screen.queryByRole('button', { name: page })).toBeNull()
+  })
+
+  it('turns to the page a refusal is about', async () => {
+    useStore.setState({ upsertSession: vi.fn(), groups: [], collections: [] })
+    render(<SessionDialog onClose={() => {}} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Terminal' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(screen.getByText('Name and host are required')).toBeInTheDocument()
+    expect(screen.getByLabelText('Name')).toBeInTheDocument()
   })
 })

@@ -19,78 +19,13 @@ import BackupSettings from './BackupSettings'
 import AboutSettings from './AboutSettings'
 import { SettingRow, SettingsGroup, SwitchRow } from './SettingsGroup'
 import { TerminalIcon } from './icons'
+import PageIcon from './PageIcon'
 import ModalBackdrop from './ModalBackdrop'
 import { keyHint } from '../state/keys'
 import { LANGUAGES, useT, type Language } from '../i18n'
 
 export type SettingsTab =
   'general' | 'tree' | 'terminal' | 'files' | 'accounts' | 'security' | 'backup' | 'about'
-
-/** A page's glyph in the list on the left, drawn in the stroke of the app's own icons. */
-function PageIcon({ page }: { page: SettingsTab }): JSX.Element {
-  const stroke = {
-    fill: 'none',
-    stroke: 'currentColor',
-    strokeWidth: 1.3,
-    strokeLinecap: 'round',
-    strokeLinejoin: 'round'
-  } as const
-  const shapes: Record<SettingsTab, JSX.Element> = {
-    general: (
-      <>
-        <path d="M2.5 4.5h5.7M11.8 4.5h1.7M2.5 11.5h1.7M7.8 11.5h5.7" {...stroke} />
-        <circle cx="10" cy="4.5" r="1.8" {...stroke} />
-        <circle cx="6" cy="11.5" r="1.8" {...stroke} />
-      </>
-    ),
-    tree: <path d="M4 2.5v9h3.5M4 7h3.5M9.5 3.5h4M9.5 7h4M9.5 11.5h4M2.5 3.5h3" {...stroke} />,
-    terminal: (
-      <>
-        <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" {...stroke} />
-        <path d="M4.5 6l2 2-2 2M8 10.5h3.5" {...stroke} />
-      </>
-    ),
-    files: (
-      <path
-        d="M1.8 4.2c0-.7.5-1.2 1.2-1.2h3l1.5 1.7H13c.7 0 1.2.5 1.2 1.2v6.4c0 .7-.5 1.2-1.2 1.2H3c-.7 0-1.2-.5-1.2-1.2z"
-        {...stroke}
-      />
-    ),
-    accounts: (
-      <>
-        <circle cx="8" cy="5.5" r="2.7" {...stroke} />
-        <path d="M2.8 13.8c.6-2.6 2.7-4.1 5.2-4.1s4.6 1.5 5.2 4.1" {...stroke} />
-      </>
-    ),
-    security: (
-      <>
-        <rect x="3" y="7" width="10" height="7" rx="1.3" {...stroke} />
-        <path d="M5.3 7V5.2a2.7 2.7 0 0 1 5.4 0V7" {...stroke} />
-      </>
-    ),
-    backup: (
-      <>
-        <ellipse cx="8" cy="4" rx="5.5" ry="2" {...stroke} />
-        <path
-          d="M2.5 4v8c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2V4M2.5 8c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2"
-          {...stroke}
-        />
-      </>
-    ),
-    about: (
-      <>
-        <circle cx="8" cy="8" r="6.2" {...stroke} />
-        <path d="M8 7.3v4" {...stroke} />
-        <circle cx="8" cy="4.9" r=".2" {...stroke} strokeWidth={1.6} />
-      </>
-    )
-  }
-  return (
-    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" focusable="false">
-      {shapes[page]}
-    </svg>
-  )
-}
 
 /**
  * Three made-up hosts drawn with the tree's own classes, so every setting on

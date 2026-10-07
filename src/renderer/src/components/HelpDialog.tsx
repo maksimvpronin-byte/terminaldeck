@@ -119,6 +119,15 @@ const CHAPTERS: Chapter[] = [
           {
             title: 'What a group passes on',
             rows: [
+              {
+                what: 'A host’s dialog is in pages: General holds all a new host needs, Sign-in the login'
+              },
+              {
+                what: 'Terminal, Files and Tunnels for a shell, Desktop for a desktop — never both'
+              },
+              {
+                what: 'The list marks a page that inherits from the group, and counts the tunnels'
+              },
               { what: 'A group holds a shared login, key and port — hosts inside inherit them' },
               { what: 'A blank field means inherit; untick "Inherit" on a host to stand alone' },
               {
@@ -473,7 +482,9 @@ const CHAPTERS: Chapter[] = [
           {
             title: 'Connection',
             rows: [
-              { what: 'A host’s dialog holds a Desktop section: gateway, size, and the ⌘ key' },
+              {
+                what: 'A host’s dialog has a Desktop page: gateway, screen, keyboard, clipboard and disks'
+              },
               { what: 'Set the gateway on the group and every RDP host in it goes through it' },
               {
                 what: 'A certificate the machine cannot verify is asked about once, then remembered'

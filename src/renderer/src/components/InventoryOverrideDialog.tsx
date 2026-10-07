@@ -15,13 +15,13 @@ import { appearanceSource, resolveAppearance } from '../../../shared/appearance'
 import { resolveRdp } from '../../../shared/rdpResolution'
 import { asProtocol, PROTOCOLS, protocolOf, traitsOf } from '../../../shared/protocols'
 import { useStore } from '../state/store'
-import { SESSION_COLOURS } from '../state/colours'
 import AppearanceFields from './AppearanceFields'
 import AuthFields, { type AuthWords } from './AuthFields'
 import RdpFields from './RdpFields'
-import ModalBackdrop from './ModalBackdrop'
+import PagedDialog, { type DialogPage } from './PagedDialog'
+import ColourField from './ColourField'
+import { SettingRow, SettingsGroup, SwitchRow } from './SettingsGroup'
 import { useT } from '../i18n'
-import Hint from './Hint'
 import AccountSelect from './AccountSelect'
 import CollectionFields from './CollectionFields'
 import {
@@ -48,6 +48,9 @@ interface Props {
 function isHost(node: SessionProfile | SessionGroup): node is SessionProfile {
   return 'host' in node
 }
+
+/** The pages of a repository node's local settings. */
+type OverridePage = 'general' | 'login' | 'terminal' | 'files' | 'desktop'
 
 export default function InventoryOverrideDialog({
   node,
@@ -86,6 +89,7 @@ export default function InventoryOverrideDialog({
 
   const [override, setOverride] = useState<InventoryOverride>(existing ?? { nodeId: node.id })
   const [error, setError] = useState<string>()
+  const [page, setPage] = useState<OverridePage>('general')
   const [secret, setSecret] = useState('')
   // A credential kept here wins over anything the inventory says, so dropping it
   // has to be possible without throwing the rest of the override away.
@@ -205,6 +209,7 @@ export default function InventoryOverrideDialog({
       (!override.fileAccess.shell?.trim() || /[\r\n\0]/.test(override.fileAccess.shell))
     ) {
       setError(t('Enter a single-line shell launch command.'))
+      setPage('files')
       return
     }
     const toSave: InventoryOverride = forgetSecret
@@ -250,263 +255,34 @@ export default function InventoryOverrideDialog({
     onClose()
   }
 
+  const showsDesktop = isHost(node) && protocol === 'rdp'
+  const pages: DialogPage<OverridePage>[] = [
+    { id: 'general', label: t('General'), icon: 'host' },
+    { id: 'login', label: t('Sign-in'), icon: 'login' },
+    ...(traits.textual
+      ? [{ id: 'terminal' as const, label: t('Terminal'), icon: 'terminal' as const }]
+      : []),
+    ...(traits.files ? [{ id: 'files' as const, label: t('Files'), icon: 'files' as const }] : []),
+    ...(showsDesktop
+      ? [{ id: 'desktop' as const, label: t('Desktop'), icon: 'desktop' as const }]
+      : [])
+  ]
+  // A page the protocol no longer has falls back to the first.
+  const shown = pages.some((p) => p.id === page) ? page : 'general'
+
   return (
-    <ModalBackdrop onClose={onClose}>
-      <div className="modal-card">
-        {error && (
-          <p className="error-text" role="alert">
-            {error}
-          </p>
-        )}
-        <h2>
-          {isHost(node)
-            ? t('Local settings for {name}', { name: node.name })
-            : t('Local settings for group {name}', { name: node.name })}
-        </h2>
-        <p className="settings-note">
-          {t(
-            'Kept outside the repository and re-applied after every sync, so pulling never discards them. Leave a field blank to keep what the inventory says.'
-          )}
-          {!isHost(node) && ` ${t('Everything in this group inherits what you set here.')}`}
-        </p>
-
-        {hostIds.length > 0 && (
-          <CollectionFields
-            collections={collections}
-            value={memberOf}
-            onChange={setMemberOf}
-            forGroup={!isHost(node)}
-          />
-        )}
-
-        {isHost(node) && (
-          <label>
-            {t('Protocol')}
-            <select
-              value={override.protocol ?? ''}
-              onChange={(e) => set('protocol', asProtocol(e.target.value))}
-            >
-              <option value="">
-                {t('From the inventory ({protocol})', {
-                  protocol: traitsOf(protocolOf(node)).label
-                })}
-              </option>
-              {PROTOCOLS.map((name) => (
-                <option key={name} value={name}>
-                  {traitsOf(name).label}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-
-        <div className="form-row">
-          <label style={{ flex: 3 }}>
-            {t('Username')}
-            <input
-              autoFocus
-              value={override.username ?? ''}
-              disabled={ownAccount}
-              placeholder={
-                auth.account
-                  ? t('from the account {name}', { name: auth.account.credential.name })
-                  : fromRepo.username || t('not set in the inventory')
-              }
-              onChange={(e) => set('username', e.target.value)}
-            />
-          </label>
-          <label style={{ flex: 1 }}>
-            {t('Port')}
-            <input
-              type="number"
-              value={override.port ?? ''}
-              /* Resolved for the protocol: a desktop takes its groups' RDP
-                 port, or 3389 — never an SSH port. */
-              placeholder={String(fromRepo.port)}
-              onChange={(e) => set('port', e.target.value ? Number(e.target.value) : undefined)}
-            />
-          </label>
-        </div>
-
-        <AccountSelect
-          value={override.credentialId}
-          onChange={(id) => set('credentialId', id)}
-          credentials={credentials}
-          inherited={ownAccount ? undefined : auth.account}
-        />
-
-        {!ownAccount && (
-          <AuthFields
-            value={override}
-            set={setAuth}
-            state={auth}
-            secret={secret}
-            onSecret={setSecret}
-            forgetSecret={forgetSecret}
-            onForgetSecret={setForgetSecret}
-            onPickKey={pickKey}
-            words={authWords}
-          />
-        )}
-
-        {traits.jumpHost && (
-          <label>
-            {t('Jump host (ProxyJump)')}
-            <select
-              value={override.jumpHostId ?? ''}
-              onChange={(e) => set('jumpHostId', e.target.value || undefined)}
-            >
-              <option value="">
-                {fromRepo.jumpHostId
-                  ? t('From above ({name})', {
-                      name: sessions.find((s) => s.id === fromRepo.jumpHostId)?.name ?? t('unknown')
-                    })
-                  : t('None')}
-              </option>
-              {/* Only saved sessions can act as a bastion: an inventory host is
-                  rebuilt on every sync and its id would not survive a rename. */}
-              {sessions.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-
-        {traits.files && (
-          <label className="checkbox-row" style={{ flexDirection: 'row' }}>
-            <input
-              type="checkbox"
-              checked={override.followTerminalCwd ?? fromRepo.followTerminalCwd}
-              onChange={(e) => set('followTerminalCwd', e.target.checked)}
-            />
-            {t('SFTP panel follows the terminal’s directory')}
-          </label>
-        )}
-
-        {traits.keyAuth && (
-          <label className="checkbox-row" style={{ flexDirection: 'row' }}>
-            <input
-              type="checkbox"
-              checked={override.agentForward ?? fromRepo.agentForward}
-              onChange={(e) => set('agentForward', e.target.checked)}
-            />
-            {t('Forward SSH agent to remote host')}
-          </label>
-        )}
-
-        {traits.files && (
-          <FileAccessFields
-            value={override.fileAccess}
-            inherited={fromRepo.fileAccess}
-            canInherit
-            onChange={(value) => set('fileAccess', value)}
-          />
-        )}
-
-        {traits.textual && (
-          <>
-            <label>
-              {t('On connect')}
-              <textarea
-                rows={2}
-                value={override.onConnectCommand ?? ''}
-                placeholder={t('e.g. sudo -i')}
-                onChange={(e) => set('onConnectCommand', e.target.value)}
-              />
-            </label>
-            <p className="settings-note">
-              {t(
-                'Set here and nowhere else: this is never read from the repository. It is arbitrary code run on every connection, and honouring it from a repo would hand command execution to anyone able to commit there.'
-              )}
-            </p>
-          </>
-        )}
-
-        <label>
-          {t('Colour')}
-          <div className="colour-row">
-            <button
-              type="button"
-              className={`swatch none ${!override.color ? 'selected' : ''}`}
-              title={t('Use the repository’s colour')}
-              onClick={() => set('color', undefined)}
-            />
-            {SESSION_COLOURS.map((c) => (
-              <button
-                type="button"
-                key={c.value}
-                className={`swatch ${override.color === c.value ? 'selected' : ''}`}
-                style={{ background: c.value }}
-                title={c.name}
-                onClick={() => set('color', c.value)}
-              />
-            ))}
-          </div>
-        </label>
-
-        {traits.textual && (
-          <details className="settings-section">
-            <summary>{t('Appearance')}</summary>
-            <p className="settings-note">
-              {t('Kept locally like everything else here, so a sync never takes it away.')}
-              {!isHost(node) && ` ${t('Hosts in this group inherit it.')}`}
-            </p>
-            <AppearanceFields
-              value={override}
-              set={setLook}
-              effective={appearance}
-              inherited={inheritedLook}
-              inheritedFrom={appearanceFrom}
-              inheritToggle={{ label: t('Inherit appearance from the inventory groups') }}
-            />
-          </details>
-        )}
-
-        {isHost(node) && protocolOf(node) === 'rdp' && (
-          <details className="settings-section">
-            <summary>
-              <Hint label={t('Desktop')}>
-                {t(
-                  'Kept locally, so a sync never takes it away — including a gateway the repository does not know about.'
-                )}
-              </Hint>
-            </summary>
-            <RdpFields
-              value={override}
-              set={setRdp}
-              effective={desktop}
-              inheritedFrom={rdpFrom}
-              inheritToggle={{ label: t('Inherit desktop settings from the inventory groups') }}
-              secret={{
-                typed: gatewaySecret,
-                onTyped: setGatewaySecret,
-                own: isSet(override.gatewaySecretRef),
-                forget: forgetGatewaySecret,
-                onForget: setForgetGatewaySecret
-              }}
-            />
-          </details>
-        )}
-
-        {isHost(node) && (
-          <p className="settings-note">
-            {t('Connects as')} <strong>{effective.username || t('(no user)')}</strong>@{node.host}:
-            {effective.port} {t('using')} {effective.authMethod}
-            {effective.jumpHostId
-              ? ` ${t('via {name}', {
-                  name:
-                    sessions.find((s) => s.id === effective.jumpHostId)?.name ?? t('a jump host')
-                })}`
-              : ''}
-            .
-          </p>
-        )}
-
-        <div className="modal-actions">
+    <PagedDialog
+      title={node.name}
+      subtitle={isHost(node) ? t('Local settings') : t('Local settings for the group')}
+      pages={pages}
+      page={shown}
+      onPage={setPage}
+      error={error}
+      onClose={onClose}
+      actions={
+        <>
           {existing && (
-            <button className="danger" onClick={reset}>
+            <button className="danger" onClick={reset} style={{ marginRight: 'auto' }}>
               {t('Remove override')}
             </button>
           )}
@@ -514,8 +290,254 @@ export default function InventoryOverrideDialog({
           <button className="primary" onClick={submit}>
             {t('Save')}
           </button>
-        </div>
-      </div>
-    </ModalBackdrop>
+        </>
+      }
+    >
+      {shown === 'general' && (
+        <>
+          <p className="settings-note">
+            {t(
+              'Kept outside the repository and re-applied after every sync, so pulling never discards them. Leave a field blank to keep what the inventory says.'
+            )}
+            {!isHost(node) && ` ${t('Everything in this group inherits what you set here.')}`}
+          </p>
+
+          {isHost(node) && (
+            <SettingsGroup title={t('Connection')}>
+              <div className="settings-group-form">
+                <label>
+                  {t('Protocol')}
+                  <select
+                    value={override.protocol ?? ''}
+                    onChange={(e) => set('protocol', asProtocol(e.target.value))}
+                  >
+                    <option value="">
+                      {t('From the inventory ({protocol})', {
+                        protocol: traitsOf(protocolOf(node)).label
+                      })}
+                    </option>
+                    {PROTOCOLS.map((name) => (
+                      <option key={name} value={name}>
+                        {traitsOf(name).label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <p className="settings-note">
+                  {t('Connects as')} <strong>{effective.username || t('(no user)')}</strong>@
+                  {node.host}:{effective.port} {t('using')} {effective.authMethod}
+                  {effective.jumpHostId
+                    ? ` ${t('via {name}', {
+                        name:
+                          sessions.find((s) => s.id === effective.jumpHostId)?.name ??
+                          t('a jump host')
+                      })}`
+                    : ''}
+                  .
+                </p>
+              </div>
+            </SettingsGroup>
+          )}
+
+          {hostIds.length > 0 && (
+            <CollectionFields
+              collections={collections}
+              value={memberOf}
+              onChange={setMemberOf}
+              forGroup={!isHost(node)}
+            />
+          )}
+
+          <SettingsGroup title={t('In the tree')}>
+            <ColourField
+              value={override.color}
+              onChange={(colour) => set('color', colour)}
+              noneTitle={t('Use the repository’s colour')}
+            />
+          </SettingsGroup>
+        </>
+      )}
+
+      {shown === 'login' && (
+        <>
+          <SettingsGroup title={t('Who signs in')}>
+            <div className="settings-group-form">
+              <div className="form-row">
+                <label style={{ flex: 3 }}>
+                  {t('Username')}
+                  <input
+                    autoFocus
+                    value={override.username ?? ''}
+                    disabled={ownAccount}
+                    placeholder={
+                      auth.account
+                        ? t('from the account {name}', { name: auth.account.credential.name })
+                        : fromRepo.username || t('not set in the inventory')
+                    }
+                    onChange={(e) => set('username', e.target.value)}
+                  />
+                </label>
+                <label style={{ flex: 1 }}>
+                  {t('Port')}
+                  <input
+                    type="number"
+                    value={override.port ?? ''}
+                    /* Resolved for the protocol: a desktop takes its groups' RDP
+                       port, or 3389 — never an SSH port. */
+                    placeholder={String(fromRepo.port)}
+                    onChange={(e) =>
+                      set('port', e.target.value ? Number(e.target.value) : undefined)
+                    }
+                  />
+                </label>
+              </div>
+
+              <AccountSelect
+                value={override.credentialId}
+                onChange={(id) => set('credentialId', id)}
+                credentials={credentials}
+                inherited={ownAccount ? undefined : auth.account}
+              />
+
+              {!ownAccount && (
+                <AuthFields
+                  value={override}
+                  set={setAuth}
+                  state={auth}
+                  secret={secret}
+                  onSecret={setSecret}
+                  forgetSecret={forgetSecret}
+                  onForgetSecret={setForgetSecret}
+                  onPickKey={pickKey}
+                  words={authWords}
+                />
+              )}
+            </div>
+            {traits.keyAuth && (
+              <SwitchRow
+                label={t('Forward SSH agent to remote host')}
+                checked={override.agentForward ?? fromRepo.agentForward}
+                onChange={(on) => set('agentForward', on)}
+              />
+            )}
+          </SettingsGroup>
+
+          {traits.jumpHost && (
+            <SettingsGroup title={t('Jump host (ProxyJump)')}>
+              <SettingRow label={t('Reach it through')} controlId="override-jump">
+                <select
+                  id="override-jump"
+                  value={override.jumpHostId ?? ''}
+                  onChange={(e) => set('jumpHostId', e.target.value || undefined)}
+                >
+                  <option value="">
+                    {fromRepo.jumpHostId
+                      ? t('From above ({name})', {
+                          name:
+                            sessions.find((s) => s.id === fromRepo.jumpHostId)?.name ?? t('unknown')
+                        })
+                      : t('None')}
+                  </option>
+                  {/* Only saved sessions can act as a bastion: an inventory host
+                      is rebuilt on every sync and its id would not survive a
+                      rename. */}
+                  {sessions.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </SettingRow>
+            </SettingsGroup>
+          )}
+        </>
+      )}
+
+      {shown === 'terminal' && (
+        <>
+          <SettingsGroup title={t('On connect')}>
+            <div className="settings-group-form">
+              <label>
+                {t('Commands')}
+                <textarea
+                  rows={3}
+                  value={override.onConnectCommand ?? ''}
+                  placeholder={t('e.g. sudo -i')}
+                  onChange={(e) => set('onConnectCommand', e.target.value)}
+                />
+              </label>
+              <p className="settings-note">
+                {t(
+                  'Set here and nowhere else: this is never read from the repository. It is arbitrary code run on every connection, and honouring it from a repo would hand command execution to anyone able to commit there.'
+                )}
+              </p>
+            </div>
+          </SettingsGroup>
+
+          <SettingsGroup
+            title={t('Appearance')}
+            hint={
+              <>
+                {t('Kept locally like everything else here, so a sync never takes it away.')}
+                {!isHost(node) && ` ${t('Hosts in this group inherit it.')}`}
+              </>
+            }
+          >
+            <div className="settings-group-form">
+              <AppearanceFields
+                value={override}
+                set={setLook}
+                effective={appearance}
+                inherited={inheritedLook}
+                inheritedFrom={appearanceFrom}
+                inheritToggle={{ label: t('Inherit appearance from the inventory groups') }}
+              />
+            </div>
+          </SettingsGroup>
+        </>
+      )}
+
+      {shown === 'files' && (
+        <SettingsGroup title={t('File access')}>
+          <div className="settings-group-form">
+            <FileAccessFields
+              value={override.fileAccess}
+              inherited={fromRepo.fileAccess}
+              canInherit
+              onChange={(value) => set('fileAccess', value)}
+            />
+          </div>
+          <SwitchRow
+            label={t('SFTP panel follows the terminal’s directory')}
+            checked={override.followTerminalCwd ?? fromRepo.followTerminalCwd}
+            onChange={(on) => set('followTerminalCwd', on)}
+          />
+        </SettingsGroup>
+      )}
+
+      {shown === 'desktop' && (
+        <>
+          <p className="settings-note">
+            {t(
+              'Kept locally, so a sync never takes it away — including a gateway the repository does not know about.'
+            )}
+          </p>
+          <RdpFields
+            value={override}
+            set={setRdp}
+            effective={desktop}
+            inheritedFrom={rdpFrom}
+            inheritToggle={{ label: t('Inherit desktop settings from the inventory groups') }}
+            secret={{
+              typed: gatewaySecret,
+              onTyped: setGatewaySecret,
+              own: isSet(override.gatewaySecretRef),
+              forget: forgetGatewaySecret,
+              onForget: setForgetGatewaySecret
+            }}
+          />
+        </>
+      )}
+    </PagedDialog>
   )
 }

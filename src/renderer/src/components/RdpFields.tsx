@@ -1,5 +1,6 @@
 import type { RdpDefaults, RdpResolution, ResolvedRdp } from '../../../shared/types'
 import Hint from './Hint'
+import { SettingsGroup, SwitchRow } from './SettingsGroup'
 import { useT } from '../i18n'
 
 interface Props {
@@ -100,253 +101,242 @@ export default function RdpFields({
   return (
     <>
       {inheritToggle && (
-        <label className="checkbox-row">
-          <input
-            type="checkbox"
+        <SettingsGroup>
+          <SwitchRow
+            label={inheritToggle.label}
             checked={value.inheritRdp !== false}
-            onChange={(e) => set('inheritRdp', e.target.checked ? undefined : false)}
+            onChange={(on) => set('inheritRdp', on ? undefined : false)}
           />
-          {inheritToggle.label}
-        </label>
+        </SettingsGroup>
       )}
 
-      <div className="form-row">
-        <label style={{ flex: 3 }}>
-          <Hint label={t('RD Gateway')}>
-            {t(
-              'A gateway says where a machine lives rather than who you are on it, so it is usually stated once on a group and left blank below. Blank reaches the host directly.'
-            )}
-          </Hint>
-          <input
-            value={value.gatewayHost ?? ''}
-            placeholder={inheritedFrom('gatewayHost') || t('none — connect directly')}
-            onChange={(e) => set('gatewayHost', e.target.value || undefined)}
-          />
-        </label>
-        <label style={{ flex: 1 }}>
-          {t('Port')}
-          <input
-            type="number"
-            value={value.gatewayPort ?? ''}
-            placeholder={String(effective.gatewayPort)}
-            onChange={(e) =>
-              set('gatewayPort', e.target.value ? Number(e.target.value) : undefined)
-            }
-          />
-        </label>
-      </div>
-
-      {effective.gatewayHost && (
-        <>
+      <SettingsGroup
+        title={t('RD Gateway')}
+        hint={t(
+          'A gateway says where a machine lives rather than who you are on it, so it is usually stated once on a group and left blank below. Blank reaches the host directly.'
+        )}
+      >
+        <div className="settings-group-form">
           <div className="form-row">
-            <label style={{ flex: 1 }}>
-              {t('Gateway username')}
+            <label style={{ flex: 3 }}>
+              {t('Gateway')}
               <input
-                value={value.gatewayUsername ?? ''}
-                placeholder={inheritedFrom('gatewayUsername') || t("the host's own login")}
-                onChange={(e) => set('gatewayUsername', e.target.value || undefined)}
+                value={value.gatewayHost ?? ''}
+                placeholder={inheritedFrom('gatewayHost') || t('none — connect directly')}
+                onChange={(e) => set('gatewayHost', e.target.value || undefined)}
               />
             </label>
             <label style={{ flex: 1 }}>
-              {t('Gateway password')}
+              {t('Port')}
               <input
-                type="password"
-                value={secret.typed}
-                placeholder={
-                  secret.own && !secret.forget
-                    ? t('(saved here)')
-                    : t("(blank uses the host's own)")
+                type="number"
+                value={value.gatewayPort ?? ''}
+                placeholder={String(effective.gatewayPort)}
+                onChange={(e) =>
+                  set('gatewayPort', e.target.value ? Number(e.target.value) : undefined)
                 }
-                onChange={(e) => secret.onTyped(e.target.value)}
               />
             </label>
           </div>
 
-          {secret.own && (
-            <p className="settings-note action-note">
-              {secret.forget ? t('Will be forgotten on save') : t('Saved on this host')}
-              <Hint>
-                {secret.forget
-                  ? t('On save the gateway password stored here is forgotten.')
-                  : t('A gateway password is stored here, and the nearest value wins.')}
-              </Hint>
-              <button type="button" onClick={() => secret.onForget(!secret.forget)}>
-                {secret.forget ? t('Keep it') : t('Forget it')}
-              </button>
-            </p>
+          {effective.gatewayHost && (
+            <>
+              <div className="form-row">
+                <label style={{ flex: 1 }}>
+                  {t('Gateway username')}
+                  <input
+                    value={value.gatewayUsername ?? ''}
+                    placeholder={inheritedFrom('gatewayUsername') || t("the host's own login")}
+                    onChange={(e) => set('gatewayUsername', e.target.value || undefined)}
+                  />
+                </label>
+                <label style={{ flex: 1 }}>
+                  {t('Gateway password')}
+                  <input
+                    type="password"
+                    value={secret.typed}
+                    placeholder={
+                      secret.own && !secret.forget
+                        ? t('(saved here)')
+                        : t("(blank uses the host's own)")
+                    }
+                    onChange={(e) => secret.onTyped(e.target.value)}
+                  />
+                </label>
+              </div>
+
+              {secret.own && (
+                <p className="settings-note action-note">
+                  {secret.forget ? t('Will be forgotten on save') : t('Saved on this host')}
+                  <Hint>
+                    {secret.forget
+                      ? t('On save the gateway password stored here is forgotten.')
+                      : t('A gateway password is stored here, and the nearest value wins.')}
+                  </Hint>
+                  <button type="button" onClick={() => secret.onForget(!secret.forget)}>
+                    {secret.forget ? t('Keep it') : t('Forget it')}
+                  </button>
+                </p>
+              )}
+            </>
+          )}
+        </div>
+        {effective.gatewayHost && (
+          <SwitchRow
+            label={t('Reach private addresses directly, without the gateway')}
+            checked={effective.gatewayBypassLocal}
+            onChange={(on) => set('gatewayBypassLocal', on)}
+          />
+        )}
+      </SettingsGroup>
+
+      <SettingsGroup title={t('Screen')}>
+        <div className="settings-group-form">
+          <label>
+            <Hint label={t('Resolution')}>
+              {/* Says what the current choice does, not what the setting is for:
+                  the two answers are different enough to be worth reading. */}
+              {effective.resolution === 'fixed'
+                ? t('The desktop keeps this size and is scaled into the pane.')
+                : t(
+                    'The far end is asked to match the pane whenever it is resized, so every pixel stays its own.'
+                  )}
+            </Hint>
+            <select
+              value={value.resolution ?? ''}
+              onChange={(e) => set('resolution', (e.target.value || undefined) as RdpResolution)}
+            >
+              <option value="">
+                {t('Inherit')} (
+                {resolutionName(t, inheritedFrom('resolution') ? effective.resolution : 'fit')})
+              </option>
+              <option value="fit">{t('Fit the pane')}</option>
+              <option value="fixed">{t('Fixed size')}</option>
+            </select>
+          </label>
+
+          {effective.resolution === 'fixed' && (
+            <div className="form-row">
+              <label style={{ flex: 1 }}>
+                {t('Width')}
+                <input
+                  type="number"
+                  value={value.desktopWidth ?? ''}
+                  placeholder={String(effective.desktopWidth)}
+                  onChange={(e) =>
+                    set('desktopWidth', e.target.value ? Number(e.target.value) : undefined)
+                  }
+                />
+              </label>
+              <label style={{ flex: 1 }}>
+                {t('Height')}
+                <input
+                  type="number"
+                  value={value.desktopHeight ?? ''}
+                  placeholder={String(effective.desktopHeight)}
+                  onChange={(e) =>
+                    set('desktopHeight', e.target.value ? Number(e.target.value) : undefined)
+                  }
+                />
+              </label>
+            </div>
           )}
 
-          <label className="checkbox-row" style={{ flexDirection: 'row' }}>
-            <input
-              type="checkbox"
-              checked={effective.gatewayBypassLocal}
-              onChange={(e) => set('gatewayBypassLocal', e.target.checked)}
-            />
-            {t('Reach private addresses directly, without the gateway')}
+          <label>
+            <Hint label={t('Most pixels to ask for')}>
+              {t(
+                "Counted in the screen's own pixels, so a Retina pane can ask for up to four times the data. On an ordinary monitor nothing here changes anything."
+              )}
+            </Hint>
+            <select
+              value={String(effective.pixelBudget)}
+              onChange={(e) => set('pixelBudget', Number(e.target.value))}
+            >
+              <option value="1.5">{t('Fewest — a slow link')}</option>
+              <option value="3.5">{t('Balanced')}</option>
+              <option value="100">{t('As many as the screen has')}</option>
+            </select>
           </label>
-        </>
-      )}
-
-      <div className="form-row">
-        <label style={{ flex: 1 }}>
-          <Hint label={t('Resolution')}>
-            {/* Says what the current choice does, not what the setting is for:
-                the two answers are different enough to be worth reading. */}
-            {effective.resolution === 'fixed'
-              ? t('The desktop keeps this size and is scaled into the pane.')
-              : t(
-                  'The far end is asked to match the pane whenever it is resized, so every pixel stays its own.'
-                )}
-          </Hint>
-          <select
-            value={value.resolution ?? ''}
-            onChange={(e) => set('resolution', (e.target.value || undefined) as RdpResolution)}
-          >
-            <option value="">
-              {t('Inherit')} (
-              {resolutionName(t, inheritedFrom('resolution') ? effective.resolution : 'fit')})
-            </option>
-            <option value="fit">{t('Fit the pane')}</option>
-            <option value="fixed">{t('Fixed size')}</option>
-          </select>
-        </label>
-      </div>
-
-      {effective.resolution === 'fixed' && (
-        <div className="form-row">
-          <label style={{ flex: 1 }}>
-            {t('Width')}
-            <input
-              type="number"
-              value={value.desktopWidth ?? ''}
-              placeholder={String(effective.desktopWidth)}
-              onChange={(e) =>
-                set('desktopWidth', e.target.value ? Number(e.target.value) : undefined)
-              }
-            />
-          </label>
-          <label style={{ flex: 1 }}>
-            {t('Height')}
-            <input
-              type="number"
-              value={value.desktopHeight ?? ''}
-              placeholder={String(effective.desktopHeight)}
-              onChange={(e) =>
-                set('desktopHeight', e.target.value ? Number(e.target.value) : undefined)
-              }
-            />
+          <label>
+            <Hint label={t('How the desktop is made the right size')}>
+              {t(
+                'Asking the far end is the only way to get the right size at full sharpness, and Windows 8.1 and later act on it; older versions ignore it and the desktop stays as it was. Stretching here always works and costs sharpness.'
+              )}
+            </Hint>
+            <select value={sizing} onChange={(e) => chooseSizing(e.target.value)}>
+              <option value="">
+                {t('Inherit')} ({sizingLabel(t, effective)})
+              </option>
+              <option value="remote">{t('The far end lays itself out larger')}</option>
+              <optgroup label={t('Stretch the picture on this side')}>
+                <option value="0">{t('As much as this display needs')}</option>
+                <option value="125">125%</option>
+                <option value="150">150%</option>
+                <option value="200">200%</option>
+                <option value="300">300%</option>
+              </optgroup>
+              <option value="100">{t('Do not adjust — every pixel its own')}</option>
+            </select>
           </label>
         </div>
-      )}
+      </SettingsGroup>
 
-      <label>
-        <Hint label={t('Most pixels to ask for')}>
-          {t(
-            "Counted in the screen's own pixels, so a Retina pane can ask for up to four times the data. On an ordinary monitor nothing here changes anything."
-          )}
-        </Hint>
-        <select
-          value={String(effective.pixelBudget)}
-          onChange={(e) => set('pixelBudget', Number(e.target.value))}
-        >
-          <option value="1.5">{t('Fewest — a slow link')}</option>
-          <option value="3.5">{t('Balanced')}</option>
-          <option value="100">{t('As many as the screen has')}</option>
-        </select>
-      </label>
-      <label>
-        <Hint label={t('How the desktop is made the right size')}>
-          {t(
-            'Asking the far end is the only way to get the right size at full sharpness, and Windows 8.1 and later act on it; older versions ignore it and the desktop stays as it was. Stretching here always works and costs sharpness.'
-          )}
-        </Hint>
-        <select value={sizing} onChange={(e) => chooseSizing(e.target.value)}>
-          <option value="">
-            {t('Inherit')} ({sizingLabel(t, effective)})
-          </option>
-          <option value="remote">{t('The far end lays itself out larger')}</option>
-          <optgroup label={t('Stretch the picture on this side')}>
-            <option value="0">{t('As much as this display needs')}</option>
-            <option value="125">125%</option>
-            <option value="150">150%</option>
-            <option value="200">200%</option>
-            <option value="300">300%</option>
-          </optgroup>
-          <option value="100">{t('Do not adjust — every pixel its own')}</option>
-        </select>
-      </label>
-      <label className="checkbox-row" style={{ flexDirection: 'row' }}>
-        <input
-          type="checkbox"
-          checked={effective.sound}
-          onChange={(e) => set('sound', e.target.checked)}
-        />
-        <Hint label={t('Play the remote sound here')}>
-          {t(
-            'Played by the desktop client itself, so it costs this side nothing and the link something.'
-          )}
-        </Hint>
-      </label>
-      <label className="checkbox-row" style={{ flexDirection: 'row' }}>
-        <input
-          type="checkbox"
-          checked={effective.clipboard}
-          onChange={(e) => set('clipboard', e.target.checked)}
-        />
-        <Hint label={t('Share the clipboard with this host')}>
-          {t(
-            'What you copy here can be pasted there and back again, as every Windows client does it. Turn it off for a host you would rather not hand what you copied: anything running over there can read the clipboard, not only what you paste into.'
-          )}
-        </Hint>
-      </label>
-      <label className="checkbox-row" style={{ flexDirection: 'row' }}>
-        <input
-          type="checkbox"
-          checked={effective.drives}
-          onChange={(e) => set('drives', e.target.checked)}
-        />
-        <Hint label={t('Share this computer’s disks with this host')}>
-          {t(
-            'Every disk here appears under This PC over there, as “name on this computer” — on a Mac the system disk and whatever is plugged in, coming and going as it is. Off unless turned on: anything running over there can read and change every file you can. Takes effect on the next connection.'
-          )}
-        </Hint>
-      </label>
-      <label className="checkbox-row" style={{ flexDirection: 'row' }}>
-        <input
-          type="checkbox"
-          checked={effective.consoleSession}
-          onChange={(e) => set('consoleSession', e.target.checked)}
-        />
-        <Hint label={t('Connect in console mode (/admin)')}>
-          {t(
-            'The administrative session. On a Session Host it takes no client access licence, so it still lets you in once licensing has run out, and a Connection Broker does not send it to another server. To use it once without saving it, right-click the host.'
-          )}
-        </Hint>
-      </label>
-      <label className="checkbox-row" style={{ flexDirection: 'row' }}>
-        <input
-          type="checkbox"
-          checked={effective.commandAsControl}
-          onChange={(e) => set('commandAsControl', e.target.checked)}
-        />
-        <Hint label={t('Send ⌘ as Ctrl')}>
-          {t(
+      <SettingsGroup title={t('Keyboard')}>
+        <SwitchRow
+          label={t('Send ⌘ as Ctrl')}
+          hint={t(
             "Copy and paste then land where they do on Windows. While the desktop has the keyboard this app's own ⌘ shortcuts do not fire. ⌘Tab stays with macOS in a window; in full screen it is the far side's Alt+Tab either way."
           )}
-        </Hint>
-      </label>
-      <label className="checkbox-row" style={{ flexDirection: 'row' }}>
-        <input
-          type="checkbox"
-          checked={effective.typeAsText}
-          onChange={(e) => set('typeAsText', e.target.checked)}
+          checked={effective.commandAsControl}
+          onChange={(on) => set('commandAsControl', on)}
         />
-        <Hint label={t('Type in this machine’s layout')}>
-          {t(
+        <SwitchRow
+          label={t('Type in this machine’s layout')}
+          hint={t(
             'On a Mac letters go over as the characters typed here, so fn is all it takes and the far side’s own layout does not matter. Shortcuts, arrows, Space and the keypad still go as keys. Turn it off for a program that listens for keys rather than text, a game or a console inside the session. Elsewhere keys always go as keys, as in mstsc: Alt+Shift or Ctrl+Shift switches the language over there.'
           )}
-        </Hint>
-      </label>
+          checked={effective.typeAsText}
+          onChange={(on) => set('typeAsText', on)}
+        />
+      </SettingsGroup>
+
+      <SettingsGroup title={t('Clipboard, sound and disks')}>
+        <SwitchRow
+          label={t('Share the clipboard with this host')}
+          hint={t(
+            'What you copy here can be pasted there and back again, as every Windows client does it. Turn it off for a host you would rather not hand what you copied: anything running over there can read the clipboard, not only what you paste into.'
+          )}
+          checked={effective.clipboard}
+          onChange={(on) => set('clipboard', on)}
+        />
+        <SwitchRow
+          label={t('Play the remote sound here')}
+          hint={t(
+            'Played by the desktop client itself, so it costs this side nothing and the link something.'
+          )}
+          checked={effective.sound}
+          onChange={(on) => set('sound', on)}
+        />
+        <SwitchRow
+          label={t('Share this computer’s disks with this host')}
+          hint={t(
+            'Every disk here appears under This PC over there, as “name on this computer” — on a Mac the system disk and whatever is plugged in, coming and going as it is. Off unless turned on: anything running over there can read and change every file you can. Takes effect on the next connection.'
+          )}
+          checked={effective.drives}
+          onChange={(on) => set('drives', on)}
+        />
+      </SettingsGroup>
+
+      <SettingsGroup title={t('Session')}>
+        <SwitchRow
+          label={t('Connect in console mode (/admin)')}
+          hint={t(
+            'The administrative session. On a Session Host it takes no client access licence, so it still lets you in once licensing has run out, and a Connection Broker does not send it to another server. To use it once without saving it, right-click the host.'
+          )}
+          checked={effective.consoleSession}
+          onChange={(on) => set('consoleSession', on)}
+        />
+      </SettingsGroup>
     </>
   )
 }

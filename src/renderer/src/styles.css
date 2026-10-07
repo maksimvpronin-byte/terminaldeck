@@ -2253,6 +2253,33 @@ textarea:focus {
   border-top: 1px solid var(--border);
 }
 
+/* What a paged dialog edits, named over its list of pages. */
+.paged-dialog-title {
+  padding: 0 8px 6px;
+}
+.paged-dialog-title h2 {
+  margin: 0;
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.paged-dialog-subtitle {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+/* Where a page's values come from, or how many it holds. */
+.settings-nav button .nav-badge {
+  margin-left: auto;
+  font-size: 10.5px;
+  color: var(--text-dim);
+}
+.paged-dialog-error {
+  margin-right: auto;
+  align-self: center;
+}
+
 /* One card of settings that belong together. */
 .settings-group {
   display: flex;
@@ -2763,17 +2790,26 @@ kbd {
   white-space: nowrap;
 }
 
-.pf-rule {
-  display: flex;
-  gap: 6px;
+/* A host's port forwards, one rule to a row: the type, where it listens, where
+   it goes, and a remove button, in columns that line up. */
+.pf-table {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 6px 8px;
   align-items: center;
-  font-size: 11px;
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  padding: 6px;
 }
-.pf-rule input,
-.pf-rule select {
+.pf-head {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.pf-end {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px;
+  gap: 4px;
+}
+.pf-table input,
+.pf-table select {
+  min-width: 0;
   padding: 4px 6px;
 }
 
