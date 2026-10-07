@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { ImportSummary } from '../../../shared/types'
 import { useStore } from '../state/store'
 import { useT } from '../i18n'
-import Hint from './Hint'
+import { SettingRow, SettingsGroup, SwitchRow } from './SettingsGroup'
 
 export default function BackupSettings(): JSX.Element {
   const t = useT()
@@ -12,35 +12,6 @@ export default function BackupSettings(): JSX.Element {
   const loadGitFolders = useStore((s) => s.loadGitFolders)
   const loadCollections = useStore((s) => s.loadCollections)
   const loadCredentials = useStore((s) => s.loadCredentials)
-
-  const [checking, setChecking] = useState(false)
-  /** What the last manual check found, said out loud — see below. */
-  const [checked, setChecked] = useState('')
-
-  /**
-   * A check by hand, which has to answer even when the answer is "nothing".
-   *
-   * The banner at the top of the window speaks when there is something to do
-   * about an update and stays silent otherwise, which is right for a check
-   * nobody asked for and wrong for one somebody just pressed a button for: a
-   * button that does nothing visible reads as a broken button.
-   */
-  async function checkForUpdate(): Promise<void> {
-    setChecking(true)
-    setChecked('')
-    try {
-      const found = await window.td.updates.check()
-      setChecked(
-        !found || found === window.td.appVersion
-          ? t('This is the newest version.')
-          : t('Version {version} is available.', { version: found })
-      )
-    } catch (err) {
-      setChecked(String((err as Error).message ?? err))
-    } finally {
-      setChecking(false)
-    }
-  }
 
   // Off by default: an export leaves the machine and the OS account that
   // protects the vault, so including credentials must be a deliberate choice.
@@ -123,90 +94,75 @@ export default function BackupSettings(): JSX.Element {
 
   return (
     <>
-      <h3 className="settings-heading">
-        <Hint label={t('Export')}>
-          {t(
-            'Writes sessions, groups, snippets and inventory sources to one file. Terminal appearance and trusted host keys stay on this machine.'
-          )}
-        </Hint>
-      </h3>
-
-      <label className="checkbox-row" style={{ flexDirection: 'row' }}>
-        <input
-          type="checkbox"
+      <SettingsGroup
+        title={t('Export')}
+        hint={t(
+          'Writes sessions, groups, snippets and inventory sources to one file. Terminal appearance and trusted host keys stay on this machine.'
+        )}
+      >
+        <SwitchRow
+          label={t('Include saved credentials')}
           checked={includeSecrets}
-          onChange={(e) => setIncludeSecrets(e.target.checked)}
+          onChange={setIncludeSecrets}
         />
-        {t('Include saved credentials')}
-      </label>
 
-      {includeSecrets && (
-        <>
-          <label>
-            {t('Password for the exported credentials')}
+        {includeSecrets && (
+          <SettingRow
+            stacked
+            controlId="export-password"
+            label={t('Password for the exported credentials')}
+            note={
+              <>
+                {t(
+                  'Credentials are re-encrypted with AES-256-GCM under this password — the same scheme the vault uses — and never written in the clear. A separate password is used so the file can travel without handing over your master password.'
+                )}{' '}
+                {t(
+                  'Treat the file as a secret all the same. Unlike the vault it leaves this machine and the account protecting it, and can be attacked offline for as long as someone likes, so use a long password and delete the file once the move is done. Lose the password and those credentials are unrecoverable.'
+                )}
+              </>
+            }
+          >
             <input
+              id="export-password"
               type="password"
               value={exportPassword}
               onChange={(e) => setExportPassword(e.target.value)}
             />
-          </label>
-          <p className="settings-note">
-            {t(
-              'Credentials are re-encrypted with AES-256-GCM under this password — the same scheme the vault uses — and never written in the clear. A separate password is used so the file can travel without handing over your master password.'
-            )}
-          </p>
-          <p className="settings-note">
-            {t(
-              'Treat the file as a secret all the same. Unlike the vault it leaves this machine and the account protecting it, and can be attacked offline for as long as someone likes, so use a long password and delete the file once the move is done. Lose the password and those credentials are unrecoverable.'
-            )}
-          </p>
-        </>
-      )}
+          </SettingRow>
+        )}
 
-      <div>
-        <button className="primary" onClick={doExport}>
-          {t('Export…')}
-        </button>
-      </div>
+        <div className="settings-group-actions">
+          <button className="primary" onClick={doExport}>
+            {t('Export…')}
+          </button>
+        </div>
+      </SettingsGroup>
 
-      <h3 className="settings-heading">
-        <Hint label={t('Import')}>
-          {t(
-            'Entries are matched by id: an existing one is replaced, a new one is added, and nothing already here is deleted.'
-          )}
-        </Hint>
-      </h3>
-      <label>
-        {t('Password, if the file contains credentials')}
-        <input
-          type="password"
-          value={importPassword}
-          onChange={(e) => setImportPassword(e.target.value)}
-        />
-      </label>
-      <div>
-        <button onClick={doImport}>{t('Import…')}</button>
-      </div>
+      <SettingsGroup
+        title={t('Import')}
+        hint={t(
+          'Entries are matched by id: an existing one is replaced, a new one is added, and nothing already here is deleted.'
+        )}
+      >
+        <SettingRow
+          stacked
+          controlId="import-password"
+          label={t('Password, if the file contains credentials')}
+        >
+          <input
+            id="import-password"
+            type="password"
+            value={importPassword}
+            onChange={(e) => setImportPassword(e.target.value)}
+          />
+        </SettingRow>
+        <div className="settings-group-actions">
+          <button onClick={doImport}>{t('Import…')}</button>
+        </div>
+      </SettingsGroup>
 
       {error && <span className="error-text">{error}</span>}
       {done && <span className="success-text">{done}</span>}
-
-      <h3 className="settings-heading">
-        <Hint label={t('Updates')}>
-          {t(
-            'Asked for on the hour while the application runs, and at every start. This is the same question asked now, for when a release has just gone out.'
-          )}
-        </Hint>
-      </h3>
-      <p className="settings-note">
-        {t('This is version {version}.', { version: window.td.appVersion })}
-      </p>
-      <div>
-        <button onClick={checkForUpdate} disabled={checking}>
-          {checking ? t('Checking…') : t('Check for updates')}
-        </button>
-      </div>
-      {checked && <span className="success-text">{checked}</span>}
     </>
   )
 }

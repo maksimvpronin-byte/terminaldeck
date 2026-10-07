@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState, type CSSProperties } from 'react'
 import { useStore } from '../state/store'
 import {
   FONT_CHOICES,
@@ -8,6 +8,7 @@ import {
   TREE_ROW_MIN,
   terminalDefaults,
   themeOf,
+  treeDefaults,
   treeRowHeightOf,
   treeTintOf,
   type TreeTint
@@ -15,12 +16,111 @@ import {
 import SecuritySettings from './SecuritySettings'
 import CredentialsSettings from './CredentialsSettings'
 import BackupSettings from './BackupSettings'
-import Hint from './Hint'
+import AboutSettings from './AboutSettings'
+import { SettingRow, SettingsGroup, SwitchRow } from './SettingsGroup'
+import { TerminalIcon } from './icons'
 import ModalBackdrop from './ModalBackdrop'
 import { keyHint } from '../state/keys'
 import { LANGUAGES, useT, type Language } from '../i18n'
 
-export type SettingsTab = 'general' | 'terminal' | 'files' | 'accounts' | 'security' | 'backup'
+export type SettingsTab =
+  'general' | 'tree' | 'terminal' | 'files' | 'accounts' | 'security' | 'backup' | 'about'
+
+/** A page's glyph in the list on the left, drawn in the stroke of the app's own icons. */
+function PageIcon({ page }: { page: SettingsTab }): JSX.Element {
+  const stroke = {
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 1.3,
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round'
+  } as const
+  const shapes: Record<SettingsTab, JSX.Element> = {
+    general: (
+      <>
+        <path d="M2.5 4.5h5.7M11.8 4.5h1.7M2.5 11.5h1.7M7.8 11.5h5.7" {...stroke} />
+        <circle cx="10" cy="4.5" r="1.8" {...stroke} />
+        <circle cx="6" cy="11.5" r="1.8" {...stroke} />
+      </>
+    ),
+    tree: <path d="M4 2.5v9h3.5M4 7h3.5M9.5 3.5h4M9.5 7h4M9.5 11.5h4M2.5 3.5h3" {...stroke} />,
+    terminal: (
+      <>
+        <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" {...stroke} />
+        <path d="M4.5 6l2 2-2 2M8 10.5h3.5" {...stroke} />
+      </>
+    ),
+    files: (
+      <path
+        d="M1.8 4.2c0-.7.5-1.2 1.2-1.2h3l1.5 1.7H13c.7 0 1.2.5 1.2 1.2v6.4c0 .7-.5 1.2-1.2 1.2H3c-.7 0-1.2-.5-1.2-1.2z"
+        {...stroke}
+      />
+    ),
+    accounts: (
+      <>
+        <circle cx="8" cy="5.5" r="2.7" {...stroke} />
+        <path d="M2.8 13.8c.6-2.6 2.7-4.1 5.2-4.1s4.6 1.5 5.2 4.1" {...stroke} />
+      </>
+    ),
+    security: (
+      <>
+        <rect x="3" y="7" width="10" height="7" rx="1.3" {...stroke} />
+        <path d="M5.3 7V5.2a2.7 2.7 0 0 1 5.4 0V7" {...stroke} />
+      </>
+    ),
+    backup: (
+      <>
+        <ellipse cx="8" cy="4" rx="5.5" ry="2" {...stroke} />
+        <path
+          d="M2.5 4v8c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2V4M2.5 8c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2"
+          {...stroke}
+        />
+      </>
+    ),
+    about: (
+      <>
+        <circle cx="8" cy="8" r="6.2" {...stroke} />
+        <path d="M8 7.3v4" {...stroke} />
+        <circle cx="8" cy="4.9" r=".2" {...stroke} strokeWidth={1.6} />
+      </>
+    )
+  }
+  return (
+    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" focusable="false">
+      {shapes[page]}
+    </svg>
+  )
+}
+
+/**
+ * Three made-up hosts drawn with the tree's own classes, so every setting on
+ * the page shows on them as it will in the tree — fill, edge, bold, height.
+ */
+function TreePreview(): JSX.Element {
+  const rows = [
+    { name: 'web-01.prod', colour: '#3fb950', open: true },
+    { name: 'db-01.prod', colour: '#e5534b', open: false },
+    { name: 'build.lab', colour: undefined, open: false }
+  ]
+  return (
+    <div className="sidebar-tree tree-preview" aria-hidden="true">
+      {rows.map((row) => (
+        <div
+          key={row.name}
+          className={`tree-item${row.colour ? ' tinted' : ''}`}
+          style={(row.colour ? { '--host-colour': row.colour } : {}) as CSSProperties}
+        >
+          <span className="name">
+            <span className={`session-kind${row.open ? ' live' : ''}`}>
+              <TerminalIcon />
+            </span>
+            {row.name}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 export default function SettingsDialog({
   initialTab,
@@ -34,6 +134,7 @@ export default function SettingsDialog({
   const updateSettings = useStore((s) => s.updateSettings)
   const preview = themeOf(settings)
   const t = useT()
+  const id = useId()
   const [tab, setTab] = useState<SettingsTab>(initialTab ?? 'general')
   /*
    * Typed, then taken on leaving the field. Taken keystroke by keystroke, the
@@ -55,351 +156,375 @@ export default function SettingsDialog({
     if (path) updateSettings({ externalEditor: path })
   }
 
+  /*
+   * A list down the side rather than a row of tabs across the top. Six tabs
+   * already wrapped onto a second line in a 460px card, and the Russian labels
+   * are the longer ones; a column takes any number of pages in any language,
+   * and the groups say which pages are about this machine's look and feel and
+   * which about what it keeps.
+   */
+  const sections: Array<{ title: string; pages: Array<{ id: SettingsTab; label: string }> }> = [
+    {
+      title: t('Application'),
+      pages: [
+        { id: 'general', label: t('General') },
+        { id: 'tree', label: t('Tree and tabs') },
+        { id: 'terminal', label: t('Terminal') },
+        { id: 'files', label: t('Files') }
+      ]
+    },
+    {
+      title: t('Access and data'),
+      pages: [
+        { id: 'accounts', label: t('Accounts') },
+        { id: 'security', label: t('Security') },
+        { id: 'backup', label: t('Backup') }
+      ]
+    },
+    { title: '', pages: [{ id: 'about', label: t('About') }] }
+  ]
+  const current = sections.flatMap((s) => s.pages).find((p) => p.id === tab)
+
+  /* Only the pages whose settings have defaults worth going back to, and only
+     their own fields — see `terminalDefaults`. */
+  const reset = tab === 'terminal' ? terminalDefaults : tab === 'tree' ? treeDefaults : undefined
+
   return (
     <ModalBackdrop onClose={onClose}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <h2>{t('Settings')}</h2>
-
-        {/* Nothing floats above the tabs any more. Language sat up here, which
-            put it on every tab — a setting somebody changes once, permanently in
-            front of the ones they came to change. */}
-        <div className="settings-tabs">
-          <button className={tab === 'general' ? 'active' : ''} onClick={() => setTab('general')}>
-            {t('General')}
-          </button>
-          <button className={tab === 'terminal' ? 'active' : ''} onClick={() => setTab('terminal')}>
-            {t('Terminal')}
-          </button>
-          <button className={tab === 'files' ? 'active' : ''} onClick={() => setTab('files')}>
-            {t('Files')}
-          </button>
-          <button className={tab === 'accounts' ? 'active' : ''} onClick={() => setTab('accounts')}>
-            {t('Accounts')}
-          </button>
-          <button className={tab === 'security' ? 'active' : ''} onClick={() => setTab('security')}>
-            {t('Security')}
-          </button>
-          <button className={tab === 'backup' ? 'active' : ''} onClick={() => setTab('backup')}>
-            {t('Backup')}
-          </button>
-        </div>
-
-        {tab === 'files' && (
-          <>
-            <h3 className="settings-heading">{t('External editor')}</h3>
-            <div className="form-row">
-              <label style={{ flex: 1 }}>
-                <Hint label={t('Command')}>
-                  {t(
-                    'Used by “Edit locally” in the SFTP panel. Left empty, the file opens in Notepad on Windows and in your default text editor on macOS — never in whatever program would run it.'
-                  )}{' '}
-                  <code>{'{file}'}</code>{' '}
-                  {t(
-                    'is replaced by the path; without it the path is appended. Give the full path to the program — a windowed app does not inherit the PATH from your shell, so a bare code or subl may not be found.'
-                  )}
-                </Hint>
-                <input
-                  value={settings.externalEditor}
-                  placeholder="e.g. code -w {file}"
-                  onChange={(e) => updateSettings({ externalEditor: e.target.value })}
-                />
-              </label>
-              <button style={{ alignSelf: 'flex-end' }} onClick={pickEditor}>
-                {t('Browse…')}
-              </button>
-            </div>
-          </>
-        )}
-
-        {tab === 'accounts' && <CredentialsSettings />}
-        {tab === 'security' && <SecuritySettings />}
-        {tab === 'backup' && <BackupSettings />}
-
-        {tab === 'general' && (
-          <>
-            <label>
-              <Hint label={t('Language')}>
-                {t('Applies at once, and to this window only — nothing is sent anywhere.')}
-              </Hint>
-              <select
-                value={settings.language}
-                onChange={(e) => updateSettings({ language: e.target.value as Language })}
-              >
-                {LANGUAGES.map((language) => (
-                  <option key={language.id} value={language.id}>
-                    {language.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="checkbox-row" style={{ flexDirection: 'row' }}>
-              <input
-                type="checkbox"
-                checked={settings.monitorForAll}
-                onChange={(e) => updateSettings({ monitorForAll: e.target.checked })}
-              />
-              {t('Show the monitor under every SSH session')}
-              <Hint>
-                {t(
-                  'The strip the Monitor button opens — load, memory, disks — under every terminal, without pressing it in each. The button then closes it for that pane alone.'
-                )}
-              </Hint>
-            </label>
-
-            <h3 className="settings-heading">{t('Host tree')}</h3>
-            <label className="checkbox-row" style={{ flexDirection: 'row' }}>
-              <input
-                type="checkbox"
-                checked={settings.expandOnArrowOnly}
-                onChange={(e) => updateSettings({ expandOnArrowOnly: e.target.checked })}
-              />
-              {t('Open and close a group only with the arrow beside its name')}
-            </label>
-            <label className="checkbox-row" style={{ flexDirection: 'row' }}>
-              <input
-                type="checkbox"
-                checked={settings.revealActiveHost}
-                onChange={(e) => updateSettings({ revealActiveHost: e.target.checked })}
-              />
-              {t('Select the host of the tab in front, and scroll the tree to it')}
-            </label>
-            <label className="checkbox-row" style={{ flexDirection: 'row' }}>
-              <input
-                type="checkbox"
-                checked={settings.reuseOpenHost}
-                onChange={(e) => updateSettings({ reuseOpenHost: e.target.checked })}
-              />
-              {t('Double-click on a host that is open goes to its tab instead of opening another')}
-              <Hint>
-                {t(
-                  '“Open another tab” in the host’s menu still opens a second one. A desktop is never opened twice for one account, whatever this says: Windows keeps one session per user, and a second tab would take it from the first.'
-                )}
-              </Hint>
-            </label>
-            <label className="checkbox-row" style={{ flexDirection: 'row' }}>
-              <input
-                type="checkbox"
-                checked={settings.workspacePerGroup}
-                onChange={(e) => updateSettings({ workspacePerGroup: e.target.checked })}
-              />
-              {t('Open each host in a workspace named after its group')}
-              <Hint>
-                {t(
-                  'Off, a host opened from the tree goes to an ordinary workspace — the one in front, unless that one is a set’s. A host opened from a set goes to the set’s workspace either way.'
-                )}
-              </Hint>
-            </label>
-            <label>
-              {t('Colour of coloured rows')}
-              <select
-                value={treeTintOf(settings)}
-                onChange={(e) => updateSettings({ treeTint: e.target.value as TreeTint })}
-              >
-                <option value="fade">{t('Fading from the edge')}</option>
-                <option value="flat">{t('Even and faint, across the row')}</option>
-              </select>
-            </label>
-            <label className="checkbox-row" style={{ flexDirection: 'row' }}>
-              <input
-                type="checkbox"
-                checked={settings.treeEdge}
-                onChange={(e) => updateSettings({ treeEdge: e.target.checked })}
-              />
-              {t('A stripe of the colour down the left edge of a coloured row')}
-            </label>
-            <label className="checkbox-row" style={{ flexDirection: 'row' }}>
-              <input
-                type="checkbox"
-                checked={settings.treeBoldOpen}
-                onChange={(e) => updateSettings({ treeBoldOpen: e.target.checked })}
-              />
-              {t('Name open hosts in bold')}
-            </label>
-            <label>
-              <Hint label={t('Row height: {px} px', { px: treeRowHeightOf(settings) })}>
-                {t(
-                  'How close together hosts and groups sit in the left panel. {px} px is the usual height; lower packs a long list onto one screen.',
-                  { px: TREE_ROW_DEFAULT }
-                )}
-              </Hint>
-              <div className="form-row" style={{ alignItems: 'center' }}>
-                <input
-                  type="range"
-                  min={TREE_ROW_MIN}
-                  max={TREE_ROW_MAX}
-                  step={1}
-                  style={{ flex: 1 }}
-                  value={treeRowHeightOf(settings)}
-                  onChange={(e) => updateSettings({ treeRowHeight: Number(e.target.value) })}
-                />
+      <div className="modal-card settings-card" onClick={(e) => e.stopPropagation()}>
+        <nav className="settings-nav" aria-label={t('Settings')}>
+          <h2>{t('Settings')}</h2>
+          {sections.map((section, i) => (
+            <div className="settings-nav-section" key={i}>
+              {section.title && <div className="settings-nav-title">{section.title}</div>}
+              {section.pages.map((page) => (
                 <button
-                  type="button"
-                  disabled={treeRowHeightOf(settings) === TREE_ROW_DEFAULT}
-                  onClick={() => updateSettings({ treeRowHeight: TREE_ROW_DEFAULT })}
+                  key={page.id}
+                  className={tab === page.id ? 'active' : ''}
+                  aria-current={tab === page.id ? 'page' : undefined}
+                  onClick={() => setTab(page.id)}
                 >
-                  {t('Reset')}
+                  <PageIcon page={page.id} />
+                  {page.label}
                 </button>
-              </div>
-            </label>
-          </>
-        )}
-
-        {tab === 'terminal' && (
-          <>
-            {/* A statement about the whole tab rather than about one control,
-                so it stays where it can be read without being looked for. */}
-            <p className="settings-note">
-              {t(
-                'The defaults every terminal starts from. A group or a single host can override any of this in its own dialog, under Appearance.'
-              )}
-            </p>
-
-            <label>
-              {t('Font')}
-              <select
-                value={settings.fontFamily}
-                onChange={(e) => updateSettings({ fontFamily: e.target.value })}
-              >
-                {FONT_CHOICES.map((f) => (
-                  <option key={f} value={f}>
-                    {f.split(',')[0]}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <div className="form-row">
-              <label>
-                {t('Font size')}
-                <div className="stepper">
-                  <button
-                    title={keyHint(t('Smaller (⌘−)'))}
-                    disabled={settings.fontSize <= 8}
-                    onClick={() => updateSettings({ fontSize: settings.fontSize - 1 })}
-                  >
-                    −
-                  </button>
-                  <span className="stepper-value">{settings.fontSize}</span>
-                  <button
-                    title={keyHint(t('Larger (⌘+)'))}
-                    disabled={settings.fontSize >= 32}
-                    onClick={() => updateSettings({ fontSize: settings.fontSize + 1 })}
-                  >
-                    +
-                  </button>
-                </div>
-              </label>
-              <label>
-                {t('Scrollback (lines)')}
-                <input
-                  type="number"
-                  min={100}
-                  max={200000}
-                  step={1000}
-                  value={scrollbackDraft ?? settings.scrollback}
-                  onChange={(e) => setScrollbackDraft(e.target.value)}
-                  onBlur={commitScrollback}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') commitScrollback()
-                  }}
-                />
-              </label>
+              ))}
             </div>
+          ))}
+        </nav>
 
-            <label>
-              {t('Colour theme')}
-              <select
-                value={settings.themeName}
-                onChange={(e) => updateSettings({ themeName: e.target.value })}
-              >
-                {THEME_GROUPS.map((group) => (
-                  <optgroup key={group.label} label={group.label}>
-                    {group.names.map((name) => (
-                      <option key={name} value={name}>
-                        {name}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-            </label>
+        <div className="settings-page">
+          <div className="settings-page-body" key={tab}>
+            <h2>{current?.label}</h2>
 
-            <div
-              className="theme-preview"
-              style={{
-                background: preview.background,
-                color: preview.foreground,
-                fontFamily: settings.fontFamily,
-                fontSize: settings.fontSize
-              }}
-            >
-              <div>
-                <span style={{ color: preview.green ?? preview.foreground }}>user@host</span>:
-                <span style={{ color: preview.blue ?? preview.foreground }}>~</span>${' '}
-                <span>ls -la</span>
-              </div>
-              <div style={{ color: preview.red ?? preview.foreground }}>permission denied</div>
-            </div>
+            {tab === 'general' && (
+              <>
+                <SettingsGroup title={t('Interface')}>
+                  <SettingRow
+                    controlId={`${id}-language`}
+                    label={t('Language')}
+                    hint={t('Applies at once, and to this window only — nothing is sent anywhere.')}
+                  >
+                    <select
+                      id={`${id}-language`}
+                      value={settings.language}
+                      onChange={(e) => updateSettings({ language: e.target.value as Language })}
+                    >
+                      {LANGUAGES.map((language) => (
+                        <option key={language.id} value={language.id}>
+                          {language.name}
+                        </option>
+                      ))}
+                    </select>
+                  </SettingRow>
+                </SettingsGroup>
 
-            <div className="form-row">
-              <label>
-                {t('Cursor style')}
-                <select
-                  value={settings.cursorStyle}
-                  onChange={(e) =>
-                    updateSettings({ cursorStyle: e.target.value as typeof settings.cursorStyle })
+                <SettingsGroup title={t('Session logs')}>
+                  <SettingRow
+                    label={t('Logs folder')}
+                    note={t(
+                      'Sessions with “Log session output to file” enabled write here. The transcript contains everything the terminal showed, so treat it as sensitive.'
+                    )}
+                  >
+                    <button onClick={() => window.td.logs.reveal()}>{t('Open logs folder')}</button>
+                  </SettingRow>
+                </SettingsGroup>
+              </>
+            )}
+
+            {tab === 'tree' && (
+              <>
+                <SettingsGroup title={t('Behaviour')}>
+                  <SwitchRow
+                    label={t('Open groups only by their arrow')}
+                    note={t('Off, a click anywhere on the row opens and closes a group.')}
+                    checked={settings.expandOnArrowOnly}
+                    onChange={(on) => updateSettings({ expandOnArrowOnly: on })}
+                  />
+                  <SwitchRow
+                    label={t('Show the host of the tab in front')}
+                    note={t('Selects it in the tree and scrolls to it.')}
+                    checked={settings.revealActiveHost}
+                    onChange={(on) => updateSettings({ revealActiveHost: on })}
+                  />
+                  <SwitchRow
+                    label={t('Double-click on an open host goes to its tab')}
+                    hint={t(
+                      '“Open another tab” in the host’s menu still opens a second one. A desktop is never opened twice for one account, whatever this says: Windows keeps one session per user, and a second tab would take it from the first.'
+                    )}
+                    checked={settings.reuseOpenHost}
+                    onChange={(on) => updateSettings({ reuseOpenHost: on })}
+                  />
+                  <SwitchRow
+                    label={t('A workspace for each group')}
+                    note={t('A host opens in a workspace named after its group.')}
+                    hint={t(
+                      'Off, a host opened from the tree goes to an ordinary workspace — the one in front, unless that one is a set’s. A host opened from a set goes to the set’s workspace either way.'
+                    )}
+                    checked={settings.workspacePerGroup}
+                    onChange={(on) => updateSettings({ workspacePerGroup: on })}
+                  />
+                </SettingsGroup>
+
+                <SettingsGroup title={t('Appearance')}>
+                  <TreePreview />
+                  <SettingRow controlId={`${id}-tint`} label={t('Colour of coloured rows')}>
+                    <select
+                      id={`${id}-tint`}
+                      value={treeTintOf(settings)}
+                      onChange={(e) => updateSettings({ treeTint: e.target.value as TreeTint })}
+                    >
+                      <option value="fade">{t('Fading from the edge')}</option>
+                      <option value="flat">{t('Even and faint, across the row')}</option>
+                    </select>
+                  </SettingRow>
+                  <SwitchRow
+                    label={t('A stripe of the colour down the left edge')}
+                    checked={settings.treeEdge}
+                    onChange={(on) => updateSettings({ treeEdge: on })}
+                  />
+                  <SwitchRow
+                    label={t('Name open hosts in bold')}
+                    checked={settings.treeBoldOpen}
+                    onChange={(on) => updateSettings({ treeBoldOpen: on })}
+                  />
+                  <SettingRow
+                    controlId={`${id}-row`}
+                    label={t('Row height')}
+                    hint={t(
+                      'How close together hosts and groups sit in the left panel. {px} px is the usual height; lower packs a long list onto one screen.',
+                      { px: TREE_ROW_DEFAULT }
+                    )}
+                  >
+                    <input
+                      id={`${id}-row`}
+                      type="range"
+                      min={TREE_ROW_MIN}
+                      max={TREE_ROW_MAX}
+                      step={1}
+                      value={treeRowHeightOf(settings)}
+                      onChange={(e) => updateSettings({ treeRowHeight: Number(e.target.value) })}
+                    />
+                    <span className="setting-value range-value">
+                      {treeRowHeightOf(settings)} px
+                    </span>
+                  </SettingRow>
+                </SettingsGroup>
+              </>
+            )}
+
+            {tab === 'terminal' && (
+              <>
+                {/* A statement about the whole page rather than about one
+                    control, so it stays where it can be read without being
+                    looked for. */}
+                <p className="settings-note">
+                  {t(
+                    'The defaults every terminal starts from. A group or a single host can override any of this in its own dialog, under Appearance.'
+                  )}
+                </p>
+
+                <SettingsGroup title={t('Font and colours')}>
+                  <SettingRow controlId={`${id}-font`} label={t('Font')}>
+                    <select
+                      id={`${id}-font`}
+                      value={settings.fontFamily}
+                      onChange={(e) => updateSettings({ fontFamily: e.target.value })}
+                    >
+                      {FONT_CHOICES.map((f) => (
+                        <option key={f} value={f}>
+                          {f.split(',')[0]}
+                        </option>
+                      ))}
+                    </select>
+                  </SettingRow>
+                  <SettingRow label={t('Font size')}>
+                    <div className="stepper">
+                      <button
+                        title={keyHint(t('Smaller (⌘−)'))}
+                        disabled={settings.fontSize <= 8}
+                        onClick={() => updateSettings({ fontSize: settings.fontSize - 1 })}
+                      >
+                        −
+                      </button>
+                      <span className="stepper-value">{settings.fontSize}</span>
+                      <button
+                        title={keyHint(t('Larger (⌘+)'))}
+                        disabled={settings.fontSize >= 32}
+                        onClick={() => updateSettings({ fontSize: settings.fontSize + 1 })}
+                      >
+                        +
+                      </button>
+                    </div>
+                  </SettingRow>
+                  <SettingRow controlId={`${id}-theme`} label={t('Colour theme')}>
+                    <select
+                      id={`${id}-theme`}
+                      value={settings.themeName}
+                      onChange={(e) => updateSettings({ themeName: e.target.value })}
+                    >
+                      {THEME_GROUPS.map((group) => (
+                        <optgroup key={group.label} label={group.label}>
+                          {group.names.map((name) => (
+                            <option key={name} value={name}>
+                              {name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </SettingRow>
+                  <div
+                    className="theme-preview"
+                    style={{
+                      background: preview.background,
+                      color: preview.foreground,
+                      fontFamily: settings.fontFamily,
+                      fontSize: settings.fontSize
+                    }}
+                  >
+                    <div>
+                      <span style={{ color: preview.green ?? preview.foreground }}>user@host</span>:
+                      <span style={{ color: preview.blue ?? preview.foreground }}>~</span>${' '}
+                      <span>ls -la</span>
+                    </div>
+                    <div style={{ color: preview.red ?? preview.foreground }}>
+                      permission denied
+                    </div>
+                  </div>
+                </SettingsGroup>
+
+                <SettingsGroup title={t('Cursor')}>
+                  <SettingRow controlId={`${id}-cursor`} label={t('Cursor style')}>
+                    <select
+                      id={`${id}-cursor`}
+                      value={settings.cursorStyle}
+                      onChange={(e) =>
+                        updateSettings({
+                          cursorStyle: e.target.value as typeof settings.cursorStyle
+                        })
+                      }
+                    >
+                      <option value="block">{t('Block')}</option>
+                      <option value="underline">{t('Underline')}</option>
+                      <option value="bar">{t('Bar')}</option>
+                    </select>
+                  </SettingRow>
+                  <SwitchRow
+                    label={t('Blinking cursor')}
+                    checked={settings.cursorBlink}
+                    onChange={(on) => updateSettings({ cursorBlink: on })}
+                  />
+                </SettingsGroup>
+
+                <SettingsGroup title={t('Scrollback and clipboard')}>
+                  <SettingRow controlId={`${id}-scrollback`} label={t('Scrollback (lines)')}>
+                    <input
+                      id={`${id}-scrollback`}
+                      type="number"
+                      min={100}
+                      max={200000}
+                      step={1000}
+                      value={scrollbackDraft ?? settings.scrollback}
+                      onChange={(e) => setScrollbackDraft(e.target.value)}
+                      onBlur={commitScrollback}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') commitScrollback()
+                      }}
+                    />
+                  </SettingRow>
+                  <SwitchRow
+                    label={t('Copy to clipboard as soon as text is selected')}
+                    checked={settings.copyOnSelect}
+                    onChange={(on) => updateSettings({ copyOnSelect: on })}
+                  />
+                  <SettingRow controlId={`${id}-right`} label={t('Right-click in a terminal')}>
+                    <select
+                      id={`${id}-right`}
+                      value={settings.rightClick}
+                      onChange={(e) =>
+                        updateSettings({ rightClick: e.target.value as typeof settings.rightClick })
+                      }
+                    >
+                      <option value="paste">{t('Paste clipboard')}</option>
+                      <option value="menu">{t('Open context menu')}</option>
+                    </select>
+                  </SettingRow>
+                </SettingsGroup>
+
+                <SettingsGroup title={t('SSH sessions')}>
+                  <SwitchRow
+                    label={t('Show the monitor under every SSH session')}
+                    hint={t(
+                      'The strip the Monitor button opens — load, memory, disks — under every terminal, without pressing it in each. The button then closes it for that pane alone.'
+                    )}
+                    checked={settings.monitorForAll}
+                    onChange={(on) => updateSettings({ monitorForAll: on })}
+                  />
+                </SettingsGroup>
+              </>
+            )}
+
+            {tab === 'files' && (
+              <SettingsGroup title={t('External editor')}>
+                <SettingRow
+                  stacked
+                  controlId={`${id}-editor`}
+                  label={t('Command')}
+                  hint={
+                    <>
+                      {t(
+                        'Used by “Edit locally” in the SFTP panel. Left empty, the file opens in Notepad on Windows and in your default text editor on macOS — never in whatever program would run it.'
+                      )}{' '}
+                      <code>{'{file}'}</code>{' '}
+                      {t(
+                        'is replaced by the path; without it the path is appended. Give the full path to the program — a windowed app does not inherit the PATH from your shell, so a bare code or subl may not be found.'
+                      )}
+                    </>
                   }
                 >
-                  <option value="block">{t('Block')}</option>
-                  <option value="underline">{t('Underline')}</option>
-                  <option value="bar">{t('Bar')}</option>
-                </select>
-              </label>
-              <label className="checkbox-row" style={{ alignSelf: 'flex-end', paddingBottom: 6 }}>
-                <input
-                  type="checkbox"
-                  checked={settings.cursorBlink}
-                  onChange={(e) => updateSettings({ cursorBlink: e.target.checked })}
-                />
-                {t('Blinking cursor')}
-              </label>
-            </div>
+                  <input
+                    id={`${id}-editor`}
+                    value={settings.externalEditor}
+                    placeholder="code -w {file}"
+                    onChange={(e) => updateSettings({ externalEditor: e.target.value })}
+                  />
+                  <button onClick={pickEditor}>{t('Browse…')}</button>
+                </SettingRow>
+              </SettingsGroup>
+            )}
 
-            <label className="checkbox-row" style={{ flexDirection: 'row' }}>
-              <input
-                type="checkbox"
-                checked={settings.copyOnSelect}
-                onChange={(e) => updateSettings({ copyOnSelect: e.target.checked })}
-              />
-              {t('Copy to clipboard as soon as text is selected')}
-            </label>
+            {tab === 'accounts' && <CredentialsSettings />}
+            {tab === 'security' && <SecuritySettings />}
+            {tab === 'backup' && <BackupSettings />}
+            {tab === 'about' && <AboutSettings />}
+          </div>
 
-            <label>
-              {t('Right-click in a terminal')}
-              <select
-                value={settings.rightClick}
-                onChange={(e) =>
-                  updateSettings({ rightClick: e.target.value as typeof settings.rightClick })
-                }
-              >
-                <option value="paste">{t('Paste clipboard')}</option>
-                <option value="menu">{t('Open context menu')}</option>
-              </select>
-            </label>
-          </>
-        )}
-
-        <div className="modal-actions">
-          {/* This tab's fields and no others — see `terminalDefaults`. */}
-          {tab === 'terminal' && (
-            <button onClick={() => updateSettings(terminalDefaults())}>
-              {t('Reset to defaults')}
+          <div className="modal-actions settings-actions">
+            {reset && <button onClick={() => updateSettings(reset())}>{t('Reset section')}</button>}
+            <button className="primary" onClick={onClose}>
+              {t('Done')}
             </button>
-          )}
-          <button className="primary" onClick={onClose}>
-            {t('Done')}
-          </button>
+          </div>
         </div>
       </div>
     </ModalBackdrop>

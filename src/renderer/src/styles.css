@@ -220,33 +220,6 @@ label {
   flex-shrink: 0;
   -webkit-app-region: drag;
 }
-.sidebar-tabs {
-  display: flex;
-  border-bottom: 1px solid var(--border);
-  -webkit-app-region: no-drag;
-}
-.sidebar-tabs button {
-  flex: 1;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  padding: 8px 0;
-  color: var(--text-dim);
-  border-bottom: 2px solid transparent;
-}
-.sidebar-tabs button.active {
-  color: var(--text);
-  border-bottom-color: var(--accent);
-  background: transparent;
-}
-.sidebar-tabs button:hover {
-  background: var(--bg-2);
-  border-color: transparent;
-  border-bottom: 2px solid var(--border);
-}
-.sidebar-tabs button.active:hover {
-  border-bottom-color: var(--accent);
-}
 .inventory-meta {
   font-size: 10px;
   color: var(--text-dim);
@@ -2182,29 +2155,281 @@ textarea:focus {
   gap: 8px;
   margin-top: 6px;
 }
-/* Wraps, because the row outgrew the card the moment a sixth tab was added.
-   The card is a fixed 460px and does not scroll sideways, so a row that does
-   not fit is a row with its last tab sliced off by the edge — which is what
-   "Резервная копия" was, while "Учётные записи" beside it had been squeezed
-   onto two lines to make room. Neither is a width worth tuning: the labels are
-   translated, and a row that fits in English is not one that fits in Russian.
-   A second line costs twenty pixels and is right in every language. */
-.settings-tabs {
+/* --- settings ---
+   A list of pages down the left and the page at the right. The card has a
+   fixed height so that moving between a short page and a long one does not
+   make the whole dialog jump; the page scrolls, the list and the buttons stay
+   where they are. */
+.modal-card.settings-card {
+  width: 760px;
+  max-width: calc(100vw - 32px);
+  height: min(680px, 88vh);
+  max-height: none;
+  padding: 0;
+  gap: 0;
+  flex-direction: row;
+  overflow: hidden;
+}
+.settings-nav {
+  width: 196px;
+  flex-shrink: 0;
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 8px;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 10px;
+  background: var(--bg-0);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
 }
-/* Whole words on one line each. Wrapping settles which tabs share a row; this
-   is what stops a tab that has a row to itself still breaking its own label. */
-.settings-tabs button {
+.settings-nav h2 {
+  margin: 0 8px 4px;
+  font-size: 15px;
+}
+.settings-nav-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+/* The last group is the one with no title: it sits at the foot of the list. */
+.settings-nav-section:last-child {
+  margin-top: auto;
+}
+.settings-nav-title {
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.settings-nav button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 6px 8px;
+  text-align: left;
   white-space: nowrap;
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-dim);
 }
-.settings-tabs button.active {
+.settings-nav button:hover {
+  background: var(--bg-2);
+  border-color: transparent;
+  color: var(--text);
+}
+.settings-nav button.active {
   background: var(--accent-dim);
-  border-color: var(--accent);
+  border-color: transparent;
+  color: var(--text);
 }
+.settings-nav button svg {
+  flex-shrink: 0;
+}
+.settings-page {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.settings-page-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 22px;
+  animation: td-fade-in var(--motion-fast) var(--ease-out);
+}
+.settings-page-body > * {
+  flex-shrink: 0;
+}
+.settings-page-body > h2 {
+  margin: 0;
+  font-size: 15px;
+}
+.settings-actions {
+  margin: 0;
+  padding: 12px 22px;
+  border-top: 1px solid var(--border);
+}
+
+/* One card of settings that belong together. */
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.settings-group-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 2px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-dim);
+}
+.settings-group-body {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg-2) 45%, var(--bg-1));
+}
+/* Whatever a card holds besides rows — a preview, a list, a form, a button —
+   sits on the card's own margins and is divided from its neighbours the way
+   rows are. */
+.settings-group-body > * {
+  padding: 10px 14px;
+}
+.settings-group-body > * + * {
+  border-top: 1px solid var(--border);
+}
+.settings-group-body > .settings-note {
+  padding: 10px 14px;
+}
+.settings-group-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.settings-group-actions {
+  display: flex;
+  gap: 8px;
+}
+.settings-group-body > .known-hosts-list:empty {
+  display: none;
+}
+
+/* A setting: what it is on the left, the control on the right. */
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 40px;
+  box-sizing: border-box;
+}
+.setting-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.setting-label {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 12.5px;
+  color: var(--text);
+}
+.setting-label > label {
+  display: inline;
+  font-size: inherit;
+  color: inherit;
+}
+.setting-note {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+.setting-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.setting-control > select {
+  width: 220px;
+}
+.setting-control > input[type='number'] {
+  width: 110px;
+}
+.setting-control > input[type='range'] {
+  width: 150px;
+  padding: 0;
+  accent-color: var(--accent);
+}
+.setting-value {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.range-value {
+  min-width: 40px;
+  text-align: right;
+}
+/* Caption over control, for a field that wants the whole width. */
+.setting-row.stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+.setting-row.stacked .setting-control > input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* A checkbox drawn as a switch. Still a checkbox to the keyboard and to a
+   screen reader, which is told it is a switch by its role. */
+input.switch {
+  appearance: none;
+  position: relative;
+  width: 32px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 9px;
+  background: var(--bg-3);
+  box-shadow: inset 0 0 0 1px var(--border);
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--ease-out);
+}
+input.switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  transition:
+    transform var(--motion-fast) var(--ease-out),
+    background var(--motion-fast) var(--ease-out);
+}
+input.switch:checked {
+  background: var(--accent);
+  box-shadow: none;
+}
+input.switch:checked::after {
+  transform: translateX(14px);
+  background: #fff;
+}
+input.switch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The host tree page's sample rows: the tree's own classes, so its settings
+   show here exactly as they will there, without the tree's scrolling. */
+.settings-group-body > .tree-preview {
+  flex: none;
+  overflow: visible;
+  padding: 8px;
+}
+.tree-preview .tree-item {
+  pointer-events: none;
+}
+.settings-group-body > .theme-preview {
+  margin: 12px 14px;
+  padding: 10px;
+}
+.settings-group-body > .theme-preview + * {
+  border-top: 1px solid var(--border);
+}
+
 /* Sits in the session tree under the groups, so it needs room for its own
    "new" button without looking like another toolbar. */
 .collections-heading {
@@ -2216,6 +2441,12 @@ textarea:focus {
 .collections-heading button {
   padding: 0 6px;
   line-height: 1;
+}
+/* More than one button at the right of a heading — the inventory's sync and add. */
+.heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .crash-screen {
@@ -2401,26 +2632,39 @@ textarea:focus {
 }
 
 /* --- help --- */
+/* The release notes' card; Help itself is a `.settings-card`, which wins. */
 .help-card {
   width: 620px;
   max-width: 92vw;
 }
-.help-title {
+/* Help is laid out as Settings is — see `.settings-card` — with a search box
+   over the list and the version and release notes at its foot. */
+.help-search {
+  margin: 0 2px;
+}
+.help-nav-footer {
+  margin-top: auto;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
+  padding: 8px 8px 0;
+  border-top: 1px solid var(--border);
 }
 .help-version {
-  margin-left: auto;
   font-size: 11px;
-  font-weight: 400;
   color: var(--text-dim);
 }
 .help-whats-new {
+  margin-left: auto;
   padding: 1px 8px;
   font-size: 11px;
-  font-weight: 400;
-  align-self: center;
+}
+.help-part-title {
+  margin: 4px 2px -6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-dim);
 }
 /* The notes of a release, read after an update or from Help. */
 .whats-new-card p {
@@ -2447,24 +2691,38 @@ textarea:focus {
   left: 2px;
   color: var(--text-dim);
 }
+/* A part's rows in one card, a line between each, as a settings card has. */
 .help-rows {
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg-2) 45%, var(--bg-1));
 }
 .help-row {
   display: grid;
-  grid-template-columns: 130px 1fr;
-  gap: 10px;
+  grid-template-columns: 1fr;
+  gap: 12px;
   align-items: baseline;
+  padding: 8px 14px;
   font-size: 12px;
+}
+.help-row + .help-row {
+  border-top: 1px solid var(--border);
+}
+/* The key column only where a part names a key, so a page of prose is not
+   pushed a hundred pixels to the right by a column with nothing in it. */
+.help-rows.has-keys .help-row {
+  grid-template-columns: 120px 1fr;
 }
 .help-keys {
   text-align: right;
 }
+.help-rows:not(.has-keys) .help-keys {
+  display: none;
+}
 .help-what {
-  color: var(--text-dim);
+  color: var(--text);
   line-height: 1.45;
 }
 /* A line to be typed into a file somewhere else, under the row that explains
@@ -2654,7 +2912,6 @@ button,
 .tab,
 .tab .close,
 .workspace-chip .close,
-.sidebar-tabs button,
 .context-menu button,
 .palette-row,
 .sftp-tree-row,

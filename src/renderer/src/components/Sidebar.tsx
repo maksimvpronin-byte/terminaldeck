@@ -240,7 +240,6 @@ export default function Sidebar({
     forId?: string
   } | null>(null)
   const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsed)
-  const [tab, setTab] = useState<'sessions' | 'inventory'>('sessions')
   /** Hosts waiting to be put into a brand new collection. */
   const [collecting, setCollecting] = useState<string[] | null>(null)
   /** A folder's sync, once its repository has been read and before it is taken. */
@@ -358,6 +357,14 @@ export default function Sidebar({
   }
 
   const needle = query.trim().toLowerCase()
+  /** Whether the inventory section below has something to show for the filter. */
+  const inventoryMatches = useStore((s) =>
+    needle === ''
+      ? false
+      : s.inventoryTrees.some((tree) =>
+          tree.sessions.some((h) => `${h.name} ${h.host}`.toLowerCase().includes(needle))
+        )
+  )
   const visible = useMemo(
     () =>
       needle
@@ -695,7 +702,7 @@ export default function Sidebar({
         forId: host.id
       })
     } else if (findHost(state, hostId)?.fromInventory) {
-      setTab('inventory')
+      // The inventory section of this tree answers it, with its own menu.
     } else {
       state.requestHostMenu(null)
     }
@@ -1163,22 +1170,11 @@ export default function Sidebar({
        * arithmetic of wrong. */}
       {!fullscreen && <div className="titlebar-spacer" />}
 
-      <div className="sidebar-tabs">
-        <button className={tab === 'sessions' ? 'active' : ''} onClick={() => setTab('sessions')}>
-          {t('Sessions')}
-        </button>
-        <button className={tab === 'inventory' ? 'active' : ''} onClick={() => setTab('inventory')}>
-          {t('Inventory')}
-        </button>
-      </div>
-
       <div className="sidebar-header" style={{ borderTop: 'none' }}>
         <div className="filter-field">
           <input
             ref={queryRef}
-            placeholder={
-              tab === 'sessions' ? t('Filter hosts and groups…') : t('Filter inventory…')
-            }
+            placeholder={t('Filter hosts and groups…')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
@@ -1208,81 +1204,80 @@ export default function Sidebar({
         </div>
       </div>
 
-      {tab === 'inventory' && <InventoryTree query={query} />}
+      {/* One tree: saved hosts, the inventories, collections and multi-windows.
+          The inventory had a tab of its own until 0.27 — see InventoryTree. */}
+      <>
+        <div className="sidebar-header">
+          <button className="primary" style={{ flex: 1 }} onClick={() => newSession(null)}>
+            {t('+ Session')}
+          </button>
+          <button onClick={() => setGroupDialog({ parentId: null })}>{t('+ Group')}</button>
+          <button title={t('Import from ~/.ssh/config')} onClick={() => setShowImport(true)}>
+            ⇩
+          </button>
+        </div>
+        <div className="sidebar-header" style={{ borderTop: 'none' }}>
+          <button style={{ flex: 1 }} onClick={() => setShowQuickConnect(true)}>
+            {t('Quick connect…')}
+          </button>
+          <button
+            className="icon-button"
+            title={t('Expand all')}
+            aria-label={t('Expand all')}
+            onClick={() => foldAll(true)}
+          >
+            <ExpandAllIcon />
+          </button>
+          <button
+            className="icon-button"
+            title={t('Collapse all')}
+            aria-label={t('Collapse all')}
+            onClick={() => foldAll(false)}
+          >
+            <CollapseAllIcon />
+          </button>
+        </div>
+        <div className="sidebar-tree">
+          {renderGroups(null, 0)}
 
-      {tab === 'sessions' && (
-        <>
-          <div className="sidebar-header">
-            <button className="primary" style={{ flex: 1 }} onClick={() => newSession(null)}>
-              {t('+ Session')}
-            </button>
-            <button onClick={() => setGroupDialog({ parentId: null })}>{t('+ Group')}</button>
-            <button title={t('Import from ~/.ssh/config')} onClick={() => setShowImport(true)}>
-              ⇩
-            </button>
-          </div>
-          <div className="sidebar-header" style={{ borderTop: 'none' }}>
-            <button style={{ flex: 1 }} onClick={() => setShowQuickConnect(true)}>
-              {t('Quick connect…')}
-            </button>
-            <button
-              className="icon-button"
-              title={t('Expand all')}
-              aria-label={t('Expand all')}
-              onClick={() => foldAll(true)}
-            >
-              <ExpandAllIcon />
-            </button>
-            <button
-              className="icon-button"
-              title={t('Collapse all')}
-              aria-label={t('Collapse all')}
-              onClick={() => foldAll(false)}
-            >
-              <CollapseAllIcon />
-            </button>
-          </div>
-          <div className="sidebar-tree">
-            {renderGroups(null, 0)}
+          {rootSessions.length > 0 && (
+            <div className="tree-group">
+              <div className="tree-group-title">{t('Sessions')}</div>
+              {rootSessions.map((s) => renderSession(s, groupIndent(0)))}
+            </div>
+          )}
 
-            {rootSessions.length > 0 && (
-              <div className="tree-group">
-                <div className="tree-group-title">{t('Sessions')}</div>
-                {rootSessions.map((s) => renderSession(s, groupIndent(0)))}
-              </div>
-            )}
+          {groups.length === 0 && sessions.length === 0 && (
+            <div style={{ padding: 12, color: 'var(--text-dim)', fontSize: 12 }}>
+              {t('No saved sessions yet. Click "+ Session" to add one.')}
+            </div>
+          )}
+          {needle !== '' && visible.length === 0 && wholeGroups.size === 0 && !inventoryMatches && (
+            <div style={{ padding: 12, color: 'var(--text-dim)', fontSize: 12 }}>
+              Nothing matches “{query}”.
+            </div>
+          )}
 
-            {groups.length === 0 && sessions.length === 0 && (
-              <div style={{ padding: 12, color: 'var(--text-dim)', fontSize: 12 }}>
-                {t('No saved sessions yet. Click "+ Session" to add one.')}
-              </div>
-            )}
-            {needle !== '' && visible.length === 0 && wholeGroups.size === 0 && (
-              <div style={{ padding: 12, color: 'var(--text-dim)', fontSize: 12 }}>
-                Nothing matches “{query}”.
-              </div>
-            )}
-
-            {/* An explicit strip, rather than outlining the whole tree, which made
+          {/* An explicit strip, rather than outlining the whole tree, which made
             it look as though the entire structure were being moved. */}
-            {isDragging && !(dragItem && isGitNode(dragItem.id)) && (
-              <div
-                className={`root-drop-zone ${dropTarget === ROOT_TARGET ? 'over' : ''}`}
-                onDragOver={(e) => allowDrop(e, null)}
-                onDragLeave={() => setDropTarget(null)}
-                onDrop={(e) => handleDrop(e, null)}
-              >
-                {t('Move to top level')}
-              </div>
-            )}
+          {isDragging && !(dragItem && isGitNode(dragItem.id)) && (
+            <div
+              className={`root-drop-zone ${dropTarget === ROOT_TARGET ? 'over' : ''}`}
+              onDragOver={(e) => allowDrop(e, null)}
+              onDragLeave={() => setDropTarget(null)}
+              onDrop={(e) => handleDrop(e, null)}
+            >
+              {t('Move to top level')}
+            </div>
+          )}
 
-            {/* Custom sets live in the same tree as the groups, below them: they are
+          {/* Custom sets live in the same tree as the groups, below them: they are
             another way of grouping the very same hosts, not a separate place. */}
-            <CollectionsPanel query={query} fold={fold} />
-            <MultiWindowsPanel query={query} />
-          </div>
-        </>
-      )}
+          <InventoryTree query={query} fold={fold} />
+          <CollectionsPanel query={query} fold={fold} />
+          <MultiWindowsPanel query={query} />
+        </div>
+      </>
 
       {/* Only once there is a batch to act on. Every verb here is about several
           hosts at once, and one host is opened by clicking it — so for a single
@@ -1424,7 +1419,7 @@ export default function Sidebar({
         />
       )}
 
-      {/* The same dialog the Inventory tab uses, pointed at this folder's own
+      {/* The same dialog the Inventory section uses, pointed at this folder's own
           store of local settings — the question it answers is identical. */}
       {overriding && (
         <InventoryOverrideDialog

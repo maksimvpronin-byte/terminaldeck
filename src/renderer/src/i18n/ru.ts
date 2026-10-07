@@ -46,12 +46,12 @@ export const ru: Record<string, string> = {
   'Running commands everywhere': 'Команды сразу везде',
   'Files (SFTP)': 'Файлы (SFTP)',
   'Inventory from git': 'Инвентарь из git',
-  'Your own sets of hosts, under the groups in the Sessions tab':
-    'Ваши собственные наборы хостов — под группами на вкладке «Сессии»',
+  'Your own sets of hosts, in the tree under the groups and the inventory':
+    'Ваши собственные наборы хостов — в дереве под группами и инвентарём',
   'A named set that outlives the workspace you opened them in':
     'Именованный набор, который переживает рабочую область, где вы их открыли',
-  'Tick hosts in either tab, then press Collect to save them as a set':
-    'Отметьте хосты на любой вкладке и нажмите «Собрать», чтобы сохранить набор',
+  'Tick hosts anywhere in the tree, then press Collect to save them as a set':
+    'Отметьте хосты в любом месте дерева и нажмите «Собрать», чтобы сохранить набор',
   'Or right-click a workspace above and choose “Save as collection…”':
     'Или правый клик по рабочей области сверху и «Сохранить как набор…»',
   'Close the workspace freely — Open brings the whole set back':
@@ -195,8 +195,8 @@ export const ru: Record<string, string> = {
   'Tick everything between the last click and this one': 'Отметить всё между прошлым кликом и этим',
   'A bar appears with Open, for separate tabs, and Tile, for one tab':
     'Появляется полоса с «Открыть» — по вкладкам, и «Плиткой» — в одной вкладке',
-  'The selection spans both tabs, so saved and inventory hosts mix freely':
-    'Выделение общее для обеих вкладок, сохранённые и инвентарные хосты смешиваются',
+  'Saved hosts and inventory hosts can be ticked together, in one selection':
+    'Сохранённые и инвентарные хосты отмечаются вместе, в одно выделение',
   'Drag hosts and groups between groups, or onto empty space for the top level':
     'Перетаскивайте хосты и группы между группами или на пустое место — в верхний уровень',
   'Drop a host onto the top or bottom edge of another to sort the list by hand':
@@ -213,8 +213,6 @@ export const ru: Record<string, string> = {
     'Это тоже наследуется, поэтому вся группа может начинать с sudo -i',
   'Colour a host or group to tell production apart at a glance':
     'Пометьте хост или группу цветом, чтобы отличать продакшн с одного взгляда',
-  'A green dot marks a host that already has a terminal open':
-    'Зелёная точка отмечает хост, у которого уже открыт терминал',
   'Settings → Backup moves everything to another machine, credentials optional':
     'Настройки → «Резервная копия» переносят всё на другую машину, пароли по желанию',
   'Snippet palette: ⏎ runs, ⇧⏎ drops it on the prompt unrun':
@@ -264,8 +262,8 @@ export const ru: Record<string, string> = {
     'Клик по уже открытому хосту выводит вперёд его панель и отдаёт ей клавиатуру',
   'A double-click on a host already open goes to its tab and reconnects it if dropped':
     'Двойной клик по уже открытому хосту переходит на его вкладку и переподключает её, если связь оборвалась',
-  '“Open another tab” in its menu makes a second; Settings → General turns this off':
-    '«Открыть ещё одну вкладку» в его меню открывает вторую; выключается в Настройки → Общие',
+  '“Open another tab” in its menu makes a second; Settings → Tree and tabs turns this off':
+    '«Открыть ещё одну вкладку» в его меню открывает вторую; выключается в Настройки → Дерево и вкладки',
   'A desktop is never opened twice for one account: Windows keeps one session per user':
     'Рабочий стол под одной учётной записью дважды не открывается: в Windows у пользователя один сеанс',
   'A desktop just opened takes the keyboard, as a new terminal does':
@@ -365,8 +363,23 @@ export const ru: Record<string, string> = {
   'Right-click in a terminal': 'Правый клик в терминале',
   'Paste clipboard': 'Вставить из буфера',
   'Open context menu': 'Открыть контекстное меню',
-  'Reset to defaults': 'Сбросить к исходным',
+  'Reset section': 'Сбросить раздел',
   Done: 'Готово',
+  Application: 'Приложение',
+  'Access and data': 'Доступ и данные',
+  'Tree and tabs': 'Дерево и вкладки',
+  About: 'О программе',
+  Interface: 'Интерфейс',
+  'Logs folder': 'Папка журналов',
+  Behaviour: 'Поведение',
+  'Font and colours': 'Шрифт и цвета',
+  Cursor: 'Курсор',
+  'Scrollback and clipboard': 'История и буфер обмена',
+  'SSH sessions': 'SSH-сессии',
+  Version: 'Версия',
+  'Trusted on this machine': 'Доверенное на этом компьютере',
+  'SSH host keys': 'Ключи SSH-хостов',
+  'Desktop certificates': 'Сертификаты рабочих столов',
   'Shortcuts and features': 'Сочетания клавиш и возможности',
   Connect: 'Подключиться',
   Reconnect: 'Переподключиться',
@@ -379,7 +392,13 @@ export const ru: Record<string, string> = {
   'New session here': 'Новая сессия здесь',
   'New collection…': 'Новый набор…',
   'Filter hosts and groups…': 'Фильтр хостов и групп…',
-  'Filter inventory…': 'Фильтр инвентаря…',
+  'Add a repository': 'Добавить репозиторий',
+  'The Inventory section sits in the tree under your hosts: + adds a repository, ⟳ syncs them all':
+    'Раздел «Инвентарь» стоит в дереве под вашими хостами: «+» добавляет репозиторий, ⟳ синхронизирует все',
+  'Each repository has its own ⟳ to sync it, and its menu removes it after asking':
+    'У каждого репозитория свой ⟳ для синхронизации, а из его меню он удаляется после вопроса',
+  'Remove the repository “{name}”? Its hosts leave the tree, with their local settings; the repository itself is not touched.':
+    'Удалить репозиторий «{name}»? Его хосты уйдут из дерева вместе с локальными настройками; сам репозиторий не изменится.',
   'Lock vault (⌘L)': 'Заблокировать хранилище (⌘L)',
   'Shortcuts and features (⌘/)': 'Сочетания клавиш и возможности (⌘/)',
   'Snippets (⌘K)': 'Сниппеты (⌘K)',
@@ -445,8 +464,8 @@ export const ru: Record<string, string> = {
     'Хранятся только ссылки: никаких паролей, панели быстрого подключения не сохраняются',
   'Right-click to replace it with the tab in front, rename, reorder or delete':
     'Правый клик — заменить текущей вкладкой, переименовать, переставить или удалить',
-  'Settings → General can show it under every SSH session; its button closes one':
-    'В Настройки → Общие его можно показывать во всех SSH-сессиях; кнопка закрывает его в одной',
+  'Settings → Terminal can show it under every SSH session; its button closes one':
+    'В Настройки → Терминал его можно показывать во всех SSH-сессиях; кнопка закрывает его в одной',
   'Show the monitor under every SSH session': 'Показывать монитор во всех SSH-сессиях',
   'The strip the Monitor button opens — load, memory, disks — under every terminal, without pressing it in each. The button then closes it for that pane alone.':
     'Полоса, которую открывает кнопка «Монитор», — нагрузка, память, диски — под каждым терминалом, без нажатия в каждом. Кнопка тогда закрывает её только в своей панели.',
@@ -647,8 +666,6 @@ export const ru: Record<string, string> = {
     'Файлы едут так же: скопировали в Finder, вставили в сессии, вместе с каталогами',
   'Nothing is copied first — the far end reads them off this disk as it pastes':
     'Ничего заранее не копируется — та сторона читает файлы с этого диска в момент вставки',
-  'The other direction, copying files out of a session, is not here yet':
-    'Обратного направления, из сессии сюда, пока нет',
   'The far end’s sound plays here, and can be turned off per host or group':
     'Звук той стороны слышен здесь; выключается для хоста или для всей группы',
   'The picture is decoded by a client of its own, so H.264 hosts are drawn as such':
@@ -659,8 +676,6 @@ export const ru: Record<string, string> = {
     'При возврате экран отрисовывается целиком, без переподключения',
   'Nothing types the password into the window: the client signs in outside it':
     'Пароль не попадает в окно: клиент входит в систему за его пределами',
-  'Copying files between the two sides is not back yet — see the release notes':
-    'Обмен файлами между сторонами пока не вернулся — см. заметки к выпуску',
   'Send ⌘ as Ctrl': 'Отправлять ⌘ как Ctrl',
   'Keyboard for the remote desktop': 'Клавиатура удалённого рабочего стола',
   "Copy and paste then land where they do on Windows. While the desktop has the keyboard this app's own ⌘ shortcuts do not fire. ⌘Tab stays with macOS in a window; in full screen it is the far side's Alt+Tab either way.":
@@ -735,7 +750,6 @@ export const ru: Record<string, string> = {
   Updates: 'Обновления',
   'Asked for on the hour while the application runs, and at every start. This is the same question asked now, for when a release has just gone out.':
     'Спрашивается раз в час, пока приложение работает, и при каждом запуске. Эта кнопка задаёт тот же вопрос сейчас — на случай, когда релиз только что вышел.',
-  'This is version {version}.': 'Это версия {version}.',
   'Check for updates': 'Проверить обновления',
   'Checking…': 'Проверяю…',
   'This is the newest version.': 'Установлена новейшая версия.',
@@ -1296,8 +1310,8 @@ export const ru: Record<string, string> = {
     'Настройки, которые хранятся здесь поверх того, что говорит репозиторий',
   'Reading the repository…': 'Читаем репозиторий…',
   'A Sessions folder tied to git': 'Папка на вкладке «Сессии», привязанная к git',
-  'Edit any folder on the Sessions tab and point it at a repository':
-    'Откройте любую папку на вкладке «Сессии» и укажите ей репозиторий',
+  'Edit any folder of your own in the tree and point it at a repository':
+    'Откройте любую свою папку в дереве и укажите ей репозиторий',
   'Its hosts land in the folder as one list, however deeply the inventory nests them':
     'Хосты попадают в папку одним списком, как бы глубоко их ни вкладывал инвентарь',
   'They sit beside your own sessions, which can stay in the same folder':
@@ -1308,8 +1322,8 @@ export const ru: Record<string, string> = {
     'Группы всё равно читаются: из них берутся настройки хоста и group_vars',
   'Nothing is fetched on its own — the folder is read from disk when the window opens':
     'Само ничего не скачивается — при открытии окна папка читается с диска',
-  'Sync with git… on the folder, or the ⟳ button on its row, goes to the repository':
-    '«Синхронизировать с git…» на папке или кнопка ⟳ в её строке идут в репозиторий',
+  'Sync with git… in the folder’s menu goes to the repository':
+    '«Синхронизировать с git…» в меню папки идёт в репозиторий',
   'Every sync asks which groups to take; ticking a group takes its subgroups':
     'Каждая синхронизация спрашивает, какие группы взять; отметка на группе берёт и подгруппы',
   'Groups that appeared since last time arrive ticked and marked new':
@@ -1324,8 +1338,8 @@ export const ru: Record<string, string> = {
     'Локальные настройки и пароли уходящего хоста удаляются вместе с ним',
   'Nothing on disk changes until you press Apply; Cancel leaves the folder as it was':
     'До нажатия «Применить» на диске ничего не меняется; «Отмена» оставляет папку как была',
-  'Read-only, like the Inventory tab: nothing is ever pushed back':
-    'Только чтение, как и вкладка «Инвентарь»: обратно никогда ничего не отправляется',
+  'Read-only, like the Inventory section: nothing is ever pushed back':
+    'Только чтение, как и раздел «Инвентарь»: обратно никогда ничего не отправляется',
   'A backup carries the repository and the chosen groups, not the mirrored hosts':
     'Резервная копия несёт репозиторий и выбранные группы, но не сами отражённые хосты',
   'Several folders can read one repository: it is cloned once, and each folder takes its own paths out of it — production from one inventory file, staging from another. A repository is offered in the list here after its first successful sync.':
@@ -1413,39 +1427,78 @@ export const ru: Record<string, string> = {
   'Saved on this group': 'Сохранён на этой группе',
   'Add {count} hosts to a collection…': 'Добавить хосты в набор ({count})…',
   'Add to collection…': 'Добавить в набор…',
-  'Host tree': 'Дерево хостов',
-  'Open and close a group only with the arrow beside its name':
-    'Раскрывать и сворачивать группу только стрелкой слева от имени',
-  'Double-click on a host that is open goes to its tab instead of opening another':
-    'Двойной клик по уже открытому хосту переходит на его вкладку, а не открывает новую',
-  'Open each host in a workspace named after its group':
-    'Открывать каждый хост в рабочей области с именем его группы',
+  'Open groups only by their arrow': 'Раскрывать группы только по стрелке',
+  'Off, a click anywhere on the row opens and closes a group.':
+    'Иначе группа раскрывается щелчком в любом месте строки.',
+  'Double-click on an open host goes to its tab':
+    'Двойной клик по открытому хосту — переход на его вкладку',
+  'A workspace for each group': 'Отдельная рабочая область для каждой группы',
+  'A host opens in a workspace named after its group.':
+    'Хост открывается в рабочей области с именем своей группы.',
   'Off, a host opened from the tree goes to an ordinary workspace — the one in front, unless that one is a set’s. A host opened from a set goes to the set’s workspace either way.':
     'Когда выключено, хост из дерева открывается в обычной рабочей области — в той, что впереди, если она не принадлежит набору. Хост, открытый из набора, в любом случае уходит в область набора.',
   '“Open another tab” in the host’s menu still opens a second one. A desktop is never opened twice for one account, whatever this says: Windows keeps one session per user, and a second tab would take it from the first.':
     '«Открыть ещё одну вкладку» в меню хоста по-прежнему открывает вторую. Рабочий стол под одной учётной записью дважды не открывается в любом случае: в Windows у пользователя один сеанс, и вторая вкладка отобрала бы его у первой.',
   'Open another tab': 'Открыть ещё одну вкладку',
-  'Select the host of the tab in front, and scroll the tree to it':
-    'При переключении вкладки выделять её хост в дереве и прокручивать к нему',
-  'Row height: {px} px': 'Высота строки: {px} px',
+  'Show the host of the tab in front': 'Показывать в дереве хост активной вкладки',
+  'Selects it in the tree and scrolls to it.': 'Выделяет его и прокручивает дерево к нему.',
+  'Row height': 'Высота строки',
   'How close together hosts and groups sit in the left panel. {px} px is the usual height; lower packs a long list onto one screen.':
     'Насколько плотно стоят хосты и группы в левой панели. {px} px — обычная высота; меньше — длинный список помещается на один экран.',
-  Reset: 'Сбросить',
   'Colour of coloured rows': 'Заливка цветных строк',
   'Fading from the edge': 'Градиент от левого края',
   'Even and faint, across the row': 'Ровная и лёгкая, на всю строку',
-  'A stripe of the colour down the left edge of a coloured row':
-    'Цветная полоса у левого края цветной строки',
-  'Name open hosts in bold': 'Выделять открытые хосты жирным шрифтом',
+  'A stripe of the colour down the left edge': 'Цветная полоса у левого края',
+  'Name open hosts in bold': 'Открытые хосты жирным шрифтом',
   'An open host’s name is in bold as well, so it stands out on a coloured row':
     'Имя открытого хоста к тому же набрано жирным — его видно и на цветной строке',
-  'Settings → General → Host tree takes away the edge, or the bold':
-    'В Настройках → Общие → Дерево хостов можно убрать полосу или жирный шрифт',
+  'Settings → Tree and tabs takes away the edge, or the bold':
+    'В Настройках → Дерево и вкладки можно убрать полосу или жирный шрифт',
+  'Settings → About shows the version and asks for an update on the spot':
+    'Настройки → О программе показывают версию и сразу проверяют обновления',
   'What’s new': 'Что нового',
   'No release notes.': 'Заметок к выпуску нет.',
   'Updated to {version}.': 'Приложение обновлено до {version}.',
   'After an update a plate above the window says what came with it':
     'После обновления плашка над окном рассказывает, что в нём нового',
-  'What’s new, beside the version above, reads the last few releases again':
-    '«Что нового» рядом с версией вверху этого окна — последние выпуски ещё раз'
+  // Help: its pages and the parts they are cut into
+  'Search results': 'Результаты поиска',
+  'Keyboard shortcuts': 'Сочетания клавиш',
+  'Search the help': 'Поиск по справке',
+  'Nothing found.': 'Ничего не найдено.',
+  Basics: 'Основы',
+  'Hosts and groups': 'Хосты и группы',
+  'The tree': 'Дерево',
+  'Opening a host': 'Открытие хоста',
+  'Several at once': 'Несколько сразу',
+  'Sorting by dragging': 'Порядок перетаскиванием',
+  'What a group passes on': 'Что даёт группа',
+  'Finding a host': 'Поиск хоста',
+  Tabs: 'Вкладки',
+  Panes: 'Панели',
+  'Making one': 'Как собрать',
+  'Opening one': 'Как открыть',
+  'Look and credentials': 'Оформление и учётные данные',
+  Connections: 'Подключения',
+  'Moving around': 'Навигация',
+  'Following the terminal': 'Следом за терминалом',
+  Transfers: 'Передача файлов',
+  'Editing and comparing': 'Правка и сравнение',
+  'Staying current': 'Обновление списка',
+  Connection: 'Подключение',
+  'Size and picture': 'Размер и изображение',
+  Keyboard: 'Клавиатура',
+  'Full screen': 'Полный экран',
+  'Clipboard, sound and disks': 'Буфер обмена, звук и диски',
+  'Files copied over there come here first; paste once “Files ready to paste” shows':
+    'Файлы, скопированные там, сначала скачиваются сюда; вставляйте, когда появится «Файлы готовы к вставке»',
+  'Vault and lock': 'Хранилище и блокировка',
+  'Backup and updates': 'Резервная копия и обновления',
+  'What’s new, beside the version, reads the last few releases again':
+    '«Что нового» рядом с версией — последние выпуски ещё раз',
+  Inventories: 'Инвентари',
+  'The repository': 'Репозиторий',
+  'Desktops from an inventory': 'Рабочие столы из инвентаря',
+  'Linking a folder': 'Привязка папки',
+  Syncing: 'Синхронизация'
 }

@@ -21,7 +21,10 @@ sequential and retain the conflict dialog.
 ### Machine inventories from git
 
 - Point the app at a git repository holding an **Ansible inventory** and its hosts appear under
-  an Inventory tab, alongside the hand-made sessions
+  an **Inventory** section of the session tree, below the hand-made sessions and beside the
+  collections and multi-windows. It was a tab of its own until 0.27; the hosts, their local
+  settings and passwords were never part of the tab and stayed where they were. **+** in its
+  heading adds a repository and ⟳ syncs them all; removing one asks first
 - Cloned read-only through the **system git**, so existing SSH keys, agents, credential helpers
   and proxies apply as they do in a terminal; nothing is ever pushed
 - Ansible groups, `children`, inline `vars`, `group_vars/` and `host_vars/` become groups and
@@ -49,12 +52,12 @@ sequential and retain the conflict dialog.
 
 ### A Sessions folder tied to git
 
-The Inventory tab is a place of its own. This is the same idea inside the ordinary tree: any
-folder you make on the **Sessions** tab can mirror an Ansible inventory out of a repository, and
+The Inventory section keeps each repository's own tree of groups. This is the same idea inside
+your own folders: any folder you make in the tree can mirror an Ansible inventory out of a repository, and
 the hosts it brings in stand in the tree beside the ones you saved by hand.
 
 - Edit a folder, tick **Mirror an inventory from a git repository**, and give it a URL, a branch
-  and the paths to read — the same reader the Inventory tab uses, so `children`, inline `vars`,
+  and the paths to read — the same reader the Inventory section uses, so `children`, inline `vars`,
   `group_vars/` and `host_vars/` mean the same things. Read-only through the system git;
   nothing is ever pushed
 - **One repository per folder**, and the folder can hold your own sessions and subfolders as
@@ -85,7 +88,7 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   The layout choice is remembered for future syncs. Connection settings still inherit through
   the repository groups in either layout
 - Hosts arrive as **derived nodes with local settings layered on top**, exactly as on the
-  Inventory tab: right-click one for *Local settings…*, and what you set there survives every
+  Inventory section: right-click one for *Local settings…*, and what you set there survives every
   later sync. Their connection settings inherit through the repository's groups and on up into
   the folder you made, so a login set on the folder covers everything under it
 - A backup carries the repository, the branch, the chosen groups and your local settings — not
@@ -161,7 +164,7 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   host group or a whole inventory repository into one, with a tab per host. Tabs drag between
   workspaces without dropping their connection. A host opened from the tree rather than from a
   set never lands in a set's workspace: it goes to the ordinary one in front, else the last
-  ordinary one on the strip, else a new one. Settings → General → Host tree can instead give
+  ordinary one on the strip, else a new one. Settings → Tree and tabs can instead give
   each group a workspace of its own, named and coloured after it (off by default): a host goes to
   its nearest group's, hosts tiled together only when they all share that group, and a host
   outside any group to an ordinary workspace
@@ -202,7 +205,7 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   a double-click on a host that is **already open** goes to its tab — the one in front, else the
   first in this workspace, else the first anywhere — and reconnects it if it has dropped, instead
   of opening another. **Open another tab** in the host's menu makes a second one, and Settings →
-  General → Host tree turns the whole of this off. A **desktop** is never opened twice for one
+  Tree and tabs turns the whole of this off. A **desktop** is never opened twice for one
   account, whatever that setting says: Windows keeps one session per user, and a second tab took
   the session from the first and left it showing an error. Another account (Connect as…) is
   another session and opens beside it. A desktop opened by double-click takes the keyboard as a
@@ -244,9 +247,15 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   `Shift` is part of the modifier there and cannot also choose the direction
 - Colour-coded sessions, restored workspace and tab layout on launch, activity marks on
   background tabs and workspaces, and a green mark and a bold name on hosts that are open.
-  Settings → General → Host tree chooses how a coloured row is filled (fading from the edge, or
+  Settings → Tree and tabs chooses how a coloured row is filled (fading from the edge, or
   even across it), whether it keeps the coloured stripe down its left edge, whether open hosts
   are named in bold, and the height of a row
+- **Settings** in one window with its pages listed down the side — General, Tree and tabs,
+  Terminal, Files, then Accounts, Security and Backup, and About at the foot with the version and
+  the update check. Each page is laid out in titled cards, yes-or-no settings are switches, and
+  the host tree page shows three sample rows that take every change as it is made. **Reset
+  section** on the Terminal and the Tree and tabs pages puts back that page's defaults and no
+  other's
 - **What's new** after an update: a plate above the window, once, opening the release notes of
   every version since the one last run (the latest five at most), in Russian when the interface
   is. Help reads the latest few again
@@ -283,7 +292,7 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
 - **Certificates are checked**, for the gateway and for the desktop host alike. One signed by an
   authority the machine already trusts is accepted silently and nothing is remembered about it,
   so a routine reissue changes nothing. Anything else asks once, with the fingerprint, and is
-  remembered under Settings → Security → Trusted certificates; a certificate that later changes
+  remembered under Settings → Security → Desktop certificates; a certificate that later changes
   warns loudly rather than reconnecting. Refusing stops the session — it never falls back to
   connecting anyway
 - The gateway takes the host's own login unless given one of its own, which is what
@@ -486,7 +495,7 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
 - **Remote monitoring**: a strip under the pane with processor load and a short history of it,
   memory in use, network throughput, uptime, the logged-in user, and how full each mounted disk
   is, with a warning colour past 75% and an alarm past 90%. It polls on its own channel, so
-  nothing is typed into your shell, and only while the strip is open. **Settings → General →
+  nothing is typed into your shell, and only while the strip is open. **Settings → Terminal →
   Show the monitor under every SSH session** opens it in every terminal at once; its button then
   closes it for that pane alone
 - **Follow the terminal**, optionally: the `⇉` button in the path bar makes the panel track the
@@ -518,7 +527,7 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   is what the translation is keyed by, so anything not yet translated appears in English rather
   than as a placeholder — and a test fails if a phrase is asked for that the book does not have,
   so the gap is always the screens nobody has been through yet rather than a line someone missed.
-  **741 phrases** so far: Settings including its security and backup tabs, the shortcut list, the
+  **990 phrases** so far: Settings including its security and backup pages, the shortcut list, the
   session tree, the tab strip, the pane toolbar, the first-run and unlock screens, and the host,
   group and inventory-override dialogs. What that test checks is that every phrase *asked for* has
   an entry, not that every line of text asks — a paragraph written straight into the markup is
@@ -528,7 +537,10 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   English is the crash screen, which must not depend on the store it is reporting the failure of,
   and the status lines the app writes into the terminal
 
-Press `⌘/` in the app for the full list of shortcuts and gestures.
+Press `⌘/` in the app for the full list of shortcuts and gestures. Help is laid out as Settings
+is: subjects down the side in four groups, the long ones cut into headed parts, a first page that
+gathers every shortcut from all of them, and a search box that looks through every page in the
+language the interface is in.
 
 ## Status
 
@@ -607,7 +619,7 @@ This opens the app with hot reload. The first `npm run dev` also downloads the E
 one to take a couple of minutes. On first launch you'll be asked to create a master password for
 the local credential vault (stored in the OS user-data directory, never sent anywhere).
 
-Syncing an inventory needs `git` on `PATH`; the Inventory tab says so if it is missing.
+Syncing an inventory needs `git` on `PATH`; the Inventory section says so, once it holds a repository, if it is missing.
 
 Both side panels are dragged by their inner edge and remember their width in the window
 they were set in.

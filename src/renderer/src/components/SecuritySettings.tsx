@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import Hint from './Hint'
+import { useEffect, useId, useState } from 'react'
+import { SettingRow, SettingsGroup } from './SettingsGroup'
 import PasswordInput from './PasswordInput'
 import { useStore } from '../state/store'
 import { useT } from '../i18n'
@@ -117,12 +117,12 @@ function TrustedSummary({
   onOpen: () => void
 }): JSX.Element {
   const t = useT()
-  if (entries.length === 0) return <p className="settings-note">{empty}</p>
+  if (entries.length === 0) return <span className="setting-value">{empty}</span>
   return (
-    <p className="settings-note action-note">
-      {t('{total} trusted', { total: entries.length })}
+    <>
+      <span className="setting-value">{t('{total} trusted', { total: entries.length })}</span>
       <button onClick={onOpen}>{t('Review…')}</button>
-    </p>
+    </>
   )
 }
 
@@ -138,6 +138,7 @@ export default function SecuritySettings(): JSX.Element {
   const [reviewing, setReviewing] = useState<'hosts' | 'certificates' | null>(null)
   const [hosts, setHosts] = useState<TrustedHost[]>([])
   const [certificates, setCertificates] = useState<TrustedHost[]>([])
+  const lockId = useId()
 
   async function refreshHosts(): Promise<void> {
     setHosts(await window.td.knownHosts.list())
@@ -186,94 +187,89 @@ export default function SecuritySettings(): JSX.Element {
 
   return (
     <>
-      <h3 className="settings-heading">{t('Locking')}</h3>
-      <label>
-        <Hint label={t('Lock after this long untouched')}>
-          {t(
+      <SettingsGroup title={t('Locking')}>
+        <SettingRow
+          controlId={lockId}
+          label={t('Lock after this long untouched')}
+          hint={t(
             'Untouched means no typing, no pointer and no scrolling anywhere in the window, a terminal included. Locking closes nothing: sessions stay open and keep running, and the vault stops answering for stored passwords until the master password is given again.'
           )}
-        </Hint>
-        <select
-          value={String(lockAfterMinutes)}
-          onChange={(e) => updateSettings({ lockAfterMinutes: Number(e.target.value) })}
         >
-          {LOCK_DELAYS.map((minutes) => (
-            <option key={minutes} value={minutes}>
-              {minutes === 0
-                ? t('Never — stay unlocked')
-                : minutes < 60
-                  ? `${minutes} ${t('minutes')}`
-                  : `${minutes / 60} ${t('hours')}`}
-            </option>
-          ))}
-        </select>
-      </label>
+          <select
+            id={lockId}
+            value={String(lockAfterMinutes)}
+            onChange={(e) => updateSettings({ lockAfterMinutes: Number(e.target.value) })}
+          >
+            {LOCK_DELAYS.map((minutes) => (
+              <option key={minutes} value={minutes}>
+                {minutes === 0
+                  ? t('Never — stay unlocked')
+                  : minutes < 60
+                    ? `${minutes} ${t('minutes')}`
+                    : `${minutes / 60} ${t('hours')}`}
+              </option>
+            ))}
+          </select>
+        </SettingRow>
+      </SettingsGroup>
 
-      <h3 className="settings-heading">
-        <Hint label={t('Master password')}>
-          {t(
-            'Every stored secret is re-encrypted under the new password. Nothing is lost, and the password itself is never written to disk.'
-          )}
-        </Hint>
-      </h3>
-      <label>
-        {t('Current password')}
-        <PasswordInput value={current} onChange={(e) => setCurrent(e.target.value)} />
-      </label>
-      <div className="form-row">
-        <label>
-          {t('New password')}
-          <PasswordInput value={next} onChange={(e) => setNext(e.target.value)} />
-        </label>
-        <label>
-          {t('Confirm')}
-          <PasswordInput value={confirm} onChange={(e) => setConfirm(e.target.value)} />
-        </label>
-      </div>
-      {pwError && <span className="error-text">{pwError}</span>}
-      {pwDone && <span className="success-text">{t('Master password changed.')}</span>}
-      <div>
-        <button className="primary" onClick={changePassword} disabled={!current || !next}>
-          {t('Change password')}
-        </button>
-      </div>
+      <SettingsGroup
+        title={t('Master password')}
+        hint={t(
+          'Every stored secret is re-encrypted under the new password. Nothing is lost, and the password itself is never written to disk.'
+        )}
+      >
+        <div className="settings-group-form">
+          <label>
+            {t('Current password')}
+            <PasswordInput value={current} onChange={(e) => setCurrent(e.target.value)} />
+          </label>
+          <div className="form-row">
+            <label>
+              {t('New password')}
+              <PasswordInput value={next} onChange={(e) => setNext(e.target.value)} />
+            </label>
+            <label>
+              {t('Confirm')}
+              <PasswordInput value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+            </label>
+          </div>
+          {pwError && <span className="error-text">{pwError}</span>}
+          {pwDone && <span className="success-text">{t('Master password changed.')}</span>}
+          <div>
+            <button className="primary" onClick={changePassword} disabled={!current || !next}>
+              {t('Change password')}
+            </button>
+          </div>
+        </div>
+      </SettingsGroup>
 
-      <h3 className="settings-heading">
-        <Hint label={t('Session logs')}>
-          {t(
-            'Sessions with “Log session output to file” enabled write here. The transcript contains everything the terminal showed, so treat it as sensitive.'
-          )}
-        </Hint>
-      </h3>
-      <div>
-        <button onClick={() => window.td.logs.reveal()}>{t('Open logs folder')}</button>
-      </div>
-
-      <h3 className="settings-heading">
-        <Hint label={t('Trusted host keys')}>
-          {t(
+      <SettingsGroup title={t('Trusted on this machine')}>
+        <SettingRow
+          label={t('SSH host keys')}
+          hint={t(
             'Removing an entry makes TerminalDeck ask again on the next connection. Do that when a server was legitimately rebuilt and its key changed.'
           )}
-        </Hint>
-      </h3>
-      <TrustedSummary
-        entries={hosts}
-        empty={t('No hosts trusted yet.')}
-        onOpen={() => setReviewing('hosts')}
-      />
-
-      <h3 className="settings-heading">
-        <Hint label={t('Trusted certificates')}>
-          {t(
+        >
+          <TrustedSummary
+            entries={hosts}
+            empty={t('No hosts trusted yet.')}
+            onOpen={() => setReviewing('hosts')}
+          />
+        </SettingRow>
+        <SettingRow
+          label={t('Desktop certificates')}
+          hint={t(
             'Desktop sessions only, and only certificates this machine could not verify on its own — a gateway or a host that issues its own. One signed by a public authority is checked against the system and never listed here, so a routine reissue changes nothing.'
           )}
-        </Hint>
-      </h3>
-      <TrustedSummary
-        entries={certificates}
-        empty={t('No certificates trusted by hand.')}
-        onOpen={() => setReviewing('certificates')}
-      />
+        >
+          <TrustedSummary
+            entries={certificates}
+            empty={t('No certificates trusted by hand.')}
+            onOpen={() => setReviewing('certificates')}
+          />
+        </SettingRow>
+      </SettingsGroup>
 
       {reviewing === 'hosts' && (
         <TrustedDialog

@@ -468,7 +468,7 @@ describe('a host’s menu asked for from its tab', () => {
   })
 })
 
-it('turns to the Inventory tab for an inventory host, whose tree then shows its menu', () => {
+it('shows an inventory host in the same tree, and its own menu when its tab asks', () => {
   const root = 'inv:src:root'
   useStore.setState({
     sessions: [],
@@ -491,9 +491,48 @@ it('turns to the Inventory tab for an inventory host, whose tree then shows its 
     hostMenuRequest: null
   })
   render(<Sidebar onOpenSnippets={() => {}} onOpenHelp={() => {}} />)
-  expect(screen.queryByText('db1')).toBeNull()
-  act(() => useStore.getState().requestHostMenu({ hostId: 'inv:src:h:db1', x: 1, y: 2 }))
+  // No tab to turn to: the inventory is a section of the one tree.
+  expect(screen.getByText('Inventory')).toBeTruthy()
   expect(screen.getByText('db1')).toBeTruthy()
+  act(() => useStore.getState().requestHostMenu({ hostId: 'inv:src:h:db1', x: 1, y: 2 }))
   expect(screen.getByText('Override locally…')).toBeTruthy()
   expect(useStore.getState().hostMenuRequest).toBeNull()
+})
+
+/**
+ * The inventory sits under the saved hosts now, so the filter has to treat the
+ * two as one list: an inventory host that matches is a match.
+ */
+it('does not say nothing matches while an inventory host does', () => {
+  const root = 'inv:src:root'
+  useStore.setState({
+    sessions: [host({ id: 'h1', name: 'web-1' })],
+    groups: [],
+    gitFolderTrees: [],
+    gitFolderOverrides: [],
+    inventorySources: [{ id: 'src', name: 'Repo', repoUrl: 'git@example.com:x.git', paths: [] }],
+    inventoryTrees: [
+      {
+        sourceId: 'src',
+        groups: [{ id: root, name: 'Repo', parentId: null }],
+        sessions: [host({ id: 'inv:src:h:db1', name: 'db1', groupId: root })],
+        memberships: {}
+      }
+    ],
+    inventoryOverrides: [],
+    inventorySyncing: [],
+    inventorySyncErrors: {},
+    selectedHostIds: [],
+    hostMenuRequest: null
+  })
+  render(<Sidebar onOpenSnippets={() => {}} onOpenHelp={() => {}} />)
+  fireEvent.change(screen.getByPlaceholderText('Filter hosts and groups…'), {
+    target: { value: 'db1' }
+  })
+  expect(screen.getByText('db1')).toBeTruthy()
+  expect(screen.queryByText(/Nothing matches/)).toBeNull()
+  fireEvent.change(screen.getByPlaceholderText('Filter hosts and groups…'), {
+    target: { value: 'zzz' }
+  })
+  expect(screen.getByText(/Nothing matches/)).toBeTruthy()
 })

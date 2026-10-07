@@ -581,13 +581,13 @@ export const DEFAULT_SETTINGS: TerminalSettings = {
 }
 
 /**
- * Which settings the Terminal tab owns — and, therefore, the only ones its
- * "Reset to defaults" is entitled to touch.
+ * Which settings the Terminal page owns — and, therefore, the only ones its
+ * "Reset section" is entitled to touch.
  *
  * The button handed over the whole of `DEFAULT_SETTINGS`, so resetting the font
  * size also put the interface back into another language, forgot the external
  * editor and moved the idle lock back to fifteen minutes. Three settings on
- * other tabs, changed by a button that names none of them.
+ * other pages, changed by a button that names none of them.
  */
 export const TERMINAL_KEYS = [
   'fontFamily',
@@ -597,28 +597,45 @@ export const TERMINAL_KEYS = [
   'cursorStyle',
   'cursorBlink',
   'copyOnSelect',
-  'rightClick'
+  'rightClick',
+  'monitorForAll'
 ] as const satisfies ReadonlyArray<keyof TerminalSettings>
 
-/** Everything else, listed so that a new setting has to be placed deliberately. */
-export const OTHER_KEYS = [
-  'language',
-  'externalEditor',
-  'lockAfterMinutes',
+/** The page for the host tree and the tabs it opens — how it behaves and how it looks. */
+export const TREE_KEYS = [
   'expandOnArrowOnly',
   'revealActiveHost',
   'reuseOpenHost',
   'workspacePerGroup',
-  'monitorForAll',
   'treeRowHeight',
   'treeTint',
   'treeEdge',
   'treeBoldOpen'
 ] as const satisfies ReadonlyArray<keyof TerminalSettings>
 
-/** The defaults for the Terminal tab alone. */
+/**
+ * Everything else, listed so that a new setting has to be placed deliberately.
+ * None of these has a reset: a language, an editor's path and a lock delay are
+ * each one choice, made on purpose and put back the same way.
+ */
+export const OTHER_KEYS = [
+  'language',
+  'externalEditor',
+  'lockAfterMinutes'
+] as const satisfies ReadonlyArray<keyof TerminalSettings>
+
+function defaultsFor(keys: ReadonlyArray<keyof TerminalSettings>): Partial<TerminalSettings> {
+  return Object.fromEntries(keys.map((key) => [key, DEFAULT_SETTINGS[key]]))
+}
+
+/** The defaults for the Terminal page alone. */
 export function terminalDefaults(): Partial<TerminalSettings> {
-  return Object.fromEntries(TERMINAL_KEYS.map((key) => [key, DEFAULT_SETTINGS[key]]))
+  return defaultsFor(TERMINAL_KEYS)
+}
+
+/** The defaults for the host tree page alone. */
+export function treeDefaults(): Partial<TerminalSettings> {
+  return defaultsFor(TREE_KEYS)
 }
 
 export const FONT_CHOICES = [
