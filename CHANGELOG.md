@@ -6,6 +6,18 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.26.1
+
+### Fixed
+
+- **Copying a file on a Windows desktop no longer ends the session.** A file
+  larger than 64 KiB, copied by menu or Ctrl+C, cut the session before it
+  could be pasted, and the pane said only "Success.". Its contents are now
+  fetched one request at a time, a mebibyte each, so the transfer is as fast
+  as before.
+- **A desktop that closes for no reason the client gives** now shows the
+  client's last complaint instead of "Success.".
+
 ## 0.26.0
 
 ### Added
