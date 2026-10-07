@@ -154,6 +154,17 @@ typedef struct
 	UINT32 clip_requested, clip_next;
 	int clip_requested_files, clip_next_files;
 	int clip_next_pending;
+	/*
+	 * Which file of the far end's copy has had its size asked, as its index
+	 * plus one, and the chunk request held back until the answer comes. A
+	 * Windows host answers a first request for a file's bytes with an empty
+	 * message unless its size was asked first, which is what every client it
+	 * has met does; see td_clip_get_chunk. Under `clip`: the request is made
+	 * on the main loop and answered on the channel thread.
+	 */
+	UINT32 clip_sized;
+	int clip_held;
+	CLIPRDR_FILE_CONTENTS_REQUEST clip_held_request;
 
 	/** The size last asked of the server, so a repeat can be ignored. */
 	UINT32 want_width, want_height, want_scale;
@@ -781,6 +792,10 @@ static UINT td_clip_server_format_list(CliprdrClientContext* ctx, const CLIPRDR_
 			wanted = CF_TEXT;
 	}
 	/* Cancel any transfer for the previous clipboard before publishing this one. */
+	EnterCriticalSection(&td->clip);
+	td->clip_sized = 0;
+	td->clip_held = 0;
+	LeaveCriticalSection(&td->clip);
 	const BYTE has_files = files != 0;
 	(void)td_write_record(TD_REC_CLIP_RESET, &has_files, 1);
 	if (files) wanted = files;
@@ -1116,11 +1131,61 @@ static UINT td_clip_local_request(CliprdrClientContext* ctx, const CLIPRDR_FILE_
  * channel, and FreeRDP drops the session over that. */
 #define TD_CLIP_CHUNK_MAX (1024u * 1024u)
 
+/* Stream ids this side uses for its own size requests. ClipboardDownload.ts
+ * numbers its chunk requests below 0x80000000, so the two never meet. */
+#define TD_SIZE_STREAM 0x80000000u
+
+static UINT td_clip_file_response(CliprdrClientContext* ctx,
+                                  const CLIPRDR_FILE_CONTENTS_RESPONSE* response);
+
+static UINT td_clip_send_chunk(tdContext* td, const CLIPRDR_FILE_CONTENTS_REQUEST* request)
+{
+	if (td->cliprdr->ClientFileContentsRequest(td->cliprdr, request) == CHANNEL_RC_OK)
+		return CHANNEL_RC_OK;
+	CLIPRDR_FILE_CONTENTS_RESPONSE failure = { 0 };
+	failure.streamId = request->streamId;
+	failure.common.msgFlags = CB_RESPONSE_FAIL;
+	return td_clip_file_response(td->cliprdr, &failure);
+}
+
+/**
+ * The answer to a size request, which goes no further than this: the size is
+ * already known from the file list. What it releases is the chunk request held
+ * back for it — sent whether the answer was yes or no, so that a host which
+ * refuses the size still gets to say whether it will give the bytes.
+ */
+static UINT td_clip_sized(CliprdrClientContext* ctx, const CLIPRDR_FILE_CONTENTS_RESPONSE* response)
+{
+	tdContext* td = td_of(ctx);
+	CLIPRDR_FILE_CONTENTS_REQUEST request = { 0 };
+	int held;
+	UINT64 size = 0;
+
+	if (response->cbRequested >= 8 && response->requestedData)
+		for (size_t i = 0; i < 8; i++)
+			size |= (UINT64)response->requestedData[i] << (i * 8);
+	WLog_INFO(TAG, "clipboard: file %u is %llu byte(s), flags 0x%04x",
+	          (unsigned)(response->streamId & ~TD_SIZE_STREAM), (unsigned long long)size,
+	          (unsigned)response->common.msgFlags);
+
+	EnterCriticalSection(&td->clip);
+	held = td->clip_held && td->clip_held_request.listIndex == (response->streamId & ~TD_SIZE_STREAM);
+	if (held)
+	{
+		request = td->clip_held_request;
+		td->clip_sized = request.listIndex + 1;
+		td->clip_held = 0;
+	}
+	LeaveCriticalSection(&td->clip);
+	return held ? td_clip_send_chunk(td, &request) : CHANNEL_RC_OK;
+}
+
 /* File payloads stay binary across the pipe; Node owns staging and path validation. */
 static UINT td_clip_file_response(CliprdrClientContext* ctx,
                                   const CLIPRDR_FILE_CONTENTS_RESPONSE* response)
 {
-	(void)ctx;
+	if (response->streamId & TD_SIZE_STREAM)
+		return td_clip_sized(ctx, response);
 	UINT32 length = response->cbRequested;
 	if (length > TD_CLIP_CHUNK_MAX || (length && !response->requestedData)) length = 0;
 	BYTE* packet = calloc(1, (size_t)length + 8);
@@ -1167,12 +1232,41 @@ static void td_clip_get_chunk(tdContext* td, const td_cmd* cmd)
 	WLog_INFO(TAG, "clipboard: asking for stream %u, file %u, %u byte(s) from %llu",
 	          (unsigned)request.streamId, (unsigned)request.listIndex,
 	          (unsigned)request.cbRequested, (unsigned long long)offset);
-	if (td->cliprdr->ClientFileContentsRequest(td->cliprdr, &request) != CHANNEL_RC_OK)
+
+	/*
+	 * A file's size first, then its bytes. The size is known already, from the
+	 * file list, and the answer is thrown away — but a Windows host answers a
+	 * first request for a file's bytes with an empty message otherwise, and
+	 * never with the bytes. FreeRDP's own clients, and mstsc by way of the
+	 * shell asking for a stream's size, always ask for it first.
+	 */
+	EnterCriticalSection(&td->clip);
+	const int sized = td->clip_sized == request.listIndex + 1;
+	if (!sized)
+	{
+		td->clip_held = 1;
+		td->clip_held_request = request;
+	}
+	LeaveCriticalSection(&td->clip);
+	if (sized)
+	{
+		(void)td_clip_send_chunk(td, &request);
+		return;
+	}
+
+	CLIPRDR_FILE_CONTENTS_REQUEST size = { 0 };
+	size.common.msgType = CB_FILECONTENTS_REQUEST;
+	size.streamId = TD_SIZE_STREAM | request.listIndex;
+	size.listIndex = request.listIndex;
+	size.dwFlags = FILECONTENTS_SIZE;
+	size.cbRequested = 8;
+	WLog_INFO(TAG, "clipboard: asking for the size of file %u", (unsigned)request.listIndex);
+	if (td->cliprdr->ClientFileContentsRequest(td->cliprdr, &size) != CHANNEL_RC_OK)
 	{
 		CLIPRDR_FILE_CONTENTS_RESPONSE failure = { 0 };
-		failure.streamId = request.streamId;
+		failure.streamId = size.streamId;
 		failure.common.msgFlags = CB_RESPONSE_FAIL;
-		(void)td_clip_file_response(td->cliprdr, &failure);
+		(void)td_clip_sized(td->cliprdr, &failure);
 	}
 }
 

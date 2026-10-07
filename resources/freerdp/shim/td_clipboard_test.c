@@ -12,6 +12,7 @@
 #include <unistd.h>
 #endif
 
+static int (*clip_chunk_sink)(uint8_t type, const void* payload, size_t length);
 static char captured[1024];
 static size_t captured_length;
 static unsigned records, requests;
@@ -19,6 +20,7 @@ static UINT32 requested;
 static uint8_t captured_type;
 int capture_record(uint8_t type, const void* payload, size_t length)
 {
+	if (clip_chunk_sink) return clip_chunk_sink(type, payload, length);
 	if (type == TD_REC_CLIP_RESET) return 1;
 	assert(length < sizeof(captured));
 	captured_type = type;
@@ -266,6 +268,69 @@ static void file_transfers(tdContext* td, CliprdrClientContext* ctx)
 	assert(captured[0] == 17 && captured[4] == 1 && memcmp(captured + 8, "3456", 4) == 0);
 	assert(cliprdr_file_context_uninit(td->clip_files, ctx));
 }
+/* The file-contents requests that go to the far end, in order. */
+static CLIPRDR_FILE_CONTENTS_REQUEST sent[8];
+static unsigned sent_count;
+static UINT record_request(CliprdrClientContext* ctx, const CLIPRDR_FILE_CONTENTS_REQUEST* request)
+{
+	(void)ctx;
+	assert(sent_count < 8);
+	sent[sent_count++] = *request;
+	return CHANNEL_RC_OK;
+}
+static unsigned chunks_forwarded;
+static int forward_chunk(uint8_t type, const void* payload, size_t length)
+{
+	(void)payload;
+	(void)length;
+	if (type == TD_REC_CLIP_CHUNK) chunks_forwarded++;
+	return 1;
+}
+
+/*
+ * A Windows host answers a first request for a file's bytes with an empty
+ * message unless the file's size was asked first. The size goes first, the
+ * chunk waits for its answer, and the answer itself goes no further.
+ */
+static void size_first(tdContext* td, CliprdrClientContext* ctx)
+{
+	td_field fields[] = { { "stream", "5" }, { "index", "2" }, { "offset", "0" }, { "length", "4096" } };
+	td_cmd cmd = { 0 };
+	memcpy(cmd.fields, fields, sizeof(fields));
+	cmd.count = 4;
+
+	td->clipboard = 1;
+	td->clip_sized = 0;
+	td->clip_held = 0;
+	ctx->ClientFileContentsRequest = record_request;
+	sent_count = 0;
+
+	td_clip_get_chunk(td, &cmd);
+	assert(sent_count == 1);
+	assert(sent[0].dwFlags == FILECONTENTS_SIZE && sent[0].cbRequested == 8);
+	assert(sent[0].listIndex == 2 && (sent[0].streamId & TD_SIZE_STREAM));
+
+	BYTE size[8] = { 0x00, 0x10 };
+	CLIPRDR_FILE_CONTENTS_RESPONSE answer = { 0 };
+	answer.common.msgFlags = CB_RESPONSE_OK;
+	answer.streamId = sent[0].streamId;
+	answer.cbRequested = 8;
+	answer.requestedData = size;
+	clip_chunk_sink = forward_chunk;
+	assert(td_clip_file_response(ctx, &answer) == CHANNEL_RC_OK);
+	assert(chunks_forwarded == 0);
+	assert(sent_count == 2);
+	assert(sent[1].dwFlags == FILECONTENTS_RANGE && sent[1].streamId == 5);
+	assert(sent[1].cbRequested == 4096 && sent[1].listIndex == 2);
+
+	/* The next chunk of the same file goes straight out. */
+	cmd.fields[0].value = "6";
+	cmd.fields[2].value = "4096";
+	td_clip_get_chunk(td, &cmd);
+	assert(sent_count == 3 && sent[2].dwFlags == FILECONTENTS_RANGE && sent[2].streamId == 6);
+	clip_chunk_sink = NULL;
+}
+
 /* What reaches FreeRDP's own reassembly, which the test stands in for. */
 static unsigned delivered;
 static BOOL deliver(freerdp* instance, UINT16 channelId, const BYTE* data, size_t size,
@@ -362,6 +427,7 @@ int main(void)
 	assert(records == before_records + 1);
 	file_transfers(&td, &ctx);
 	empty_messages();
+	size_first(&td, &ctx);
 	cliprdr_file_context_free(td.clip_files);
 	ClipboardDestroy(td.clip_system);
 	DeleteCriticalSection(&td.clip);
