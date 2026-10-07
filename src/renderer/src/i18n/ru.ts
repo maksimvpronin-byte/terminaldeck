@@ -1310,8 +1310,8 @@ export const ru: Record<string, string> = {
   'A Sessions folder tied to git': 'Папка на вкладке «Сессии», привязанная к git',
   'Edit any folder of your own in the tree and point it at a repository':
     'Откройте любую свою папку в дереве и укажите ей репозиторий',
-  'Its hosts land in the folder as one list, however deeply the inventory nests them':
-    'Хосты попадают в папку одним списком, как бы глубоко их ни вкладывал инвентарь',
+  'Its hosts land in the folder as one list by default, however deeply the inventory nests them':
+    'По умолчанию его хосты ложатся в папку одним списком, как бы глубоко их ни вложил инвентарь',
   'They sit beside your own sessions, which can stay in the same folder':
     'Они стоят рядом с вашими сессиями, которые могут лежать в той же папке',
   'A host named by several Ansible groups appears once — it is one host':
@@ -1535,5 +1535,76 @@ export const ru: Record<string, string> = {
   From: 'Откуда',
   To: 'Куда',
   'wherever the client asks': 'куда попросит клиент',
-  Remove: 'Удалить'
+  Remove: 'Удалить',
+  // Help: the features it had not described
+  'Quick connect… opens a host once, SSH or RDP, saving neither it nor its password':
+    '«Быстрое подключение…» открывает хост разово, по SSH или RDP, не сохраняя ни его, ни пароль',
+  '⇩ beside + Group imports hosts from ~/.ssh/config, ProxyJump links included':
+    '⇩ рядом с «+ Группа» импортирует хосты из ~/.ssh/config, вместе со связями ProxyJump',
+  'Copy user@host in the same menu puts the address on the clipboard':
+    '«Скопировать user@host» в том же меню кладёт адрес в буфер обмена',
+  'Right-click a group for New session here, New subgroup… and Delete group…':
+    'Правый клик по группе — «Новая сессия здесь», «Новая подгруппа…» и «Удалить группу…»',
+  'Deleting a group keeps its hosts: they move up a level':
+    'Удаление группы сохраняет её хосты: они поднимаются на уровень выше',
+  'Workspace opens them in a new workspace; Collect puts them into a collection':
+    '«Рабочая область» открывает их в новой рабочей области, «Собрать» кладёт в набор',
+  'With no password saved, the connection asks for it when it needs it':
+    'Если пароль не сохранён, подключение спросит его, когда он понадобится',
+  'Two-factor codes are asked for the same way, one prompt after another':
+    'Коды двухфакторного входа спрашиваются так же, по одному запросу за раз',
+  'A host key is asked about the first time, then checked; a changed one is warned about':
+    'Ключ хоста спрашивают при первой встрече, потом сверяют; о сменившемся предупреждают',
+  'Settings → Security lists the trusted keys, and forgets one when a server is rebuilt':
+    'Настройки → Безопасность показывают доверенные ключи и забывают ключ пересобранного сервера',
+  'Keys can be OpenSSH files or PuTTY .ppk of any version, with no converting':
+    'Ключи — файлы OpenSSH или PuTTY .ppk любой версии, без конвертации',
+  'On Windows the SSH agent is Pageant or the OpenSSH Authentication Agent service':
+    'На Windows агент SSH — это Pageant или служба OpenSSH Authentication Agent',
+  'Workspaces, tabs and splits come back at launch, each pane waiting for Connect':
+    'Рабочие области, вкладки и разбиения возвращаются при запуске, каждая панель ждёт «Подключиться»',
+  'A pane whose connection dropped offers Reconnect':
+    'Панель с оборвавшимся соединением предлагает «Переподключиться»',
+  'Its menu can sign out of every Windows session in it before closing the desktops':
+    '«Выйти из сессий Windows» в её меню выходит из Windows во всех её рабочих столах и закрывает их',
+  'Its menu opens it tiled in one tab instead':
+    'Из его меню набор открывается и плиткой в одной вкладке',
+  'That menu copies, pastes, selects all, finds and clears the screen':
+    'В этом меню — копирование, вставка, выделение всего, поиск и очистка экрана',
+  '⇉ above the tabs turns it on, and every pane gets a tick of its own':
+    '⇉ над вкладками включает её, и у каждой панели появляется своя галочка',
+  'A banner says how many terminals hear you, with All and None':
+    'Плашка говорит, сколько терминалов вас слышат, — с кнопками «Все» и «Ни одного»',
+  'Tabs that take part are marked ⇉': 'Участвующие вкладки помечены ⇉',
+  '+ New snippet saves a command with a name and tags; each row edits or deletes it':
+    '«+ Новый сниппет» сохраняет команду с именем и метками; в строке её можно править или удалить',
+  'Right-click a result for Show in its folder': 'Правый клик по результату — «Показать в папке»',
+  '⊞ in the path bar shows a folder tree beside the listing':
+    '⊞ в строке пути показывает дерево папок рядом со списком',
+  'Columns give size, date, permissions, owner and group, coloured by kind':
+    'Колонки — размер, дата, права, владелец и группа, с цветом по типу файла',
+  'Drag a column’s edge to widen it; widths and the sort order are remembered':
+    'Тяните край колонки, чтобы расширить её; ширина и сортировка запоминаются',
+  'The menu uploads a file or a whole folder too, and downloads a folder':
+    'Меню тоже загружает файл или целую папку и скачивает папку',
+  'Drag files onto another host’s SFTP panel to copy them straight across':
+    'Перетащите файлы на панель SFTP другого хоста — они скопируются прямо туда',
+  'Nothing lands on this machine on the way, and the hosts need no route to each other':
+    'По пути ничего не ложится на этот компьютер, и хостам не нужен маршрут друг к другу',
+  'With it, files are reached as another user, through a command such as sudo -n -i -u postgres':
+    'С ним файлы доступны от имени другого пользователя — через команду вроде sudo -n -i -u postgres',
+  'The terminal keeps its own login, and the command must not ask for a password':
+    'Терминал остаётся со своим логином, а команда не должна спрашивать пароль',
+  'The Windows key on the far side': 'Клавиша Windows на той стороне',
+  'A gateway can leave private addresses alone and reach them directly':
+    'Шлюз может не трогать частные адреса и ходить к ним напрямую',
+  'With no password saved the pane asks for one; Try again repeats the last attempt':
+    'Без сохранённого пароля панель спрашивает его; «Повторить» повторяет прошлую попытку',
+  'Another password… signs in with a different one': '«Другой пароль…» входит с другим паролем',
+  'Only YAML is read: .yml and .yaml files, a folder one level deep; INI is not':
+    'Читается только YAML: файлы .yml и .yaml, папка — на один уровень; INI не читается',
+  'Arrange hosts in group folders, in the same dialog, nests them by group instead of one list':
+    '«Разложить хосты по папкам групп» там же раскладывает их по группам вместо одного списка',
+  'An update installs now, at the next quit, or later — open connections are named first':
+    'Обновление ставится сразу, при следующем выходе или позже — открытые подключения называются заранее'
 }

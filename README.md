@@ -436,6 +436,9 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   Right-click a Windows host and choose **Connect in console mode** to open it once, the way
   mRemoteNG's *Connect to console session* does — the pane keeps it across reconnects and the
   host is not changed. To make it the default, tick it under Desktop for a host or a group
+- **`Alt+Home` sends the Windows key**, which this machine would otherwise keep for itself, and
+  **Sign out of Windows sessions** in a workspace's menu signs every desktop in it out of Windows
+  before closing them — asking first, and again for any that did not confirm
 - Panels that ride on an SSH connection — the file browser, port forwarding, monitoring,
   broadcast — are hidden for a desktop rather than greyed out, since none of them is coming
 - **A connection that fails says why.** FreeRDP's own summary names the step and only the step

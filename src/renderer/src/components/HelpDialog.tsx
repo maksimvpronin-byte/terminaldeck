@@ -60,6 +60,12 @@ const CHAPTERS: Chapter[] = [
             rows: [
               { what: 'The filter matches group names too, and shows a matching group whole' },
               { what: 'The arrows beside Quick connect open or close every folder at once' },
+              {
+                what: 'Quick connect… opens a host once, SSH or RDP, saving neither it nor its password'
+              },
+              {
+                what: '⇩ beside + Group imports hosts from ~/.ssh/config, ProxyJump links included'
+              },
               { what: 'The mark in front of a name says what it opens: a terminal or a desktop' },
               { what: 'It turns green while that machine is open, desktops and terminals alike' },
               { what: 'A host given a colour wears it as its own background and a coloured edge' },
@@ -89,7 +95,12 @@ const CHAPTERS: Chapter[] = [
               },
               { what: 'A desktop just opened takes the keyboard, as a new terminal does' },
               { what: 'Right-click for connect, split, duplicate, edit and delete' },
-              { what: 'Deleting lives in that menu alone, behind a prompt — no button to misclick' }
+              {
+                what: 'Deleting lives in that menu alone, behind a prompt — no button to misclick'
+              },
+              { what: 'Copy user@host in the same menu puts the address on the clipboard' },
+              { what: 'Right-click a group for New session here, New subgroup… and Delete group…' },
+              { what: 'Deleting a group keeps its hosts: they move up a level' }
             ]
           },
           {
@@ -98,6 +109,9 @@ const CHAPTERS: Chapter[] = [
               { keys: '⌘ click', what: 'Tick a host as well, to open several at once' },
               { keys: '⇧ click', what: 'Tick everything between the last click and this one' },
               { what: 'A bar appears with Open, for separate tabs, and Tile, for one tab' },
+              {
+                what: 'Workspace opens them in a new workspace; Collect puts them into a collection'
+              },
               { what: 'Saved hosts and inventory hosts can be ticked together, in one selection' }
             ]
           },
@@ -145,6 +159,20 @@ const CHAPTERS: Chapter[] = [
               },
               {
                 what: '"Log session output to file" keeps a transcript per connection under the logs folder'
+              },
+              { what: 'With no password saved, the connection asks for it when it needs it' },
+              { what: 'Two-factor codes are asked for the same way, one prompt after another' },
+              {
+                what: 'A host key is asked about the first time, then checked; a changed one is warned about'
+              },
+              {
+                what: 'Settings → Security lists the trusted keys, and forgets one when a server is rebuilt'
+              },
+              {
+                what: 'Keys can be OpenSSH files or PuTTY .ppk of any version, with no converting'
+              },
+              {
+                what: 'On Windows the SSH agent is Pageant or the OpenSSH Authentication Agent service'
               }
             ]
           }
@@ -183,7 +211,11 @@ const CHAPTERS: Chapter[] = [
               { what: 'A dot on a background tab means new output arrived there' },
               {
                 what: 'The window opens where it was left, at the size it was, maximised if it was'
-              }
+              },
+              {
+                what: 'Workspaces, tabs and splits come back at launch, each pane waiting for Connect'
+              },
+              { what: 'A pane whose connection dropped offers Reconnect' }
             ]
           },
           {
@@ -217,6 +249,9 @@ const CHAPTERS: Chapter[] = [
               { what: 'Drag a tab beside another to change their order' },
               { keys: '⌘⇧1 … ⌘⇧9', what: 'Jump to that workspace' },
               { what: 'Closing a workspace closes every terminal in it' },
+              {
+                what: 'Its menu can sign out of every Windows session in it before closing the desktops'
+              },
               { what: 'A dot on a workspace means new output arrived in one of its tabs' }
             ]
           }
@@ -248,6 +283,7 @@ const CHAPTERS: Chapter[] = [
             title: 'Opening one',
             rows: [
               { what: 'Close the workspace freely — Open brings the whole set back' },
+              { what: 'Its menu opens it tiled in one tab instead' },
               {
                 what: 'A host double-clicked under a set opens in that set’s workspace, or a new one'
               },
@@ -313,7 +349,8 @@ const CHAPTERS: Chapter[] = [
                 what: 'Goes to the shell, never to this app: Ctrl+C interrupts, Ctrl+D ends the session, Ctrl+R, Ctrl+K, Ctrl+W and Ctrl+L do what readline says'
               },
               { what: 'Selecting text copies it straight away; right-click pastes' },
-              { what: 'Both of those are switchable in Settings if you prefer a menu' }
+              { what: 'Both of those are switchable in Settings if you prefer a menu' },
+              { what: 'That menu copies, pastes, selects all, finds and clears the screen' }
             ]
           }
         ]
@@ -349,7 +386,13 @@ const CHAPTERS: Chapter[] = [
             rows: [
               { keys: '⌘K', what: 'Snippet palette: ⏎ runs, ⇧⏎ drops it on the prompt unrun' },
               { what: 'Broadcast mirrors your typing into every terminal you tick' },
-              { what: 'The palette states where a command will land before you send it' }
+              { what: '⇉ above the tabs turns it on, and every pane gets a tick of its own' },
+              { what: 'A banner says how many terminals hear you, with All and None' },
+              { what: 'Tabs that take part are marked ⇉' },
+              { what: 'The palette states where a command will land before you send it' },
+              {
+                what: '+ New snippet saves a command with a name and tags; each row edits or deletes it'
+              }
             ]
           }
         ]
@@ -422,7 +465,11 @@ const CHAPTERS: Chapter[] = [
               { what: 'The box under the path narrows the folder as you type; * and ? work' },
               {
                 what: '⏎ in it searches every folder below as well, and shows where each result is'
-              }
+              },
+              { what: 'Right-click a result for Show in its folder' },
+              { what: '⊞ in the path bar shows a folder tree beside the listing' },
+              { what: 'Columns give size, date, permissions, owner and group, coloured by kind' },
+              { what: 'Drag a column’s edge to widen it; widths and the sort order are remembered' }
             ]
           },
           {
@@ -441,10 +488,21 @@ const CHAPTERS: Chapter[] = [
               { what: 'Double-click opens a folder, or a file in your editor' },
               { what: 'Right-click to download, rename, delete, or make a folder' },
               { what: 'Drag files or folders in from Finder to upload them' },
+              { what: 'The menu uploads a file or a whole folder too, and downloads a folder' },
+              { what: 'Drag files onto another host’s SFTP panel to copy them straight across' },
+              {
+                what: 'Nothing lands on this machine on the way, and the hosts need no route to each other'
+              },
               { what: 'Anything that would overwrite is listed first, both ways, and asked about' },
               { what: 'Every clash starts on Skip; nothing is remembered between transfers' },
               { what: 'A folder where a file must go is refused rather than replaced' },
-              { what: 'SCP / Shell can be set on a group, for every SSH host inside it' }
+              { what: 'SCP / Shell can be set on a group, for every SSH host inside it' },
+              {
+                what: 'With it, files are reached as another user, through a command such as sudo -n -i -u postgres'
+              },
+              {
+                what: 'The terminal keeps its own login, and the command must not ask for a password'
+              }
             ]
           },
           {
@@ -486,6 +544,7 @@ const CHAPTERS: Chapter[] = [
                 what: 'A host’s dialog has a Desktop page: gateway, screen, keyboard, clipboard and disks'
               },
               { what: 'Set the gateway on the group and every RDP host in it goes through it' },
+              { what: 'A gateway can leave private addresses alone and reach them directly' },
               {
                 what: 'A certificate the machine cannot verify is asked about once, then remembered'
               },
@@ -495,6 +554,10 @@ const CHAPTERS: Chapter[] = [
               {
                 what: 'Nothing types the password into the window: the client signs in outside it'
               },
+              {
+                what: 'With no password saved the pane asks for one; Try again repeats the last attempt'
+              },
+              { what: 'Another password… signs in with a different one' },
               {
                 what: 'Right-click a Windows host and choose “Connect in console mode” for the /admin session'
               }
@@ -530,6 +593,7 @@ const CHAPTERS: Chapter[] = [
                 keys: 'Ctrl+Alt+End',
                 what: 'Ctrl+Alt+Del on the far side; this machine keeps the real one'
               },
+              { keys: 'Alt+Home', what: 'The Windows key on the far side' },
               {
                 what: 'A desktop with the focus takes every shortcut this app owns, ⌘W and Ctrl+W included'
               },
@@ -690,7 +754,10 @@ const CHAPTERS: Chapter[] = [
               },
               { what: 'Settings → About shows the version and asks for an update on the spot' },
               { what: 'After an update a plate above the window says what came with it' },
-              { what: 'What’s new, beside the version, reads the last few releases again' }
+              { what: 'What’s new, beside the version, reads the last few releases again' },
+              {
+                what: 'An update installs now, at the next quit, or later — open connections are named first'
+              }
             ]
           }
         ]
@@ -724,6 +791,9 @@ const CHAPTERS: Chapter[] = [
               { what: 'A source follows one branch — empty means the default, usually main' },
               { what: 'The line under a repository states the branch, revision and what was read' },
               { what: 'Work on another branch will not appear until you name it or merge it' },
+              {
+                what: 'Only YAML is read: .yml and .yaml files, a folder one level deep; INI is not'
+              },
               { what: 'Local tweaks to a host survive the next sync' }
             ]
           },
@@ -774,7 +844,7 @@ terminaldeck_protocol: rdp`
                 what: 'Two folders on one repository share a clone and read their own paths from it'
               },
               {
-                what: 'Its hosts land in the folder as one list, however deeply the inventory nests them'
+                what: 'Its hosts land in the folder as one list by default, however deeply the inventory nests them'
               },
               { what: 'They sit beside your own sessions, which can stay in the same folder' },
               { what: 'A host named by several Ansible groups appears once — it is one host' },
@@ -797,6 +867,9 @@ terminaldeck_protocol: rdp`
               { what: 'A subgroup you untick stays unticked — it is not offered again as new' },
               {
                 what: 'Include hosts of child groups: a group brings every host beneath it, children found by name as Ansible does'
+              },
+              {
+                what: 'Arrange hosts in group folders, in the same dialog, nests them by group instead of one list'
               },
               {
                 what: 'What has left the repository leaves the folder, and the dialog says what goes'

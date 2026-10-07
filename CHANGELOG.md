@@ -34,6 +34,13 @@ the other produces a version nobody can install, which is how 0.1.10 through
 - **Help is laid out in subjects**, grouped down the side, the long ones cut
   into headed parts. It opens on every keyboard shortcut gathered in one place,
   and a search box looks through all of it in the interface's language.
+- **Help describes everything the application does.** Over thirty features it
+  had never mentioned are in it now — among them importing `~/.ssh/config`,
+  quick connect, two-factor codes, host keys, `.ppk` keys and Pageant,
+  broadcast and snippets, copying files between two hosts' panels, the
+  folder tree, SCP/Shell as another user, `Alt+Home` for the Windows key,
+  signing out of a workspace's Windows sessions and the gateway's bypass for
+  private addresses.
 
 ### Fixed
 
