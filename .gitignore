@@ -19,3 +19,7 @@ resources/freerdp/vcpkg/
 
 # Editor/tooling scratch, not part of the project.
 .claude/
+
+# Recorded feature videos and their voice-overs: made locally, kept out of the
+# repository.
+docs/video/
