@@ -6,6 +6,15 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.26.3
+
+### Fixed
+
+- **Copying a file on a Windows desktop no longer ends the session.** When a
+  file on its clipboard is first asked for, a Windows host sends an empty
+  message on the clipboard channel, and the desktop client closed the session
+  over it. That message is now passed over.
+
 ## 0.26.2
 
 ### Fixed
