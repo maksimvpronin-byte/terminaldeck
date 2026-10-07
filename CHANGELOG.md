@@ -6,6 +6,42 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.27.0
+
+### Changed
+
+- **Settings is a list of pages down the side**, instead of six tabs that
+  wrapped onto two rows: General, Tree and tabs, Terminal and Files, then
+  Accounts, Security and Backup, and About with the version, What's new and
+  the update check, which used to sit at the foot of Backup. Each page is cut
+  into titled cards and yes-or-no settings are switches. The host tree page
+  shows three sample rows that take every change as it is made, the SSH
+  monitor moved to Terminal and the logs folder to General. **Reset section**
+  on the Terminal and the Tree and tabs pages puts back that page's defaults
+  and no other's.
+- **The dialogs of a host, a group, a repository and a host's local settings
+  are laid out the same way.** A host has General, which holds everything a
+  new host needs, then Sign-in, and Terminal, Files and Tunnels for a shell or
+  Desktop for a desktop; a group has General, SSH, Desktop, Appearance and
+  Git. The list marks a sign-in inherited from the group and counts the
+  tunnels, and a save that is refused turns to the page it is about. Port
+  forwards are a table, and the desktop settings come in gateway, screen,
+  keyboard, clipboard and session cards.
+- **The Inventory tab is gone: repositories are a section of the one tree**,
+  under your hosts and beside the collections and multi-windows, so the
+  filter, a selection and Expand all or Collapse all reach them too. The
+  hosts, their local settings and passwords stay exactly where they were.
+- **Help is laid out in subjects**, grouped down the side, the long ones cut
+  into headed parts. It opens on every keyboard shortcut gathered in one place,
+  and a search box looks through all of it in the interface's language.
+
+### Fixed
+
+- **Removing a repository asks first.** It takes the repository's hosts with
+  it, along with every local setting made on them.
+- Three lines of Help that had stopped being true are gone or rewritten,
+  among them one saying files could not yet be copied out of a desktop.
+
 ## 0.26.5
 
 ### Fixed
