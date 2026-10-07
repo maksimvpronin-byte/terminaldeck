@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { complaintIn, failureText } from './clientLog'
+import { complaintIn, failureText, isEcho } from './clientLog'
 
 /** A line in WinPR's default layout, which is what the client actually writes. */
 function logged(level: string, fn: string, message: string): string {
@@ -66,5 +66,27 @@ describe('failureText', () => {
   it('stands on its own when the client said nothing', () => {
     expect(failureText('', undefined, 0)).toBe('Could not connect')
     expect(failureText('   ', undefined, 0x0002000d)).toBe('Could not connect (0x0002000d)')
+  })
+})
+
+/** What a failing channel says on its way out, after it has said why. */
+describe('isEcho', () => {
+  it.each([
+    'checkChannelErrorEvent() failed - 0',
+    'cliprdr_virtual_channel_open_event_ex reported an error. Error was 12',
+    'failed with error 12',
+    'Stream_New failed!',
+    'transport_check_fds: transport->ReceiveCallback() - STATE_RUN_FAILED [-1]'
+  ])('takes %s for an echo', (line) => {
+    expect(isEcho(line)).toBe(true)
+  })
+
+  it('takes the reason for the reason', () => {
+    expect(
+      isEcho(
+        'clipboard channel: a continuation arrived with no message open (flags 0x00000010, size 1600, total 1048588, 0 of the open message so far)'
+      )
+    ).toBe(false)
+    expect(isEcho('No security protocol is enabled')).toBe(false)
   })
 })

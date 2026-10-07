@@ -39,6 +39,21 @@ export function complaintIn(line: string): string | undefined {
 }
 
 /**
+ * Whether a complaint only repeats one made a moment earlier.
+ *
+ * A channel that fails is reported several times on its way out — by the
+ * channel, by the plugin that hosts it, by the loop that stops — and the last
+ * of those, which is what used to be shown, says only that something failed:
+ * "checkChannelErrorEvent() failed - 0". These are kept only when nothing
+ * better was said.
+ */
+export function isEcho(complaint: string): boolean {
+  return /^checkChannelErrorEvent\(\) failed|reported an error\. Error was \d+$|^failed with error \d+$|^Stream_New failed!$|^transport_check_fds:/.test(
+    complaint
+  )
+}
+
+/**
  * Why a desktop did not open, in as many words as are known.
  *
  * The summary is FreeRDP's own sentence, the complaint is the client's last

@@ -51,6 +51,11 @@ int td_proto_init(void)
 	 * whoever is reading this process's log, which is where it was useful. */
 	if (td_dup2(2, 1) < 0)
 		return 0;
+	/* And unbuffered, as stderr is. WinPR writes its quieter levels to stdout
+	 * and its errors to stderr; with stdout buffered as a pipe is, an error
+	 * reached the log before the lines that led up to it, and a trace read in
+	 * file order told the story backwards. */
+	setvbuf(stdout, NULL, _IONBF, 0);
 
 	out_pipe = fdopen(moved, "wb");
 	if (!out_pipe)

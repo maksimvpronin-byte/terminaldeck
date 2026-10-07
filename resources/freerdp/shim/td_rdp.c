@@ -1164,6 +1164,9 @@ static void td_clip_get_chunk(tdContext* td, const td_cmd* cmd)
 	request.nPositionHigh = (UINT32)(offset >> 32);
 	request.cbRequested = (UINT32)td_cmd_int(cmd, "length", 65536);
 	if (request.cbRequested > TD_CLIP_CHUNK_MAX) request.cbRequested = TD_CLIP_CHUNK_MAX;
+	WLog_INFO(TAG, "clipboard: asking for stream %u, file %u, %u byte(s) from %llu",
+	          (unsigned)request.streamId, (unsigned)request.listIndex,
+	          (unsigned)request.cbRequested, (unsigned long long)offset);
 	if (td->cliprdr->ClientFileContentsRequest(td->cliprdr, &request) != CHANNEL_RC_OK)
 	{
 		CLIPRDR_FILE_CONTENTS_RESPONSE failure = { 0 };
@@ -1171,6 +1174,94 @@ static void td_clip_get_chunk(tdContext* td, const td_cmd* cmd)
 		failure.common.msgFlags = CB_RESPONSE_FAIL;
 		(void)td_clip_file_response(td->cliprdr, &failure);
 	}
+}
+
+/* ------------------------------------------------ the clipboard channel's pieces */
+
+/*
+ * What the far end sends on the clipboard channel, piece by piece.
+ *
+ * FreeRDP reassembles a channel's messages in one buffer, and a piece that
+ * does not fit the message it is building — a continuation with nothing open,
+ * a start with a message still open, a length that does not add up — ends the
+ * whole session with "Stream_New failed!" or "read error", neither of which
+ * says what arrived. This watches the same pieces on their way in and, when
+ * one would not fit, says so and lists the last few before it. It changes
+ * nothing about what is delivered.
+ */
+#define TD_CHUNK_RING 32
+
+typedef struct
+{
+	UINT32 flags;
+	UINT32 size;
+	UINT32 total;
+} td_chunk;
+
+static pReceiveChannelData td_receive_next;
+static UINT16 td_clip_channel_id;
+static td_chunk td_chunks[TD_CHUNK_RING];
+static unsigned td_chunk_count;
+static int td_chunk_open;
+static UINT64 td_chunk_got;
+
+static void td_chunk_complain(const char* what, const td_chunk* now)
+{
+	const unsigned seen = td_chunk_count < TD_CHUNK_RING ? td_chunk_count : TD_CHUNK_RING;
+	for (unsigned i = seen; i > 0; i--)
+	{
+		const td_chunk* c = &td_chunks[(td_chunk_count - i) % TD_CHUNK_RING];
+		WLog_WARN(TAG, "clipboard channel: piece -%u flags 0x%08x size %u total %u", i,
+		          (unsigned)c->flags, (unsigned)c->size, (unsigned)c->total);
+	}
+	WLog_ERR(TAG, "clipboard channel: %s (flags 0x%08x, size %u, total %u, %llu of the open message so far)",
+	         what, (unsigned)now->flags, (unsigned)now->size, (unsigned)now->total,
+	         (unsigned long long)td_chunk_got);
+}
+
+static BOOL td_receive_channel_data(freerdp* instance, UINT16 channelId, const BYTE* data,
+                                    size_t size, UINT32 flags, size_t totalSize)
+{
+	if (!td_clip_channel_id)
+	{
+		const char* name = freerdp_channels_get_name_by_id(instance, channelId);
+		if (name && strcmp(name, CLIPRDR_SVC_CHANNEL_NAME) == 0)
+			td_clip_channel_id = channelId;
+	}
+
+	if (channelId == td_clip_channel_id)
+	{
+		const td_chunk now = { flags, (UINT32)size, (UINT32)totalSize };
+
+		/* The same decisions channel_client_post_message makes, in its order. */
+		if (flags & (CHANNEL_FLAG_SUSPEND | CHANNEL_FLAG_RESUME))
+			td_chunk_complain("a suspend or resume piece, which FreeRDP drops", &now);
+		else
+		{
+			if (flags & CHANNEL_FLAG_FIRST)
+			{
+				if (td_chunk_open)
+					td_chunk_complain("a new message began before the last one ended", &now);
+				else if (totalSize == 0)
+					td_chunk_complain("a message announced with no length", &now);
+				td_chunk_open = 1;
+				td_chunk_got = 0;
+			}
+			else if (!td_chunk_open)
+				td_chunk_complain("a continuation arrived with no message open", &now);
+			td_chunk_got += size;
+			if (flags & CHANNEL_FLAG_LAST)
+			{
+				if (td_chunk_open && td_chunk_got != totalSize)
+					td_chunk_complain("the message ended at a length other than announced", &now);
+				td_chunk_open = 0;
+			}
+		}
+		td_chunks[td_chunk_count % TD_CHUNK_RING] = now;
+		td_chunk_count++;
+	}
+
+	return td_receive_next(instance, channelId, data, size, flags, totalSize);
 }
 
 /* -------------------------------------------------------------- the channels */
@@ -1274,6 +1365,11 @@ static BOOL td_pre_connect(freerdp* instance)
 
 	if (PubSub_SubscribeChannelConnected(context->pubSub, on_channel_connected) < 0)
 		return FALSE;
+	if (!td_receive_next)
+	{
+		td_receive_next = instance->ReceiveChannelData;
+		instance->ReceiveChannelData = td_receive_channel_data;
+	}
 	if (PubSub_SubscribeChannelDisconnected(context->pubSub, on_channel_disconnected) < 0)
 		return FALSE;
 	return TRUE;

@@ -6,7 +6,7 @@ import { IPC } from '../../shared/ipc-channels'
 import { askAboutCertificate } from './certificateVerifier'
 import { isUnlocked, requireUnlocked } from '../vault/locked'
 import { createRecordReader, encodeCommand, readCursor, readFrame, RECORD } from './recordStream'
-import { complaintIn, failureText } from './clientLog'
+import { complaintIn, failureText, isEcho } from './clientLog'
 import { ClipboardDownload, cleanClipboardDownloads } from './ClipboardDownload'
 import { pathsToUris, readFileClipboard, writeClipboardFiles } from './clipboardFiles'
 import { currentInputLanguage, keyboardLayoutFor } from '../inputLanguage'
@@ -99,6 +99,8 @@ interface Session {
   clipboardManifestTimer?: NodeJS.Timeout
   /** The client's last complaint, which is usually the reason it stopped. */
   complaint?: string
+  /** When it was made: an echo replaces a complaint older than a moment. */
+  complainedAt?: number
 }
 
 /**
@@ -256,7 +258,14 @@ class FreeRdpBridge {
         if (!text.trim()) continue
         trace(`${id} ${text}`)
         const complaint = complaintIn(text)
-        if (complaint) session.complaint = complaint
+        if (!complaint) continue
+        // An echo of a failure just named does not take its place; a warning
+        // from long before the failure is not its name, and gives way.
+        const now = Date.now()
+        if (isEcho(complaint) && session.complaint && now - (session.complainedAt ?? 0) < 2000)
+          continue
+        session.complaint = complaint
+        session.complainedAt = now
       }
     })
 
