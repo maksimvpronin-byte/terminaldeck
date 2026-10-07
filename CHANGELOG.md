@@ -6,6 +6,14 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.26.4
+
+### Fixed
+
+- **A file copied on a Windows desktop arrives instead of stopping at 0%.**
+  The host would not hand over a file's contents until it had been asked for
+  the file's size, as other clients do first; that question is now asked.
+
 ## 0.26.3
 
 ### Fixed
