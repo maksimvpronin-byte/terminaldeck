@@ -266,6 +266,48 @@ static void file_transfers(tdContext* td, CliprdrClientContext* ctx)
 	assert(captured[0] == 17 && captured[4] == 1 && memcmp(captured + 8, "3456", 4) == 0);
 	assert(cliprdr_file_context_uninit(td->clip_files, ctx));
 }
+/* What reaches FreeRDP's own reassembly, which the test stands in for. */
+static unsigned delivered;
+static BOOL deliver(freerdp* instance, UINT16 channelId, const BYTE* data, size_t size,
+                    UINT32 flags, size_t totalSize)
+{
+	(void)instance;
+	(void)channelId;
+	(void)data;
+	(void)size;
+	(void)flags;
+	(void)totalSize;
+	delivered++;
+	return TRUE;
+}
+
+/*
+ * A Windows host sends an empty message on the clipboard channel when a file
+ * on its clipboard is first asked for. FreeRDP ended the session over it, so
+ * it is held back — and only it: a message with anything in it, however it is
+ * cut into pieces, goes on.
+ */
+static void empty_messages(void)
+{
+	static const BYTE bytes[16] = { 0 };
+	const UINT32 whole = CHANNEL_FLAG_FIRST | CHANNEL_FLAG_LAST | CHANNEL_FLAG_SHOW_PROTOCOL;
+
+	td_receive_next = deliver;
+	td_clip_channel_id = 1004;
+
+	assert(td_receive_channel_data(NULL, 1004, bytes, 0, whole, 0));
+	assert(delivered == 0);
+
+	assert(td_receive_channel_data(NULL, 1004, bytes, 12, whole, 12));
+	assert(td_receive_channel_data(NULL, 1004, bytes, 8, CHANNEL_FLAG_FIRST, 16));
+	assert(td_receive_channel_data(NULL, 1004, bytes, 8, CHANNEL_FLAG_LAST, 16));
+	assert(delivered == 3);
+
+	/* Another channel's empty message is not this one's to judge. */
+	assert(td_receive_channel_data(NULL, 1007, bytes, 0, whole, 0));
+	assert(delivered == 4);
+}
+
 int main(void)
 {
 	tdContext td = { 0 };
@@ -319,6 +361,7 @@ int main(void)
 	respond(&ctx, "unsolicited");
 	assert(records == before_records + 1);
 	file_transfers(&td, &ctx);
+	empty_messages();
 	cliprdr_file_context_free(td.clip_files);
 	ClipboardDestroy(td.clip_system);
 	DeleteCriticalSection(&td.clip);

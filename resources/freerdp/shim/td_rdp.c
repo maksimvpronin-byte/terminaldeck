@@ -1186,8 +1186,8 @@ static void td_clip_get_chunk(tdContext* td, const td_cmd* cmd)
  * a start with a message still open, a length that does not add up — ends the
  * whole session with "Stream_New failed!" or "read error", neither of which
  * says what arrived. This watches the same pieces on their way in and, when
- * one would not fit, says so and lists the last few before it. It changes
- * nothing about what is delivered.
+ * one would not fit, says so and lists the last few before it. The one thing
+ * it holds back is an empty message, which FreeRDP cannot take; see below.
  */
 #define TD_CHUNK_RING 32
 
@@ -1233,6 +1233,24 @@ static BOOL td_receive_channel_data(freerdp* instance, UINT16 channelId, const B
 	{
 		const td_chunk now = { flags, (UINT32)size, (UINT32)totalSize };
 
+		/*
+		 * An empty message, whole in one piece, with nothing in it. A Windows
+		 * host sends one when a file on its clipboard is first asked for, and
+		 * FreeRDP 3.31 cannot take it: it sizes its buffer by the announced
+		 * length, gets nothing back for zero, logs "Stream_New failed!" and
+		 * ends the session. There is nothing here to deliver — no clipboard
+		 * message is shorter than its 8-byte header — so it goes no further.
+		 */
+		if ((flags & CHANNEL_FLAG_FIRST) && (flags & CHANNEL_FLAG_LAST) && size == 0 &&
+		    totalSize == 0)
+		{
+			WLog_INFO(TAG, "clipboard channel: passed over an empty message (flags 0x%08x)",
+			          (unsigned)flags);
+			td_chunks[td_chunk_count % TD_CHUNK_RING] = now;
+			td_chunk_count++;
+			return TRUE;
+		}
+
 		/* The same decisions channel_client_post_message makes, in its order. */
 		if (flags & (CHANNEL_FLAG_SUSPEND | CHANNEL_FLAG_RESUME))
 			td_chunk_complain("a suspend or resume piece, which FreeRDP drops", &now);
@@ -1255,6 +1273,7 @@ static BOOL td_receive_channel_data(freerdp* instance, UINT16 channelId, const B
 				if (td_chunk_open && td_chunk_got != totalSize)
 					td_chunk_complain("the message ended at a length other than announced", &now);
 				td_chunk_open = 0;
+				td_chunk_got = 0;
 			}
 		}
 		td_chunks[td_chunk_count % TD_CHUNK_RING] = now;
