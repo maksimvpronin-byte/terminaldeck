@@ -1110,13 +1110,19 @@ static UINT td_clip_local_request(CliprdrClientContext* ctx, const CLIPRDR_FILE_
 	return CHANNEL_RC_OK;
 }
 
+/* The most one file request asks the far end for, and so the most an answer
+ * to it may carry. ClipboardDownload.ts asks for up to this much, one request
+ * at a time: several out at once had their answers' pieces interleaved on the
+ * channel, and FreeRDP drops the session over that. */
+#define TD_CLIP_CHUNK_MAX (1024u * 1024u)
+
 /* File payloads stay binary across the pipe; Node owns staging and path validation. */
 static UINT td_clip_file_response(CliprdrClientContext* ctx,
                                   const CLIPRDR_FILE_CONTENTS_RESPONSE* response)
 {
 	(void)ctx;
 	UINT32 length = response->cbRequested;
-	if (length > 65536 || (length && !response->requestedData)) length = 0;
+	if (length > TD_CLIP_CHUNK_MAX || (length && !response->requestedData)) length = 0;
 	BYTE* packet = calloc(1, (size_t)length + 8);
 	if (!packet) return ERROR_NOT_ENOUGH_MEMORY;
 	UINT32 fields[2] = { response->streamId, response->common.msgFlags };
@@ -1157,7 +1163,7 @@ static void td_clip_get_chunk(tdContext* td, const td_cmd* cmd)
 	request.nPositionLow = (UINT32)offset;
 	request.nPositionHigh = (UINT32)(offset >> 32);
 	request.cbRequested = (UINT32)td_cmd_int(cmd, "length", 65536);
-	if (request.cbRequested > 65536) request.cbRequested = 65536;
+	if (request.cbRequested > TD_CLIP_CHUNK_MAX) request.cbRequested = TD_CLIP_CHUNK_MAX;
 	if (td->cliprdr->ClientFileContentsRequest(td->cliprdr, &request) != CHANNEL_RC_OK)
 	{
 		CLIPRDR_FILE_CONTENTS_RESPONSE failure = { 0 };

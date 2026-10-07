@@ -409,6 +409,39 @@ describe('a file list that arrives while the desktop is not in use', () => {
   })
 })
 
+/**
+ * A channel that refuses something stops FreeRDP's loop without an error of
+ * its own, and the pane said "Success." over a session that had just been cut.
+ */
+describe('a session that ends for no reason the code gives', () => {
+  function ended(complaint: string | undefined, fields: Record<string, unknown>): unknown {
+    const { session } = stubSession()
+    const said: unknown[] = []
+    ;(session.window as { webContents: { send: unknown } }).webContents.send = (
+      _channel: string,
+      payload: unknown
+    ) => said.push(payload)
+    if (complaint) session.complaint = complaint
+    const event = { e: 'ended', detail: 'Success.', ...fields }
+    innards().receive('d-ended', session, RECORD.event, Buffer.from(JSON.stringify(event)))
+    return (said[0] as { detail?: string }).detail
+  }
+
+  it('names the last thing the client complained of', () => {
+    expect(ended('cliprdr reported an error. Error was 13', { code: 0, errinfo: 0 })).toBe(
+      'cliprdr reported an error. Error was 13'
+    )
+  })
+
+  it('leaves an end the host explained alone', () => {
+    expect(ended('anything', { code: 0, errinfo: 12 })).toBe('Success.')
+  })
+
+  it('says what it said before when nothing was complained of', () => {
+    expect(ended(undefined, { code: 0, errinfo: 0 })).toBe('Success.')
+  })
+})
+
 describe('a desktop client that is not there', () => {
   it('names the build for the machine it is on', async () => {
     const { missingClient } = await import('./FreeRdpBridge')

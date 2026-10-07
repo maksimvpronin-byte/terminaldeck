@@ -52,7 +52,8 @@ describe('RDP file clipboard', () => {
       ])
     )
     expect(paths).toEqual([])
-    expect(requests[0]).toMatchObject({ index: 1, offset: '0', length: 65536 })
+    expect(requests[0]).toMatchObject({ index: 1, offset: '0', length: 70000 })
+    // A short answer is written, and the rest asked for from where it ended.
     download.receive(packet(requests[0].stream, body.subarray(0, 65536)))
     expect(requests[1]).toMatchObject({ index: 1, offset: '65536', length: 4464 })
     // A duplicate or stale chunk cannot overwrite the next range.
@@ -64,12 +65,15 @@ describe('RDP file clipboard', () => {
     expect(status).toHaveBeenLastCalledWith(70000, 70000)
   })
   /**
-   * One request at a time held a transfer to one chunk per round trip —
-   * about 1.25 MiB/s at 50 ms, however fast the link.
+   * Several requests out at once had a Windows host answer them on several
+   * threads, the pieces of the answers interleaved on the channel, and FreeRDP
+   * ended the session. One is out at a time, and each asks for a mebibyte.
    */
-  describe('with several requests out at once', () => {
+  describe('a file larger than one chunk', () => {
     type Req = { stream: number; index: number; offset: string; length: number }
-    const body = Buffer.from(Array.from({ length: 5 * 65536 + 100 }, (_, i) => i % 251))
+    const MiB = 1024 * 1024
+    const body = Buffer.alloc(2 * MiB + 100)
+    for (let i = 0; i < body.length; i++) body[i] = i % 251
     function begin(): { requests: Req[]; paths: () => string[]; status: ReturnType<typeof vi.fn> } {
       const requests: Req[] = []
       let paths: string[] = []
@@ -90,45 +94,34 @@ describe('RDP file clipboard', () => {
     }
     let answer: (r: Req, bytes?: number, ok?: boolean) => void = () => undefined
 
-    it('asks for the whole window at once and writes answers in order', () => {
+    it('asks for one mebibyte at a time, and the next only once the last has come', () => {
       const { requests, paths } = begin()
-      // All six chunks fit in the window, so all go out before any answer.
-      expect(requests.map((r) => Number(r.offset))).toEqual(
-        [0, 1, 2, 3, 4, 5].map((i) => i * 65536)
-      )
-      for (const r of [...requests].reverse()) answer(r)
-      expect(readFileSync(paths()[0])).toEqual(body)
-    })
-
-    it('asks again from the gap a short answer leaves', () => {
-      const { requests, paths } = begin()
+      expect(requests).toHaveLength(1)
+      expect(requests[0]).toMatchObject({ offset: '0', length: MiB })
+      answer(requests[0])
+      expect(requests).toHaveLength(2)
+      expect(requests[1]).toMatchObject({ offset: String(MiB), length: MiB })
       answer(requests[1])
-      answer(requests[0], 1000)
-      // Everything after the gap was dropped and asked for again from byte 1000.
-      const again = requests.slice(6)
-      expect(Number(again[0].offset)).toBe(1000)
-      answer(requests[2]) // an answer to a dropped request is ignored
-      for (let i = 0; i < again.length; i++) answer(again[i])
-      while (!paths().length) answer(requests.at(-1)!)
-      expect(readFileSync(paths()[0])).toEqual(body)
+      expect(requests[2]).toMatchObject({ offset: String(2 * MiB), length: 100 })
+      answer(requests[2])
+      expect(readFileSync(paths()[0]).equals(body)).toBe(true)
     })
 
-    it('falls back to one request at a time when the server refuses more', () => {
+    it('drops to 64 KiB chunks when the server refuses a mebibyte', () => {
       const { requests, paths, status } = begin()
-      answer(requests[3], 0, false)
-      const retry = requests.slice(6)
-      expect(retry).toHaveLength(1)
-      expect(retry[0].offset).toBe('0')
+      answer(requests[0], 0, false)
+      expect(requests[1]).toMatchObject({ offset: '0', length: 65536 })
       while (!paths().length) answer(requests.at(-1)!)
-      expect(readFileSync(paths()[0])).toEqual(body)
+      expect(readFileSync(paths()[0]).equals(body)).toBe(true)
       expect(status.mock.calls.some((c) => c[2])).toBe(false)
     })
 
-    it('falls back on a stall, and fails only when one request at a time stalls too', () => {
+    it('drops to 64 KiB chunks on a stall, and fails only when those stall too', () => {
       vi.useFakeTimers()
       const { requests, status } = begin()
       vi.advanceTimersByTime(30000)
-      expect(requests).toHaveLength(7)
+      expect(requests).toHaveLength(2)
+      expect(requests[1]).toMatchObject({ offset: '0', length: 65536 })
       expect(status.mock.lastCall?.[2]).toBeUndefined()
       vi.advanceTimersByTime(30000)
       expect(status.mock.lastCall?.[2]).toMatch(/timed out/)

@@ -787,6 +787,22 @@ class FreeRdpBridge {
       this.say(session, id, { ...event, detail })
       return
     }
+    /*
+     * A session that ended with no error and no reason from the host did not
+     * end on its own: a channel handler refused something, and FreeRDP stops
+     * the loop without setting an error of its own. Its summary for that is
+     * "Success.", and the line that names the channel is in the log, not in
+     * the code.
+     */
+    if (
+      event.e === 'ended' &&
+      !Number(event.code ?? 0) &&
+      !Number(event.errinfo ?? 0) &&
+      session.complaint
+    ) {
+      this.say(session, id, { ...event, detail: session.complaint })
+      return
+    }
     this.say(session, id, event)
   }
 

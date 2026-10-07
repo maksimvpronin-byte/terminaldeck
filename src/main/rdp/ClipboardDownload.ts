@@ -8,7 +8,6 @@ export interface ClipboardEntry {
   size: number
 }
 const DESCRIPTOR_BYTES = 592
-const CHUNK = 65536
 const MAX_BYTES = 20 * 1024 ** 3
 
 /** Validate the entire manifest before creating anything on disk. */
@@ -80,45 +79,44 @@ export function cleanClipboardDownloads(): void {
 type Request = { a: string; stream: number; index: number; offset: string; length: number }
 
 /**
- * How many chunk requests may be out at once.
+ * How much one request asks for.
  *
- * One at a time, every chunk cost a full round trip before the next was even
- * asked for: 64 KiB per 50 ms is about 1.25 MiB/s however fast the link. Eight
- * keep half a megabyte in flight, which is also all this ever holds in memory
- * for a transfer — an answer that arrives ahead of its turn waits here until
- * the ones before it are written.
+ * One request is out at a time, and that is not a choice this file is free to
+ * revisit. Several out at once let the far end answer them on several threads,
+ * and the pieces of one answer then arrive between the pieces of another. The
+ * channel has one reassembly buffer and no way to tell two answers apart, so
+ * FreeRDP drops the session with "Stream_New failed!", which the pane showed as
+ * "Success.". Speed comes from size instead: a mebibyte per round trip is about
+ * 20 MiB/s at 50 ms, and a single answer, however long, arrives in order.
  */
-const WINDOW = 8
+const CHUNK = 1024 * 1024
+/** What a server that refuses or stalls on the large size is asked for instead. */
+const SMALL_CHUNK = 65536
 
-/** One chunk asked for, and its answer once it has come and is waiting its turn. */
+/** The chunk asked for. */
 interface Pending {
   stream: number
   offset: number
   length: number
-  data?: Buffer
 }
 
 /**
- * Fetches the files a desktop copied, a bounded window of chunks at a time,
- * with a fresh stream id for every chunk and each file written strictly in
- * order.
+ * Fetches the files a desktop copied, one chunk at a time, with a fresh stream
+ * id for every chunk and each file written in order.
  *
- * A server that will not answer more than one request at a time is not given
- * up on: a refusal or a stall while several are out drops this transfer to one
- * request at a time, which is how it always worked, and asks again from the
- * last byte written.
+ * A server that will not serve a mebibyte at once is not given up on: a
+ * refusal or a stall drops this transfer to 64 KiB chunks and asks again from
+ * the last byte written.
  */
 export class ClipboardDownload {
   private dir?: string
   private fd?: number
   private entries: ClipboardEntry[] = []
   private index = 0
-  /** Bytes of the current file on disk. */
+  /** Bytes of the current file on disk, which is also where the next request starts. */
   private written = 0
-  /** Where the next request for the current file starts. */
-  private asked = 0
-  private pending: Pending[] = []
-  private window = WINDOW
+  private pending?: Pending
+  private chunk = CHUNK
   private received = 0
   private bytesTotal = 0
   get active(): boolean {
@@ -137,8 +135,8 @@ export class ClipboardDownload {
       this.entries = readFileDescriptors(manifest)
       this.bytesTotal = this.entries.reduce((n, e) => n + e.size, 0)
       this.dir = mkdtempSync(join(tmpdir(), 'terminaldeck-rdp-files-'))
-      this.index = this.written = this.asked = this.received = 0
-      this.window = WINDOW
+      this.index = this.written = this.received = 0
+      this.chunk = CHUNK
       this.status(0, this.total())
       this.advance()
     } catch (e) {
@@ -160,14 +158,14 @@ export class ClipboardDownload {
           this.fd = openSync(path, 'wx', 0o600)
         }
         if (this.written < entry.size) {
-          this.ask(entry.size)
+          if (!this.pending) this.ask(entry.size)
           return
         }
         closeSync(this.fd)
         this.fd = undefined
       }
       this.index++
-      this.written = this.asked = 0
+      this.written = 0
     }
     clearTimeout(this.timer)
     const paths = [...new Set(this.entries.map((e) => e.path.split('/')[0]))].map((p) =>
@@ -178,35 +176,32 @@ export class ClipboardDownload {
     this.status(this.received, this.total())
     this.complete(paths)
   }
-  /** Tops the window up for the current file, and gives the transfer another 30 s. */
+  /** Asks for the next chunk of the current file, and gives the transfer another 30 s. */
   private ask(size: number): void {
-    while (this.pending.length < this.window && this.asked < size) {
-      const slot = {
-        stream: nextStream++,
-        offset: this.asked,
-        length: Math.min(CHUNK, size - this.asked)
-      }
-      if (nextStream > 0x7fffffff) nextStream = 1
-      this.pending.push(slot)
-      this.asked += slot.length
-      this.request({
-        a: 'clipget',
-        stream: slot.stream,
-        index: this.index,
-        offset: String(slot.offset),
-        length: slot.length
-      })
+    const slot = {
+      stream: nextStream++,
+      offset: this.written,
+      length: Math.min(this.chunk, size - this.written)
     }
+    if (nextStream > 0x7fffffff) nextStream = 1
+    this.pending = slot
+    this.request({
+      a: 'clipget',
+      stream: slot.stream,
+      index: this.index,
+      offset: String(slot.offset),
+      length: slot.length
+    })
     clearTimeout(this.timer)
     this.timer = setTimeout(() => this.stalled(), 30000)
   }
   receive(packet: Buffer): void {
     if (!this.dir || packet.length < 8) return
     const stream = packet.readUInt32LE(0)
-    // An answer to nothing still out — a duplicate, or one dropped with the
-    // window — cannot land in the range that follows.
-    const slot = this.pending.find((p) => p.stream === stream && !p.data)
-    if (!slot) return
+    // An answer to anything but the request out — a duplicate, or one given up
+    // on — cannot land in the range that follows.
+    const slot = this.pending
+    if (!slot || slot.stream !== stream) return
     try {
       const bytes = packet.subarray(8)
       if (
@@ -215,54 +210,37 @@ export class ClipboardDownload {
         bytes.length > slot.length ||
         this.fd === undefined
       ) {
-        if (this.pending.length > 1) return this.narrow()
-        throw new Error('The RDP server refused or truncated the file transfer')
+        return this.shrink(new Error('The RDP server refused or truncated the file transfer'))
       }
-      // Copied: the record it arrived in is not ours to keep.
-      slot.data = Buffer.from(bytes)
-      this.flush()
+      this.pending = undefined
+      let written = 0
+      while (written < bytes.length) {
+        const n = writeSync(this.fd, bytes, written, bytes.length - written)
+        if (!n) throw new Error('Could not write the received file')
+        written += n
+      }
+      // A short answer is not an error: the next request starts where it ended.
+      this.written += bytes.length
+      this.received += bytes.length
+      this.status(this.received, this.total())
+      this.advance()
     } catch (e) {
       this.fail(e)
     }
   }
   /**
-   * Writes every answer that is next in line, then asks for more.
-   *
-   * Synchronous writes, still: one is a 64 KiB copy into the page cache, and
-   * the requests already out keep the link busy while it happens.
+   * Down to 64 KiB chunks, from the last byte written — or, if the request
+   * that failed was no larger than that already, the end of the transfer.
    */
-  private flush(): void {
-    while (this.pending[0]?.data) {
-      const { data, length } = this.pending.shift()!
-      let written = 0
-      while (written < data!.length) {
-        const n = writeSync(this.fd!, data!, written, data!.length - written)
-        if (!n) throw new Error('Could not write the received file')
-        written += n
-      }
-      this.written += data!.length
-      this.received += data!.length
-      if (data!.length < length) {
-        // A short answer leaves a gap no later request covers. Those are
-        // dropped, and the rest is asked for again from here.
-        this.pending = []
-        this.asked = this.written
-      }
-    }
-    this.status(this.received, this.total())
-    this.advance()
-  }
-  /** Back to one request at a time, from the last byte written. */
-  private narrow(): void {
-    this.window = 1
-    this.pending = []
-    this.asked = this.written
+  private shrink(error: Error): void {
+    if (!this.pending || this.pending.length <= SMALL_CHUNK) return this.fail(error)
+    this.chunk = SMALL_CHUNK
+    this.pending = undefined
     this.advance()
   }
   private stalled(): void {
     try {
-      if (this.pending.length > 1) this.narrow()
-      else this.fail(new Error('RDP file transfer timed out'))
+      this.shrink(new Error('RDP file transfer timed out'))
     } catch (error) {
       this.fail(error)
     }
@@ -273,7 +251,7 @@ export class ClipboardDownload {
   }
   cancel(): void {
     clearTimeout(this.timer)
-    this.pending = []
+    this.pending = undefined
     if (this.fd !== undefined) {
       closeSync(this.fd)
       this.fd = undefined
