@@ -24,7 +24,15 @@ import {
 import { loadLayout } from '../layout'
 import { findHost, hostColour } from '../hosts'
 import { protocolOf } from '../../../../shared/protocols'
-import type { AppState, OpenRequest, Workspace, WorkspaceSlice, WorkspaceTab } from './types'
+import { colourOf } from '../../../../shared/hostColour'
+import type {
+  AppState,
+  OpenRequest,
+  Workspace,
+  WorkspaceOwner,
+  WorkspaceSlice,
+  WorkspaceTab
+} from './types'
 
 const restored = loadLayout()
 
@@ -45,6 +53,62 @@ function nextTitle(workspaces: Workspace[]): string {
     const candidate = `Workspace ${n}`
     if (!taken.has(candidate)) return candidate
   }
+}
+
+/** The host a pane is for, if it is for a saved or inventory host at all. */
+function sessionOf(target: PaneTarget): string | undefined {
+  return target.kind === 'session' ? target.sessionId : undefined
+}
+
+/**
+ * Brings forward the workspace hosts opened from the tree belong in, making
+ * one if there is none — never a collection's, which holds the set and only
+ * the set: saved again as the collection, it would take a stranger in with it.
+ *
+ * With `workspacePerGroup` on, hosts that share a group go into that group's
+ * workspace, named after it. Everything else — the setting off, a host at the
+ * top of the tree, hosts from different groups opened together — goes to an
+ * ordinary workspace: the one in front if it is one, else the last on the
+ * strip, else a new one.
+ */
+function homeWorkspace(get: () => AppState, sessionIds: (string | undefined)[]): void {
+  const s = get()
+  const perGroup = s.settings.workspacePerGroup
+  if (perGroup && sessionIds.length > 0) {
+    const found = sessionIds.map((id) => (id ? findHost(s, id) : undefined))
+    const groupId = found[0]?.host.groupId
+    const group =
+      groupId && found.every((f) => f?.host.groupId === groupId)
+        ? found[0]?.groups.find((g) => g.id === groupId)
+        : undefined
+    if (group && found[0]) {
+      const own = s.workspaces.find((w) => w.groupId === group.id)
+      if (own) s.setActiveWorkspace(own.id)
+      else
+        s.openWorkspace(group.name, colourOf(group, group.parentId, found[0].groups), {
+          groupId: group.id
+        })
+      return
+    }
+  }
+  // A group's workspace is an ordinary one again once the setting is off.
+  const ordinary = (w: Workspace): boolean => !w.collectionId && !(perGroup && w.groupId)
+  if (s.workspaces.some((w) => w.id === s.activeWorkspaceId && ordinary(w))) return
+  const last = [...s.workspaces].reverse().find(ordinary)
+  if (last) s.setActiveWorkspace(last.id)
+  else s.openWorkspace()
+}
+
+/** Marks `id` as the owner's workspace, and no other one as it: one each. */
+function claim(workspaces: Workspace[], id: string, owner: WorkspaceOwner): Workspace[] {
+  const collectionId = 'collectionId' in owner ? owner.collectionId : undefined
+  const groupId = 'groupId' in owner ? owner.groupId : undefined
+  return workspaces.map((w) => {
+    if (w.id === id) return { ...w, collectionId, groupId }
+    if (collectionId && w.collectionId === collectionId) return { ...w, collectionId: undefined }
+    if (groupId && w.groupId === groupId) return { ...w, groupId: undefined }
+    return w
+  })
 }
 
 export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice> = (set, get) => ({
@@ -106,25 +170,22 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
 
   // --- workspaces (the top strip) ---
 
-  openWorkspace: (title, color, collectionId) => {
+  openWorkspace: (title, color, owner) => {
     const workspace: Workspace = {
       id: nanoid(),
       title: title?.trim() || nextTitle(get().workspaces),
       color,
-      collectionId,
       tabs: [],
       activeTabId: null
     }
-    set((s) => ({
-      workspaces: [
-        // One workspace per collection: the newest one is where its hosts go.
-        ...s.workspaces.map((w) =>
-          collectionId && w.collectionId === collectionId ? { ...w, collectionId: undefined } : w
-        ),
-        workspace
-      ],
-      activeWorkspaceId: workspace.id
-    }))
+    set((s) => {
+      const workspaces = [...s.workspaces, workspace]
+      // One workspace per collection or group: the newest is where its hosts go.
+      return {
+        workspaces: owner ? claim(workspaces, workspace.id, owner) : workspaces,
+        activeWorkspaceId: workspace.id
+      }
+    })
     return workspace.id
   },
 
@@ -142,16 +203,8 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
   setActiveWorkspace: (workspaceId) => set({ activeWorkspaceId: workspaceId }),
 
   setWorkspaceCollection: (workspaceId, collectionId) =>
-    set((s) => ({
-      workspaces: s.workspaces.map((w) =>
-        w.id === workspaceId
-          ? { ...w, collectionId }
-          : // One workspace per collection, so a host knows where to go.
-            w.collectionId === collectionId
-            ? { ...w, collectionId: undefined }
-            : w
-      )
-    })),
+    // One workspace per collection, so a host knows where to go.
+    set((s) => ({ workspaces: claim(s.workspaces, workspaceId, { collectionId }) })),
 
   renameWorkspace: (workspaceId, title) => {
     const trimmed = title.trim()
@@ -252,7 +305,9 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
     if (collection) {
       const own = s.workspaces.find((w) => w.collectionId === collection.id)
       if (own) get().setActiveWorkspace(own.id)
-      else get().openWorkspace(collection.name, color, collection.id)
+      else get().openWorkspace(collection.name, color, { collectionId: collection.id })
+    } else if (!again) {
+      homeWorkspace(get, [sessionOf(target)])
     }
     return get().openTab(title, target, color, viaCollectionId)
   },
@@ -272,11 +327,11 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
     return tab.id
   },
 
-  openMany: (items, mode, workspaceTitle, collectionId) => {
+  openMany: (items, mode, workspaceTitle, owner) => {
     if (items.length === 0) return
     if (mode === 'workspace') {
       // The group's own colour rides along, so the whole strip entry is tinted.
-      get().openWorkspace(workspaceTitle, items.find((i) => i.color)?.color, collectionId)
+      get().openWorkspace(workspaceTitle, items.find((i) => i.color)?.color, owner)
       for (const item of items) {
         get().openTab(item.title, item.target, item.color, item.viaCollectionId)
       }
@@ -284,12 +339,21 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
     }
     if (mode === 'tabs') {
       for (const item of items) {
+        // Each to its own place: with a workspace per group, hosts picked from
+        // two groups go to two workspaces.
+        if (!item.viaCollectionId) homeWorkspace(get, [sessionOf(item.target)])
         get().openTab(item.title, item.target, item.color, item.viaCollectionId)
       }
       return
     }
 
     const [first, ...rest] = items
+    // One tab holds them all, so it goes where they all belong, if they agree.
+    if (!items.some((i) => i.viaCollectionId))
+      homeWorkspace(
+        get,
+        items.map((i) => sessionOf(i.target))
+      )
     get().openTab(first.title, first.target, first.color, first.viaCollectionId)
     const tabId = activeTab(get())?.id
     if (!tabId) return

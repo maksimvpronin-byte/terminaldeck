@@ -864,7 +864,8 @@ export default function Sidebar({
               color: colourFor(s)
             })),
             'workspace',
-            group?.name
+            group?.name,
+            { groupId }
           )
       },
       ...(group?.git

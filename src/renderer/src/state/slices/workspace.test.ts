@@ -2,7 +2,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { useStore } from '../store'
 import { collectLeaves, makeLeaf, monitorShown } from '../paneTree'
-import type { SessionProfile } from '../../../../shared/types'
+import type { SessionGroup, SessionProfile } from '../../../../shared/types'
 
 describe('reorderTab', () => {
   function seed(): void {
@@ -355,6 +355,139 @@ describe('openHost: an open host is brought forward rather than opened again', (
       fromSet('web')
       expect(titleOfActive()).toBe('saved')
       expect(useStore.getState().workspaces.filter((w) => w.collectionId === 'set')).toHaveLength(1)
+    })
+  })
+
+  describe('from the tree', () => {
+    const set = { id: 'set', name: 'Set', hostIds: ['web'], createdAt: 0, updatedAt: 0 }
+    const titleOfActive = (): string | undefined => {
+      const state = useStore.getState()
+      return state.workspaces.find((w) => w.id === state.activeWorkspaceId)?.title
+    }
+    const tabsOf = (title: string): number | undefined =>
+      useStore.getState().workspaces.find((w) => w.title === title)?.tabs.length
+
+    it("stays out of a set's workspace in front, for the last ordinary one", () => {
+      seed(false)
+      useStore.setState({ collections: [set] })
+      useStore.getState().openWorkspace('plain')
+      useStore.getState().openCollection('set')
+      expect(titleOfActive()).toBe('Set')
+      open('db')
+      expect(titleOfActive()).toBe('plain')
+      expect(tabsOf('plain')).toBe(1)
+      expect(tabsOf('Set')).toBe(1)
+    })
+
+    it('makes an ordinary workspace when every one is a set’s', () => {
+      seed(false)
+      useStore.setState({ collections: [set] })
+      useStore.getState().openCollection('set')
+      open('db')
+      const state = useStore.getState()
+      expect(state.workspaces).toHaveLength(2)
+      expect(state.workspaces.find((w) => w.id === state.activeWorkspaceId)?.collectionId).toBe(
+        undefined
+      )
+    })
+
+    it('opens in the ordinary workspace in front, as before', () => {
+      seed(false)
+      useStore.getState().openWorkspace('one')
+      useStore.getState().openWorkspace('two')
+      open('web')
+      expect(tabsOf('two')).toBe(1)
+    })
+
+    it('keeps a duplicate beside its original, even in a set’s workspace', () => {
+      seed(false)
+      useStore.setState({ collections: [set] })
+      useStore.getState().openWorkspace('plain')
+      useStore.getState().openCollection('set')
+      open('web', {}, true)
+      expect(titleOfActive()).toBe('Set')
+    })
+
+    describe('with a workspace per group', () => {
+      const group = (id: string, color?: string): SessionGroup =>
+        ({ id, name: id.toUpperCase(), parentId: null, color }) as SessionGroup
+      function seedGroups(on = true): void {
+        seed(false)
+        useStore.setState((s) => ({
+          groups: [group('tls', '#0a0'), group('dns')],
+          sessions: [
+            { ...host('a'), groupId: 'tls' },
+            { ...host('b'), groupId: 'tls' },
+            { ...host('c'), groupId: 'dns' },
+            host('top')
+          ],
+          settings: { ...s.settings, workspacePerGroup: on }
+        }))
+      }
+
+      it("opens each host in its group's workspace, named after it, and reuses it", () => {
+        seedGroups()
+        useStore.getState().openWorkspace('plain')
+        open('a')
+        open('c')
+        open('b')
+        const state = useStore.getState()
+        expect(state.workspaces.map((w) => [w.title, w.tabs.length])).toEqual([
+          ['plain', 0],
+          ['TLS', 2],
+          ['DNS', 1]
+        ])
+        expect(state.workspaces[1]).toMatchObject({ groupId: 'tls', color: '#0a0' })
+        expect(titleOfActive()).toBe('TLS')
+      })
+
+      it("sends a host at the top of the tree to an ordinary workspace, not a group's", () => {
+        seedGroups()
+        useStore.getState().openWorkspace('plain')
+        open('a')
+        open('top')
+        expect(titleOfActive()).toBe('plain')
+      })
+
+      it('sends picked hosts to their own groups, and a mixed grid to an ordinary one', () => {
+        seedGroups()
+        const item = (id: string) => ({
+          title: id,
+          target: { kind: 'session' as const, sessionId: id }
+        })
+        useStore.getState().openMany([item('a'), item('c')], 'tabs')
+        expect(tabsOf('TLS')).toBe(1)
+        expect(tabsOf('DNS')).toBe(1)
+        useStore.getState().openMany([item('a'), item('b')], 'grid')
+        expect(tabsOf('TLS')).toBe(2)
+        useStore.getState().openMany([item('a'), item('c')], 'grid')
+        expect(titleOfActive()).toBe('Workspace 1')
+      })
+
+      it('takes a group opened whole in a new workspace as that group’s', () => {
+        seedGroups()
+        useStore
+          .getState()
+          .openMany(
+            [{ title: 'a', target: { kind: 'session', sessionId: 'a' } }],
+            'workspace',
+            'TLS',
+            { groupId: 'tls' }
+          )
+        useStore.getState().openWorkspace('plain')
+        open('b')
+        expect(useStore.getState().workspaces.filter((w) => w.title === 'TLS')).toHaveLength(1)
+        expect(tabsOf('TLS')).toBe(2)
+      })
+
+      it("treats a group's workspace as an ordinary one with the setting off", () => {
+        seedGroups()
+        open('a')
+        useStore.setState((s) => ({ settings: { ...s.settings, workspacePerGroup: false } }))
+        open('c')
+        expect(titleOfActive()).toBe('TLS')
+        expect(tabsOf('TLS')).toBe(2)
+      })
     })
   })
 })

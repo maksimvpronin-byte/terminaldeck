@@ -70,6 +70,9 @@ export const createCollectionsSlice: StateCreator<AppState, [], [], CollectionsS
         viaCollectionId: collection.id
       })
     }
-    if (items.length > 0) state.openMany(items, 'workspace', collection.name, collection.id)
+    if (items.length > 0)
+      state.openMany(items, 'workspace', collection.name, {
+        collectionId: collection.id
+      })
   }
 })

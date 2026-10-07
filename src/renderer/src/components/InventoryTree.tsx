@@ -432,7 +432,8 @@ export default function InventoryTree({ query }: { query: string }): JSX.Element
               color: h.color
             })),
             'workspace',
-            group.name
+            group.name,
+            { groupId: group.id }
           )
       },
       {

@@ -55,6 +55,12 @@ export interface TerminalSettings extends ResolvedAppearance {
    */
   reuseOpenHost: boolean
   /**
+   * A host opened from the tree goes into a workspace of its group's own,
+   * named after the group, rather than the ordinary one — see `openHost`. A
+   * host from a collection still goes to the collection's.
+   */
+  workspacePerGroup: boolean
+  /**
    * The monitor strip — load, memory, disks — under every SSH pane, without
    * pressing Monitor in each. Its button then closes it for one pane alone.
    */
@@ -566,6 +572,7 @@ export const DEFAULT_SETTINGS: TerminalSettings = {
   expandOnArrowOnly: false,
   revealActiveHost: true,
   reuseOpenHost: true,
+  workspacePerGroup: false,
   monitorForAll: false,
   treeRowHeight: 32,
   treeTint: 'fade',
@@ -601,6 +608,7 @@ export const OTHER_KEYS = [
   'expandOnArrowOnly',
   'revealActiveHost',
   'reuseOpenHost',
+  'workspacePerGroup',
   'monitorForAll',
   'treeRowHeight',
   'treeTint',

@@ -177,6 +177,19 @@ export default function SettingsDialog({
                 )}
               </Hint>
             </label>
+            <label className="checkbox-row" style={{ flexDirection: 'row' }}>
+              <input
+                type="checkbox"
+                checked={settings.workspacePerGroup}
+                onChange={(e) => updateSettings({ workspacePerGroup: e.target.checked })}
+              />
+              {t('Open each host in a workspace named after its group')}
+              <Hint>
+                {t(
+                  'Off, a host opened from the tree goes to an ordinary workspace — the one in front, unless that one is a set’s. A host opened from a set goes to the set’s workspace either way.'
+                )}
+              </Hint>
+            </label>
             <label>
               {t('Colour of coloured rows')}
               <select

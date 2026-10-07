@@ -56,6 +56,8 @@ export const ru: Record<string, string> = {
     'Рабочую область можно спокойно закрывать — «Открыть» вернёт весь набор',
   'A host double-clicked under a set opens in that set’s workspace, or a new one':
     'Двойной клик по хосту в наборе открывает его в области этого набора или в новой',
+  'Any other host stays out of a set’s workspace, in an ordinary one':
+    'Любой другой хост в область набора не попадает — он открывается в обычной',
   'Saving under a name that already exists offers to add to it or replace it':
     'Сохранение под существующим именем предложит дополнить набор или заменить его',
   'Independent of groups: one host can sit in as many collections as you like':
@@ -80,6 +82,8 @@ export const ru: Record<string, string> = {
     '«+» создаёт пустую; двойной клик по области переименовывает её',
   'Right-click a group or a repository to open everything in a new workspace':
     'Правый клик по группе или репозиторию открывает всё в новой рабочей области',
+  'Settings can give each group a workspace of its own, named after it':
+    'В настройках можно дать каждой группе свою рабочую область с её именем',
   'Drag a tab onto a workspace to move it there; its terminal stays connected':
     'Перетащите вкладку на другую область — терминал не разорвёт соединение',
   'Drag a tab beside another to change their order':
@@ -1412,6 +1416,10 @@ export const ru: Record<string, string> = {
     'Раскрывать и сворачивать группу только стрелкой слева от имени',
   'Double-click on a host that is open goes to its tab instead of opening another':
     'Двойной клик по уже открытому хосту переходит на его вкладку, а не открывает новую',
+  'Open each host in a workspace named after its group':
+    'Открывать каждый хост в рабочей области с именем его группы',
+  'Off, a host opened from the tree goes to an ordinary workspace — the one in front, unless that one is a set’s. A host opened from a set goes to the set’s workspace either way.':
+    'Когда выключено, хост из дерева открывается в обычной рабочей области — в той, что впереди, если она не принадлежит набору. Хост, открытый из набора, в любом случае уходит в область набора.',
   '“Open another tab” in the host’s menu still opens a second one. A desktop is never opened twice for one account, whatever this says: Windows keeps one session per user, and a second tab would take it from the first.':
     '«Открыть ещё одну вкладку» в меню хоста по-прежнему открывает вторую. Рабочий стол под одной учётной записью дважды не открывается в любом случае: в Windows у пользователя один сеанс, и вторая вкладка отобрала бы его у первой.',
   'Open another tab': 'Открыть ещё одну вкладку',

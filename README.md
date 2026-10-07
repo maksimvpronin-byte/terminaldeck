@@ -159,7 +159,12 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   sessions don't die silently behind NAT
 - **Workspaces**: a top strip of named containers, each with its own row of tabs — open a whole
   host group or a whole inventory repository into one, with a tab per host. Tabs drag between
-  workspaces without dropping their connection
+  workspaces without dropping their connection. A host opened from the tree rather than from a
+  set never lands in a set's workspace: it goes to the ordinary one in front, else the last
+  ordinary one on the strip, else a new one. Settings → General → Host tree can instead give
+  each group a workspace of its own, named and coloured after it (off by default): a host goes to
+  its nearest group's, hosts tiled together only when they all share that group, and a host
+  outside any group to an ordinary workspace
 - **Collections**: hand-picked sets of hosts, listed under the groups in the session tree and
   reopened as a workspace whenever you want them back. Unlike a group, a host can be in any
   number of them, membership has no effect on credentials, and a workspace can be saved as one

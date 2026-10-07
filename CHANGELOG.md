@@ -6,6 +6,21 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## Unreleased
+
+### Added
+
+- **A workspace per group**, optionally: Settings → General → Host tree →
+  "Open each host in a workspace named after its group" sends a host opened
+  from the tree to its group's workspace, opened with the group's name and
+  colour the first time. Off by default.
+
+### Changed
+
+- **A host from outside a set no longer opens in the set's workspace.** It
+  goes to the ordinary workspace in front, else the last ordinary one, else a
+  new one, so a set's workspace holds the set alone.
+
 ## 0.25.3
 
 ### Fixed

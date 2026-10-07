@@ -39,6 +39,11 @@ describe('a layout saved and read back', () => {
     saveLayout([{ ...workspace(), collectionId: 'set' }], 'w')
     expect(loadLayout().workspaces[0].collectionId).toBe('set')
   })
+
+  it("still knows which group a workspace is, so the group's hosts go back to it", () => {
+    saveLayout([{ ...workspace(), groupId: 'tls' }], 'w')
+    expect(loadLayout().workspaces[0].groupId).toBe('tls')
+  })
 })
 
 describe('invalid saved layouts', () => {

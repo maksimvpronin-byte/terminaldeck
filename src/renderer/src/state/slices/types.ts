@@ -44,9 +44,18 @@ export interface Workspace {
    * opened from that collection later joins this workspace, not the one in front.
    */
   collectionId?: string
+  /**
+   * The host group this workspace is, while `workspacePerGroup` is on: a host
+   * from that group, opened from the tree, joins it. Opened for the group or
+   * opened from it; with the setting off it is an ordinary workspace.
+   */
+  groupId?: string
   tabs: WorkspaceTab[]
   activeTabId: string | null
 }
+
+/** What a workspace belongs to, when it belongs to anything — one at a time. */
+export type WorkspaceOwner = { collectionId: string } | { groupId: string }
 
 export interface OpenRequest {
   title: string
@@ -57,8 +66,9 @@ export interface OpenRequest {
 }
 
 /**
- * Where a batch of hosts should land: one tab each in the current workspace,
- * all tiled into a single tab, or a new workspace of their own.
+ * Where a batch of hosts should land: one tab each, all tiled into a single
+ * tab, or a new workspace of their own. The first two go to the workspace the
+ * hosts belong in — see `openHost` — rather than simply the one in front.
  */
 export type OpenMode = 'tabs' | 'grid' | 'workspace'
 
@@ -256,7 +266,7 @@ export interface WorkspaceSlice {
   openSelectedHosts: (mode: OpenMode) => void
 
   /** Creates an empty workspace and makes it current; returns its id. */
-  openWorkspace: (title?: string, color?: string, collectionId?: string) => string
+  openWorkspace: (title?: string, color?: string, owner?: WorkspaceOwner) => string
   /** Marks a workspace as a collection's own, as `Workspace.collectionId` has it. */
   setWorkspaceCollection: (workspaceId: string, collectionId: string) => void
   closeWorkspace: (workspaceId: string) => void
@@ -280,7 +290,9 @@ export interface WorkspaceSlice {
    * for a new tab whatever the setting — a desktop still never gets one.
    * A new tab for a host opened from a collection goes into that collection's
    * workspace — a new one if none is open — unless `again` duplicates a pane
-   * where it stands. Returns the pane the host is in.
+   * where it stands. Any other host stays out of a collection's workspace: it
+   * goes to an ordinary one, or to its group's — see `homeWorkspace`. Returns
+   * the pane the host is in.
    */
   openHost: (
     title: string,
@@ -307,8 +319,8 @@ export interface WorkspaceSlice {
     items: OpenRequest[],
     mode: OpenMode,
     workspaceTitle?: string,
-    /** With mode 'workspace': the collection the new workspace is. */
-    collectionId?: string
+    /** With mode 'workspace': the collection or group the new workspace is. */
+    owner?: WorkspaceOwner
   ) => void
   closeTab: (tabId: string) => void
   setActiveTab: (tabId: string) => void
