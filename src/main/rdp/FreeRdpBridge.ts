@@ -783,6 +783,10 @@ class FreeRdpBridge {
       this.nextFilesPoll = 0
       void this.pollClipboard()
     }
+    if (event.e === 'clipboard-refused') {
+      session.download?.refuse()
+      return
+    }
     if (event.e === 'certificate') {
       void this.decideCertificate(id, session, event)
       return

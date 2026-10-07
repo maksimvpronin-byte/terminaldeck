@@ -32,6 +32,8 @@ export const ru: Record<string, string> = {
   'RDP file transfer timed out': 'Сервер перестал отвечать',
   'The RDP server refused or truncated the file transfer':
     'Сервер отказал в передаче файла или оборвал её',
+  'The remote desktop refused to hand over the file; its policy may forbid copying files out':
+    'Удалённый рабочий стол отказался отдать файл: возможно, его политика запрещает копировать файлы наружу',
   'Could not write the received file': 'Не удалось записать полученный файл',
 
   Collections: 'Наборы',

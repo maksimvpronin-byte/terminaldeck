@@ -191,3 +191,21 @@ it('reports a failed retry from the timeout callback and cancels the download', 
   expect(download.active).toBe(false)
   expect(status).toHaveBeenLastCalledWith(0, 200000, 'Client disconnected')
 })
+
+/**
+ * A host whose policy keeps its files in answers every request for one with
+ * an empty message. The transfer ended a minute later on a timeout; it ends
+ * at once, saying why.
+ */
+it('ends at once, saying so, when the host refuses to hand the file over', () => {
+  vi.useFakeTimers()
+  const requests: unknown[] = []
+  const status = vi.fn()
+  const download = new ClipboardDownload((r) => requests.push(r), vi.fn(), status)
+  download.start(manifest([{ name: 'kept.json', size: 66845 }]))
+  download.refuse()
+  expect(download.active).toBe(false)
+  expect(status.mock.lastCall?.[2]).toMatch(/refused to hand over/)
+  vi.advanceTimersByTime(60000)
+  expect(requests).toHaveLength(1)
+})

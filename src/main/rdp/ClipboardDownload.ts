@@ -238,6 +238,20 @@ export class ClipboardDownload {
     this.pending = undefined
     this.advance()
   }
+  /**
+   * The host said no to the request out, which some do to every request for a
+   * file's contents: a policy that lets a file be announced on the clipboard
+   * and never handed over. Neither a smaller chunk nor another wait changes
+   * that answer, so the transfer ends here.
+   */
+  refuse(): void {
+    if (!this.dir) return
+    this.fail(
+      new Error(
+        'The remote desktop refused to hand over the file; its policy may forbid copying files out'
+      )
+    )
+  }
   private stalled(): void {
     try {
       this.shrink(new Error('RDP file transfer timed out'))

@@ -34,5 +34,6 @@ export const EXTERNAL_PHRASES = [
   'A file is used as a directory',
   'RDP file transfer timed out',
   'The RDP server refused or truncated the file transfer',
+  'The remote desktop refused to hand over the file; its policy may forbid copying files out',
   'Could not write the received file'
 ]

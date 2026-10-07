@@ -165,6 +165,11 @@ typedef struct
 	UINT32 clip_sized;
 	int clip_held;
 	CLIPRDR_FILE_CONTENTS_REQUEST clip_held_request;
+	/* Whether a request for a file's size or bytes is out and unanswered. A
+	 * host that will not give up its files answers one with an empty message
+	 * instead, and that is how the refusal is recognised; see
+	 * td_receive_channel_data. */
+	int clip_asked;
 
 	/** The size last asked of the server, so a repeat can be ignored. */
 	UINT32 want_width, want_height, want_scale;
@@ -795,6 +800,7 @@ static UINT td_clip_server_format_list(CliprdrClientContext* ctx, const CLIPRDR_
 	EnterCriticalSection(&td->clip);
 	td->clip_sized = 0;
 	td->clip_held = 0;
+	td->clip_asked = 0;
 	LeaveCriticalSection(&td->clip);
 	const BYTE has_files = files != 0;
 	(void)td_write_record(TD_REC_CLIP_RESET, &has_files, 1);
@@ -1140,6 +1146,9 @@ static UINT td_clip_file_response(CliprdrClientContext* ctx,
 
 static UINT td_clip_send_chunk(tdContext* td, const CLIPRDR_FILE_CONTENTS_REQUEST* request)
 {
+	EnterCriticalSection(&td->clip);
+	td->clip_asked = 1;
+	LeaveCriticalSection(&td->clip);
 	if (td->cliprdr->ClientFileContentsRequest(td->cliprdr, request) == CHANNEL_RC_OK)
 		return CHANNEL_RC_OK;
 	CLIPRDR_FILE_CONTENTS_RESPONSE failure = { 0 };
@@ -1184,6 +1193,12 @@ static UINT td_clip_sized(CliprdrClientContext* ctx, const CLIPRDR_FILE_CONTENTS
 static UINT td_clip_file_response(CliprdrClientContext* ctx,
                                   const CLIPRDR_FILE_CONTENTS_RESPONSE* response)
 {
+	{
+		tdContext* td = td_of(ctx);
+		EnterCriticalSection(&td->clip);
+		td->clip_asked = 0;
+		LeaveCriticalSection(&td->clip);
+	}
 	if (response->streamId & TD_SIZE_STREAM)
 		return td_clip_sized(ctx, response);
 	UINT32 length = response->cbRequested;
@@ -1246,6 +1261,7 @@ static void td_clip_get_chunk(tdContext* td, const td_cmd* cmd)
 	{
 		td->clip_held = 1;
 		td->clip_held_request = request;
+		td->clip_asked = 1;
 	}
 	LeaveCriticalSection(&td->clip);
 	if (sized)
@@ -1342,6 +1358,25 @@ static BOOL td_receive_channel_data(freerdp* instance, UINT16 channelId, const B
 			          (unsigned)flags);
 			td_chunks[td_chunk_count % TD_CHUNK_RING] = now;
 			td_chunk_count++;
+			/*
+			 * And when it is the answer to a request for a file, it is a no:
+			 * the host gives that answer to every such request, at once,
+			 * whether for the size or for the bytes, and mstsc fares no
+			 * better against it. Waiting for anything else only leaves the
+			 * transfer at 0% until it times out.
+			 */
+			if (instance && instance->context)
+			{
+				tdContext* td = (tdContext*)instance->context;
+				int refused;
+				EnterCriticalSection(&td->clip);
+				refused = td->clip_asked;
+				td->clip_asked = 0;
+				td->clip_held = 0;
+				LeaveCriticalSection(&td->clip);
+				if (refused)
+					td_event("{\"e\":\"clipboard-refused\"}");
+			}
 			return TRUE;
 		}
 

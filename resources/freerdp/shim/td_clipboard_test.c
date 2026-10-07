@@ -1,7 +1,20 @@
 /* Exercise the real clipboard callbacks, without an RDP server. */
 #define main td_client_main
 #define td_write_record capture_record
+#define td_event capture_event
+#include <stdarg.h>
+#include <stdio.h>
+static char last_event[256];
+static int capture_event(const char* format, ...)
+{
+	va_list args;
+	va_start(args, format);
+	(void)vsnprintf(last_event, sizeof(last_event), format, args);
+	va_end(args);
+	return 1;
+}
 #include "td_rdp.c"
+#undef td_event
 #undef td_write_record
 #undef main
 #include <assert.h>
@@ -268,6 +281,9 @@ static void file_transfers(tdContext* td, CliprdrClientContext* ctx)
 	assert(captured[0] == 17 && captured[4] == 1 && memcmp(captured + 8, "3456", 4) == 0);
 	assert(cliprdr_file_context_uninit(td->clip_files, ctx));
 }
+static BOOL deliver(freerdp* instance, UINT16 channelId, const BYTE* data, size_t size,
+                    UINT32 flags, size_t totalSize);
+
 /* The file-contents requests that go to the far end, in order. */
 static CLIPRDR_FILE_CONTENTS_REQUEST sent[8];
 static unsigned sent_count;
@@ -329,6 +345,20 @@ static void size_first(tdContext* td, CliprdrClientContext* ctx)
 	td_clip_get_chunk(td, &cmd);
 	assert(sent_count == 3 && sent[2].dwFlags == FILECONTENTS_RANGE && sent[2].streamId == 6);
 	clip_chunk_sink = NULL;
+
+	/* That request answered with an empty message is a refusal, said once. */
+	static const BYTE none[1] = { 0 };
+	const UINT32 whole = CHANNEL_FLAG_FIRST | CHANNEL_FLAG_LAST | CHANNEL_FLAG_SHOW_PROTOCOL;
+	freerdp instance = { 0 };
+	instance.context = &td->common.context;
+	td_receive_next = deliver;
+	td_clip_channel_id = 1004;
+	last_event[0] = 0;
+	assert(td_receive_channel_data(&instance, 1004, none, 0, whole, 0));
+	assert(strstr(last_event, "clipboard-refused"));
+	last_event[0] = 0;
+	assert(td_receive_channel_data(&instance, 1004, none, 0, whole, 0));
+	assert(last_event[0] == 0);
 }
 
 /* What reaches FreeRDP's own reassembly, which the test stands in for. */
