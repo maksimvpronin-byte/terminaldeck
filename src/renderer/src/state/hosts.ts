@@ -107,6 +107,23 @@ export function findHost(state: AppState, id: string): FoundHost | undefined {
 }
 
 /**
+ * The group a host stands under in the tree, which is not always its own.
+ *
+ * A Git folder that lists its hosts flat hides the repository's groups and
+ * shows every host straight under the folder — yet each host still carries the
+ * Ansible group it came from, `all` as often as not, for the settings it takes
+ * from there. Sent by that, a host shown in `DC.nsd.ru` opened in a workspace
+ * called `all`, beside a saved host of the same folder that went to its own.
+ */
+export function treeGroupOf(state: Pick<AppState, 'groups'>, found: FoundHost): string | null {
+  if (found.gitFolderId) {
+    const folder = state.groups.find((g) => g.id === found.gitFolderId)
+    if (!folder?.git?.showGroupFolders) return found.gitFolderId
+  }
+  return found.host.groupId
+}
+
+/**
  * The colour a host's tab wears when it is opened from the tree: its own, else
  * the nearest folder's above it, else — for a host from an Inventory source —
  * the source's. The same answer the tree draws, so a tab and its row agree.

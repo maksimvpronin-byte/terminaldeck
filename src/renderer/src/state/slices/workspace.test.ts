@@ -480,6 +480,37 @@ describe('openHost: an open host is brought forward rather than opened again', (
         expect(tabsOf('TLS')).toBe(2)
       })
 
+      it('sends a flat Git folder’s hosts to the folder’s workspace, not their Ansible group’s', () => {
+        seedGroups()
+        const all = { ...group('git:dc:g:all'), name: 'all', parentId: 'dc' } as SessionGroup
+        const repoHost = { ...host('git:dc:h:v014'), groupId: all.id }
+        useStore.setState((s) => ({
+          groups: [...s.groups, { ...group('dc'), name: 'DC.nsd.ru' } as SessionGroup],
+          sessions: [...s.sessions, { ...host('skdpu'), groupId: 'dc' }],
+          gitFolderTrees: [
+            {
+              groupId: 'dc',
+              groups: [all],
+              sessions: [repoHost],
+              memberships: { [repoHost.id]: [all.id] }
+            }
+          ]
+        }))
+        open('skdpu')
+        open(repoHost.id)
+        expect(titleOfActive()).toBe('DC.nsd.ru')
+        expect(tabsOf('DC.nsd.ru')).toBe(2)
+
+        // Shown as folders, the repository's groups are real places in the tree again.
+        useStore.setState((s) => ({
+          groups: s.groups.map((g) =>
+            g.id === 'dc' ? { ...g, git: { showGroupFolders: true } } : g
+          ) as SessionGroup[]
+        }))
+        open(repoHost.id)
+        expect(titleOfActive()).toBe('all')
+      })
+
       it("treats a group's workspace as an ordinary one with the setting off", () => {
         seedGroups()
         open('a')

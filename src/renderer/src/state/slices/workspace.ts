@@ -22,7 +22,7 @@ import {
   workspaceOfTab
 } from '../workspaces'
 import { loadLayout } from '../layout'
-import { findHost, hostColour } from '../hosts'
+import { findHost, hostColour, treeGroupOf } from '../hosts'
 import { protocolOf } from '../../../../shared/protocols'
 import { colourOf } from '../../../../shared/hostColour'
 import { translate, type Language } from '../../i18n/language'
@@ -67,19 +67,19 @@ function sessionOf(target: PaneTarget): string | undefined {
  * the set: saved again as the collection, it would take a stranger in with it.
  *
  * With `workspacePerGroup` on, hosts that share a group go into that group's
- * workspace, named after it. Everything else — the setting off, a host at the
- * top of the tree, hosts from different groups opened together — goes to an
- * ordinary workspace: the one in front if it is one, else the last on the
- * strip, else a new one.
+ * workspace, named after it — the group they stand under in the tree.
+ * Everything else — the setting off, a host at the top of the tree, hosts from
+ * different groups opened together — goes to an ordinary workspace: the one
+ * in front if it is one, else the last on the strip, else a new one.
  */
 function homeWorkspace(get: () => AppState, sessionIds: (string | undefined)[]): void {
   const s = get()
   const perGroup = s.settings.workspacePerGroup
   if (perGroup && sessionIds.length > 0) {
     const found = sessionIds.map((id) => (id ? findHost(s, id) : undefined))
-    const groupId = found[0]?.host.groupId
+    const groupId = found[0] && treeGroupOf(s, found[0])
     const group =
-      groupId && found.every((f) => f?.host.groupId === groupId)
+      groupId && found.every((f) => f && treeGroupOf(s, f) === groupId)
         ? found[0]?.groups.find((g) => g.id === groupId)
         : undefined
     if (group && found[0]) {
