@@ -57,6 +57,16 @@ function keysAskedFor(): Map<string, string[]> {
     }
 
     /**
+     * Where there is no `t`: a store slice naming a new workspace, or a callback
+     * that must keep one identity across renders. Those name the language
+     * themselves, `translate(language, '…')`, and the phrase is the second
+     * argument.
+     */
+    for (const match of text.matchAll(/(?<![\w.$])translate\([^,]*,\s*'((?:[^'\\]|\\.)*)'/g)) {
+      add(match[1].replace(/\\'/g, "'"), file)
+    }
+
+    /**
      * The help dialog, which asks for its phrases through a variable.
      *
      * It holds its rows as data and renders them with `t(row.what)`, so the key

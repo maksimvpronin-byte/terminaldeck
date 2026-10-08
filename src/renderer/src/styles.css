@@ -246,6 +246,30 @@ label {
   align-items: center;
   padding: 2px 0;
 }
+/* One ~/.ssh/config host per row: the tick, its alias, and where it leads,
+   quieter, at the right. */
+.import-list {
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 6px 8px;
+}
+.import-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 13px;
+  color: var(--text);
+}
+.import-detail {
+  margin-left: auto;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 /* The second icon on a folder that mirrors a repository, a shade quieter than
    the folder itself: it says where the contents come from, not what this is. */
 .git-mark {

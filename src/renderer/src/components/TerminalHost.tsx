@@ -10,7 +10,7 @@ import { MIN_CONTRAST_RATIO, themeOf } from '../state/settings'
 import { useAppearance } from '../hooks/useAppearance'
 import ContextMenu, { type MenuItem } from './ContextMenu'
 import { IS_MAC } from '../state/keys'
-import { useT } from '../i18n'
+import { translate, useT } from '../i18n'
 import { diag, diagKey } from '../diag'
 
 interface Props {
@@ -150,7 +150,8 @@ export default function TerminalHost({
       if (!term) return
       detachListeners()
       setClosed(false)
-      term.writeln('Connecting...\r\n')
+      // Not t(): connect keeps one identity across renders, and t is new on each.
+      term.writeln(`${translate(useStore.getState().settings.language, 'Connecting…')}\r\n`)
       const attemptId = crypto.randomUUID()
       attemptRef.current = attemptId
       try {

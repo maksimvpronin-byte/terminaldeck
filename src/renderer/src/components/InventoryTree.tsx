@@ -451,7 +451,7 @@ export default function InventoryTree({
     const hosts = hostsUnder(group.id)
     return [
       {
-        label: `Open all in a new workspace (${hosts.length})`,
+        label: t('Open all in a new workspace ({count})', { count: hosts.length }),
         disabled: hosts.length === 0,
         onSelect: () =>
           openMany(
@@ -482,7 +482,7 @@ export default function InventoryTree({
     const hosts = hostsUnder(`inv:${source.id}:root`)
     return [
       {
-        label: `Open all in a new workspace (${hosts.length})`,
+        label: t('Open all in a new workspace ({count})', { count: hosts.length }),
         disabled: hosts.length === 0,
         onSelect: () =>
           openMany(

@@ -25,6 +25,7 @@ import { loadLayout } from '../layout'
 import { findHost, hostColour } from '../hosts'
 import { protocolOf } from '../../../../shared/protocols'
 import { colourOf } from '../../../../shared/hostColour'
+import { translate, type Language } from '../../i18n/language'
 import type {
   AppState,
   OpenRequest,
@@ -46,11 +47,11 @@ function makeTab(
   return { id: nanoid(), title, root: leaf, activePaneId: leaf.id }
 }
 
-/** "Workspace 3" — the lowest number not already on the strip. */
-function nextTitle(workspaces: Workspace[]): string {
+/** "Workspace 3", in the interface's language — the lowest number not already on the strip. */
+function nextTitle(workspaces: Workspace[], language: Language): string {
   const taken = new Set(workspaces.map((w) => w.title))
   for (let n = 1; ; n++) {
-    const candidate = `Workspace ${n}`
+    const candidate = translate(language, 'Workspace {n}', { n })
     if (!taken.has(candidate)) return candidate
   }
 }
@@ -173,7 +174,7 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
   openWorkspace: (title, color, owner) => {
     const workspace: Workspace = {
       id: nanoid(),
-      title: title?.trim() || nextTitle(get().workspaces),
+      title: title?.trim() || nextTitle(get().workspaces, get().settings.language),
       color,
       tabs: [],
       activeTabId: null

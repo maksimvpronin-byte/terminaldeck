@@ -700,6 +700,8 @@ export const ru: Record<string, string> = {
   'No password is saved for this host. Save one in its dialog to stop being asked.':
     'Для этого хоста пароль не сохранён. Сохраните его в диалоге хоста, чтобы больше не спрашивали.',
   'Connecting to': 'Подключение к',
+  'Connecting…': 'Подключение…',
+  'Workspace {n}': 'Рабочая область {n}',
   'Name and host are required': 'Нужно указать имя и хост',
   '(saved on this host — it overrides the group)': '(сохранён на этом хосте — перебивает группу)',
   '(leave blank to keep existing)': '(оставьте пустым, чтобы сохранить прежний)',
@@ -986,6 +988,8 @@ export const ru: Record<string, string> = {
   'Replace its hosts': 'Заменить его хосты',
   'Add to it': 'Добавить в него',
   'Open in a new workspace ({count})': 'Открыть в новой рабочей области ({count})',
+  'Open all in a new workspace ({count})': 'Открыть все в новой рабочей области ({count})',
+  '{count} selected': 'Выбрано: {count}',
   'Open tiled in one tab': 'Открыть плиткой в одной вкладке',
   'Open every host in a new workspace': 'Открыть все хосты в новой рабочей области',
   'Double-click to open the whole set in a new workspace':

@@ -794,7 +794,7 @@ export default function Sidebar({
               onSelect: () => clearGitFolderOverride(s.id)
             },
             {
-              label: `Copy ${addressOf(s)}`,
+              label: t('Copy {address}', { address: addressOf(s) }),
               onSelect: () => window.td.clipboard.write(addressOf(s))
             }
           ]
@@ -809,9 +809,9 @@ export default function Sidebar({
                 upsertSession(duplicateProfile(s, nanoid(), `${s.name} copy`, Date.now()))
               }
             },
-            { label: 'Edit…', onSelect: () => setEditingSession(s) },
+            { label: t('Edit…'), onSelect: () => setEditingSession(s) },
             {
-              label: `Copy ${addressOf(s)}`,
+              label: t('Copy {address}', { address: addressOf(s) }),
               onSelect: () => window.td.clipboard.write(addressOf(s))
             },
             {
@@ -861,7 +861,7 @@ export default function Sidebar({
     const hosts = hostsUnder(groupId)
     return [
       {
-        label: `Open all in a new workspace (${hosts.length})`,
+        label: t('Open all in a new workspace ({count})', { count: hosts.length }),
         disabled: hosts.length === 0,
         onSelect: () =>
           openMany(
@@ -1284,7 +1284,7 @@ export default function Sidebar({
           selection the bar offered nothing and took a row of the sidebar. */}
       {selectedHostIds.length > 1 && (
         <div className="selection-bar">
-          <span className="count">{selectedHostIds.length} selected</span>
+          <span className="count">{t('{count} selected', { count: selectedHostIds.length })}</span>
           <span style={{ flex: 1 }} />
           <button className="icon-button" title={t('Clear')} onClick={clearHostSelection}>
             ✕
