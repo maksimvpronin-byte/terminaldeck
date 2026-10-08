@@ -83,6 +83,8 @@ export default function TerminalHost({
   const termRef = useRef<Terminal | null>(null)
   const fitRef = useRef<FitAddon | null>(null)
   const searchRef = useRef<SearchAddon | null>(null)
+  // Takes back the window listener a press left waiting for its release.
+  const releaseRef = useRef<(() => void) | null>(null)
   const connIdRef = useRef<string | undefined>(connectionId)
   const unsubscribeRef = useRef<Array<() => void>>([])
   /** Bumped on every mount/unmount so stale in-flight connects can be discarded. */
@@ -308,6 +310,7 @@ export default function TerminalHost({
       // eslint-disable-next-line react-hooks/exhaustive-deps
       generationRef.current++
       detachListeners()
+      releaseRef.current?.()
       resizeObserver.disconnect()
       cancelAnimationFrame(resizeFrame)
       term.dispose()
@@ -377,6 +380,37 @@ export default function TerminalHost({
     if (selection) window.td.clipboard.write(selection)
   }
 
+  /**
+   * Copies a selection when the left button that made it is let go — wherever
+   * it is let go.
+   *
+   * It used to be any button let go over the pane. A drag that ended past the
+   * pane's edge — on the sidebar, a tab, outside the window — left the text
+   * selected and the clipboard as it was, so the next paste brought in the
+   * copy before. And the right button counted too: a right click to paste
+   * copied whatever was still selected over what had just been copied
+   * elsewhere, or on a Mac, where xterm selects the word under a right click,
+   * that word — and the paste brought in that instead.
+   *
+   * Listened for in capture from the window: xterm may stop the events on its
+   * own element, as it does for a Shift- or Option-drag over a program that
+   * has taken the mouse.
+   */
+  function copyOnRelease(e: React.MouseEvent): void {
+    releaseRef.current?.()
+    if (e.button !== 0 || !settings.copyOnSelect) return
+    const onUp = (up: MouseEvent): void => {
+      if (up.button !== 0) return
+      releaseRef.current?.()
+      copySelection()
+    }
+    window.addEventListener('mouseup', onUp, true)
+    releaseRef.current = () => {
+      window.removeEventListener('mouseup', onUp, true)
+      releaseRef.current = null
+    }
+  }
+
   function terminalMenu(): MenuItem[] {
     const term = termRef.current
     const selection = term?.getSelection() ?? ''
@@ -444,9 +478,7 @@ export default function TerminalHost({
         className="terminal-host"
         ref={hostRef}
         onClick={handleClick}
-        onMouseUp={() => {
-          if (settings.copyOnSelect) copySelection()
-        }}
+        onMouseDownCapture={copyOnRelease}
         onContextMenu={(e) => {
           e.preventDefault()
           if (settings.rightClick === 'paste') {

@@ -1,11 +1,14 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest'
-import { render, waitFor } from '@testing-library/react'
+import { fireEvent, render, waitFor } from '@testing-library/react'
 
 /*
  * xterm draws on a canvas jsdom does not have; the part under test is what the
  * pane says about its session, not the drawing.
  */
+// What the mocked terminal has selected.
+let selected = ''
+
 vi.mock('@xterm/xterm', () => ({
   Terminal: class {
     cols = 80
@@ -20,6 +23,9 @@ vi.mock('@xterm/xterm', () => ({
     writeln(): void {}
     focus(): void {}
     dispose(): void {}
+    getSelection(): string {
+      return selected
+    }
   }
 }))
 vi.mock('@xterm/addon-fit', () => ({
@@ -108,5 +114,60 @@ describe('a terminal opened again from the tree', () => {
     await waitFor(() => expect(props.onConnected).toHaveBeenCalledWith('c2'))
     view.rerender(<TerminalHost {...props} wake={7} />)
     expect(connect).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('copying a selection as it is made', () => {
+  function mount(): HTMLElement {
+    window.td.ssh.onStatus = () => () => undefined
+    window.td.ssh.onData = () => () => undefined
+    window.td.ssh.onError = () => () => undefined
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe(): void {}
+        disconnect(): void {}
+      }
+    )
+    const view = render(
+      <TerminalHost
+        target={{ kind: 'session', sessionId: 'h3' }}
+        active={false}
+        restored
+        onConnected={() => undefined}
+        onFocus={() => undefined}
+        resolveWriteTargets={(own) => [own]}
+      />
+    )
+    return view.container.querySelector('.terminal-host')!
+  }
+
+  /**
+   * A drag that ended past the pane's edge left the text selected and the
+   * clipboard as it was, and the next paste brought in the copy before.
+   */
+  it('copies when the drag ends outside the pane', () => {
+    const write = vi.fn()
+    window.td.clipboard.write = write
+    const host = mount()
+    selected = 'uptime'
+    fireEvent.mouseDown(host, { button: 0 })
+    fireEvent.mouseUp(document.body, { button: 0 })
+    expect(write).toHaveBeenCalledWith('uptime')
+  })
+
+  /**
+   * A right click to paste copied what was still selected over what had just
+   * been copied elsewhere, and the paste brought that in instead.
+   */
+  it('leaves the clipboard alone on a right click', () => {
+    const write = vi.fn()
+    window.td.clipboard.write = write
+    const host = mount()
+    selected = 'stale'
+    fireEvent.mouseDown(host, { button: 2 })
+    fireEvent.mouseUp(host, { button: 2 })
+    fireEvent.mouseUp(host, { button: 0 })
+    expect(write).not.toHaveBeenCalled()
   })
 })
