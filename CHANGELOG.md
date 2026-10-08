@@ -6,6 +6,17 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.27.3
+
+### Changed
+
+- **The diagnostics journal follows the clipboard.** For a selection that,
+  now and then, pastes nothing anywhere or pastes something older,
+  `diagnostics.log` now records each copy and paste in a terminal and how it
+  was made, a drag that selected nothing, a write the system did not accept,
+  what a remote desktop put on the clipboard, and its failures to read it.
+  Lengths only — never the text itself.
+
 ## 0.27.2
 
 ### Fixed
