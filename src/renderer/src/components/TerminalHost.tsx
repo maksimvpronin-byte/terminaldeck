@@ -248,11 +248,11 @@ export default function TerminalHost({
       }
       // Plain Ctrl+C stays SIGINT; Cmd+C and Ctrl+Shift+C copy the selection.
       if (key === 'c' && (e.metaKey || e.shiftKey) && term.hasSelection()) {
-        copySelection()
+        copySelection('keys')
         return false
       }
       if (key === 'v' && (e.metaKey || e.shiftKey)) {
-        paste()
+        paste('keys')
         return false
       }
       return true
@@ -369,15 +369,30 @@ export default function TerminalHost({
    * `term.paste` does both and hands the result to `onData`, which is where the
    * broadcast targets are already resolved.
    */
-  function paste(): void {
+  function paste(how: string): void {
     const text = window.td.clipboard.read()
-    if (!text || !connIdRef.current) return
-    termRef.current?.paste(text)
+    if (!connIdRef.current) {
+      clipDiag(`paste by ${how}: no session`)
+      return
+    }
+    clipDiag(`paste by ${how}: ${text ? `${text.length} chars` : 'clipboard empty'}`)
+    if (text) termRef.current?.paste(text)
   }
 
-  function copySelection(): void {
+  /*
+   * Copying and pasting go in the journal, as lengths only — what was copied
+   * may be a password. Kept for a selection that, now and then, would not
+   * paste anywhere afterwards, or pasted something older.
+   */
+  function clipDiag(message: string): void {
+    diag('clipboard', `${connIdRef.current?.slice(0, 8) ?? 'no session'} ${message}`)
+  }
+
+  function copySelection(how: string): void {
     const selection = termRef.current?.getSelection()
-    if (selection) window.td.clipboard.write(selection)
+    if (!selection) return
+    clipDiag(`copy by ${how}: ${selection.length} chars`)
+    window.td.clipboard.write(selection)
   }
 
   /**
@@ -399,10 +414,20 @@ export default function TerminalHost({
   function copyOnRelease(e: React.MouseEvent): void {
     releaseRef.current?.()
     if (e.button !== 0 || !settings.copyOnSelect) return
+    const from = { x: e.clientX, y: e.clientY }
     const onUp = (up: MouseEvent): void => {
       if (up.button !== 0) return
       releaseRef.current?.()
-      copySelection()
+      const term = termRef.current
+      if (term?.hasSelection()) {
+        copySelection('selecting')
+        return
+      }
+      // A drag that selected nothing: a program holding the mouse, as mc does
+      // unless Shift (Option on a Mac) is held, takes the drag for itself.
+      if (Math.abs(up.clientX - from.x) + Math.abs(up.clientY - from.y) > 4) {
+        clipDiag(`drag selected nothing, mouse ${term?.modes.mouseTrackingMode ?? 'unknown'}`)
+      }
     }
     window.addEventListener('mouseup', onUp, true)
     releaseRef.current = () => {
@@ -415,8 +440,8 @@ export default function TerminalHost({
     const term = termRef.current
     const selection = term?.getSelection() ?? ''
     return [
-      { label: t('Copy'), disabled: selection === '', onSelect: copySelection },
-      { label: t('Paste'), onSelect: paste },
+      { label: t('Copy'), disabled: selection === '', onSelect: () => copySelection('menu') },
+      { label: t('Paste'), onSelect: () => paste('menu') },
       { label: t('Select all'), separated: true, onSelect: () => term?.selectAll() },
       { label: t('Find…'), onSelect: () => setSearchOpen(true) },
       { label: t('Clear'), separated: true, onSelect: () => term?.clear() }
@@ -482,7 +507,7 @@ export default function TerminalHost({
         onContextMenu={(e) => {
           e.preventDefault()
           if (settings.rightClick === 'paste') {
-            paste()
+            paste('right click')
             termRef.current?.focus()
           } else {
             setMenu({ x: e.clientX, y: e.clientY })

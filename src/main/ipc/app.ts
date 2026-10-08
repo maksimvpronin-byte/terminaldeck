@@ -4,6 +4,7 @@ import { homedir, userInfo } from 'os'
 import { existsSync, mkdirSync } from 'fs'
 import { IPC } from '../../shared/ipc-channels'
 import { focusedWin } from './win'
+import { diag } from '../diagnostics'
 
 /** Whatever belongs to the application rather than to a connection: files and folders. */
 
@@ -28,7 +29,20 @@ export function registerAppHandlers(): void {
     event.returnValue = clipboard.readText()
   })
   ipcMain.on(IPC.clipboardWrite, (_event, text: unknown) => {
-    if (typeof text === 'string') clipboard.writeText(text)
+    if (typeof text !== 'string') return
+    clipboard.writeText(text)
+    /*
+     * Read back, because a write that does not take says nothing: on Windows
+     * the clipboard is open to one program at a time, and one holding it at
+     * that moment leaves the copy before in place. Lengths only in the journal.
+     */
+    const back = clipboard.readText()
+    if (back !== text) {
+      diag(
+        'clipboard',
+        `write of ${text.length} chars did not take, clipboard holds ${back.length}`
+      )
+    }
   })
 
   // --- Session logs ---

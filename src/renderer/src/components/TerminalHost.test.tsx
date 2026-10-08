@@ -26,6 +26,10 @@ vi.mock('@xterm/xterm', () => ({
     getSelection(): string {
       return selected
     }
+    hasSelection(): boolean {
+      return selected !== ''
+    }
+    modes = { mouseTrackingMode: 'none' }
   }
 }))
 vi.mock('@xterm/addon-fit', () => ({
@@ -154,6 +158,32 @@ describe('copying a selection as it is made', () => {
     fireEvent.mouseDown(host, { button: 0 })
     fireEvent.mouseUp(document.body, { button: 0 })
     expect(write).toHaveBeenCalledWith('uptime')
+  })
+
+  it('journals the copy as a length, never the text', () => {
+    window.td.clipboard.write = vi.fn()
+    const journal = vi.fn()
+    window.td.diag = journal
+    const host = mount()
+    selected = 'hunter2'
+    fireEvent.mouseDown(host, { button: 0 })
+    fireEvent.mouseUp(document.body, { button: 0 })
+    const lines = journal.mock.calls.map((call) => call.join(' '))
+    expect(lines).toContainEqual(expect.stringContaining('copy by selecting: 7 chars'))
+    expect(lines.join('\n')).not.toContain('hunter2')
+  })
+
+  it('journals a drag that selected nothing', () => {
+    const journal = vi.fn()
+    window.td.diag = journal
+    const host = mount()
+    selected = ''
+    fireEvent.mouseDown(host, { button: 0, clientX: 10, clientY: 10 })
+    fireEvent.mouseUp(document.body, { button: 0, clientX: 80, clientY: 10 })
+    expect(journal).toHaveBeenCalledWith(
+      'clipboard',
+      expect.stringContaining('drag selected nothing, mouse none')
+    )
   })
 
   /**

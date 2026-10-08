@@ -10,6 +10,7 @@ import { complaintIn, failureText, isEcho } from './clientLog'
 import { ClipboardDownload, cleanClipboardDownloads } from './ClipboardDownload'
 import { pathsToUris, readFileClipboard, writeClipboardFiles } from './clipboardFiles'
 import { currentInputLanguage, keyboardLayoutFor } from '../inputLanguage'
+import { diag } from '../diagnostics'
 
 /**
  * Drives td-rdp, which is what draws a desktop pane.
@@ -380,6 +381,9 @@ class FreeRdpBridge {
   private clipboardPolling = false
   private clipboardPublishing = false
   private nextFilesPoll = 0
+  /** Failed reads since the last one the journal was told about, and when that was. */
+  private clipboardReadFailures = 0
+  private clipboardReadFailureLogged = 0
 
   private cancelClipboardDownloads(): void {
     this.clipboardEpoch++
@@ -543,6 +547,20 @@ class FreeRdpBridge {
     } catch (error) {
       // Native clipboard ownership can change while it is read. Retry on the next poll.
       trace(`clipboard read failed: ${String(error)}`)
+      /*
+       * In the journal too, at most every ten seconds with a count: a read
+       * that fails is this application holding the clipboard while somebody
+       * else wanted it, which is what a paste that brings nothing looks like.
+       */
+      this.clipboardReadFailures++
+      if (Date.now() - this.clipboardReadFailureLogged >= 10_000) {
+        diag(
+          'clipboard',
+          `desktop poll could not read the clipboard (${this.clipboardReadFailures}x): ${String(error)}`
+        )
+        this.clipboardReadFailures = 0
+        this.clipboardReadFailureLogged = Date.now()
+      }
     } finally {
       this.clipboardPolling = false
     }
@@ -630,6 +648,7 @@ class FreeRdpBridge {
       this.lastClipboardVersion = version
       this.lastClipboardFiles = pathsToUris(paths)
       this.lastClipboardText = clipboard.readText()
+      diag('clipboard', `${id.slice(0, 8)} desktop copied ${paths.length} files here`)
       this.say(session, id, { e: 'clipboard-transfer', state: 'ready' })
     } catch (error) {
       this.say(session, id, {
@@ -763,6 +782,7 @@ class FreeRdpBridge {
        */
       this.lastClipboardText = text
       clipboard.writeText(text)
+      diag('clipboard', `${id.slice(0, 8)} desktop copied ${text.length} chars here`)
       this.lastClipboardFiles = ''
       this.lastClipboardVersion = ''
       this.nextFilesPoll = 0
