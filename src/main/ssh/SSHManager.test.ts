@@ -505,3 +505,124 @@ describe('the sign-in methods a server offers', () => {
     expect(watcher.seen()).toBeUndefined()
   })
 })
+
+/**
+ * On-connect commands and the setup line for following the directory. They
+ * used to race: the commands were typed at once, the setup line at the first
+ * quiet prompt, and by then `sudo -i` and `mc` were running and took it.
+ */
+describe('on-connect commands with the directory followed', () => {
+  async function connect(
+    id: string,
+    commands: string
+  ): Promise<{
+    writes: string[]
+    say: (text: string) => void
+  }> {
+    const { EventEmitter } = await import('events')
+    const { OSC7_SHELL_SETUP } = await import('../../shared/osc7')
+    const writes: string[] = []
+    const stream = Object.assign(new EventEmitter(), {
+      stderr: new EventEmitter(),
+      write: (data: string): boolean => {
+        writes.push(data === `${OSC7_SHELL_SETUP}\n` ? 'SETUP' : data)
+        return true
+      },
+      close: (): void => undefined
+    })
+    const target = Object.assign(new EventEmitter(), {
+      shell: (_opts: unknown, cb: (err: undefined, s: unknown) => void): void =>
+        cb(undefined, stream)
+    })
+    const profile = {
+      id,
+      name: id,
+      host: 'box',
+      groupId: null,
+      tags: [],
+      logToFile: false,
+      portForwards: [],
+      createdAt: 0,
+      updatedAt: 0,
+      username: 'max',
+      onConnectCommand: commands,
+      followTerminalCwd: true
+    }
+    await (sshManager as unknown as { openShell: (...args: unknown[]) => Promise<void> }).openShell(
+      stubWindow([]),
+      id,
+      target,
+      [target],
+      80,
+      24,
+      undefined,
+      profile
+    )
+    return { writes, say: (text) => stream.emit('data', Buffer.from(text, 'utf8')) }
+  }
+
+  const OSC7 = (path: string): string => `\u001b]7;file://box${path}\u001b\\`
+  const SETUP_ECHO = ' __td7(){ printf'
+
+  /** The login prompt, the setup line typed at it, and the shell's answer. */
+  function login(session: { writes: string[]; say: (text: string) => void }): void {
+    session.say('Last login: today\r\n[max@box ~]$ ')
+    vi.advanceTimersByTime(400)
+    expect(session.writes).toEqual(['SETUP'])
+    session.say(`${SETUP_ECHO} …; __td7\r\n${OSC7('/home/max')}[max@box ~]$ `)
+  }
+
+  it('types the commands only once the setup line has been answered', async () => {
+    const session = await connect('c-order', 'cd /etc')
+    session.say('Last login: today\r\n')
+    vi.advanceTimersByTime(300)
+    expect(session.writes).toEqual([])
+    login(session)
+    expect(session.writes).toEqual(['SETUP', 'cd /etc\n'])
+    sshManager.disconnect('c-order')
+  })
+
+  it('gives the shell sudo -i started the setup line as well', async () => {
+    const session = await connect('c-sudo', 'sudo -i\ncd /etc')
+    login(session)
+    expect(session.writes).toEqual(['SETUP', 'sudo -i\n', 'cd /etc\n'])
+    session.say('sudo -i\r\n[root@box ~]# cd /etc\r\n[root@box etc]# ')
+    vi.advanceTimersByTime(400)
+    expect(session.writes).toEqual(['SETUP', 'sudo -i\n', 'cd /etc\n', 'SETUP'])
+    sshManager.disconnect('c-sudo')
+  })
+
+  it('types nothing more where the same shell still reports', async () => {
+    const session = await connect('c-same', 'cd /etc')
+    login(session)
+    session.say(`cd /etc\r\n${OSC7('/etc')}[max@box etc]$ `)
+    vi.advanceTimersByTime(15_000)
+    expect(session.writes).toEqual(['SETUP', 'cd /etc\n'])
+    sshManager.disconnect('c-same')
+  })
+
+  it('types nothing into a program that holds the terminal, prompt-like as it looks', async () => {
+    const session = await connect('c-mc', 'sudo -i\nmc')
+    login(session)
+    // mc draws its own command line, and draws it last: it ends like a prompt.
+    session.say(
+      'sudo -i\r\n[root@box ~]# mc\r\n\u001b[?1049h\u001b[1;1H Left  File  Command' +
+        '\u001b[24;1H 1Help 2Menu 10Quit\u001b[23;1H[root@box ~]# '
+    )
+    vi.advanceTimersByTime(15_000)
+    // Quitting mc afterwards brings a prompt, but the look has been given up.
+    session.say('\u001b[?1049l[root@box ~]# ')
+    vi.advanceTimersByTime(1000)
+    expect(session.writes).toEqual(['SETUP', 'sudo -i\n', 'mc\n'])
+    sshManager.disconnect('c-mc')
+  })
+
+  it('does not type the setup line into a full-screen program even at the cap', async () => {
+    const session = await connect('c-full', 'cd /etc')
+    session.say('Last login: today\r\n\u001b[?1049h\u001b[1;1Hmenu: pick a host\u001b[24;1H> ')
+    vi.advanceTimersByTime(11_000)
+    // Given up on, the setup line leaves the commands to go in on their own.
+    expect(session.writes).toEqual(['cd /etc\n'])
+    sshManager.disconnect('c-full')
+  })
+})

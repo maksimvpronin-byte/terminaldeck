@@ -236,6 +236,8 @@ export const ru: Record<string, string> = {
     'Работает на живом соединении, поэтому включается и выключается сразу',
   'Turning it on types one setup line into the shell, hidden from the screen':
     'При включении в оболочку вводится одна настроечная строка, скрытая от экрана',
+  'On-connect commands wait for that line; a shell sudo -i starts gets it too':
+    'Команды при подключении ждут эту строку; оболочка, которую открыл sudo -i, тоже её получает',
   'The host or group setting only decides how a new connection starts':
     'Настройка хоста или группы решает только то, как начнётся новое соединение',
   'Toggle one file, or extend the selection to a range':

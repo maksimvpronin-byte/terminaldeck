@@ -478,6 +478,9 @@ const CHAPTERS: Chapter[] = [
               { what: 'The ⇉ button in the path bar makes the panel follow the terminal’s cd' },
               { what: 'It works on the live connection, so it takes effect at once, either way' },
               { what: 'Turning it on types one setup line into the shell, hidden from the screen' },
+              {
+                what: 'On-connect commands wait for that line; a shell sudo -i starts gets it too'
+              },
               { what: 'The host or group setting only decides how a new connection starts' }
             ]
           },

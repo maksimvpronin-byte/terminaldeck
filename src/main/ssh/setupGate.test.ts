@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { SetupGate, looksLikePrompt } from './setupGate'
+import { SetupGate, fullScreenAfter, looksLikePrompt } from './setupGate'
 import { OSC7_SHELL_SETUP } from '../../shared/osc7'
 
 const buf = (s: string): Buffer => Buffer.from(s, 'utf8')
@@ -99,4 +99,16 @@ describe('looksLikePrompt', () => {
   it.each(['Last login: Tue', 'Password: ', 'Loading profile...\r\n', ''])('rejects %j', (tail) =>
     expect(looksLikePrompt(tail)).toBe(false)
   )
+})
+
+describe('fullScreenAfter', () => {
+  it('follows the switches to and from the alternate screen, the last one deciding', () => {
+    expect(fullScreenAfter(false, 'plain output $ ')).toBe(false)
+    expect(fullScreenAfter(false, '\u001b[?1049h\u001b[2J panels')).toBe(true)
+    expect(fullScreenAfter(true, 'more of the screen # ')).toBe(true)
+    expect(fullScreenAfter(true, '\u001b[?1049l$ ')).toBe(false)
+    expect(fullScreenAfter(false, '\u001b[?1049h…\u001b[?1049l$ ')).toBe(false)
+    expect(fullScreenAfter(false, '\u001b[?47h')).toBe(true)
+    expect(fullScreenAfter(false, '\u001b[?1047h')).toBe(true)
+  })
 })

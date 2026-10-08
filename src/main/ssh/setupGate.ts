@@ -161,3 +161,21 @@ export function looksLikePrompt(tail: string): boolean {
     .replace(/\r/g, '')
   return /[$#%>❯»]\s?$/.test(plain)
 }
+
+/**
+ * Whether a full-screen program — mc, top, vim, less — holds the terminal,
+ * from the switches to and from the alternate screen in what was printed.
+ *
+ * Such a program can look like a prompt: mc draws its own command line, which
+ * ends in `# ` like any other, and the setup line typed at it went in as
+ * keystrokes and ran in mc's subshell, on screen and into root's history.
+ *
+ * `was` is the answer before `text`; the last switch in `text` decides it.
+ */
+export function fullScreenAfter(was: boolean, text: string): boolean {
+  // eslint-disable-next-line no-control-regex
+  const switches = /\u001b\[\?(?:1049|1047|47)([hl])/g
+  let holds = was
+  for (const match of text.matchAll(switches)) holds = match[1] === 'h'
+  return holds
+}

@@ -16,7 +16,8 @@ import { inheritedFrom, resolveAuth as resolveAuthChain } from '../../shared/aut
 import { applyCredential } from '../../shared/credentials'
 import { IPC } from '../../shared/ipc-channels'
 import { OSC7_SHELL_SETUP, scanOsc7 } from '../../shared/osc7'
-import { SetupGate, looksLikePrompt } from './setupGate'
+import { SetupGate, fullScreenAfter, looksLikePrompt } from './setupGate'
+import { ConnectCommands } from './connectCommands'
 import { everyGroup, findProfile } from '../store/hosts'
 import { credentialStore } from '../store/CredentialStore'
 import { defaultCredential, authChain } from '../../shared/authResolution'
@@ -62,6 +63,8 @@ interface LiveConnection {
    * typed at something that looks like a prompt. See `looksLikePrompt`.
    */
   tail: string
+  /** A full-screen program holds the terminal: nothing is typed at it. */
+  fullScreen?: boolean
   /** Where the shell last said it was, for a panel that opens after it did. */
   lastCwd?: string
   /** Set once the shell has printed OSC 7 on its own or after the setup line. */
@@ -71,6 +74,11 @@ interface LiveConnection {
    * the means to put the wait off again when it has not.
    */
   setupWait?: { timer: NodeJS.Timeout; restart: () => void }
+  /**
+   * The host's on-connect commands, held while the setup line is dealt with,
+   * then watched until the prompt after the last of them. See `ConnectCommands`.
+   */
+  commands?: ConnectCommands
   /**
    * Whether the window has said it is listening on this connection's channels.
    *
@@ -1035,7 +1043,15 @@ class SSHManager {
         noteReceived(connectionId, raw.length)
         // Still mid-login, or mid-anything: the setup line can wait.
         connection.setupWait?.restart()
-        connection.tail = (connection.tail + raw.toString('latin1')).slice(-TAIL_CHARS)
+        const text = raw.toString('latin1')
+        // A switch split between two reads is still seen: the end of the last
+        // one is looked at again, and a switch counted twice changes nothing.
+        connection.fullScreen = fullScreenAfter(
+          connection.fullScreen === true,
+          connection.tail.slice(-8) + text
+        )
+        connection.tail = (connection.tail + text).slice(-TAIL_CHARS)
+        connection.commands?.note(raw)
         // The setup line is ours, not the user's, so its echo is taken back
         // out before anyone sees it. Scanning still runs on the full stream:
         // the sequence we are looking for is the shell's answer to that line.
@@ -1098,17 +1114,15 @@ class SSHManager {
       // Typed in rather than run on a separate exec channel, so the command
       // and its output show up in the terminal, `cd` sticks, and `sudo -i`
       // hands over the session the user is looking at. A reconnect repeats it.
+      const command = auth?.onConnectCommand?.trim()
+      if (command) connection.commands = new ConnectCommands(command.split('\n'))
+
       // The shell only reports its directory if it has been told to. Sent as
       // one line so the echo is a line rather than a screenful, and appended
-      // to any PROMPT_COMMAND already there rather than replacing it.
+      // to any PROMPT_COMMAND already there rather than replacing it. The
+      // commands wait for it, so it reaches the shell the user logged in to.
       if (connection.followCwd) this.sendSetupQuietly(connection)
-
-      if (auth) {
-        const command = auth.onConnectCommand?.trim()
-        if (command) {
-          for (const line of command.split('\n')) stream.write(`${line}\n`)
-        }
-      }
+      if (!this.setupUnderWay(connection)) this.typeCommands(connection)
     })
   }
 
@@ -1173,11 +1187,13 @@ class SSHManager {
     if (conn.setupAttempts >= SETUP_MAX_ATTEMPTS) return
     const deadline = Date.now() + SETUP_WAIT_CAP_MS
     const fire = (): void => {
-      const atPrompt = looksLikePrompt(conn.tail)
-      if (!atPrompt && (conn.setupAttempts > 0 || Date.now() < deadline)) {
+      // A program holding the screen is never typed at, not even at the cap.
+      const atPrompt = !conn.fullScreen && looksLikePrompt(conn.tail)
+      if (!atPrompt && (conn.setupAttempts > 0 || conn.fullScreen || Date.now() < deadline)) {
         if (Date.now() >= deadline) {
           conn.setupWait = undefined
           diag('ssh', `${short(conn.id)} setup line not typed: no prompt in sight`)
+          this.typeCommands(conn)
           return
         }
         restart()
@@ -1235,12 +1251,64 @@ class SSHManager {
     conn.setupGate = undefined
     if (conn.setupGateTimer) clearTimeout(conn.setupGateTimer)
     conn.setupGateTimer = undefined
-    if (gate.answered) {
-      conn.shellReportsCwd = true
-      return
+    if (gate.answered) conn.shellReportsCwd = true
+    else diag('ssh', `${short(conn.id)} setup line went unanswered`)
+    // Held commands go in now. They also stand in for a second try: the look
+    // after them types the line again wherever the shell does not report.
+    if (this.typeCommands(conn)) return
+    if (!gate.answered && conn.followCwd) this.sendSetupQuietly(conn)
+  }
+
+  /** Whether the setup line is waiting to be typed, or for its answer. */
+  private setupUnderWay(conn: LiveConnection): boolean {
+    return conn.setupWait !== undefined || (conn.setupGate !== undefined && !conn.setupGate.done)
+  }
+
+  /**
+   * Types the held on-connect commands in, if there are any still held, and
+   * keeps an eye on the prompt after them while the directory is followed.
+   */
+  private typeCommands(conn: LiveConnection): boolean {
+    const commands = conn.commands
+    if (!commands || commands.typed) return false
+    for (const line of commands.take()) conn.stream.write(`${line}\n`)
+    if (conn.followCwd) this.lookAfterCommands(conn, commands)
+    else conn.commands = undefined
+    return true
+  }
+
+  /**
+   * Waits for the prompt after the last on-connect command and, if the shell
+   * there does not say where it is, types the setup line into it — the shell
+   * `sudo -i` started, typically. Only at a prompt, only once the last command
+   * has been read, and not past the cap: a command that holds the terminal,
+   * `mc` or `top`, gets nothing typed into it, and the look is given up.
+   */
+  private lookAfterCommands(conn: LiveConnection, commands: ConnectCommands): void {
+    const deadline = Date.now() + SETUP_WAIT_CAP_MS
+    const done = (why?: string): void => {
+      conn.setupWait = undefined
+      if (conn.commands === commands) conn.commands = undefined
+      if (why) diag('ssh', `${short(conn.id)} after the on-connect commands: ${why}`)
     }
-    diag('ssh', `${short(conn.id)} setup line went unanswered`)
-    if (conn.followCwd) this.sendSetupQuietly(conn)
+    const fire = (): void => {
+      if (conn.commands !== commands || !conn.followCwd) return done()
+      if (commands.reported) return done()
+      if (commands.echoed && !conn.fullScreen && looksLikePrompt(conn.tail)) {
+        done()
+        this.writeSetup(conn)
+        return
+      }
+      if (Date.now() >= deadline) return done('no prompt in sight, setup line not typed')
+      restart()
+    }
+    const restart = (): void => {
+      const wait = conn.setupWait
+      if (!wait) return
+      clearTimeout(wait.timer)
+      wait.timer = setTimeout(fire, Math.max(0, Math.min(SETUP_QUIET_MS, deadline - Date.now())))
+    }
+    conn.setupWait = { timer: setTimeout(fire, SETUP_QUIET_MS), restart }
   }
 
   /**

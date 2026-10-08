@@ -515,8 +515,12 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   back out of the stream, so it never reaches the screen, and in bash the line deletes itself from
   the shell's history, and looks again at the first prompt for a host that files commands only
   after they have run, so it never turns up in `history` either. Zsh skips it only with
-  `HIST_IGNORE_SPACE` set, as oh-my-zsh does. Off by default, since it lets the remote
-  host move the file browser. The host or group setting decides only how a new connection starts
+  `HIST_IGNORE_SPACE` set, as oh-my-zsh does. On-connect commands wait for the line, so it
+  reaches the shell you logged in to rather than `mc` or whatever the commands start; one that
+  hands over to another shell, as `sudo -i` does, gets the line again at that shell's first
+  prompt, and a program that holds the terminal gets nothing. Off by default, since it lets the
+  remote host move the file browser. The host or group setting decides only how a new connection
+  starts
 - **Overwrite confirmation, in both directions.** A transfer is planned before a byte moves, and
   anything it would replace is listed with the size and date on each side. Every clash starts on
   *Skip*, a folder standing where a file must go is refused rather than replaced, and no answer
