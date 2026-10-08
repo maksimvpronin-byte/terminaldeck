@@ -6,6 +6,18 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.27.2
+
+### Fixed
+
+- **Selecting text in a terminal copies it, wherever the drag ends.** A drag
+  that ran past the pane's edge — onto the sidebar, a tab, outside the window
+  — left the text selected and the clipboard as it was, so the next paste
+  brought in the copy before. And a right click counted as a selection: one
+  made to paste copied whatever was still selected over what had just been
+  copied elsewhere, or on a Mac the word under the pointer, and the paste
+  brought in that instead. Only the left button copies now.
+
 ## 0.27.1
 
 ### Fixed
