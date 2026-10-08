@@ -6,6 +6,29 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.27.1
+
+### Fixed
+
+- **On-connect commands no longer race the line that follows the directory.**
+  With the panel following the terminal, the commands went in the moment the
+  shell opened while the setup line waited for a quiet prompt. With `sudo -i`,
+  `cd` and `mc` there was none, so the line was typed anyway — into mc, which
+  ran it in its subshell, on screen and into root's history. The commands now
+  wait for the line, so it reaches the shell you logged in to. One that hands
+  the session to another shell, as `sudo -i` does, gets the line again at
+  that shell's first prompt, and a program holding the screen — mc, top, vim
+  — gets nothing typed into it.
+- **A git folder's hosts open in the folder's workspace.** With a workspace
+  for each group, a folder that lists its repository's hosts flat sent them
+  to a workspace named after their Ansible group — `all`, often — while a
+  saved host beside them went to the folder's. They follow the folder they
+  stand under in the tree now.
+- **The last English in the sidebar is translated**: "Open all in a new
+  workspace", "Copy user@host", "Edit…", the count of selected hosts,
+  "Connecting…", and a new workspace's name, "Рабочая область N". The
+  ~/.ssh/config import list is laid out as a list again.
+
 ## 0.27.0
 
 ### Changed
