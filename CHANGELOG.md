@@ -6,6 +6,29 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.28.0
+
+### Added
+
+- **Open in browser** in the menu of a git folder and of an inventory
+  repository shows the inventory on the repository's web page: the file or
+  directory it reads, on its branch, or the repository itself when it reads
+  several paths. The page is worked out from the clone address — GitHub and
+  Bitbucket by name, any other server as GitLab — and a login or token
+  written into the address is left out of it.
+- **The Inventory, Collections and Multi-windows sections fold away whole**
+  from their heading, and **change places by dragging a heading** over
+  another section; a line shows whether it lands above or below. The order
+  and the folded sections are kept on this machine. A filter unfolds them
+  while it is typed, and Expand all opens them as well.
+- **Reconnecting by double-click**, two switches in Settings → Tree and tabs,
+  both off by default. *Double-click on a connected host reconnects it* starts
+  a live pane over from a double-click in the tree, the inventory or a
+  collection; *Double-click on a tab reconnects it* does the same for the pane
+  in front in a tab, connected or dropped. A terminal starts a new shell, a
+  desktop signs in again to the same Windows session, so what was open on it
+  stays open.
+
 ## 0.27.3
 
 ### Changed
