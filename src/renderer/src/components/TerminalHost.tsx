@@ -38,6 +38,8 @@ interface Props {
    * instead: if it is not connected, it connects, as its button would.
    */
   wake?: number
+  /** The wake asks a connected pane to reconnect as well. */
+  wakeReconnect?: boolean
 }
 
 /**
@@ -76,7 +78,8 @@ export default function TerminalHost({
   onFocus,
   onOutput,
   resolveWriteTargets,
-  wake = 0
+  wake = 0,
+  wakeReconnect = false
 }: Props): JSX.Element {
   const t = useT()
   const hostRef = useRef<HTMLDivElement | null>(null)
@@ -455,14 +458,30 @@ export default function TerminalHost({
   }
 
   // Opened again from the tree: a pane that has dropped, or was restored idle,
-  // connects; one that is connected or connecting is left as it is.
+  // connects; one that is connecting is left as it is, and so is a connected
+  // one unless the double-click asked for it to start over.
   // Only a request made while mounted: one left in the store from before
   // would otherwise dial out from a pane that was merely moved.
   const wakeSeen = useRef(wake)
   useEffect(() => {
     if (wake === wakeSeen.current) return
     wakeSeen.current = wake
-    if (closedRef.current) void connect(generationRef.current)
+    if (closedRef.current) {
+      void connect(generationRef.current)
+      return
+    }
+    const live = connIdRef.current
+    if (!wakeReconnect || !live || attemptRef.current) return
+    // Its listeners go first, so the old session's ending is not reported in
+    // the middle of the new one starting.
+    detachListeners()
+    connIdRef.current = undefined
+    onConnectedRef.current(undefined)
+    window.td.ssh.disconnect(live)
+    termRef.current?.writeln('\r\n')
+    void connect(generationRef.current)
+    // The request is what this answers; `wakeReconnect` is read along with it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wake, connect])
 
   return (

@@ -11,6 +11,8 @@ import { useEffect, useRef } from 'react'
 const attempts: Array<string | undefined> = []
 /** Where each attempt was aimed, when it was a desktop typed into Quick connect. */
 const quicks: unknown[] = []
+/** How each attempt ends: failing, as most tests here want, or signed in. */
+let outcome: 'failed' | 'connected' = 'failed'
 vi.mock('./RemoteScreen', () => ({
   default: function FailingScreen({
     password,
@@ -19,7 +21,7 @@ vi.mock('./RemoteScreen', () => ({
   }: {
     password?: string
     quick?: unknown
-    onPhase: (phase: { at: 'failed'; reason: string }) => void
+    onPhase: (phase: { at: 'failed'; reason: string } | { at: 'connected' }) => void
   }) {
     // Read through a ref: the pane builds this object afresh on each render.
     const aimed = useRef(quick)
@@ -27,7 +29,11 @@ vi.mock('./RemoteScreen', () => ({
     useEffect(() => {
       attempts.push(password)
       if (aimed.current) quicks.push(aimed.current)
-      onPhase({ at: 'failed', reason: 'Authentication failed' })
+      onPhase(
+        outcome === 'connected'
+          ? { at: 'connected' }
+          : { at: 'failed', reason: 'Authentication failed' }
+      )
     }, [password, onPhase])
     return null
   }
@@ -46,6 +52,7 @@ function open(hasPassword: boolean): void {
 beforeEach(() => {
   attempts.length = 0
   quicks.length = 0
+  outcome = 'failed'
 })
 
 describe('a desktop whose password was wrong', () => {
@@ -129,6 +136,27 @@ describe('a desktop opened again from the tree', () => {
     // Started by itself, failed; the request standing from before is not a new one.
     expect(attempts).toEqual([undefined])
     view.rerender(<GraphicalHost protocol="rdp" host="win" sessionId="h" paneVisible wake={4} />)
+    await act(async () => {})
+    expect(attempts).toEqual([undefined, undefined])
+  })
+
+  it('signs a connected desktop in again only when the double-click asks for it', async () => {
+    outcome = 'connected'
+    window.td.rdp.login = vi.fn(async () => ({ username: 'admin', hasPassword: true }))
+    window.td.rdp.settings = vi.fn(async () => {
+      throw new Error('nothing stated')
+    })
+    const view = render(
+      <GraphicalHost protocol="rdp" host="win" sessionId="h" paneVisible wake={1} />
+    )
+    await act(async () => {})
+    expect(attempts).toEqual([undefined])
+    view.rerender(<GraphicalHost protocol="rdp" host="win" sessionId="h" paneVisible wake={2} />)
+    await act(async () => {})
+    expect(attempts).toEqual([undefined])
+    view.rerender(
+      <GraphicalHost protocol="rdp" host="win" sessionId="h" paneVisible wake={3} wakeReconnect />
+    )
     await act(async () => {})
     expect(attempts).toEqual([undefined, undefined])
   })

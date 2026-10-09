@@ -32,6 +32,8 @@ export default function Workspace(): JSX.Element {
   const moveTabToWorkspace = useStore((s) => s.moveTabToWorkspace)
   const reorderTab = useStore((s) => s.reorderTab)
   const setActiveTab = useStore((s) => s.setActiveTab)
+  const wakePane = useStore((s) => s.wakePane)
+  const reconnectOnTabDoubleClick = useStore((s) => s.settings.reconnectOnTabDoubleClick)
   const requestHostMenu = useStore((s) => s.requestHostMenu)
   const multiWindowDraft = useStore((s) => s.multiWindowDraft)
   const draftMultiWindow = useStore((s) => s.draftMultiWindow)
@@ -286,6 +288,13 @@ export default function Workspace(): JSX.Element {
               onClick={() => {
                 setActiveTab(tab.id)
                 focusActivePane()
+              }}
+              // With the setting on, the pane in front in the tab starts over:
+              // a terminal with a new shell, a desktop signed in again.
+              onDoubleClick={(e) => {
+                if (!reconnectOnTabDoubleClick) return
+                if (e.target instanceof Element && e.target.closest('.close')) return
+                wakePane(tab.activePaneId, true)
               }}
               // The host's own menu, as its row in the tree has it: the tab is
               // that host, and connecting again, as another account, or into a

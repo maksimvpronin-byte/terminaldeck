@@ -55,6 +55,19 @@ export interface TerminalSettings extends ResolvedAppearance {
    */
   reuseOpenHost: boolean
   /**
+   * A double-click on a host whose pane is connected reconnects it — a
+   * terminal and a desktop alike. One that dropped is reconnected by the
+   * double-click anyway; one still connecting is left to finish. A terminal is
+   * only reached this way while `reuseOpenHost` is on: off, it gets a new tab.
+   */
+  reconnectOnDoubleClick: boolean
+  /**
+   * A double-click on a tab reconnects the pane in front in it, connected or
+   * dropped, terminal or desktop. Off, a double-click on a tab does nothing
+   * more than its click.
+   */
+  reconnectOnTabDoubleClick: boolean
+  /**
    * A host opened from the tree goes into a workspace of its group's own,
    * named after the group, rather than the ordinary one — see `openHost`. A
    * host from a collection still goes to the collection's.
@@ -572,6 +585,8 @@ export const DEFAULT_SETTINGS: TerminalSettings = {
   expandOnArrowOnly: false,
   revealActiveHost: true,
   reuseOpenHost: true,
+  reconnectOnDoubleClick: false,
+  reconnectOnTabDoubleClick: false,
   workspacePerGroup: false,
   monitorForAll: false,
   treeRowHeight: 32,
@@ -606,6 +621,8 @@ export const TREE_KEYS = [
   'expandOnArrowOnly',
   'revealActiveHost',
   'reuseOpenHost',
+  'reconnectOnDoubleClick',
+  'reconnectOnTabDoubleClick',
   'workspacePerGroup',
   'treeRowHeight',
   'treeTint',

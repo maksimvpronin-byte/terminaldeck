@@ -210,6 +210,21 @@ export default function SettingsDialog({
                     onChange={(on) => updateSettings({ reuseOpenHost: on })}
                   />
                   <SwitchRow
+                    label={t('Double-click on a connected host reconnects it')}
+                    note={t('For terminals and desktops alike.')}
+                    hint={t(
+                      'A host that has dropped is reconnected by a double-click either way. A terminal reaches its open tab only while the setting above is on; off, a double-click opens another tab and nothing is reconnected. A terminal starts a new shell, and whatever ran in the old one ends with it. A desktop signs in again to the same Windows session, so what was open on it stays open.'
+                    )}
+                    checked={settings.reconnectOnDoubleClick}
+                    onChange={(on) => updateSettings({ reconnectOnDoubleClick: on })}
+                  />
+                  <SwitchRow
+                    label={t('Double-click on a tab reconnects it')}
+                    note={t('The pane in front in the tab, connected or dropped.')}
+                    checked={settings.reconnectOnTabDoubleClick}
+                    onChange={(on) => updateSettings({ reconnectOnTabDoubleClick: on })}
+                  />
+                  <SwitchRow
                     label={t('A workspace for each group')}
                     note={t('A host opens in a workspace named after its group.')}
                     hint={t(

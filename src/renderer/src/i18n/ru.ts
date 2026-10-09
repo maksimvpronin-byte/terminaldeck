@@ -203,6 +203,10 @@ export const ru: Record<string, string> = {
     'Бросьте хост на верхний или нижний край другого, чтобы упорядочить список вручную',
   'A line shows the gap it will land in; the order is kept between launches':
     'Линия показывает промежуток, куда он попадёт; порядок сохраняется между запусками',
+  'Inventory, Collections and Multi-windows fold away whole from their heading':
+    'Инвентарь, Наборы и Мульти-окна сворачиваются целиком щелчком по заголовку',
+  'Drag a section’s heading over another to change their places':
+    'Перетащите заголовок раздела на другой, чтобы поменять их местами',
   'A group holds a shared login, key and port — hosts inside inherit them':
     'Группа хранит общий логин, ключ и порт — хосты внутри их наследуют',
   'A blank field means inherit; untick "Inherit" on a host to stand alone':
@@ -264,6 +268,10 @@ export const ru: Record<string, string> = {
     'Клик по уже открытому хосту выводит вперёд его панель и отдаёт ей клавиатуру',
   'A double-click on a host already open goes to its tab and reconnects it if dropped':
     'Двойной клик по уже открытому хосту переходит на его вкладку и переподключает её, если связь оборвалась',
+  'Settings → Tree and tabs can make it reconnect a connected one too, terminal or desktop':
+    'В «Настройки → Дерево и вкладки» можно сделать, чтобы он переподключал и подключённый — терминал или рабочий стол',
+  'And make a double-click on a tab reconnect the pane in front in it':
+    'А также сделать, чтобы двойной клик по вкладке переподключал её активную панель',
   '“Open another tab” in its menu makes a second; Settings → Tree and tabs turns this off':
     '«Открыть ещё одну вкладку» в его меню открывает вторую; выключается в Настройки → Дерево и вкладки',
   'A desktop is never opened twice for one account: Windows keeps one session per user':
@@ -399,6 +407,8 @@ export const ru: Record<string, string> = {
     'Раздел «Инвентарь» стоит в дереве под вашими хостами: «+» добавляет репозиторий, ⟳ синхронизирует все',
   'Each repository has its own ⟳ to sync it, and its menu removes it after asking':
     'У каждого репозитория свой ⟳ для синхронизации, а из его меню он удаляется после вопроса',
+  'Open in browser in a repository’s menu shows the inventory on its web page':
+    '«Открыть в браузере» в меню репозитория показывает инвентарь на его веб-странице',
   'Remove the repository “{name}”? Its hosts leave the tree, with their local settings; the repository itself is not touched.':
     'Удалить репозиторий «{name}»? Его хосты уйдут из дерева вместе с локальными настройками; сам репозиторий не изменится.',
   'Lock vault (⌘L)': 'Заблокировать хранилище (⌘L)',
@@ -1308,6 +1318,7 @@ export const ru: Record<string, string> = {
     'Сохранение отвяжет эту папку: отражённые хосты исчезнут вместе с локальными настройками и сохранёнными для них паролями. Сам репозиторий не трогается.',
   'Reset local settings': 'Сбросить локальные настройки',
   'Sync with git…': 'Синхронизировать с git…',
+  'Open in browser': 'Открыть в браузере',
   'From the repository this folder mirrors · double-click to connect · drag into a collection':
     'Из репозитория, который отражает эта папка · двойной клик — подключиться · перетащите в набор, чтобы добавить',
   'Settings kept here, over what the repository says':
@@ -1328,6 +1339,8 @@ export const ru: Record<string, string> = {
     'Само ничего не скачивается — при открытии окна папка читается с диска',
   'Sync with git… in the folder’s menu goes to the repository':
     '«Синхронизировать с git…» в меню папки идёт в репозиторий',
+  'Open in browser in the folder’s menu shows the inventory on the repository’s web page':
+    '«Открыть в браузере» в меню папки показывает инвентарь на веб-странице репозитория',
   'Every sync asks which groups to take; ticking a group takes its subgroups':
     'Каждая синхронизация спрашивает, какие группы взять; отметка на группе берёт и подгруппы',
   'Groups that appeared since last time arrive ticked and marked new':
@@ -1436,6 +1449,14 @@ export const ru: Record<string, string> = {
     'Иначе группа раскрывается щелчком в любом месте строки.',
   'Double-click on an open host goes to its tab':
     'Двойной клик по открытому хосту — переход на его вкладку',
+  'Double-click on a connected host reconnects it':
+    'Двойной клик по подключённому хосту — переподключение',
+  'For terminals and desktops alike.': 'И для терминалов, и для рабочих столов.',
+  'Double-click on a tab reconnects it': 'Двойной клик по вкладке — переподключение',
+  'The pane in front in the tab, connected or dropped.':
+    'Активная панель вкладки — подключённая или отвалившаяся.',
+  'A host that has dropped is reconnected by a double-click either way. A terminal reaches its open tab only while the setting above is on; off, a double-click opens another tab and nothing is reconnected. A terminal starts a new shell, and whatever ran in the old one ends with it. A desktop signs in again to the same Windows session, so what was open on it stays open.':
+    'Отвалившийся хост двойной клик переподключает в любом случае. Терминал попадает в свою открытую вкладку, только пока включена настройка выше; без неё двойной клик открывает ещё одну вкладку и ничего не переподключает. Терминал запускает новую оболочку, и всё, что работало в старой, завершается вместе с ней. Рабочий стол заново входит в тот же сеанс Windows, так что открытое в нём остаётся открытым.',
   'A workspace for each group': 'Отдельная рабочая область для каждой группы',
   'A host opens in a workspace named after its group.':
     'Хост открывается в рабочей области с именем своей группы.',

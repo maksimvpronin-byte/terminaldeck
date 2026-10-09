@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { it, expect, vi } from 'vitest'
-import { createEvent, fireEvent, render } from '@testing-library/react'
+import { act, createEvent, fireEvent, render } from '@testing-library/react'
 import { useStore } from '../state/store'
 import { makeLeaf } from '../state/paneTree'
 import { DRAG_MIME } from '../state/dnd'
@@ -84,4 +84,31 @@ it('asks for the host’s menu on a right-click on its tab, and for none on a qu
     y: 40,
     tabId: 'a'
   })
+})
+
+it('reconnects the pane in front on a double-click on its tab, only with the setting on', () => {
+  const root = makeLeaf('a', { kind: 'session', sessionId: 'host-a' })
+  useStore.setState((s) => ({
+    activeWorkspaceId: 'w',
+    wakeRequest: null,
+    settings: { ...s.settings, reconnectOnTabDoubleClick: false },
+    workspaces: [
+      {
+        id: 'w',
+        title: 'work',
+        activeTabId: 'a',
+        tabs: [{ id: 'a', title: 'a', root, activePaneId: root.id }]
+      }
+    ]
+  }))
+  const view = render(<Workspace />)
+  const tab = view.container.querySelector<HTMLElement>('.tab')!
+  fireEvent.doubleClick(tab)
+  expect(useStore.getState().wakeRequest).toBeNull()
+
+  act(() =>
+    useStore.setState((s) => ({ settings: { ...s.settings, reconnectOnTabDoubleClick: true } }))
+  )
+  fireEvent.doubleClick(tab)
+  expect(useStore.getState().wakeRequest).toEqual({ paneId: root.id, n: 1, reconnect: true })
 })

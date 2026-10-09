@@ -276,7 +276,7 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
     return tab.activePaneId
   },
 
-  openHost: (title, target, color, viaCollectionId, again = false) => {
+  openHost: (title, target, color, viaCollectionId, again = false, doubleClick = false) => {
     const s = get()
     if (target.kind === 'session') {
       const desktop = protocolOf(findHost(s, target.sessionId)?.host) === 'rdp'
@@ -293,9 +293,7 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
         get().setActiveTab(place.tabId)
         get().setActivePane(place.tabId, place.paneId)
         get().focusActivePane()
-        set((st) => ({
-          wakeRequest: { paneId: place.paneId, n: (st.wakeRequest?.n ?? 0) + 1 }
-        }))
+        get().wakePane(place.paneId, doubleClick && s.settings.reconnectOnDoubleClick)
         return place.paneId
       }
     }
@@ -312,6 +310,9 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
     }
     return get().openTab(title, target, color, viaCollectionId)
   },
+
+  wakePane: (paneId, reconnect) =>
+    set((s) => ({ wakeRequest: { paneId, n: (s.wakeRequest?.n ?? 0) + 1, reconnect } })),
 
   requestHostMenu: (request) => set({ hostMenuRequest: request }),
 

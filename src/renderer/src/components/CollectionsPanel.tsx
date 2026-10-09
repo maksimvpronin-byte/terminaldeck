@@ -11,6 +11,7 @@ import CollectionDialog from './CollectionDialog'
 import { Chevron, TreeChildren, togglesFolder } from './TreeToggle'
 import { TREE_HOST_NUDGE } from './treeIndent'
 import { HOSTS_MIME } from '../state/dnd'
+import { SectionHeading, type SectionControls } from './TreeSection'
 import { currentPlace, returnTo, type Place } from '../state/clickPlace'
 
 const COLLAPSED_KEY = 'terminaldeck.collapsedCollections'
@@ -28,11 +29,14 @@ function loadCollapsed(): Set<string> {
 
 export default function CollectionsPanel({
   query,
-  fold = null
+  fold = null,
+  section
 }: {
   query: string
   /** The tree's "expand all" or "collapse all", stamped so a repeat still acts. */
   fold?: { open: boolean; at: number } | null
+  /** Folding the whole section and moving it — see TreeSection. */
+  section?: SectionControls
 }): JSX.Element {
   const t = useT()
   const collections = useStore((s) => s.collections)
@@ -209,8 +213,7 @@ export default function CollectionsPanel({
   return (
     <>
       <div className="tree-group">
-        <div className="tree-group-title collections-heading">
-          <span>{t('Collections')}</span>
+        <SectionHeading section={section} title={t('Collections')}>
           <button
             className="icon-button"
             title={t('New collection')}
@@ -218,159 +221,166 @@ export default function CollectionsPanel({
           >
             +
           </button>
-        </div>
+        </SectionHeading>
 
-        {collections.length === 0 && (
-          <div
-            style={{
-              padding: '4px 12px 8px',
-              color: 'var(--text-dim)',
-              fontSize: 11,
-              lineHeight: 1.5
-            }}
-          >
-            {t('Your own sets of hosts, across any groups. Tick hosts above and press')}
-            <strong> {t('Collect')}</strong>
-            {t(', or right-click a workspace and save it here.')}
-          </div>
-        )}
-
-        {visible.map((collection) => {
-          const isCollapsed = needle === '' && collapsed.has(collection.id)
-          const members = membersOf(collection)
-          const missing = members.filter((m) => m.missing).length
-          return (
-            <div
-              className="tree-group"
-              key={collection.id}
-              onDragOver={(e) => allowHostsDrop(e, collection.id)}
-              onDragLeave={(e) => leaveHostsDrop(e, collection.id)}
-              onDrop={(e) => void dropHosts(e, collection.id)}
-            >
+        {!section?.folded && (
+          <>
+            {collections.length === 0 && (
               <div
-                className={`tree-item${menu?.forId === collection.id ? ' menu-open' : ''}${
-                  dropOn === collection.id ? ' drop-target' : ''
-                }`}
-                style={{ paddingLeft: COLLECTION_INDENT }}
-                onClick={(e) => {
-                  if (togglesFolder(e, settings.expandOnArrowOnly)) toggleCollapsed(collection.id)
+                style={{
+                  padding: '4px 12px 8px',
+                  color: 'var(--text-dim)',
+                  fontSize: 11,
+                  lineHeight: 1.5
                 }}
-                onDoubleClick={() => openCollection(collection.id)}
-                onContextMenu={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  setMenu({
-                    x: e.clientX,
-                    y: e.clientY,
-                    items: collectionMenu(collection),
-                    forId: collection.id
-                  })
-                }}
-                title={t('Double-click to open the whole set in a new workspace')}
               >
-                <span className={`tree-group-title name ${isCollapsed ? '' : 'open'}`}>
-                  <Chevron open={!isCollapsed} />
-                  <span
-                    className="session-dot"
-                    style={collection.color ? { background: collection.color } : undefined}
-                    aria-hidden="true"
-                  />
-                  {collection.name}
-                </span>
-                <div className="actions">
-                  <button
-                    title={t('Open every host in a new workspace')}
+                {t('Your own sets of hosts, across any groups. Tick hosts above and press')}
+                <strong> {t('Collect')}</strong>
+                {t(', or right-click a workspace and save it here.')}
+              </div>
+            )}
+
+            {visible.map((collection) => {
+              const isCollapsed = needle === '' && collapsed.has(collection.id)
+              const members = membersOf(collection)
+              const missing = members.filter((m) => m.missing).length
+              return (
+                <div
+                  className="tree-group"
+                  key={collection.id}
+                  onDragOver={(e) => allowHostsDrop(e, collection.id)}
+                  onDragLeave={(e) => leaveHostsDrop(e, collection.id)}
+                  onDrop={(e) => void dropHosts(e, collection.id)}
+                >
+                  <div
+                    className={`tree-item${menu?.forId === collection.id ? ' menu-open' : ''}${
+                      dropOn === collection.id ? ' drop-target' : ''
+                    }`}
+                    style={{ paddingLeft: COLLECTION_INDENT }}
                     onClick={(e) => {
-                      e.stopPropagation()
-                      openCollection(collection.id)
+                      if (togglesFolder(e, settings.expandOnArrowOnly))
+                        toggleCollapsed(collection.id)
                     }}
+                    onDoubleClick={() => openCollection(collection.id)}
+                    onContextMenu={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      setMenu({
+                        x: e.clientX,
+                        y: e.clientY,
+                        items: collectionMenu(collection),
+                        forId: collection.id
+                      })
+                    }}
+                    title={t('Double-click to open the whole set in a new workspace')}
                   >
-                    {t('Open')}
-                  </button>
-                </div>
-              </div>
-
-              <div className="inventory-meta" style={{ paddingLeft: 34 }}>
-                {t('Hosts: {count}', { count: members.length })}
-                {missing > 0 ? t(' · {count} missing', { count: missing }) : ''}
-              </div>
-
-              {!isCollapsed && (
-                <TreeChildren indent={COLLECTION_INDENT}>
-                  {members.map((m) => (
-                    <div
-                      key={m.id}
-                      className={`tree-item${
-                        menu?.forId === `${collection.id}/${m.id}` ? ' menu-open' : ''
-                      }`}
-                      // Past the branch drawn to it, like a host in the Sessions tree.
-                      style={{ paddingLeft: COLLECTION_INDENT + TREE_HOST_NUDGE }}
-                      title={m.missing ? undefined : t('Double-click to connect')}
-                      onClick={(e) => {
-                        // The second click of a double-click opens; it does not
-                        // move on to the next place the host is open in.
-                        if (e.detail > 1) return
-                        clickedFrom.current = currentPlace()
-                        revealSession(m.id)
-                      }}
-                      onDoubleClick={() => {
-                        if (!m.missing) {
-                          returnTo(clickedFrom.current)
-                          // Opened from here, so this set lends its look. Not
-                          // always a new tab: see `openHost`.
-                          openHost(
-                            m.name,
-                            { kind: 'session', sessionId: m.id },
-                            m.color,
-                            collection.id
-                          )
-                        }
-                      }}
-                      onContextMenu={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        setMenu({
-                          x: e.clientX,
-                          y: e.clientY,
-                          forId: `${collection.id}/${m.id}`,
-                          items: [
-                            {
-                              label: t('Remove from collection'),
-                              danger: true,
-                              onSelect: () => removeFromCollection(collection.id, m.id)
-                            }
-                          ]
-                        })
-                      }}
-                    >
-                      <span className="name">
-                        <span
-                          className={`session-kind ${connected.has(m.id) ? 'live' : ''}`}
-                          title={
-                            connected.has(m.id)
-                              ? t('Open now')
-                              : m.protocol === 'rdp'
-                                ? t('Opens a desktop')
-                                : t('Opens a terminal')
-                          }
-                        >
-                          {m.protocol === 'rdp' ? <DesktopIcon /> : <TerminalIcon />}
-                        </span>
-                        {m.missing ? (
-                          <span style={{ color: 'var(--text-dim)' }}>
-                            {t('{name} — no longer exists', { name: m.name })}
-                          </span>
-                        ) : (
-                          m.name
-                        )}
-                      </span>
+                    <span className={`tree-group-title name ${isCollapsed ? '' : 'open'}`}>
+                      <Chevron open={!isCollapsed} />
+                      <span
+                        className="session-dot"
+                        style={collection.color ? { background: collection.color } : undefined}
+                        aria-hidden="true"
+                      />
+                      {collection.name}
+                    </span>
+                    <div className="actions">
+                      <button
+                        title={t('Open every host in a new workspace')}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          openCollection(collection.id)
+                        }}
+                      >
+                        {t('Open')}
+                      </button>
                     </div>
-                  ))}
-                </TreeChildren>
-              )}
-            </div>
-          )
-        })}
+                  </div>
+
+                  <div className="inventory-meta" style={{ paddingLeft: 34 }}>
+                    {t('Hosts: {count}', { count: members.length })}
+                    {missing > 0 ? t(' · {count} missing', { count: missing }) : ''}
+                  </div>
+
+                  {!isCollapsed && (
+                    <TreeChildren indent={COLLECTION_INDENT}>
+                      {members.map((m) => (
+                        <div
+                          key={m.id}
+                          className={`tree-item${
+                            menu?.forId === `${collection.id}/${m.id}` ? ' menu-open' : ''
+                          }`}
+                          // Past the branch drawn to it, like a host in the Sessions tree.
+                          style={{ paddingLeft: COLLECTION_INDENT + TREE_HOST_NUDGE }}
+                          title={m.missing ? undefined : t('Double-click to connect')}
+                          onClick={(e) => {
+                            // The second click of a double-click opens; it does not
+                            // move on to the next place the host is open in.
+                            if (e.detail > 1) return
+                            clickedFrom.current = currentPlace()
+                            revealSession(m.id)
+                          }}
+                          onDoubleClick={() => {
+                            if (!m.missing) {
+                              returnTo(clickedFrom.current)
+                              // Opened from here, so this set lends its look. Not
+                              // always a new tab: see `openHost`.
+                              openHost(
+                                m.name,
+                                { kind: 'session', sessionId: m.id },
+                                m.color,
+                                collection.id,
+                                false,
+                                true
+                              )
+                            }
+                          }}
+                          onContextMenu={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            setMenu({
+                              x: e.clientX,
+                              y: e.clientY,
+                              forId: `${collection.id}/${m.id}`,
+                              items: [
+                                {
+                                  label: t('Remove from collection'),
+                                  danger: true,
+                                  onSelect: () => removeFromCollection(collection.id, m.id)
+                                }
+                              ]
+                            })
+                          }}
+                        >
+                          <span className="name">
+                            <span
+                              className={`session-kind ${connected.has(m.id) ? 'live' : ''}`}
+                              title={
+                                connected.has(m.id)
+                                  ? t('Open now')
+                                  : m.protocol === 'rdp'
+                                    ? t('Opens a desktop')
+                                    : t('Opens a terminal')
+                              }
+                            >
+                              {m.protocol === 'rdp' ? <DesktopIcon /> : <TerminalIcon />}
+                            </span>
+                            {m.missing ? (
+                              <span style={{ color: 'var(--text-dim)' }}>
+                                {t('{name} — no longer exists', { name: m.name })}
+                              </span>
+                            ) : (
+                              m.name
+                            )}
+                          </span>
+                        </div>
+                      ))}
+                    </TreeChildren>
+                  )}
+                </div>
+              )
+            })}
+          </>
+        )}
       </div>
 
       {editing !== undefined && (

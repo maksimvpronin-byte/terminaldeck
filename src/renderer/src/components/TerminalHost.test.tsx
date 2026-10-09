@@ -119,6 +119,41 @@ describe('a terminal opened again from the tree', () => {
     view.rerender(<TerminalHost {...props} wake={7} />)
     expect(connect).toHaveBeenCalledTimes(1)
   })
+
+  it('starts a live session over when the double-click asks for it', async () => {
+    const connect = vi
+      .fn()
+      .mockResolvedValueOnce({ connectionId: 'old' })
+      .mockResolvedValueOnce({ connectionId: 'new' })
+    const disconnect = vi.fn()
+    window.td.ssh.connect = connect
+    window.td.ssh.disconnect = disconnect
+    window.td.ssh.onStatus = () => () => undefined
+    window.td.ssh.onData = () => () => undefined
+    window.td.ssh.onError = () => () => undefined
+    window.td.ssh.ready = vi.fn()
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe(): void {}
+        disconnect(): void {}
+      }
+    )
+    const props = {
+      target: { kind: 'session', sessionId: 'h3' } as const,
+      active: false,
+      onConnected: vi.fn(),
+      onFocus: () => undefined,
+      resolveWriteTargets: (own: string) => [own]
+    }
+    const view = render(<TerminalHost {...props} wake={1} />)
+    await waitFor(() => expect(props.onConnected).toHaveBeenCalledWith('old'))
+
+    view.rerender(<TerminalHost {...props} wake={2} wakeReconnect />)
+    await waitFor(() => expect(props.onConnected).toHaveBeenLastCalledWith('new'))
+    expect(disconnect).toHaveBeenCalledWith('old')
+    expect(connect).toHaveBeenCalledTimes(2)
+  })
 })
 
 describe('copying a selection as it is made', () => {

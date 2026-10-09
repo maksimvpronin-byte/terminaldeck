@@ -20,6 +20,8 @@ import CollectionDialog from './CollectionDialog'
 import { colourOf } from '../../../shared/hostColour'
 import { findPane } from '../state/paneTree'
 import { morphOpen } from './hostMorph'
+import { repoWebUrl } from './repoWebUrl'
+import { SectionHeading, type SectionControls } from './TreeSection'
 import { paneTitle } from '../state/connect'
 import { hostColour, overridesByNode } from '../state/hosts'
 import { tabMenuItems } from './tabMenu'
@@ -52,11 +54,14 @@ function loadCollapsed(): Set<string> {
  */
 export default function InventoryTree({
   query,
-  fold
+  fold,
+  section
 }: {
   query: string
   /** Every folder opened or closed at once, from the buttons above the tree. */
   fold?: { open: boolean; at: number } | null
+  /** Folding the whole section and moving it — see TreeSection. */
+  section?: SectionControls
 }): JSX.Element {
   const t = useT()
   const sources = useStore((s) => s.inventorySources)
@@ -291,7 +296,8 @@ export default function InventoryTree({
     colour?: string,
     credentialId?: string,
     admin?: boolean,
-    again = false
+    again = false,
+    doubleClick = false
   ): void {
     const credential = credentials.find((c) => c.id === credentialId)
     const title = paneTitle(host.name, credential)
@@ -301,7 +307,8 @@ export default function InventoryTree({
       { kind: 'session', sessionId: host.id, credentialId, admin },
       colour,
       undefined,
-      again
+      again,
+      doubleClick
     )
   }
 
@@ -480,6 +487,7 @@ export default function InventoryTree({
 
   function sourceMenu(source: InventorySource): MenuItem[] {
     const hosts = hostsUnder(`inv:${source.id}:root`)
+    const webUrl = repoWebUrl(source)
     return [
       {
         label: t('Open all in a new workspace ({count})', { count: hosts.length }),
@@ -496,6 +504,14 @@ export default function InventoryTree({
           )
       },
       { label: t('Sync now'), separated: true, onSelect: () => syncInventory(source.id) },
+      {
+        label: t('Open in browser'),
+        disabled: !webUrl,
+        // The main process hands an http(s) link to the system browser.
+        onSelect: () => {
+          if (webUrl) window.open(webUrl, '_blank')
+        }
+      },
       { label: t('Edit…'), onSelect: () => setEditing(source) },
       {
         label: t('Remove source'),
@@ -613,7 +629,7 @@ export default function InventoryTree({
         onClick={(e) => onHostClick(e, host)}
         onDoubleClick={(e) => {
           const row = e.currentTarget
-          connect(host, rowColour)
+          connect(host, rowColour, undefined, undefined, false, true)
           morphOpen(row, currentTab(useStore.getState())?.id, {
             title: host.name,
             colour: rowColour
@@ -672,8 +688,7 @@ export default function InventoryTree({
 
   return (
     <div className="tree-group">
-      <div className="tree-group-title collections-heading">
-        <span>{t('Inventory')}</span>
+      <SectionHeading section={section} title={t('Inventory')}>
         <span className="heading-actions">
           {sources.length > 0 && (
             <button
@@ -695,114 +710,125 @@ export default function InventoryTree({
             +
           </button>
         </span>
-      </div>
+      </SectionHeading>
 
-      {!gitAvailable && sources.length > 0 && (
-        <div className="inventory-warning">
-          {t(
-            'git was not found on this machine. Install it (or add it to PATH) to sync inventories.'
+      {!section?.folded && (
+        <>
+          {!gitAvailable && sources.length > 0 && (
+            <div className="inventory-warning">
+              {t(
+                'git was not found on this machine. Install it (or add it to PATH) to sync inventories.'
+              )}
+            </div>
           )}
-        </div>
-      )}
 
-      {sources.length === 0 && (
-        <div
-          style={{
-            padding: '4px 12px 8px',
-            color: 'var(--text-dim)',
-            fontSize: 11,
-            lineHeight: 1.5
-          }}
-        >
-          {t('No repositories yet. Add one to pull an Ansible inventory and get its hosts here.')}
-        </div>
-      )}
-
-      {sources.map((source) => {
-        const rootId = `inv:${source.id}:root`
-        const isCollapsed = needle === '' && collapsed.has(rootId)
-        const busy = syncing.includes(source.id)
-        return (
-          <div className="tree-group" key={source.id}>
+          {sources.length === 0 && (
             <div
-              className={`tree-item${menu?.forId === rootId ? ' menu-open' : ''}`}
-              style={{ paddingLeft: groupIndent(0) }}
-              onClick={(e) => {
-                if (togglesFolder(e, settings.expandOnArrowOnly)) toggleCollapsed(rootId)
-              }}
-              onContextMenu={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                setMenu({ x: e.clientX, y: e.clientY, items: sourceMenu(source), forId: rootId })
+              style={{
+                padding: '4px 12px 8px',
+                color: 'var(--text-dim)',
+                fontSize: 11,
+                lineHeight: 1.5
               }}
             >
-              <span className={`tree-group-title name ${isCollapsed ? '' : 'open'}`}>
-                <Chevron open={!isCollapsed} />
-                <span
-                  className="session-dot"
-                  style={source.color ? { background: source.color } : undefined}
-                  aria-hidden="true"
-                />
-                {source.name}
-                {/* Branch, revision, counts and files together say which step
+              {t(
+                'No repositories yet. Add one to pull an Ansible inventory and get its hosts here.'
+              )}
+            </div>
+          )}
+
+          {sources.map((source) => {
+            const rootId = `inv:${source.id}:root`
+            const isCollapsed = needle === '' && collapsed.has(rootId)
+            const busy = syncing.includes(source.id)
+            return (
+              <div className="tree-group" key={source.id}>
+                <div
+                  className={`tree-item${menu?.forId === rootId ? ' menu-open' : ''}`}
+                  style={{ paddingLeft: groupIndent(0) }}
+                  onClick={(e) => {
+                    if (togglesFolder(e, settings.expandOnArrowOnly)) toggleCollapsed(rootId)
+                  }}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setMenu({
+                      x: e.clientX,
+                      y: e.clientY,
+                      items: sourceMenu(source),
+                      forId: rootId
+                    })
+                  }}
+                >
+                  <span className={`tree-group-title name ${isCollapsed ? '' : 'open'}`}>
+                    <Chevron open={!isCollapsed} />
+                    <span
+                      className="session-dot"
+                      style={source.color ? { background: source.color } : undefined}
+                      aria-hidden="true"
+                    />
+                    {source.name}
+                    {/* Branch, revision, counts and files together say which step
                       of a sync went wrong — every one of those failures looks
                       identical from the outside otherwise: a sync that reports
                       success and leaves the hosts exactly as they were. Worth
                       keeping and not worth four lines under every repository in
                       the list, which is what it was. */}
-                <Hint>
-                  <div>
-                    {ago(t, source.lastSyncedAt)}
-                    {` · ${source.branch || t('default branch')}`}
-                    {source.lastRevision ? ` · ${source.lastRevision}` : ''}
-                    {` · ${countsFor(source.id)}`}
+                    <Hint>
+                      <div>
+                        {ago(t, source.lastSyncedAt)}
+                        {` · ${source.branch || t('default branch')}`}
+                        {source.lastRevision ? ` · ${source.lastRevision}` : ''}
+                        {` · ${countsFor(source.id)}`}
+                      </div>
+                      {source.lastFiles && (
+                        <div>
+                          {t('read {count} files', { count: source.lastFiles.length })}
+                          {source.lastFiles.length > 0 ? `: ${source.lastFiles.join(', ')}` : ''}
+                        </div>
+                      )}
+                    </Hint>
+                  </span>
+                  <div className="actions">
+                    <button
+                      className="icon-button"
+                      title={t('Sync now')}
+                      disabled={busy}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        syncInventory(source.id)
+                      }}
+                    >
+                      {busy ? '…' : <RefreshIcon />}
+                    </button>
                   </div>
-                  {source.lastFiles && (
-                    <div>
-                      {t('read {count} files', { count: source.lastFiles.length })}
-                      {source.lastFiles.length > 0 ? `: ${source.lastFiles.join(', ')}` : ''}
-                    </div>
-                  )}
-                </Hint>
-              </span>
-              <div className="actions">
-                <button
-                  className="icon-button"
-                  title={t('Sync now')}
-                  disabled={busy}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    syncInventory(source.id)
-                  }}
-                >
-                  {busy ? '…' : <RefreshIcon />}
-                </button>
-              </div>
-            </div>
+                </div>
 
-            {/* While a sync is running, and only then. It is the one state
+                {/* While a sync is running, and only then. It is the one state
                   worth interrupting the list for: everything else about a
                   repository is under the mark beside its name. */}
-            {busy && (
-              <div className="inventory-meta" style={{ paddingLeft: hostIndent(0) }}>
-                {t('syncing…')}
-              </div>
-            )}
-            {(source.lastError || syncErrors[source.id]) && (
-              <div className="inventory-error" style={{ paddingLeft: hostIndent(0) }}>
-                {source.lastError ?? syncErrors[source.id]}
-              </div>
-            )}
+                {busy && (
+                  <div className="inventory-meta" style={{ paddingLeft: hostIndent(0) }}>
+                    {t('syncing…')}
+                  </div>
+                )}
+                {(source.lastError || syncErrors[source.id]) && (
+                  <div className="inventory-error" style={{ paddingLeft: hostIndent(0) }}>
+                    {source.lastError ?? syncErrors[source.id]}
+                  </div>
+                )}
 
-            {!isCollapsed && (
-              <TreeChildren indent={groupIndent(0)}>
-                {hostsOf(rootId).map((h) => renderHost(h, hostIndent(0), source.color))}
-                {renderGroups(rootId, 1, source.color)}
-              </TreeChildren>
-            )}
-          </div>
-        )
-      })}
+                {!isCollapsed && (
+                  <TreeChildren indent={groupIndent(0)}>
+                    {hostsOf(rootId).map((h) => renderHost(h, hostIndent(0), source.color))}
+                    {renderGroups(rootId, 1, source.color)}
+                  </TreeChildren>
+                )}
+              </div>
+            )
+          })}
+        </>
+      )}
 
       {editing !== undefined && (
         <InventorySourceDialog

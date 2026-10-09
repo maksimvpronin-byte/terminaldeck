@@ -88,6 +88,12 @@ const CHAPTERS: Chapter[] = [
                 what: 'A double-click on a host already open goes to its tab and reconnects it if dropped'
               },
               {
+                what: 'Settings → Tree and tabs can make it reconnect a connected one too, terminal or desktop'
+              },
+              {
+                what: 'And make a double-click on a tab reconnect the pane in front in it'
+              },
+              {
                 what: '“Open another tab” in its menu makes a second; Settings → Tree and tabs turns this off'
               },
               {
@@ -127,7 +133,13 @@ const CHAPTERS: Chapter[] = [
               {
                 what: 'A group sorts the same way: its edges are the gaps, its middle means inside'
               },
-              { what: 'A line shows the gap it will land in; the order is kept between launches' }
+              { what: 'A line shows the gap it will land in; the order is kept between launches' },
+              {
+                what: 'Inventory, Collections and Multi-windows fold away whole from their heading'
+              },
+              {
+                what: 'Drag a section’s heading over another to change their places'
+              }
             ]
           },
           {
@@ -784,6 +796,9 @@ const CHAPTERS: Chapter[] = [
               {
                 what: 'Each repository has its own ⟳ to sync it, and its menu removes it after asking'
               },
+              {
+                what: 'Open in browser in a repository’s menu shows the inventory on its web page'
+              },
               { what: 'Cloned read-only through your own git, so your keys and helpers are used' },
               {
                 what: 'Ansible groups, group_vars and host_vars become groups and connection settings'
@@ -864,6 +879,9 @@ terminaldeck_protocol: rdp`
               },
               {
                 what: 'Sync with git… in the folder’s menu goes to the repository'
+              },
+              {
+                what: 'Open in browser in the folder’s menu shows the inventory on the repository’s web page'
               },
               { what: 'Every sync asks which groups to take; ticking a group takes its subgroups' },
               { what: 'Groups that appeared since last time arrive ticked and marked new' },

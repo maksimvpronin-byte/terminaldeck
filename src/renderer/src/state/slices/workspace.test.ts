@@ -257,9 +257,32 @@ describe('openHost: an open host is brought forward rather than opened again', (
     open('dc')
     expect(open('web')).toBe(first)
     expect(tabCount()).toBe(2)
-    expect(useStore.getState().wakeRequest).toEqual({ paneId: first, n: 1 })
+    expect(useStore.getState().wakeRequest).toEqual({ paneId: first, n: 1, reconnect: false })
     const tab = useStore.getState().workspaces[0].tabs.find((t) => t.activePaneId === first)
     expect(useStore.getState().workspaces[0].activeTabId).toBe(tab?.id)
+  })
+
+  it('asks a live pane to reconnect only for a double-click, with the setting on', () => {
+    seed()
+    const first = open('web')
+    const again = (doubleClick: boolean): unknown => {
+      useStore
+        .getState()
+        .openHost(
+          'web',
+          { kind: 'session', sessionId: 'web' },
+          undefined,
+          undefined,
+          false,
+          doubleClick
+        )
+      return useStore.getState().wakeRequest?.reconnect
+    }
+    expect(again(true)).toBe(false)
+    useStore.setState((s) => ({ settings: { ...s.settings, reconnectOnDoubleClick: true } }))
+    expect(again(false)).toBe(false)
+    expect(again(true)).toBe(true)
+    expect(useStore.getState().wakeRequest?.paneId).toBe(first)
   })
 
   it('opens another terminal when asked, when an account is chosen, or with the setting off', () => {

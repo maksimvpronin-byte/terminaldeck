@@ -8,6 +8,7 @@ import ContextMenu, { type MenuItem } from './ContextMenu'
 import MultiWindowDialog from './MultiWindowDialog'
 import { SplitRightIcon } from './icons'
 import { useT } from '../i18n'
+import { SectionHeading, type SectionControls } from './TreeSection'
 
 const INDENT = 8
 
@@ -18,7 +19,14 @@ const INDENT = 8
  * and how large — so a desk of four consoles laid out once comes back laid out.
  * A double-click opens one as a new tab in the workspace in front.
  */
-export default function MultiWindowsPanel({ query }: { query: string }): JSX.Element {
+export default function MultiWindowsPanel({
+  query,
+  section
+}: {
+  query: string
+  /** Folding the whole section and moving it — see TreeSection. */
+  section?: SectionControls
+}): JSX.Element {
   const t = useT()
   const multiWindows = useStore((s) => s.multiWindows)
   const loadMultiWindows = useStore((s) => s.loadMultiWindows)
@@ -87,8 +95,7 @@ export default function MultiWindowsPanel({ query }: { query: string }): JSX.Ele
 
   return (
     <div className="tree-group">
-      <div className="tree-group-title collections-heading">
-        <span>{t('Multi-windows')}</span>
+      <SectionHeading section={section} title={t('Multi-windows')}>
         <button
           className="icon-button"
           title={t('Save the tab in front as a multi-window')}
@@ -97,64 +104,68 @@ export default function MultiWindowsPanel({ query }: { query: string }): JSX.Ele
         >
           +
         </button>
-      </div>
+      </SectionHeading>
 
-      {multiWindows.length === 0 && (
-        <div
-          style={{
-            padding: '4px 12px 8px',
-            color: 'var(--text-dim)',
-            fontSize: 11,
-            lineHeight: 1.5
-          }}
-        >
-          {t(
-            'A tab kept by name, panes and all. Split a tab into the hosts you want, then press + here or right-click its tab.'
-          )}
-        </div>
-      )}
-
-      {visible.map((w) => {
-        const hosts = hostsOf(w.root)
-        const missing = hosts.filter((id) => !findHost(state, id)).length
-        return (
-          <div key={w.id}>
+      {!section?.folded && (
+        <>
+          {multiWindows.length === 0 && (
             <div
-              className={`tree-item${menu?.forId === w.id ? ' menu-open' : ''}`}
-              style={{ paddingLeft: INDENT }}
-              title={t('Double-click to open it as a new tab, laid out as it was kept')}
-              onDoubleClick={() => openMultiWindow(w.id)}
-              onContextMenu={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                setMenu({ x: e.clientX, y: e.clientY, items: menuFor(w), forId: w.id })
+              style={{
+                padding: '4px 12px 8px',
+                color: 'var(--text-dim)',
+                fontSize: 11,
+                lineHeight: 1.5
               }}
             >
-              <span className="name">
-                <span className="session-kind" aria-hidden="true">
-                  <SplitRightIcon />
-                </span>
-                {w.name}
-              </span>
-              <div className="actions">
-                <button
-                  title={t('Open it as a new tab')}
-                  onClick={(e) => {
+              {t(
+                'A tab kept by name, panes and all. Split a tab into the hosts you want, then press + here or right-click its tab.'
+              )}
+            </div>
+          )}
+
+          {visible.map((w) => {
+            const hosts = hostsOf(w.root)
+            const missing = hosts.filter((id) => !findHost(state, id)).length
+            return (
+              <div key={w.id}>
+                <div
+                  className={`tree-item${menu?.forId === w.id ? ' menu-open' : ''}`}
+                  style={{ paddingLeft: INDENT }}
+                  title={t('Double-click to open it as a new tab, laid out as it was kept')}
+                  onDoubleClick={() => openMultiWindow(w.id)}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
                     e.stopPropagation()
-                    openMultiWindow(w.id)
+                    setMenu({ x: e.clientX, y: e.clientY, items: menuFor(w), forId: w.id })
                   }}
                 >
-                  {t('Open')}
-                </button>
+                  <span className="name">
+                    <span className="session-kind" aria-hidden="true">
+                      <SplitRightIcon />
+                    </span>
+                    {w.name}
+                  </span>
+                  <div className="actions">
+                    <button
+                      title={t('Open it as a new tab')}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openMultiWindow(w.id)
+                      }}
+                    >
+                      {t('Open')}
+                    </button>
+                  </div>
+                </div>
+                <div className="inventory-meta" style={{ paddingLeft: 34 }}>
+                  {t('Panes: {count}', { count: hosts.length })}
+                  {missing > 0 ? t(' · {count} missing', { count: missing }) : ''}
+                </div>
               </div>
-            </div>
-            <div className="inventory-meta" style={{ paddingLeft: 34 }}>
-              {t('Panes: {count}', { count: hosts.length })}
-              {missing > 0 ? t(' · {count} missing', { count: missing }) : ''}
-            </div>
-          </div>
-        )
-      })}
+            )
+          })}
+        </>
+      )}
 
       {menu && (
         <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />

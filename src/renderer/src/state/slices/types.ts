@@ -288,6 +288,8 @@ export interface WorkspaceSlice {
    * and reconnected if it had dropped. A terminal goes the same way while
    * `reuseOpenHost` is on, unless an account was chosen for it. `again` asks
    * for a new tab whatever the setting — a desktop still never gets one.
+   * `doubleClick` says the host was double-clicked, which with
+   * `reconnectOnDoubleClick` on starts a connected pane over.
    * A new tab for a host opened from a collection goes into that collection's
    * workspace — a new one if none is open — unless `again` duplicates a pane
    * where it stands. Any other host stays out of a collection's workspace: it
@@ -299,13 +301,18 @@ export interface WorkspaceSlice {
     target: PaneTarget,
     color?: string,
     viaCollectionId?: string,
-    again?: boolean
+    again?: boolean,
+    doubleClick?: boolean
   ) => string
   /**
    * Bumped for one pane: connect it if it is not connected. See `openHost`;
-   * a pane that is connecting or connected ignores it.
+   * a pane that is connecting ignores it, and so does a connected one unless
+   * `reconnect` says to start it over — a double-click with
+   * `reconnectOnDoubleClick` on.
    */
-  wakeRequest: { paneId: string; n: number } | null
+  wakeRequest: { paneId: string; n: number; reconnect?: boolean } | null
+  /** Makes a `wakeRequest` for one pane; `reconnect` starts a connected one over. */
+  wakePane: (paneId: string, reconnect: boolean) => void
   /**
    * A host's own menu, asked for from somewhere that has none — a tab. The
    * tree that holds the host shows it and clears this. See `Workspace`.

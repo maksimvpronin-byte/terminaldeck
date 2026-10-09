@@ -24,7 +24,8 @@ sequential and retain the conflict dialog.
   an **Inventory** section of the session tree, below the hand-made sessions and beside the
   collections and multi-windows. It was a tab of its own until 0.27; the hosts, their local
   settings and passwords were never part of the tab and stayed where they were. **+** in its
-  heading adds a repository and ⟳ syncs them all; removing one asks first
+  heading adds a repository and ⟳ syncs them all; removing one asks first. **Open in browser**
+  in a repository's menu shows it on its web page, the same way as for a git folder below
 - Cloned read-only through the **system git**, so existing SSH keys, agents, credential helpers
   and proxies apply as they do in a terminal; nothing is ever pushed
 - Ansible groups, `children`, inline `vars`, `group_vars/` and `host_vars/` become groups and
@@ -70,6 +71,10 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
 - **Nothing happens on its own.** What the last sync took is written to disk, so the folder shows
   its hosts on the first frame after the window opens, without going near the network. Going to
   git is **Sync with git…** on the folder, or the ⟳ button on its row
+- **Open in browser** on the folder shows its inventory on the repository's web page: the file or
+  directory it reads, on its branch, or the repository itself when it reads several paths. The
+  page is worked out from the clone address — GitHub and Bitbucket by name, any other server as
+  GitLab — and a login or token written into the address is left out of it
 - Every sync **asks which groups to take**, before anything on disk changes: the previous choice
   is ticked, groups that appeared since last time are ticked and marked *new*, and a subgroup you
   untick stays unticked rather than being offered again as a discovery. Ticking a group takes its
@@ -107,6 +112,10 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   with everything inside it, so typing the name of an environment brings the environment up
 - **Expand all / Collapse all** beside Quick connect opens or closes every folder at once, the
   collections below them included
+- The **Inventory, Collections and Multi-windows sections fold away whole** from their heading,
+  and **change places by dragging a heading** over another section — a line shows whether it
+  lands above or below. The order and the folded sections are kept on this machine. A filter
+  unfolds them while it is typed; Expand all opens them as well, Collapse all only the folders
 
 ### Credentials
 
@@ -205,8 +214,13 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   a double-click on a host that is **already open** goes to its tab — the one in front, else the
   first in this workspace, else the first anywhere — and reconnects it if it has dropped, instead
   of opening another. **Open another tab** in the host's menu makes a second one, and Settings →
-  Tree and tabs turns the whole of this off. A **desktop** is never opened twice for one
-  account, whatever that setting says: Windows keeps one session per user, and a second tab took
+  Tree and tabs turns the whole of this off. **Double-click on a connected host reconnects it**,
+  on the same page and off by default, starts a live pane over from a double-click in the tree,
+  the inventory or a collection — a terminal with a new shell, a desktop signed in again to the
+  same Windows session; the menu's Connect and the palette still only go to the tab. Beside it,
+  **Double-click on a tab reconnects it** does the same for the pane in front in a tab, whether
+  it is connected or has dropped. A **desktop** is never opened twice for one account, whatever
+  that setting says: Windows keeps one session per user, and a second tab took
   the session from the first and left it showing an error. Another account (Connect as…) is
   another session and opens beside it. A desktop opened by double-click takes the keyboard as a
   new terminal does — and deleting a host or a group lives in the right-click menu behind a

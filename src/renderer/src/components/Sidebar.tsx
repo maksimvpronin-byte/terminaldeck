@@ -41,6 +41,8 @@ import MultiConnectDialog from './MultiConnectDialog'
 import ContextMenu, { type MenuItem } from './ContextMenu'
 import { collectionItems, connectMenuItems } from './connectMenu'
 import { morphOpen } from './hostMorph'
+import { useTreeSections, type SectionId } from './TreeSection'
+import { repoWebUrl } from './repoWebUrl'
 import { paneTitle } from '../state/connect'
 import { findHost, overridesByNode } from '../state/hosts'
 import { keyHint } from '../state/keys'
@@ -255,7 +257,12 @@ export default function Sidebar({
    * too, which the panel that draws them is told through `fold`.
    */
   const [fold, setFold] = useState<{ open: boolean; at: number } | null>(null)
+  /** The inventory, collections and multi-windows: their order, and which are folded. */
+  const sections = useTreeSections(query.trim() !== '', settings.expandOnArrowOnly)
   function foldAll(open: boolean): void {
+    // Expand all leaves nothing hidden, a folded section included. Collapse all
+    // stops at the folders: it is there to tidy them, not to hide the sections.
+    if (open) sections.unfoldAll()
     const next = new Set(open ? [] : groups.map((g) => g.id))
     localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...next]))
     setCollapsed(next)
@@ -328,7 +335,8 @@ export default function Sidebar({
     session: SessionProfile,
     credentialId?: string,
     admin?: boolean,
-    again = false
+    again = false,
+    doubleClick = false
   ): void {
     const credential = credentials.find((c) => c.id === credentialId)
     const title = paneTitle(session.name, credential)
@@ -338,7 +346,8 @@ export default function Sidebar({
       { kind: 'session', sessionId: session.id, credentialId, admin },
       colourFor(session),
       undefined,
-      again
+      again,
+      doubleClick
     )
   }
 
@@ -859,6 +868,7 @@ export default function Sidebar({
   function groupMenu(groupId: string): MenuItem[] {
     const group = groups.find((g) => g.id === groupId)
     const hosts = hostsUnder(groupId)
+    const webUrl = group?.git ? repoWebUrl(group.git) : undefined
     return [
       {
         label: t('Open all in a new workspace ({count})', { count: hosts.length }),
@@ -882,6 +892,14 @@ export default function Sidebar({
               separated: true,
               disabled: gitSyncing.includes(groupId),
               onSelect: () => startSync(group)
+            },
+            {
+              label: t('Open in browser'),
+              disabled: !webUrl,
+              // The main process hands an http(s) link to the system browser.
+              onSelect: () => {
+                if (webUrl) window.open(webUrl, '_blank')
+              }
             }
           ]
         : []),
@@ -988,7 +1006,7 @@ export default function Sidebar({
         onDoubleClick={(e) => {
           const row = e.currentTarget
           returnTo(clickedFrom.current)
-          connect(s)
+          connect(s, undefined, false, false, true)
           morphOpen(row, currentTab(useStore.getState())?.id, { title: s.name, colour })
         }}
         title={
@@ -1032,6 +1050,14 @@ export default function Sidebar({
          * host from a repository; deleting was only ever there. */}
       </div>
     )
+  }
+
+  function renderSection(id: SectionId): JSX.Element {
+    const section = sections.controls(id)
+    if (id === 'inventory') return <InventoryTree query={query} fold={fold} section={section} />
+    if (id === 'collections')
+      return <CollectionsPanel query={query} fold={fold} section={section} />
+    return <MultiWindowsPanel query={query} section={section} />
   }
 
   function renderGroups(parentId: string | null, depth: number): JSX.Element[] {
@@ -1273,9 +1299,11 @@ export default function Sidebar({
 
           {/* Custom sets live in the same tree as the groups, below them: they are
             another way of grouping the very same hosts, not a separate place. */}
-          <InventoryTree query={query} fold={fold} />
-          <CollectionsPanel query={query} fold={fold} />
-          <MultiWindowsPanel query={query} />
+          {sections.order.map((id) => (
+            <div key={id} {...sections.frame(id)}>
+              {renderSection(id)}
+            </div>
+          ))}
         </div>
       </>
 

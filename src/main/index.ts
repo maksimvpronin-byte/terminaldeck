@@ -235,10 +235,11 @@ function createWindow(): void {
   /**
    * Nothing opens a window; a link is handed to the browser, and only a link.
    *
-   * Nothing in this interface asks for one today — there are no anchors in the
-   * renderer and the terminal does not turn output into links — so this is a
-   * guard against a path that does not exist yet rather than one that does.
-   * It is here because of what the missing check would cost if one appeared:
+   * The one thing that asks for it is Open in browser on a git folder or an
+   * inventory repository, which hands over the repository's web page; there
+   * are no anchors in the renderer and the terminal does not turn output into
+   * links. The check is
+   * here because of what its absence would cost if something else appeared:
    * `openExternal` hands a URL to the operating system, and `file://` opens a
    * file with whatever is registered for it while `smb://` on Windows will
    * offer the user's credentials to whoever is listening. A hostile host that

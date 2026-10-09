@@ -37,7 +37,8 @@ export default function GraphicalHost({
   paneVisible,
   active,
   restored,
-  wake = 0
+  wake = 0,
+  wakeReconnect = false
 }: {
   protocol: Protocol
   host?: string
@@ -96,6 +97,12 @@ export default function GraphicalHost({
    * be started connects, as its own button would.
    */
   wake?: number
+  /**
+   * The wake asks a connected desktop to start over as well: a new attempt,
+   * which ends this one and signs in again — Windows hands the same session
+   * back, so what was open on it is still there.
+   */
+  wakeReconnect?: boolean
 }): JSX.Element {
   const [phase, setPhase] = useState<Phase>({ at: 'loading' })
   const focusRequest = useStore((s) => s.focusRequest)
@@ -305,6 +312,7 @@ export default function GraphicalHost({
     wakeSeen.current = wake
     if (phase.at === 'failed' || phase.at === 'closed') tryAgain()
     else if (phase.at === 'choosing' && lookSettled) connectFresh()
+    else if (phase.at === 'connected' && wakeReconnect) tryAgain()
     // Read at the moment of the request, which is what these are.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wake])

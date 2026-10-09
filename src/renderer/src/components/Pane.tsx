@@ -48,6 +48,10 @@ function Pane({
   const mergeTabInto = useStore((s) => s.mergeTabInto)
   /** The host was opened again and this pane was chosen for it: see `openHost`. */
   const wake = useStore((s) => (s.wakeRequest?.paneId === node.id ? s.wakeRequest.n : 0))
+  /** That request asks a connected pane to start over as well. */
+  const wakeReconnect = useStore(
+    (s) => s.wakeRequest?.paneId === node.id && s.wakeRequest.reconnect === true
+  )
 
   // Read from the profile rather than copied onto the leaf: changing a host's
   // protocol should take effect in its open panes, not only in the next one.
@@ -324,6 +328,7 @@ function Pane({
             onOutput={() => markActivity(tabId)}
             onConnected={(connectionId) => setPaneConnection(tabId, node.id, connectionId)}
             wake={wake}
+            wakeReconnect={wakeReconnect}
             resolveWriteTargets={(own) => {
               const state = useStore.getState()
               // A terminal excluded from broadcast keeps its own input to itself.
@@ -352,6 +357,7 @@ function Pane({
             active={isActive}
             restored={node.restored}
             wake={wake}
+            wakeReconnect={wakeReconnect}
           />
         )}
         {traits.files && node.sftpOpen && (
