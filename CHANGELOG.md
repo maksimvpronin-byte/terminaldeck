@@ -6,6 +6,15 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.28.1
+
+### Fixed
+
+- **Open in browser finds a path typed with Windows backslashes.** A git
+  folder reading `inventory\k8s-test\inventory.yml` opened a page where
+  GitLab said the file did not exist: the backslashes went into the link as
+  they were. They become forward slashes now.
+
 ## 0.28.0
 
 ### Added
