@@ -2708,6 +2708,23 @@ input.switch:focus-visible {
 }
 /* Help is laid out as Settings is — see `.settings-card` — with a search box
    over the list and the version and release notes at its foot. */
+/* Its list is as wide as its longest subject, not the 196 pixels Settings
+   needs: in Russian "Сохранённые учётные записи" ran past the edge and the
+   list scrolled sideways. Up to a limit; the title wraps to that width rather
+   than setting it. */
+.help-card .settings-nav {
+  width: auto;
+  min-width: 196px;
+  max-width: 240px;
+  overflow-x: hidden;
+}
+.help-card .settings-nav h2 {
+  contain: inline-size;
+}
+/* One subject longer than that takes a second line rather than being cut. */
+.help-card .settings-nav button {
+  white-space: normal;
+}
 .help-search {
   margin: 0 2px;
 }

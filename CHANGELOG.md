@@ -14,6 +14,10 @@ the other produces a version nobody can install, which is how 0.1.10 through
   folder reading `inventory\k8s-test\inventory.yml` opened a page where
   GitLab said the file did not exist: the backslashes went into the link as
   they were. They become forward slashes now.
+- **Help's list of subjects is as wide as its longest one.** In Russian,
+  "Сохранённые учётные записи" and a few others ran past its edge and the
+  list scrolled sideways. A subject too long for a sensible width takes a
+  second line.
 
 ## 0.28.0
 
