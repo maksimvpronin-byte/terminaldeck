@@ -79,11 +79,16 @@ function finish(
 }
 
 function cleanPath(path: string): string {
-  return path
-    .trim()
-    .replace(/^(\.\/)+/, '')
-    .replace(/^\/+/, '')
-    .replace(/\/+$/, '')
+  return (
+    path
+      .trim()
+      // Typed the Windows way, which the sync there reads as written; a forge
+      // only knows the forward slash.
+      .replace(/\\/g, '/')
+      .replace(/^(\.\/)+/, '')
+      .replace(/^\/+/, '')
+      .replace(/\/+$/, '')
+  )
 }
 
 function segments(path: string): string {

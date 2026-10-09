@@ -54,6 +54,18 @@ describe('repoWebUrl', () => {
     )
   })
 
+  it('reads a path typed with Windows backslashes', () => {
+    expect(
+      url(
+        'https://gitlabsvr.corp.ru/gitlab/osa/iac.git',
+        ['inventory\\k8s-test\\K8S1\\inventory.yml'],
+        'master'
+      )
+    ).toBe(
+      'https://gitlabsvr.corp.ru/gitlab/osa/iac/-/tree/master/inventory/k8s-test/K8S1/inventory.yml'
+    )
+  })
+
   it('encodes what a URL cannot carry as is', () => {
     expect(url('git@gitlab.corp.ru:a/b.git', ['my hosts/#1.yml'], 'main')).toBe(
       'https://gitlab.corp.ru/a/b/-/tree/main/my%20hosts/%231.yml'
