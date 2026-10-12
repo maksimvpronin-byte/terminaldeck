@@ -5,7 +5,7 @@ import { existsSync } from 'fs'
 import { join } from 'path'
 import { ADHOC_MARKER, canReplaceItself } from '../shared/adhocSigned'
 import { IPC } from '../shared/ipc-channels'
-import { stateForRelease } from '../shared/updateState'
+import { overtaken, stateForRelease } from '../shared/updateState'
 import type { UpdateState } from '../shared/types'
 
 /**
@@ -66,6 +66,11 @@ export function registerUpdater(win: BrowserWindow): void {
     // here anyway would download a hundred megabytes to fail at the last step.
     if (!selfUpdating()) throw new Error('This build cannot install an update over itself')
     publish({ status: 'downloading', percent: 0 })
+    // Asked again first, because what is downloaded is whatever the last check
+    // found. A banner left up for an afternoon was found hours ago, and fetching
+    // that release after two more had followed it meant a second update straight
+    // after the restart.
+    await autoUpdater.checkForUpdates()
     await autoUpdater.downloadUpdate()
   })
 
@@ -105,6 +110,16 @@ export function registerUpdater(win: BrowserWindow): void {
   autoUpdater.autoInstallOnAppQuit = true
 
   autoUpdater.on('update-available', (info) => {
+    // A newer release than the one downloaded and waiting: fetched straight
+    // away, since installing was already agreed to. The wait is shown as a
+    // download, because it is one: the installer waiting is removed from the
+    // cache as the newer one starts, and an Install button left up meanwhile
+    // would quit the app into an installer that is no longer there.
+    if (overtaken(state, info.version) && selfUpdating()) {
+      publish({ status: 'downloading', percent: 0 })
+      autoUpdater.downloadUpdate().catch(failed)
+      return
+    }
     // A build that cannot replace itself still says a version is out; it just
     // offers the downloads rather than an install that cannot finish. And a
     // release already being fetched, or fetched, stays where it has got to.
@@ -136,12 +151,15 @@ export function registerUpdater(win: BrowserWindow): void {
 
   ask()
   /*
-   * And again, on the hour, unless there is already an answer to act on.
-   * Re-announcing an update somebody has seen and left for later is noise, and
-   * asking while one is downloading would interrupt it.
+   * And again, on the hour, whatever the banner already says, except while a
+   * download is under way. It used to stop asking once there was an answer, so
+   * a banner left for later went on offering the release it was first shown
+   * with while newer ones came out, and an update downloaded and left for a
+   * restart installed a version that was already old. Asking again costs
+   * nothing visible: the same answer changes nothing (see `stateForRelease`).
    */
   const timer = setInterval(() => {
-    if (state.status === 'idle' || state.status === 'error') ask()
+    if (state.status !== 'downloading') ask()
   }, RECHECK_MS)
   timer.unref?.()
 }
