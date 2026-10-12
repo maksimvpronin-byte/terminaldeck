@@ -117,17 +117,21 @@ export function nextOpenPaneOf(
  *
  * `account` narrows it to panes signed in as that account (undefined being the
  * host's own login) — for a desktop, where another account is another Windows
- * session and may stand beside this one.
+ * session and may stand beside this one. Console mode narrows it the same way:
+ * the administrative session is a different session too, and bringing forward
+ * the ordinary pane for it would reconnect that pane without `/admin`.
  */
 export function paneToReuse(
   state: HasWorkspaces,
   sessionId: string,
-  account?: { credentialId: string | undefined }
+  account?: { credentialId: string | undefined; admin?: boolean }
 ): { tabId: string; paneId: string } | undefined {
   const fits = (leaf: ReturnType<typeof collectLeaves>[number]): boolean =>
     leaf.target.kind === 'session' &&
     leaf.target.sessionId === sessionId &&
-    (!account || leaf.target.credentialId === account.credentialId)
+    (!account ||
+      (leaf.target.credentialId === account.credentialId &&
+        (leaf.target.admin === true) === (account.admin === true)))
   const current = activeTab(state)
   const front = current && collectLeaves(current.root).find((l) => l.id === current.activePaneId)
   if (current && front && fits(front)) return { tabId: current.id, paneId: front.id }

@@ -287,7 +287,7 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
         paneToReuse(
           s,
           target.sessionId,
-          desktop ? { credentialId: target.credentialId } : undefined
+          desktop ? { credentialId: target.credentialId, admin: target.admin } : undefined
         )
       if (place) {
         get().setActiveTab(place.tabId)

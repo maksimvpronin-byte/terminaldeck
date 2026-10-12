@@ -310,6 +310,18 @@ describe('openHost: an open host is brought forward rather than opened again', (
     expect(tabCount()).toBe(2)
   })
 
+  it('opens console mode beside an ordinary desktop rather than bringing that one forward', () => {
+    seed()
+    const ordinary = open('dc')
+    // The ordinary pane woken here reconnected without /admin, and a Session
+    // Host out of licences refused it.
+    const adminPane = open('dc', { admin: true })
+    expect(adminPane).not.toBe(ordinary)
+    expect(open('dc', { admin: true })).toBe(adminPane)
+    expect(open('dc')).toBe(ordinary)
+    expect(tabCount()).toBe(2)
+  })
+
   it('finds the host in another workspace and brings that workspace forward', () => {
     seed()
     const first = open('web')
