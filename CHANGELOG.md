@@ -6,6 +6,23 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.28.2
+
+### Fixed
+
+- **Connect in console mode works with the host already open.** It brought
+  forward the ordinary desktop and reconnected it without `/admin`, so a
+  Session Host out of licences refused it with a licensing error. The
+  console session now opens in a tab of its own, beside the ordinary one.
+- **A desktop's tab closes when Windows Server 2022 restarts.** Server 2022
+  ends the session as "disconnected by an administrative tool" rather than
+  as a logoff, and the tab stayed open saying the session had ended.
+- **Updating installs the newest release.** A banner left for later kept
+  offering the version it first found, so with releases out since, the
+  restarted app asked to update again straight away. The banner now moves
+  to the newest release, Download fetches the newest, and an update already
+  downloaded is replaced by a newer one without asking again.
+
 ## 0.28.1
 
 ### Fixed
