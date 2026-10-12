@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   endedBySignOut,
   ERRINFO_LOGOFF_BY_USER,
+  ERRINFO_RPC_INITIATED_DISCONNECT,
   ERRINFO_RPC_INITIATED_LOGOFF,
   logoffSequence,
   SENT_WAIT,
@@ -70,8 +71,14 @@ describe('a desktop that ended', () => {
     expect(endedBySignOut(ERRINFO_LOGOFF_BY_USER, 0x00020009)).toBe(true)
   })
 
+  // Windows Server 2022 going down for a restart says it was disconnected by an
+  // administrative tool, where older hosts say logged off.
+  it('is gone when the host restarted', () => {
+    expect(endedBySignOut(ERRINFO_RPC_INITIATED_DISCONNECT, 0x00010001)).toBe(true)
+    expect(endedBySignOut(undefined, 0x00010001)).toBe(true)
+  })
+
   it('was not signed out of when it was disconnected, timed out or dropped', () => {
-    expect(endedBySignOut(0x00000001, 0x00010001)).toBe(false) // disconnected by an admin
     expect(endedBySignOut(0x0000000b, 0x0001000b)).toBe(false) // Start, Disconnect
     expect(endedBySignOut(0x00000003, 0x00010003)).toBe(false) // idle timeout
     expect(endedBySignOut(0, 0x00020009)).toBe(false) // the network went

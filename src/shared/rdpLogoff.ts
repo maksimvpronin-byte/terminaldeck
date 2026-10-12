@@ -74,13 +74,26 @@ export function logoffSequence(): LogoffStep[] {
  * client's last error, which carries the same reason in the error-info class —
  * until something else fails on the way down and overwrites it — and is read
  * only when `errinfo` did not arrive, from a client built before it was sent.
+ *
+ * A restart counts too. Older hosts end the session with a logoff when they go
+ * down, but Windows Server 2022 ends it with "disconnected by an administrative
+ * tool", which is also what an administrator's Disconnect in Task Manager sends.
+ * The pane closes for both. Closing it after a restart matters more: a pane left
+ * showing "Session ended" over a session that no longer exists is what this is
+ * here to avoid. After a Disconnect the session is still on the host, and
+ * opening the host again resumes it.
  */
+export const ERRINFO_RPC_INITIATED_DISCONNECT = 0x00000001
 export const ERRINFO_RPC_INITIATED_LOGOFF = 0x00000002
 export const ERRINFO_LOGOFF_BY_USER = 0x0000000c
 /** FreeRDP's error-info class, as `MAKE_FREERDP_ERROR(ERRINFO, …)` shifts it. */
 const ERRINFO_CLASS = 0x00010000
 
-const SIGNED_OUT = new Set([ERRINFO_LOGOFF_BY_USER, ERRINFO_RPC_INITIATED_LOGOFF])
+const SIGNED_OUT = new Set([
+  ERRINFO_LOGOFF_BY_USER,
+  ERRINFO_RPC_INITIATED_LOGOFF,
+  ERRINFO_RPC_INITIATED_DISCONNECT
+])
 
 export function endedBySignOut(errinfo: unknown, code: unknown): boolean {
   if (typeof errinfo === 'number') return SIGNED_OUT.has(errinfo)
