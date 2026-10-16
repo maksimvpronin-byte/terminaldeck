@@ -6,6 +6,32 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.28.3
+
+### Security
+
+- **Electron 43.5.1.** 43.4.1 let a compromised page poison the code cache
+  of the sandboxed preload script (GHSA-qmv3-fv6v-rmhq); 43.5.1 closes it.
+  This is the one change here that reaches the installed app.
+- **Every build and test dependency an audit of 0.28.2 flagged is past its
+  advisory**, and `npm audit` finds nothing:
+  - Vitest 3 → 5, which answers its own path-traversal advisory and drops
+    tinypool and its two prototype-pollution ones;
+  - undici, brace-expansion, fast-uri, source-map-js and
+    http-cache-semantics to their patched releases, inside the ranges already
+    declared;
+  - one esbuild, 0.28.2, for electron-vite as well as Vite. electron-vite's
+    own 0.25.12 was built with Go 1.23.12, and the advisories against that
+    runtime were most of what the scan found. The bundles it builds are byte
+    for byte the same;
+  - global-agent 3 → 4 under electron-builder, which leaves behind sprintf-js,
+    a package with no fixed release.
+
+  The scan's other findings are 7-Zip 16.04 and 20.02 inside
+  `electron-winstaller`, which electron-builder always installs and which
+  ships the same binaries in its newest release. It is used only to build
+  Squirrel installers, and this app builds NSIS and portable ones.
+
 ## 0.28.2
 
 ### Fixed
