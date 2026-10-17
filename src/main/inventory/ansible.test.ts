@@ -714,6 +714,42 @@ all:
     ).toBe('deploy')
   })
 
+  /* The account chosen for db in its local settings is part of the login h takes from db. */
+  it('takes the account of the group its login is carried from', () => {
+    const { groups, hosts } = parseAnsibleInventory(
+      parse(`
+all:
+  children:
+    db:
+      vars: { ansible_user: deploy }
+      hosts: { h: {} }
+    web:
+      hosts: { h: {} }
+`),
+      SRC
+    )
+    const db = groupId(SRC, 'all/db')
+    const local = groups.map((g) =>
+      applyOverride(g, g.id === db ? { nodeId: db, credentialId: 'admin' } : undefined)
+    )
+    const credentials = [
+      {
+        id: 'admin',
+        name: 'Admin',
+        username: 'admin',
+        authMethod: 'password' as const,
+        secretRef: 's1',
+        createdAt: 0,
+        updatedAt: 0
+      }
+    ]
+    const h = hosts[0]
+    expect(resolveAuth(h, h.groupId ?? null, local, { credentials })).toMatchObject({
+      username: 'admin',
+      secretRef: 's1'
+    })
+  })
+
   it('still lets the host’s own settings win', () => {
     const doc = `
 all:

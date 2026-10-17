@@ -99,7 +99,15 @@ function carriedLevel(
   const level: AuthDefaults & RdpLoginDefaults = { ...carriedAuth }
   for (const [key, groupId] of Object.entries(carriedFrom) as [keyof AuthDefaults, string][]) {
     const group = groups.find((g) => g.id === groupId)
-    if (group && isSet(group[key])) Object.assign(level, { [key]: group[key] })
+    if (!group) continue
+    if (isSet(group[key])) Object.assign(level, { [key]: group[key] })
+    // A login comes with the account and the password saved beside it: db's
+    // login without db's account signed in as deploy with nothing saved.
+    if (key === 'username') {
+      for (const field of ['credentialId', 'secretRef'] as const) {
+        if (isSet(group[field])) Object.assign(level, { [field]: group[field] })
+      }
+    }
   }
   return level
 }
