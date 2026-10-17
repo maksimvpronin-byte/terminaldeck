@@ -4,6 +4,7 @@ import { tmpdir } from 'os'
 import { dirname, join } from 'path'
 import { readInventory } from './readInventory'
 import { reallyInsideCheckout } from './checkout'
+import { resolveAuth } from '../../shared/authResolution'
 
 describe('inventory worker parsing', () => {
   it('keeps first host values, unions membership, reads vars and attaches roots', () => {
@@ -345,6 +346,24 @@ describe('a group written down in more than one place', () => {
     )
     expect(loginOf(result, 'web1')).toBe('admin')
     expect(result.groups.find((g) => g.name === 'web')?.port).toBe(2200)
+  })
+
+  /*
+   * Without an all key, all's vars are laid under each top group, and when
+   * the winner of a setting was chosen they counted as z's own: z, read after
+   * a, beat a's deploy with all's root. With an explicit all, a won.
+   */
+  it('lets all’s vars lose to any group that states the setting, all key or not', () => {
+    const result = read(
+      repo({
+        'hosts.yml': 'a:\n  hosts:\n    h: {}\nz:\n  hosts:\n    h: {}\n',
+        'group_vars/all.yml': 'ansible_user: root\n',
+        'group_vars/a.yml': 'ansible_user: deploy\n'
+      }),
+      ['hosts.yml']
+    )
+    const h = result.hosts.find((x) => x.name === 'h')!
+    expect(resolveAuth(h, h.groupId ?? null, result.groups).username).toBe('deploy')
   })
 
   /** One group's own vars and its group_vars, in two spellings: Ansible takes ansible_ssh_*. */

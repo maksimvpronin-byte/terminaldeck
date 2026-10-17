@@ -366,6 +366,21 @@ export function parseAnsibleInventories(
     ...varsToAuth(varsOf(node.name))
   }))
   const groupById = new Map(groups.map((g) => [g.id, g]))
+  /**
+   * What a group says itself, without all's vars laid under it. A top group
+   * of an inventory with no all key carries those, and when the group a
+   * setting comes from was chosen they counted as its own: z, read after a,
+   * beat a's deploy with all's root.
+   */
+  const ownAuth = new Map<string, AuthDefaults>()
+  const authOf = (name: string): AuthDefaults => {
+    let auth = ownAuth.get(name)
+    if (!auth) {
+      auth = varsToAuth(varsOf(name))
+      ownAuth.set(name, auth)
+    }
+    return auth
+  }
   const depthOf = (id: string): number => id.split('/').length
 
   const hosts: SessionProfile[] = []
@@ -439,12 +454,18 @@ export function parseAnsibleInventories(
       onChain.add(g.id)
       g = g.parentId ? groupById.get(g.parentId) : undefined
     }
+    // all first, as the shallowest level, when no all node holds the groups;
+    // the chain's top group already carries what it says.
+    const levels: { id?: string; name: string; auth: AuthDefaults }[] = [
+      ...(inAnsibleOrder.some(underAll) ? [{ name: 'all', auth: authOf('all') }] : []),
+      ...inAnsibleOrder.map((g) => ({ id: g.id, name: g.name, auth: authOf(g.name) }))
+    ]
     const carried: AuthDefaults = {}
     const carriedFrom = new Set<string>()
     for (const key of CONNECTION_KEYS) {
-      const winner = inAnsibleOrder.findLast((g) => isSet(g[key]))
-      if (!winner || onChain.has(winner.id)) continue
-      Object.assign(carried, { [key]: winner[key] })
+      const winner = levels.findLast((level) => isSet(level.auth[key]))
+      if (!winner?.id || onChain.has(winner.id)) continue
+      Object.assign(carried, { [key]: winner.auth[key] })
       carriedFrom.add(winner.name)
     }
     const carriedAuth =
