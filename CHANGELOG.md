@@ -6,6 +6,36 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.28.4
+
+### Security
+
+- **The vault locks on time with the window closed.** On a Mac, closing the
+  window leaves TerminalDeck running, and the idle lock was counted by the
+  window alone — so the vault stayed open for as long as the application
+  did, and a window opened again the next day asked for nothing. With no
+  window, the application now counts the same minutes itself and locks the
+  vault; the window opened afterwards asks for the master password. "Never"
+  still means never.
+- **A download writes only into a file of its own.** A file is fetched
+  under a temporary name beside its destination and moved onto it at the
+  end. That name was predictable, and the transfer wrote through a link left
+  at it, so anyone able to write to the folder could have a download written
+  into a file of their choosing. The name is random now, and the file is
+  created by the download alone, readable only by you, before a byte
+  arrives.
+- **A file downloaded over another keeps its permissions.** Fetching an SSH
+  key or a config that was readable only by you again left it readable by
+  everyone, and a script lost its executable bit. The new copy takes the
+  permissions of the file it replaces; a new file gets the usual ones.
+- **A repository address keeps no password or token.** An inventory or git
+  folder address such as `https://user:TOKEN@…` was kept as typed — in the
+  clear in the data folder, and in a backup exported without credentials.
+  The dialogs now refuse one and ask for the secret to go into git's
+  credential helper, and an export writes every address without it. An
+  address saved before this release keeps working until its dialog is next
+  saved.
+
 ## 0.28.3
 
 ### Security
