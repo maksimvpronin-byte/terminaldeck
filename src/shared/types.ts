@@ -355,6 +355,13 @@ export interface SessionGroup
   name: string
   parentId: string | null
   /**
+   * What `all` says, beneath a top group of an inventory that has no `all` to
+   * hold it. A level of its own just under the group, so that a host in two
+   * groups weighs all as Ansible does — the shallowest of them — rather than
+   * as part of whichever top group was read last.
+   */
+  fromAll?: AuthDefaults
+  /**
    * Worn by the folder in the tree, and by every host inside it that has no
    * colour of its own — in the tree and on the tabs they open. The nearest
    * colour wins: a host's own, then its folder's, then that folder's parent's.
@@ -420,13 +427,11 @@ export interface PortForwardRule {
 
 export interface SessionProfile extends AuthDefaults, AppearanceDefaults, RdpDefaults {
   /**
-   * What groups the host does not inherit from said about logging in: those
-   * Ansible takes a setting from off the host's own chain (see
-   * parseAnsibleInventories), and those a git folder left out (see
-   * `pruneTree`). Read along the chain after the host's own settings and
+   * What groups left out of a git folder said about logging in, for a host
+   * those groups held. Read along the chain after the host's own settings and
    * before its group's, and read as a group is — so a desktop takes its RDP
    * side and never its `ansible_port`, whatever protocol the host is switched
-   * to locally.
+   * to locally. See `pruneTree`.
    */
   carriedAuth?: AuthDefaults &
     RdpLoginDefaults & {
@@ -434,12 +439,15 @@ export interface SessionProfile extends AuthDefaults, AppearanceDefaults, RdpDef
       name?: string
     }
   /**
-   * Which group each carried setting is Ansible's choice from, when that group
-   * is still in the tree. Resolution reads the setting from the group as it is
-   * then, local settings and all, and the copy in carriedAuth only stands in
-   * for a group that is gone. See parseAnsibleInventories.
+   * Every group an inventory puts this host in, and all their parents, in the
+   * order Ansible reads them: shallower first, by name within a level. Set
+   * when they are more than the one chain above `groupId`. Resolution reads
+   * each of them as it stands, local settings and all, and the last to state
+   * a setting wins — as Ansible merges a host's group vars.
    */
-  carriedFrom?: Partial<Record<keyof AuthDefaults, string>>
+  groupOrder?: string[]
+  /** The groups that name the host, which the walk up to `groupOrder` starts from. */
+  memberOf?: string[]
   id: string
   name: string
   /**

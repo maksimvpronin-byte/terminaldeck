@@ -1,6 +1,5 @@
 import { asProtocol, type Protocol } from '../../shared/protocols'
 import type { AuthDefaults, SessionGroup, SessionProfile } from '../../shared/types'
-import { isSet } from '../../shared/overrides'
 
 export interface ParsedInventory {
   groups: SessionGroup[]
@@ -88,9 +87,6 @@ function inventoryPort(value: unknown): number | undefined {
 function spelled(vars: AnsibleVars, plain: string, ssh: string): unknown {
   return vars[ssh] !== undefined && vars[ssh] !== null ? vars[ssh] : vars[plain]
 }
-
-/** Every field `varsToAuth` can set, which is what a group can hand a host. */
-const CONNECTION_KEYS = ['username', 'port', 'privateKeyPath', 'authMethod'] as const
 
 /** Maps the Ansible connection vars we understand onto our own auth fields. */
 export function varsToAuth(vars: AnsibleVars): AuthDefaults {
@@ -354,31 +350,19 @@ export function parseAnsibleInventories(
     node.parentId === null && node.name !== 'all'
 
   /*
-   * Each level read on its own, then laid over the one beneath, as a group
-   * nested under an explicit `all` is. Merged as raw vars first, all's
-   * `ansible_user` beat the group's own `ansible_ssh_user`.
+   * Each group by what it says itself, and all's word beneath a top group
+   * that no all node holds, as a level of its own: merged as raw vars, all's
+   * `ansible_user` beat the group's own `ansible_ssh_user`, and merged into
+   * the group, all's root counted as z's and beat a's deploy for a host in
+   * both. See SessionGroup.fromAll.
    */
+  const allAuth = varsToAuth(varsOf('all'))
   const groups: SessionGroup[] = [...nodes.values()].map((node) => ({
     ...node,
-    ...(underAll(node) ? varsToAuth(varsOf('all')) : {}),
-    ...varsToAuth(varsOf(node.name))
+    ...varsToAuth(varsOf(node.name)),
+    ...(underAll(node) && Object.keys(allAuth).length > 0 ? { fromAll: allAuth } : {})
   }))
   const groupById = new Map(groups.map((g) => [g.id, g]))
-  /**
-   * What a group says itself, without all's vars laid under it. A top group
-   * of an inventory with no all key carries those, and when the group a
-   * setting comes from was chosen they counted as its own: z, read after a,
-   * beat a's deploy with all's root.
-   */
-  const ownAuth = new Map<string, AuthDefaults>()
-  const authOf = (name: string): AuthDefaults => {
-    let auth = ownAuth.get(name)
-    if (!auth) {
-      auth = varsToAuth(varsOf(name))
-      ownAuth.set(name, auth)
-    }
-    return auth
-  }
   /**
    * A group's depth as Ansible counts it, from all down. Every group is
    * below all whether a file says so or not, and a top group of a file
@@ -455,38 +439,18 @@ export function parseAnsibleInventories(
     const protocol = protocolFromVars(hostVars) ?? protocolFromVars(fromGroups)
 
     /*
-     * The host inherits along one chain, its primary group's, and Ansible reads
-     * every group the host is in and all of their parents. With web under both
-     * prod and stage, the chain through stage never saw prod's deploy:2222 and
-     * the host connected as nobody on 22. So where the group Ansible would take
-     * a setting from lies off that chain, the setting is carried on the host,
-     * a level read just above its groups and as a group is read. A setting the
-     * chain itself wins is left to the chain, so editing that group still
-     * reaches the host.
+     * The host hangs off one group, and Ansible reads every group the host is
+     * in and all of their parents. With web under both prod and stage, the
+     * chain through stage never saw prod's deploy:2222, and the host connected
+     * as nobody on 22. So a host whose groups are more than that one chain
+     * keeps them all, in Ansible's order, and resolution reads them in it.
      */
     const onChain = new Set<string>()
     for (let g = groupById.get(primary); g && !onChain.has(g.id);) {
       onChain.add(g.id)
       g = g.parentId ? groupById.get(g.parentId) : undefined
     }
-    // all first, as the shallowest level, when no all node holds the groups;
-    // the chain's top group already carries what it says.
-    const levels: { id?: string; name: string; auth: AuthDefaults }[] = [
-      ...(inAnsibleOrder.some(underAll) ? [{ name: 'all', auth: authOf('all') }] : []),
-      ...inAnsibleOrder.map((g) => ({ id: g.id, name: g.name, auth: authOf(g.name) }))
-    ]
-    const carried: AuthDefaults = {}
-    const carriedFrom: Partial<Record<keyof AuthDefaults, string>> = {}
-    const carriedNames = new Set<string>()
-    for (const key of CONNECTION_KEYS) {
-      const winner = levels.findLast((level) => isSet(level.auth[key]))
-      if (!winner?.id || onChain.has(winner.id)) continue
-      Object.assign(carried, { [key]: winner.auth[key] })
-      carriedFrom[key] = winner.id
-      carriedNames.add(winner.name)
-    }
-    const carriedAuth =
-      carriedNames.size > 0 ? { ...carried, name: [...carriedNames].join(', ') } : undefined
+    const spread = inAnsibleOrder.some((g) => !onChain.has(g.id))
 
     hosts.push({
       id: key,
@@ -500,7 +464,7 @@ export function parseAnsibleInventories(
       createdAt: now,
       updatedAt: now,
       ...portForProtocol(varsToAuth(hostVars), protocol, { ...fromGroups, ...hostVars }),
-      ...(carriedAuth ? { carriedAuth, carriedFrom } : {})
+      ...(spread ? { groupOrder: inAnsibleOrder.map((g) => g.id), memberOf: ordered } : {})
     })
     memberships[key] = ordered
   }

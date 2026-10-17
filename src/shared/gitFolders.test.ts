@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { resolveAuth } from './authResolution'
 import {
   descendantPaths,
   gitFolderLayout,
@@ -205,6 +206,36 @@ describe('pruneTree with the hosts of child groups', () => {
     const pruned = pruneTree(FOLDER, referenced(), ['all/cluster'], true)
     expect(pruned.sessions.map((s) => s.name)).toEqual(['cp1', 'w1'])
     expect(pruned.sessions.every((s) => s.groupId === gitGroupId(FOLDER, 'all/cluster'))).toBe(true)
+  })
+
+  /*
+   * h is in web and in api, under prod and under stage; with only the parents
+   * ticked it arrives through both. Resolution walks up from the groups that
+   * hold a host, and those it named were gone: prod's login never reached it.
+   */
+  it('walks up from the groups that hold a host now', () => {
+    const id = (path: string) => gitGroupId(FOLDER, path)
+    const full: GitFolderTree = {
+      groupId: FOLDER,
+      groups: [
+        group('all', FOLDER),
+        { ...group('all/prod', id('all')), username: 'deploy' },
+        group('all/stage', id('all')),
+        group('all/prod/web', id('all/prod')),
+        group('all/stage/api', id('all/stage'))
+      ],
+      sessions: [
+        {
+          ...host('h', 'all/prod/web'),
+          groupOrder: ['all', 'all/prod', 'all/stage', 'all/stage/api', 'all/prod/web'].map(id),
+          memberOf: [id('all/stage/api'), id('all/prod/web')]
+        }
+      ],
+      memberships: { [gitHostId(FOLDER, 'h')]: [id('all/stage/api'), id('all/prod/web')] }
+    }
+    const pruned = pruneTree(FOLDER, full, ['all', 'all/prod', 'all/stage'], true)
+    const h = pruned.sessions[0]
+    expect(resolveAuth(h, h.groupId ?? null, pruned.groups).username).toBe('deploy')
   })
 
   it('keeps settings from the group a host names, and lists it under both', () => {

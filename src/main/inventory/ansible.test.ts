@@ -617,11 +617,11 @@ all:
 })
 
 /**
- * A host inherits along one chain of groups, and Ansible reads every group
- * the host is in and all their parents. What the chain does not reach is
- * carried on the host where Ansible would take it from elsewhere.
+ * A host hangs off one group, and Ansible reads every group the host is in
+ * and all their parents, the last to state a setting winning. So does
+ * resolution, for a host whose groups are more than one chain.
  */
-describe('settings from a group off the host’s own chain', () => {
+describe('a host in groups beyond one chain', () => {
   function connects(doc: string, name: string): { username?: string; port: number } {
     const { groups, hosts } = parseAnsibleInventory(parse(doc), SRC)
     const host = hosts.find((h) => h.name === name)!
@@ -645,7 +645,7 @@ all:
     expect(connects(doc, 'h')).toEqual({ username: 'deploy', port: 2222 })
   })
 
-  it('carries nothing the chain itself wins', () => {
+  it('takes what the group read last says', () => {
     const doc = `
 all:
   children:
@@ -659,9 +659,7 @@ all:
       children:
         web: {}
 `
-    const { hosts } = parseAnsibleInventory(parse(doc), SRC)
-    // stage is read after prod, and the chain runs through stage.
-    expect(hosts[0].carriedAuth).toBeUndefined()
+    // stage is read after prod.
     expect(connects(doc, 'h').username).toBe('staging')
   })
 
@@ -678,11 +676,8 @@ all:
     expect(connects(doc, 'h').port).toBe(2200)
   })
 
-  /*
-   * Copied when the repository was read, a carried setting went on saying
-   * what db said then: local settings given to db never reached h.
-   */
-  it('reads a carried setting from its group as the group is now', () => {
+  /* Local settings given to db reach h, which takes its login from db. */
+  it('reads each group as it is now, local settings and all', () => {
     const { groups, hosts } = parseAnsibleInventory(
       parse(`
 all:
@@ -704,14 +699,6 @@ all:
       username: 'local',
       port: 2200
     })
-    // A group gone from the tree leaves the copy to speak for it.
-    expect(
-      resolveAuth(
-        h,
-        h.groupId ?? null,
-        local.filter((g) => g.id !== db)
-      ).username
-    ).toBe('deploy')
   })
 
   /* The account chosen for db in its local settings is part of the login h takes from db. */
@@ -750,11 +737,8 @@ all:
     })
   })
 
-  /*
-   * The secret saved for db is the passphrase of db's key. Carried with the
-   * login and without the key, it was sent to the server as a password.
-   */
-  it('carries a group’s saved secret only with the way it signs in', () => {
+  /* db's key, with the passphrase saved for it on db. */
+  it('takes a group’s way in with the secret saved for it', () => {
     const { groups, hosts } = parseAnsibleInventory(
       parse(`
 all:
@@ -784,8 +768,12 @@ all:
       privateKeyPath: '/keys/encrypted',
       secretRef: 'pp'
     })
-    // A secret saved without saying how it is used stays with db's own hosts.
-    expect(withLocal({ secretRef: 'pw' }).secretRef).toBeUndefined()
+    // db's login with the password saved for it on db.
+    expect(withLocal({ secretRef: 'pw' })).toMatchObject({
+      username: 'deploy',
+      authMethod: 'password',
+      secretRef: 'pw'
+    })
   })
 
   /* The way in comes whole from one group, whichever groups the login and the key are from. */
@@ -793,19 +781,17 @@ all:
     const resolveWith = (
       doc: string,
       local: Record<string, Record<string, unknown>>,
-      { protocol, without }: { protocol?: 'ssh' | 'rdp'; without?: string } = {}
+      { protocol }: { protocol?: 'ssh' | 'rdp' } = {}
     ) => {
       const { groups, hosts } = parseAnsibleInventory(parse(doc), SRC)
       const h = hosts[0]
       return resolveAuth(
         h,
         h.groupId ?? null,
-        groups
-          .filter((g) => g.id !== (without && groupId(SRC, `all/${without}`)))
-          .map((g) => {
-            const name = Object.keys(local).find((n) => g.id === groupId(SRC, `all/${n}`))
-            return applyOverride(g, name ? { nodeId: g.id, ...local[name] } : undefined)
-          }),
+        groups.map((g) => {
+          const name = Object.keys(local).find((n) => g.id === groupId(SRC, `all/${n}`))
+          return applyOverride(g, name ? { nodeId: g.id, ...local[name] } : undefined)
+        }),
         { protocol }
       )
     }
@@ -838,25 +824,17 @@ all:
       })
     })
 
-    /* b's way in has no secret saved; z's key passphrase was taken for b's password. */
-    it('takes no secret from the chain for a way in carried from elsewhere', () => {
+    /* z is read after b, and its key comes with the passphrase saved for it. */
+    it('takes the way in of the group read last, with its secret', () => {
       const auth = resolveWith(threeGroups, {
         b: { authMethod: 'password' },
         z: { authMethod: 'privateKey', privateKeyPath: '/keys/z', secretRef: 'pp-z' }
       })
-      expect(auth).toMatchObject({ authMethod: 'password' })
-      expect(auth.secretRef).toBeUndefined()
-    })
-
-    /* With b gone from the tree, the copy of its key stands in, not a's way in. */
-    it('keeps the copy of a way in whose group is gone', () => {
-      const auth = resolveWith(
-        threeGroups,
-        { a: { authMethod: 'password', secretRef: 'pw-a' } },
-        { without: 'b' }
-      )
-      expect(auth).toMatchObject({ authMethod: 'privateKey', privateKeyPath: '/keys/b' })
-      expect(auth.secretRef).toBeUndefined()
+      expect(auth).toMatchObject({
+        authMethod: 'privateKey',
+        privateKeyPath: '/keys/z',
+        secretRef: 'pp-z'
+      })
     })
 
     /* A desktop takes db's RDP side as it takes db's SSH side. */
@@ -901,6 +879,59 @@ all:
         secretRef: 'pp-db'
       })
     })
+  })
+
+  /*
+   * Local settings on web, the group h hangs off, used to lose to what was
+   * carried from db. web is read after db, so they win, as web's own vars would.
+   */
+  it('lets local settings on a group read later win', () => {
+    const { groups, hosts } = parseAnsibleInventory(
+      parse(`
+all:
+  children:
+    db:
+      vars: { ansible_user: deploy, ansible_port: 2200 }
+      hosts: { h: {} }
+    web:
+      hosts: { h: {} }
+`),
+      SRC
+    )
+    const web = groupId(SRC, 'all/web')
+    const local = groups.map((g) =>
+      applyOverride(g, g.id === web ? { nodeId: web, username: 'local', port: 2222 } : undefined)
+    )
+    const h = hosts[0]
+    expect(resolveAuth(h, h.groupId ?? null, local)).toMatchObject({
+      username: 'local',
+      port: 2222
+    })
+  })
+
+  /* A group that opts out of inheriting ends the walk up through it, as on one chain. */
+  it('stops at a group that opts out of inheriting', () => {
+    const { groups, hosts } = parseAnsibleInventory(
+      parse(`
+all:
+  vars: { ansible_user: root }
+  children:
+    prod:
+      vars: { ansible_port: 2222 }
+      children:
+        web:
+          hosts: { h: {} }
+    stage:
+      children:
+        web: {}
+`),
+      SRC
+    )
+    const local = groups.map((g) =>
+      applyOverride(g, g.name === 'web' ? { nodeId: g.id, inheritAuth: false } : undefined)
+    )
+    const h = hosts[0]
+    expect(resolveAuth(h, h.groupId ?? null, local)).toMatchObject({ username: '', port: 22 })
   })
 
   it('still lets the host’s own settings win', () => {

@@ -198,8 +198,10 @@ export function pruneTree(
       : []
     if (claims.length === 0 && through.length === 0) continue
     const primary = claims.length > 0 ? claims[claims.length - 1] : through[through.length - 1].id
-    sessions.push({ ...host, groupId: primary })
-    memberships[host.id] = [...claims, ...through.map((g) => g.id)]
+    // The groups that still hold the host, which resolution walks up from.
+    const held = [...claims, ...through.map((g) => g.id)]
+    sessions.push({ ...host, groupId: primary, ...(host.memberOf ? { memberOf: held } : {}) })
+    memberships[host.id] = held
   }
 
   return { groupId: folderId, groups, sessions, memberships }

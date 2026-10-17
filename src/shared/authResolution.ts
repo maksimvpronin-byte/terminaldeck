@@ -64,6 +64,10 @@ function asRdpLevel(group: AuthDefaults & RdpLoginDefaults): AuthDefaults {
  * The chain a value is looked up along: the item itself, then its group, then
  * that group's parent, and so on. Nearest definition wins.
  *
+ * A host an inventory puts in groups beyond that one chain reads them all,
+ * latest in Ansible's order first; see `levelsOf`. And a top group that no
+ * `all` holds has all's word just beneath it; see `withAll`.
+ *
  * For an RDP host every group is seen through `asRdpLevel`; the host itself is
  * not, since a host has one protocol and its own fields already mean it.
  */
@@ -73,97 +77,71 @@ export function authChain(
   groups: SessionGroup[],
   context: AuthContext = {}
 ): AuthDefaults[] {
-  const chain = inheritanceChain(own, groupId, groups, optedOut)
-  // Settings carried from groups the host does not inherit from sit just above it.
-  const carried = carriedLevel(own, groups)
-  const hasCarried = carried !== undefined && !optedOut(own)
-  if (hasCarried) chain.splice(1, 0, carried)
-  const seen =
-    context.protocol === 'rdp'
-      ? chain.map((level, i) => (i === 0 ? level : groupLevelFor(level, 'rdp')))
-      : chain
-  /*
-   * A way in carried from elsewhere is complete as it stands. A key or a
-   * secret it did not state was filled in from the host's own groups: z's key
-   * passphrase went to the server as the password b's method asked for.
-   */
-  // A desktop's way in is its RDP login, which an SSH key says nothing about.
-  const statesWay =
-    context.protocol === 'rdp'
-      ? isSet(carried?.rdpUsername) ||
-        isSet(carried?.rdpSecretRef) ||
-        isSet(carried?.rdpCredentialId)
-      : isSet(seen[1]?.authMethod)
-  if (!hasCarried || !statesWay) return seen
-  return seen.map((level, i) =>
-    i < 2 ? level : { ...level, privateKeyPath: undefined, secretRef: undefined }
-  )
+  const chain = withAll(levelsOf(own, groupId, groups))
+  // Settings carried for groups a git folder left out sit just above the host.
+  const carried = (own as { carriedAuth?: AuthDefaults & RdpLoginDefaults }).carriedAuth
+  if (carried && !optedOut(own)) chain.splice(1, 0, carried)
+  if (context.protocol !== 'rdp') return chain
+  return chain.map((level, i) => (i === 0 ? level : groupLevelFor(level, 'rdp')))
 }
 
-/** What signs a host in once its login is known, which belongs together. */
-const SIGN_IN: (keyof AuthDefaults)[] = ['authMethod', 'privateKeyPath', 'secretRef']
-
 /**
- * The level of settings carried on a host. Copied when the repository was
- * read, a setting from a group still in the tree went on saying what the
- * group said then: local settings given to that group never reached the
- * host. It is read from the group now; the copy speaks for a group gone.
+ * The item and the groups above it, nearest first.
+ *
+ * Ansible reads every group a host is in and all of their parents, in one
+ * order — shallower first, by name within a level — and the last to state a
+ * setting wins. One chain up from the host's group missed the rest: with web
+ * under both prod and stage, the chain through stage never saw prod's
+ * deploy:2222. So for a host with `groupOrder` every group it reaches is read
+ * in that order, each as it stands with its local settings, and what lies
+ * above the inventory's groups — a source's own settings, a folder of the
+ * user's — comes after them, as it did. A group that opts out of inheriting
+ * still ends the walk up through it.
  */
-function carriedLevel(
+function levelsOf(
   own: AuthDefaults,
+  groupId: string | null,
   groups: SessionGroup[]
-): (AuthDefaults & RdpLoginDefaults) | undefined {
-  const { carriedAuth, carriedFrom } = own as {
-    carriedAuth?: AuthDefaults & RdpLoginDefaults
-    carriedFrom?: Partial<Record<keyof AuthDefaults, string>>
-  }
-  if (!carriedFrom) return carriedAuth
-  const level: AuthDefaults & RdpLoginDefaults = { ...carriedAuth }
-  const groupOf = (key: keyof AuthDefaults): SessionGroup | undefined =>
-    carriedFrom[key] === undefined ? undefined : groups.find((g) => g.id === carriedFrom[key])
-
-  for (const key of Object.keys(carriedFrom) as (keyof AuthDefaults)[]) {
-    if (SIGN_IN.includes(key)) continue
-    const group = groupOf(key)
-    if (group && isSet(group[key])) Object.assign(level, { [key]: group[key] })
-  }
-  // A login comes with the account chosen beside it, which brings its own
-  // way in: db's login without db's account signed in as deploy with
-  // nothing saved. And with the group's RDP login, which a desktop signs in
-  // with in its place; the port with the group's RDP port likewise.
-  const login = groupOf('username')
-  if (login && isSet(login.credentialId)) level.credentialId = login.credentialId
-  for (const [key, from] of [
-    ['rdpUsername', login],
-    ['rdpSecretRef', login],
-    ['rdpCredentialId', login],
-    ['rdpPort', groupOf('port')]
-  ] as const) {
-    if (from && isSet(from[key])) Object.assign(level, { [key]: from[key] })
-  }
-
-  /*
-   * The way in — method, key and the secret saved for them — comes whole from
-   * one group: the one Ansible takes the method or the key from, or else the
-   * login's, when that group says how it signs in. Taken a field at a time,
-   * a passphrase saved for one group's key went to the server as the password
-   * another group's method asked for, and a key came without its passphrase.
-   */
-  // A way in carried from a group no longer in the tree is the copy's to
-  // give, not the login group's.
-  const wayKey =
-    carriedFrom.authMethod !== undefined
-      ? 'authMethod'
-      : carriedFrom.privateKeyPath !== undefined
-        ? 'privateKeyPath'
-        : undefined
-  const way = wayKey ? groupOf(wayKey) : login && isSet(login.authMethod) ? login : undefined
-  if (way) {
-    for (const key of SIGN_IN) {
-      if (isSet(way[key])) Object.assign(level, { [key]: way[key] })
+): AuthDefaults[] {
+  const chain = inheritanceChain(own, groupId, groups, optedOut)
+  const { groupOrder, memberOf } = own as { groupOrder?: string[]; memberOf?: string[] }
+  if (!groupOrder || optedOut(own)) return chain
+  const byId = new Map(groups.map((g) => [g.id, g]))
+  const reached = new Set<string>()
+  for (const start of [groupId, ...(memberOf ?? [])]) {
+    let id = start
+    let group = id ? byId.get(id) : undefined
+    while (id && group && !reached.has(id)) {
+      reached.add(id)
+      if (optedOut(group)) break
+      id = group.parentId
+      group = id ? byId.get(id) : undefined
     }
   }
-  return level
+  const listed = new Set(groupOrder)
+  const inventory = [...groupOrder]
+    .reverse()
+    .filter((id) => reached.has(id))
+    .map((id) => byId.get(id)!)
+  const above = chain.slice(1).filter((level) => !listed.has((level as SessionGroup).id))
+  return [chain[0], ...inventory, ...above]
+}
+
+/**
+ * The levels with all's word put in, as the shallowest of an inventory's.
+ *
+ * A top group of an inventory with no `all` holds what all says beneath its
+ * own; merged into the group, all's root counted as z's and beat a's deploy
+ * for a host in both. It goes once, after the last group that holds it — the
+ * shallowest of the inventory's — unless that group opts out of inheriting.
+ */
+function withAll(levels: AuthDefaults[]): AuthDefaults[] {
+  const last = levels.findLastIndex((level) => (level as SessionGroup).fromAll !== undefined)
+  if (last < 0) return levels
+  const top = levels[last] as SessionGroup
+  if (optedOut(top)) return levels
+  const all = { ...top.fromAll, id: `${top.id}#all`, name: 'all', parentId: null }
+  return [...levels.slice(0, last + 1), all, ...levels.slice(last + 1)]
 }
 
 /**

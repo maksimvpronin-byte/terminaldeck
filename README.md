@@ -45,11 +45,11 @@ sequential and retain the conflict dialog.
   a single host throughout — one set of local overrides, one entry in a collection, one terminal.
   Its connection settings come from **every group that names it and all their parents**, in
   Ansible's order: deeper groups after shallower ones, alphabetically within a level, the last to
-  state a setting winning. The host sits in the tree under the group Ansible would let win; a
-  setting it takes from another group is carried on the host itself, so a group's local settings
-  reach it where that group is the one that wins. Within a group or a host, `ansible_ssh_user`,
-  `ansible_ssh_port` and the other `ansible_ssh_*` spellings beat the plain ones, as they do in
-  Ansible. One step of Ansible's precedence is still not taken — any group's `group_vars` beating
+  state a setting winning. Each group is read as it stands, local settings included, so a local
+  login on any of them takes its place in that order — and `all`, stated or not, is the
+  shallowest of them. The host sits in the tree under the group Ansible would let win. Within a
+  group or a host, `ansible_ssh_user`, `ansible_ssh_port` and the other `ansible_ssh_*` spellings
+  beat the plain ones, as they do in Ansible. One step of Ansible's precedence is still not taken — any group's `group_vars` beating
   any other group's inline vars — and where that matters, set the host's own local override
 - A source follows **one branch** — the default one unless you name another — and the line under
   it states that branch, the revision, the host and group counts, and the files it read, so a

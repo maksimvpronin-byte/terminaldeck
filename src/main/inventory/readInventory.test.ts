@@ -172,15 +172,10 @@ describe('a group written down in more than one place', () => {
     return dir
   }
 
-  /** The login a host ends up with: its own, or the nearest group's above it. */
+  /** The login a host ends up with, as resolution reads it. */
   function loginOf(result: ReturnType<typeof readInventory>, host: string): string | undefined {
     const found = result.hosts.find((h) => h.name === host)!
-    if (found.username) return found.username
-    const byId = new Map(result.groups.map((g) => [g.id, g]))
-    for (let g = byId.get(found.groupId!); g; g = g.parentId ? byId.get(g.parentId) : undefined) {
-      if (g.username) return g.username
-    }
-    return undefined
+    return resolveAuth(found, found.groupId ?? null, result.groups).username || undefined
   }
 
   function read(dir: string, paths: string[]): ReturnType<typeof readInventory> {
