@@ -3,6 +3,7 @@ import { IPC } from '../../shared/ipc-channels'
 import type { InventoryOverride, InventorySource } from '../../shared/types'
 import { isGitAvailable } from '../inventory/GitRepo'
 import { inventoryStore } from '../inventory/InventoryStore'
+import { refuseRepoSecret } from './repoSecret'
 import { SECRET_FIELDS, forgetSecretsAt, saveWithSecrets } from './secrets'
 
 /** Inventory repositories, their syncs, and the local overrides on top of them. */
@@ -15,9 +16,11 @@ export function registerInventoryHandlers(): void {
     overrides: inventoryStore.overrides(),
     trees: inventoryStore.allTrees()
   }))
-  ipcMain.handle(IPC.inventorySaveSource, (_e, source: InventorySource) =>
-    inventoryStore.saveSource(source)
-  )
+  ipcMain.handle(IPC.inventorySaveSource, (_e, source: InventorySource) => {
+    const before = inventoryStore.sources().find((s) => s.id === source.id)
+    refuseRepoSecret(source.repoUrl, before?.repoUrl)
+    return inventoryStore.saveSource(source)
+  })
   ipcMain.handle(IPC.inventoryRemoveSource, (_e, id: string) => {
     // Removing a repository takes its overrides with it, so their credentials go
     // too — along with the repository's own, and the gateway passwords as well

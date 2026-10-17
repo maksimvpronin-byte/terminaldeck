@@ -9,6 +9,7 @@ import ColourField from './ColourField'
 import { SettingRow, SettingsGroup, SwitchRow } from './SettingsGroup'
 import { useT } from '../i18n'
 import Hint from './Hint'
+import { repoUrlHasSecret } from '../../../shared/repoSecret'
 
 /** The pages of a repository's dialog. */
 type SourcePage = 'general' | 'login' | 'terminal' | 'files'
@@ -53,6 +54,15 @@ export default function InventorySourceDialog({
   async function submit(): Promise<void> {
     if (!source.name.trim() || !source.repoUrl.trim()) {
       setError(t('Name and repository URL are required'))
+      setPage('general')
+      return
+    }
+    if (repoUrlHasSecret(source.repoUrl)) {
+      setError(
+        t(
+          'Take the password or token out of the repository address: git gets it from its credential helper'
+        )
+      )
       setPage('general')
       return
     }

@@ -240,6 +240,41 @@ describe('backup export', () => {
     for (const value of Object.values(SECRETS)) expect(raw).not.toContain(value)
   })
 
+  /**
+   * A token written into a repository address, from before the dialogs
+   * refused one, sat outside the encrypted block — in an export said to have
+   * no credentials in it at all.
+   */
+  it('takes a token out of every repository address it writes', async () => {
+    populate()
+    sessionStore.saveGroup({
+      id: 'linked',
+      name: 'From git',
+      parentId: null,
+      git: {
+        repoUrl: 'https://deploy:TOKEN-1@gitlab.example.com/ops/inv.git',
+        paths: [],
+        includedGroups: []
+      }
+    })
+    inventoryStore.saveSource({
+      ...source,
+      repoUrl: 'https://ghp_TOKEN2abcdefghij@github.com/ops/inv.git'
+    })
+    saveTo = FILE
+
+    await exportToFile(win, false)
+
+    const raw = readFileSync(FILE, 'utf8')
+    expect(raw).not.toContain('TOKEN-1')
+    expect(raw).not.toContain('ghp_TOKEN2')
+    const file = JSON.parse(raw)
+    expect(file.groups.find((g: SessionGroup) => g.id === 'linked').git.repoUrl).toBe(
+      'https://deploy@gitlab.example.com/ops/inv.git'
+    )
+    expect(file.inventorySources[0].repoUrl).toBe('https://github.com/ops/inv.git')
+  })
+
   it('never writes a credential in the clear', async () => {
     populate()
     saveTo = FILE

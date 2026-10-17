@@ -15,6 +15,7 @@ import { credentialStore } from '../store/CredentialStore'
 import { sessionStore } from '../store/SessionStore'
 import { snippetStore } from '../store/SnippetStore'
 import { forgetGitFolder } from './gitFolders'
+import { refuseRepoSecret } from './repoSecret'
 import {
   SECRET_FIELDS,
   forgetSecret,
@@ -101,6 +102,7 @@ export function registerStoreHandlers(): void {
       rdpSecret?: string | null
     ) => {
       const had = sessionStore.getAll().groups.find((g) => g.id === group.id)?.git
+      if (group.git) refuseRepoSecret(group.git.repoUrl, had?.repoUrl)
       const saved = saveWithSecrets(
         group,
         unshareSecrets(

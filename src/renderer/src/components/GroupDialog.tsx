@@ -30,6 +30,7 @@ import ColourField from './ColourField'
 import { SettingsGroup, SwitchRow } from './SettingsGroup'
 import { useT } from '../i18n'
 import Hint from './Hint'
+import { repoUrlHasSecret } from '../../../shared/repoSecret'
 
 /** The pages of the group dialog. */
 type GroupPage = 'general' | 'ssh' | 'desktop' | 'appearance' | 'git'
@@ -220,6 +221,15 @@ export default function GroupDialog({
     }
     if (linked && !link?.repoUrl.trim()) {
       setError(t('A repository address is required'))
+      setPage('git')
+      return
+    }
+    if (linked && link && repoUrlHasSecret(link.repoUrl)) {
+      setError(
+        t(
+          'Take the password or token out of the repository address: git gets it from its credential helper'
+        )
+      )
       setPage('git')
       return
     }

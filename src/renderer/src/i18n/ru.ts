@@ -1410,6 +1410,8 @@ export const ru: Record<string, string> = {
   'inherited from {name}': 'унаследованный от «{name}»',
   '(blank keeps the one {source})': '(если оставить пустым, останется {source})',
   'Name is required': 'Нужно указать имя',
+  'Take the password or token out of the repository address: git gets it from its credential helper':
+    'Уберите пароль или токен из адреса репозитория: git берёт их из своего хранилища учётных данных',
   'A repository address is required': 'Нужно указать адрес репозитория',
   'Name and repository URL are required': 'Нужно указать имя и адрес репозитория',
   '(saved on this group)': '(сохранён на этой группе)',

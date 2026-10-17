@@ -23,6 +23,7 @@ import type {
   MultiWindow,
   SavedPane
 } from '../../shared/types'
+import { withoutRepoSecret } from '../../shared/repoSecret'
 
 interface BackupFile {
   format: 'terminaldeck-backup'
@@ -467,12 +468,18 @@ export async function exportToFile(
     format: 'terminaldeck-backup',
     version: 1,
     exportedAt: Date.now(),
-    groups: store.groups,
+    // A password or token written into a repository address, from before the
+    // dialogs refused one, does not leave in the file; see repoSecret.
+    groups: store.groups.map((g) =>
+      g.git ? { ...g, git: { ...g.git, repoUrl: withoutRepoSecret(g.git.repoUrl) } } : g
+    ),
     sessions: store.sessions,
     snippets: snippetStore.list(),
     collections: collectionStore.list(),
     multiWindows: multiWindowStore.list(),
-    inventorySources: inventoryStore.sources(),
+    inventorySources: inventoryStore
+      .sources()
+      .map((source) => ({ ...source, repoUrl: withoutRepoSecret(source.repoUrl) })),
     inventoryOverrides: inventoryStore.overrides(),
     gitFolderOverrides: gitFolderStore.overrides(),
     credentials: credentialStore.list()

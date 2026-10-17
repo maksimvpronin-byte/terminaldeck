@@ -65,3 +65,24 @@ describe('removing an inventory repository', () => {
     expect(vault.getSecret('elsewhere-gateway')).toBe('d')
   })
 })
+
+describe('saving an inventory repository', () => {
+  it('refuses an address with a token in it', () => {
+    expect(() =>
+      invoke(IPC.inventorySaveSource, {
+        id: 'tokened',
+        name: 'Repo',
+        repoUrl: 'https://user:TOKEN@gitlab.example.com/inv.git',
+        paths: []
+      })
+    ).toThrow(/password or token/)
+    expect(inventoryStore.sources().some((s) => s.id === 'tokened')).toBe(false)
+  })
+
+  it('still saves one that already had such an address, as long as it is unchanged', () => {
+    const repoUrl = 'https://user:TOKEN@gitlab.example.com/inv.git'
+    inventoryStore.saveSource({ id: 'old', name: 'Repo', repoUrl, paths: [] })
+    invoke(IPC.inventorySaveSource, { id: 'old', name: 'Renamed', repoUrl, paths: [] })
+    expect(inventoryStore.sources().find((s) => s.id === 'old')?.name).toBe('Renamed')
+  })
+})
