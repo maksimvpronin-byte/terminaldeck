@@ -4,7 +4,8 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import InventoryOverrideDialog from './InventoryOverrideDialog'
 import { useStore } from '../state/store'
-import type { SessionProfile } from '../../../shared/types'
+import type { InventoryTree, SessionProfile } from '../../../shared/types'
+import { applyOverride } from '../../../shared/overrides'
 
 const host: SessionProfile = {
   id: 'inv:dc1',
@@ -56,6 +57,57 @@ describe('the protocol of a host from a repository', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(save.mock.calls[0][0].protocol).toBeUndefined()
+  })
+})
+
+/**
+ * A host the inventory calls SSH, on WinRM's 5985, connects as a desktop on
+ * 3389 once RDP is picked here; the port it came with belongs to SSH.
+ */
+describe('the port of a host switched to another protocol', () => {
+  const winrm: SessionProfile = { ...host, port: 5985 }
+  const tree = (session: SessionProfile): InventoryTree => ({
+    sourceId: 'inv',
+    groups: [],
+    sessions: [session],
+    memberships: { [session.id]: [] }
+  })
+
+  it('offers the new protocol’s port, not the repository’s', async () => {
+    useStore.setState({ inventoryOverrides: [], inventoryTrees: [tree(winrm)] })
+
+    render(
+      <InventoryOverrideDialog node={winrm} groups={[]} scope="inventory" onClose={() => {}} />
+    )
+    await userEvent.selectOptions(screen.getByLabelText('Protocol'), 'rdp')
+    await userEvent.click(screen.getByRole('button', { name: 'Sign-in' }))
+
+    expect(screen.getByLabelText('Port')).toHaveAttribute('placeholder', '3389')
+  })
+
+  /*
+   * The tree hands the dialog the host as it is used, override and all. Read
+   * as the repository's, a host saved as RDP had already lost its 2222, and
+   * set back to SSH it was said to connect on 22.
+   */
+  it('reads the repository’s own host, not the one the override made', async () => {
+    const own: SessionProfile = { ...host, port: 2222 }
+    const override = { nodeId: own.id, protocol: 'rdp' as const }
+    useStore.setState({ inventoryOverrides: [override], inventoryTrees: [tree(own)] })
+
+    render(
+      <InventoryOverrideDialog
+        node={applyOverride(own, override)}
+        groups={[]}
+        scope="inventory"
+        onClose={() => {}}
+      />
+    )
+    expect(screen.getByRole('option', { name: 'From the inventory (SSH)' })).toBeInTheDocument()
+    await userEvent.selectOptions(screen.getByLabelText('Protocol'), 'ssh')
+    await userEvent.click(screen.getByRole('button', { name: 'Sign-in' }))
+
+    expect(screen.getByLabelText('Port')).toHaveAttribute('placeholder', '2222')
   })
 })
 

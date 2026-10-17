@@ -10,7 +10,7 @@ import type {
 } from '../../../shared/types'
 import { resolveAuth } from '../../../shared/authResolution'
 import { authFieldsState, secretToSave } from '../../../shared/authFields'
-import { applyOverride, isSet } from '../../../shared/overrides'
+import { applyOverride, isSet, layerOver } from '../../../shared/overrides'
 import { appearanceSource, resolveAppearance } from '../../../shared/appearance'
 import { resolveRdp } from '../../../shared/rdpResolution'
 import { asProtocol, PROTOCOLS, protocolOf, traitsOf } from '../../../shared/protocols'
@@ -53,14 +53,14 @@ function isHost(node: SessionProfile | SessionGroup): node is SessionProfile {
 type OverridePage = 'general' | 'login' | 'terminal' | 'files' | 'desktop'
 
 export default function InventoryOverrideDialog({
-  node,
+  node: given,
   groups,
   scope = 'inventory',
   onClose
 }: Props): JSX.Element {
   const fromGit = scope === 'gitFolder'
   const existing = useStore((s) =>
-    (fromGit ? s.gitFolderOverrides : s.inventoryOverrides).find((o) => o.nodeId === node.id)
+    (fromGit ? s.gitFolderOverrides : s.inventoryOverrides).find((o) => o.nodeId === given.id)
   )
   const saveOverride = useStore((s) =>
     fromGit ? s.saveGitFolderOverride : s.saveInventoryOverride
@@ -74,6 +74,19 @@ export default function InventoryOverrideDialog({
   const collections = useStore((s) => s.collections)
   const upsertCollection = useStore((s) => s.upsertCollection)
   const trees = useStore((s) => (fromGit ? s.gitFolderTrees : s.inventoryTrees))
+  /*
+   * The node as the repository has it. The trees hand over the host as it is
+   * used, the saved override already on it, and read as the repository's that
+   * showed the override's protocol as the inventory's and had lost the port
+   * a switch of protocol drops: a host saved as RDP and set back to SSH here
+   * was said to connect on 22 while it connected on its 2222.
+   */
+  const node: SessionProfile | SessionGroup =
+    trees
+      .flatMap((tree): (SessionProfile | SessionGroup)[] =>
+        isHost(given) ? tree.sessions : tree.groups
+      )
+      .find((n) => n.id === given.id) ?? given
   const t = useT()
   /**
    * The hosts the collections below are ticked for: this one, or every host in
@@ -127,7 +140,11 @@ export default function InventoryOverrideDialog({
   const protocol = isHost(node) ? (override.protocol ?? protocolOf(node)) : 'ssh'
   const traits = traitsOf(protocol)
   // What the repository alone would give this node, ignoring the override.
-  const fromRepo = resolveAuth(node, parentId, groups, { protocol, credentials })
+  // With the protocol chosen here, which takes the repository's port with it.
+  const fromRepo = resolveAuth(layerOver(node, { protocol: override.protocol }), parentId, groups, {
+    protocol,
+    credentials
+  })
 
   /**
    * The override, then what the repository and its groups say, then the
