@@ -379,7 +379,22 @@ export function parseAnsibleInventories(
     }
     return auth
   }
-  const depthOf = (id: string): number => id.split('/').length
+  /**
+   * A group's depth as Ansible counts it, from all down. Every group is
+   * below all whether a file says so or not, and a top group of a file
+   * without all was counted level with another file's all — and lost to it
+   * by name, a before all.
+   */
+  const depths = new Map<string, number>()
+  const depthOf = (id: string): number => {
+    let depth = depths.get(id)
+    if (depth === undefined) {
+      const group = groupById.get(id)!
+      depth = group.parentId ? depthOf(group.parentId) + 1 : group.name === 'all' ? 0 : 1
+      depths.set(id, depth)
+    }
+    return depth
+  }
 
   const hosts: SessionProfile[] = []
   const memberships: Record<string, string[]> = {}

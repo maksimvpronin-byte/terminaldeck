@@ -379,6 +379,24 @@ describe('a group written down in more than one place', () => {
     expect(result.hosts.find((x) => x.name === 'h')).toMatchObject({ protocol: 'rdp', port: 3390 })
   })
 
+  /*
+   * Every group is below all, whether a file says so or not. A top group of
+   * a file without all sat level with another file's all, and lost to it by
+   * name: h took all's root over a's deploy, and all as its group.
+   */
+  it('puts a top group of one file below another file’s all', () => {
+    const result = read(
+      repo({
+        '1.yml': 'all:\n  vars:\n    ansible_user: root\n  hosts:\n    h: {}\n',
+        '2.yml': 'a:\n  vars:\n    ansible_user: deploy\n  hosts:\n    h: {}\n'
+      }),
+      ['1.yml', '2.yml']
+    )
+    const h = result.hosts.find((x) => x.name === 'h')!
+    expect(result.groups.find((g) => g.id === h.groupId)?.name).toBe('a')
+    expect(resolveAuth(h, h.groupId ?? null, result.groups).username).toBe('deploy')
+  })
+
   /** One group's own vars and its group_vars, in two spellings: Ansible takes ansible_ssh_*. */
   it('takes the ansible_ssh_* spelling from group_vars over ansible_user inline', () => {
     const result = read(
