@@ -49,9 +49,12 @@ function num(value: unknown): number | undefined {
 /**
  * A Jinja template or an inline `!vault` value: Ansible resolves those at run
  * time and we cannot, so they say nothing here rather than something wrong.
+ * Jinja opens with `{%` and `{#` as well as `{{`; only the last was looked for,
+ * and `{% if prod %}root{% endif %}` became a login, and as a port stopped the
+ * whole inventory from being read.
  */
 function unresolved(value: unknown): boolean {
-  return typeof value === 'string' && (value.includes('{{') || value.startsWith('$ANSIBLE_VAULT'))
+  return typeof value === 'string' && (/\{[{%#]/.test(value) || value.startsWith('$ANSIBLE_VAULT'))
 }
 
 /**

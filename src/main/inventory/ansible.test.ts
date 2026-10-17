@@ -40,6 +40,16 @@ describe('varsToAuth', () => {
     })
   })
 
+  it('takes nothing from a block or comment template either', () => {
+    expect(
+      varsToAuth({
+        ansible_user: '{% if prod %}root{% else %}deploy{% endif %}',
+        ansible_ssh_private_key_file: '{# set by the play #}',
+        ansible_port: '{% if prod %}22{% endif %}'
+      })
+    ).toEqual({})
+  })
+
   it('falls back to the host name when ansible_host is a template', () => {
     const { hosts } = parseAnsibleInventory(
       { web: { hosts: { web1: { ansible_host: '{{ lookup("dig", "web1") }}' } } } },
