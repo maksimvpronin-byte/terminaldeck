@@ -692,6 +692,10 @@ class SFTPManager {
   /**
    * Gives a freshly written copy the mode and owner of the file it replaces, or
    * refuses the replacement with the reason.
+   *
+   * Owner first, then mode: a chown clears setuid and setgid, so a 6755 binary
+   * whose copy was given its mode and then its owner came out 0755. The shell
+   * route has always done it in this order.
    */
   private async matchMetadata(
     sftp: SFTPWrapper,
@@ -699,20 +703,21 @@ class SFTPManager {
     existing: Stats,
     target: string
   ): Promise<void> {
+    const written = await lstatRaw(sftp, partial)
+    if (written && (written.uid !== existing.uid || written.gid !== existing.gid)) {
+      try {
+        await sftpCall((cb) => sftp.chown(partial, existing.uid, existing.gid, cb))
+      } catch {
+        throw new Error(
+          `${target} was left unchanged: it belongs to ${existing.uid}:${existing.gid}, and this login cannot give a new copy that owner. Replacing it would change who owns it, and writing over it in place would destroy it if the transfer stopped halfway. Upload it as its owner, or remove it first.`
+        )
+      }
+    }
     try {
       await sftpCall((cb) => sftp.chmod(partial, existing.mode & 0o7777, cb))
     } catch (err) {
       throw new Error(
         `${target} was left unchanged: the new copy could not be given its permissions (${(err as Error).message}).`
-      )
-    }
-    const written = await lstatRaw(sftp, partial)
-    if (!written || (written.uid === existing.uid && written.gid === existing.gid)) return
-    try {
-      await sftpCall((cb) => sftp.chown(partial, existing.uid, existing.gid, cb))
-    } catch {
-      throw new Error(
-        `${target} was left unchanged: it belongs to ${existing.uid}:${existing.gid}, and this login cannot give a new copy that owner. Replacing it would change who owns it, and writing over it in place would destroy it if the transfer stopped halfway. Upload it as its owner, or remove it first.`
       )
     }
   }

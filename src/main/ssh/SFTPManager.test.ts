@@ -163,7 +163,11 @@ function stubSession(
     },
     chown(path: string, uid: number, _gid: number, cb: (err?: Error | null) => void): void {
       if (opts.failChown) return cb(new Error('Permission denied'))
-      if (entries[path]) entries[path].uid = uid
+      // As a server does: a change of owner clears setuid and setgid.
+      if (entries[path]) {
+        entries[path].uid = uid
+        entries[path].mode = (entries[path].mode ?? 0o644) & ~0o6000
+      }
       cb(null)
     },
     unlink(path: string, cb: (err?: Error | null) => void): void {
@@ -900,6 +904,22 @@ describe('replacing a remote file', () => {
 
     expect(calls.filter((c) => c.op === 'posixRename').map((c) => c.to)).toEqual(['/srv/app.conf'])
     expect(entries['/srv/app.conf']).toMatchObject({ size: 1024, mode: 0o640, uid: 33 })
+  })
+
+  it('keeps setuid and setgid on a file whose copy had to be given its owner', async () => {
+    const entries: Record<string, Entry> = {
+      '/srv': { dir: true },
+      '/srv/helper': { size: 4096, mode: 0o6755, uid: 33 }
+    }
+    attach('conn', stubSession([], entries))
+    const overwrite = plan('upload', [item('/local/helper', '/srv/helper')])
+    overwrite.conflicts = [
+      { ...item('/local/helper', '/srv/helper'), destSize: 4096, destMtime: 0, reason: 'file' }
+    ]
+
+    await sftpManager.runPlan('conn', overwrite, { '/srv/helper': 'overwrite' })
+
+    expect(entries['/srv/helper']).toMatchObject({ mode: 0o6755, uid: 33 })
   })
 
   it('does not write over something that appeared after the plan was made', async () => {
