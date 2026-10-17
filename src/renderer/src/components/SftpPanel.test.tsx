@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it, beforeEach } from 'vitest'
+import { describe, expect, it, beforeEach, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { SftpEntry } from '../../../shared/types'
@@ -153,5 +153,39 @@ describe('going to a typed path', () => {
 
     expect(input.title).toBe('/b')
     expect(listed).not.toContain('/a')
+  })
+})
+
+/**
+ * A listing describes a link, not what it names, so a link to a folder came
+ * in as a file: Download asked for a file name and planned the link as one
+ * file, and the transfer failed on reading a folder.
+ */
+describe('downloading a link', () => {
+  it('downloads a link to a folder as that folder', async () => {
+    const latest: SftpEntry = { ...entry('latest'), isSymlink: true }
+    window.td.sftp.list = () => Promise.resolve([...listing, latest])
+    window.td.sftp.realpath = (_c: string, p: string) =>
+      Promise.resolve(p === latest.path ? '/srv/logs' : '/home/u')
+    window.td.sftp.stat = (_c: string, p: string) =>
+      Promise.resolve({ ...entry('logs', true), path: p })
+    window.td.dialogs.pickDirectory = vi.fn().mockResolvedValue('/dl')
+    window.td.dialogs.pickSavePath = vi.fn().mockResolvedValue('/dl/latest')
+    const planDownload = vi.fn().mockResolvedValue({
+      direction: 'download',
+      items: [],
+      conflicts: [],
+      totalBytes: 0
+    })
+    window.td.sftp.planDownload = planDownload
+    window.td.sftp.runPlan = vi.fn().mockResolvedValue({ written: 0, skipped: 0, changed: [] })
+    render(<SftpPanel connectionId="c1" />)
+
+    fireEvent.contextMenu(await row('latest'))
+    await userEvent.click(await screen.findByText(/^Download/))
+
+    await waitFor(() => expect(planDownload).toHaveBeenCalled())
+    expect(window.td.dialogs.pickSavePath).not.toHaveBeenCalled()
+    expect(planDownload).toHaveBeenCalledWith('c1', latest.path, '/dl')
   })
 })

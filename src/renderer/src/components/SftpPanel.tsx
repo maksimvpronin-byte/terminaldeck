@@ -571,8 +571,22 @@ export default function SftpPanel({
 
   async function download(entry: SftpEntry): Promise<void> {
     if (!connectionId) return
+    /*
+     * A listing describes a link, not what it names, so a link to a folder
+     * reads as a file here: it was saved under a file name, planned as one
+     * file, and failed on reading a folder. What it points at decides.
+     */
+    let isFolder = entry.isDirectory
+    if (entry.isSymlink) {
+      try {
+        const real = await window.td.sftp.realpath(connectionId, entry.path)
+        isFolder = (await window.td.sftp.stat(connectionId, real))?.isDirectory ?? false
+      } catch {
+        // A link to nothing: fetched as a file, which says why it cannot be.
+      }
+    }
     // A folder needs a destination directory; a file needs a destination filename.
-    const localPath = entry.isDirectory
+    const localPath = isFolder
       ? await window.td.dialogs.pickDirectory()
       : await window.td.dialogs.pickSavePath(entry.name)
     if (!localPath) return
@@ -583,7 +597,7 @@ export default function SftpPanel({
       // the main process, which checks the name; a single file goes to the
       // exact name the save dialog returned, and is checked against that name.
       await transfers.run(
-        entry.isDirectory
+        isFolder
           ? await window.td.sftp.planDownload(connectionId, entry.path, localPath)
           : await window.td.sftp.planDownload(connectionId, entry.path, localPath, true),
         undefined,
