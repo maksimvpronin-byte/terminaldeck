@@ -163,6 +163,16 @@ describe('remote editing', () => {
     expect(existsSync(local)).toBe(true)
   })
 
+  /** The editor outlives the tab: a save made in it afterwards is the only copy. */
+  it('keeps a copy saved in its editor after the connection had closed', async () => {
+    const local = await remoteEdit.open(win, 'connection-7', '/etc/motd', 'true')
+    remoteEdit.stopAllFor('connection-7')
+    save(local, 'edited after the tab was closed')
+
+    expect(remoteEdit.cleanUp()).toEqual([local])
+    expect(readFileSync(local, 'utf8')).toBe('edited after the tab was closed')
+  })
+
   it('removes a copy whose session is still live', async () => {
     const local = await remoteEdit.open(win, 'connection-2', '/etc/hosts', 'true')
     remoteEdit.cleanUp()

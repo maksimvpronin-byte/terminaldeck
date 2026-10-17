@@ -372,6 +372,14 @@ class RemoteEditManager {
   private kept = new Map<string, string>()
 
   /**
+   * Copies whose session has ended, by directory, with when they were last
+   * sent. The editor is somebody else's program and outlives the tab: a save
+   * made in it after its connection closed reaches nobody, and the copy it
+   * went into was then deleted at quit with that save in it.
+   */
+  private released = new Map<string, { localPath: string; sentMtimeMs: number }>()
+
+  /**
    * Lets a session go. One holding an unsent save keeps its copy — the only
    * place that save now exists — and the window is told where it is.
    */
@@ -379,7 +387,13 @@ class RemoteEditManager {
     clearTimeout(session.timer)
     session.watcher.close()
     this.sessions.delete(key)
-    if (!this.unsynced(session)) return
+    if (!this.unsynced(session)) {
+      this.released.set(dirname(session.localPath), {
+        localPath: session.localPath,
+        sentMtimeMs: session.lastMtimeMs
+      })
+      return
+    }
     this.kept.set(dirname(session.localPath), session.localPath)
     if (!session.win.isDestroyed()) {
       session.win.webContents.send(`${IPC.sftpEdited}:${session.connectionId}`, {
@@ -416,6 +430,16 @@ class RemoteEditManager {
   cleanUp(): string[] {
     for (const token of this.openingTokens.values()) token.cancelled = true
     for (const [key, session] of [...this.sessions]) this.release(key, session)
+
+    // Saved in an editor after its connection had gone: kept, like the rest.
+    for (const [dir, { localPath, sentMtimeMs }] of this.released) {
+      try {
+        if (statSync(localPath).mtimeMs !== sentMtimeMs) this.kept.set(dir, localPath)
+      } catch {
+        // Gone already; nothing to keep.
+      }
+    }
+    this.released.clear()
 
     // Every directory ever made, not only the ones still being watched.
     for (const dir of this.dirs) {
