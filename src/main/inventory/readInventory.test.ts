@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from 'fs'
 import { tmpdir } from 'os'
-import { join } from 'path'
+import { dirname, join } from 'path'
 import { readInventory } from './readInventory'
 import { reallyInsideCheckout } from './checkout'
 
@@ -29,7 +29,8 @@ describe('inventory worker parsing', () => {
       expect(result.hosts).toHaveLength(1)
       expect(result.hosts[0]).toMatchObject({ host: '10.0.0.1', username: 'deploy' })
       expect(result.groups.every((g) => g.parentId === 'root')).toBe(true)
-      expect(result.memberships[result.hosts[0].id]).toEqual(result.groups.map((g) => g.id))
+      // In Ansible's order, whichever file named the group first.
+      expect(result.memberships[result.hosts[0].id]).toEqual(['git:repo:g:dev', 'git:repo:g:prod'])
       expect(result.files).toHaveLength(2)
     } finally {
       rmSync(dir, { recursive: true, force: true })
@@ -154,4 +155,101 @@ it('skips a vars file encrypted with ansible-vault and keeps syncing', () => {
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
+})
+
+/**
+ * To Ansible a group is its name, wherever and in whichever file it is
+ * written; each of these lost the login a host should have inherited.
+ */
+describe('a group written down in more than one place', () => {
+  function repo(files: Record<string, string>): string {
+    const dir = mkdtempSync(join(tmpdir(), 'td-inventory-'))
+    for (const [path, body] of Object.entries(files)) {
+      mkdirSync(dirname(join(dir, path)), { recursive: true })
+      writeFileSync(join(dir, path), body)
+    }
+    return dir
+  }
+
+  /** The login a host ends up with: its own, or the nearest group's above it. */
+  function loginOf(result: ReturnType<typeof readInventory>, host: string): string | undefined {
+    const found = result.hosts.find((h) => h.name === host)!
+    if (found.username) return found.username
+    const byId = new Map(result.groups.map((g) => [g.id, g]))
+    for (let g = byId.get(found.groupId!); g; g = g.parentId ? byId.get(g.parentId) : undefined) {
+      if (g.username) return g.username
+    }
+    return undefined
+  }
+
+  function read(dir: string, paths: string[]): ReturnType<typeof readInventory> {
+    try {
+      return readInventory({ dir, paths, sourceId: 'repo', prefix: 'inv', rootId: 'root' })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  }
+
+  it('gives the hosts of a group named as a child the login of its parent', () => {
+    const result = read(
+      repo({
+        'hosts.yml': [
+          'all:',
+          '  children:',
+          '    prod:',
+          '      vars:',
+          '        ansible_user: deploy',
+          '      children:',
+          '        web: {}',
+          '    web:',
+          '      hosts:',
+          '        web1: {}',
+          ''
+        ].join('\n')
+      }),
+      ['hosts.yml']
+    )
+    expect(loginOf(result, 'web1')).toBe('deploy')
+    // Shown under both places web is written, as Ansible counts it in both.
+    expect(result.memberships['inv:repo:h:web1']).toEqual([
+      'inv:repo:g:all/web',
+      'inv:repo:g:all/prod/web'
+    ])
+  })
+
+  it('takes a group’s vars from a later file as well as the first', () => {
+    const result = read(
+      repo({
+        'a.yml': 'web: {}\n',
+        'b.yml': 'web:\n  vars:\n    ansible_user: deploy\n  hosts:\n    web1: {}\n'
+      }),
+      ['a.yml', 'b.yml']
+    )
+    expect(result.groups.filter((g) => g.name === 'web')).toHaveLength(1)
+    expect(loginOf(result, 'web1')).toBe('deploy')
+  })
+
+  it('applies group_vars/all.yml to a file that never names all', () => {
+    const result = read(
+      repo({
+        'hosts.yml': 'web:\n  hosts:\n    web1: {}\n',
+        'group_vars/all.yml': 'ansible_user: deploy\nansible_port: 2222\n'
+      }),
+      ['hosts.yml']
+    )
+    expect(loginOf(result, 'web1')).toBe('deploy')
+    // The group keeps its place, and its own vars still win over all's.
+    expect(result.groups.map((g) => g.id)).toEqual(['inv:repo:g:web'])
+  })
+
+  it('lets a group’s own vars win over group_vars/all without an all key', () => {
+    const result = read(
+      repo({
+        'hosts.yml': 'web:\n  vars:\n    ansible_user: www\n  hosts:\n    web1: {}\n',
+        'group_vars/all.yml': 'ansible_user: deploy\n'
+      }),
+      ['hosts.yml']
+    )
+    expect(loginOf(result, 'web1')).toBe('www')
+  })
 })

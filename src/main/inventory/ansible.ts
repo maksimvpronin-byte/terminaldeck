@@ -135,109 +135,166 @@ export function parseAnsibleInventory(
   lookupVars: (kind: 'group' | 'host', name: string) => AnsibleVars = () => ({}),
   prefix = 'inv'
 ): ParsedInventory {
-  const groups: SessionGroup[] = []
-  const hosts: SessionProfile[] = []
-  const memberships: Record<string, string[]> = {}
+  return parseAnsibleInventories([{ doc, lookupVars }], sourceId, prefix)
+}
+
+/** One inventory file, and where its group_vars and host_vars are looked up. */
+export interface InventoryDocument {
+  doc: unknown
+  lookupVars: (kind: 'group' | 'host', name: string) => AnsibleVars
+}
+
+/**
+ * Several inventory files read as the one inventory Ansible makes of them.
+ *
+ * To Ansible a group is its name. It is written down wherever it is convenient
+ * — its hosts in one place, its vars in another, named again as a child of some
+ * other group, again in the next file — and all of that is one group. Here a
+ * group is a node in a tree, placed by its path, and the tree keeps that: a
+ * group named under two parents appears under both. What a group says, though,
+ * is now said by the name, wherever it was written:
+ *
+ * - its vars are gathered from every definition, in every file, and every
+ *   node of that name carries the result. Only the first file's definition
+ *   used to count, so a group whose login was set in the second file had none;
+ * - its hosts are its hosts at every node of that name. `prod` naming `web` as
+ *   a child, with web's hosts listed elsewhere, made a `web` under prod with no
+ *   hosts and a `web` beside it whose hosts never saw prod's login;
+ * - `all` is there whether or not the file says so. Ansible makes every group a
+ *   child of it, so `group_vars/all.yml` reaches every host, and a file with no
+ *   `all` key read nothing from it. Such a file's top groups keep their place
+ *   (their ids are what local settings are kept under) and take those vars
+ *   underneath their own.
+ */
+export function parseAnsibleInventories(
+  docs: InventoryDocument[],
+  sourceId: string,
+  prefix = 'inv'
+): ParsedInventory {
   const now = Date.now()
 
-  if (!doc || typeof doc !== 'object') return { groups, hosts, memberships }
-
-  /** One group naming a host, carrying the vars stated at that mention. */
+  /** A group naming a host at one node, carrying the vars stated at that mention. */
   interface Claim {
-    id: string
-    depth: number
-    name: string
+    group: string
     vars: AnsibleVars
   }
-  const seen = new Map<string, { name: string; claims: Claim[] }>()
-  /*
-   * The vars each group has been given so far, by id. A group can be written
-   * down more than once at the same place — listed under `all.children`, and
-   * again at the top of the file with its vars, which lands on the same path —
-   * and Ansible reads that as one group with both halves merged. It used to
-   * become two groups with one id, and inheritance found the first, so the
-   * vars in the second never reached a host.
-   */
-  const groupVars = new Map<string, AnsibleVars>()
+  const seen = new Map<
+    string,
+    { name: string; claims: Claim[]; lookupVars: InventoryDocument['lookupVars'] }
+  >()
+  /** Each node, by id, in the order first met. */
+  const nodes = new Map<string, { id: string; name: string; parentId: string | null }>()
+  /** Every node id of each group name. */
+  const nodesOf = new Map<string, Set<string>>()
+  /** Each group's vars by name, gathered from every definition of it. */
+  const varsOf = new Map<string, AnsibleVars>()
+  /** group_vars/all of the files that never name `all`; see above. */
+  let implicitAll: AnsibleVars = {}
 
-  const walk = (name: string, raw: RawGroup | null, parentPath: string | null): void => {
-    const path = parentPath ? `${parentPath}/${name}` : name
-    const id = groupId(sourceId, path, prefix)
-    const vars = {
-      ...(groupVars.get(id) ?? lookupVars('group', name)),
-      ...(raw?.vars ?? {})
-    }
-    groupVars.set(id, vars)
-
-    const group: SessionGroup = {
-      id,
-      name,
-      parentId: parentPath ? groupId(sourceId, parentPath, prefix) : null,
-      ...varsToAuth(vars)
-    }
-    const again = groups.findIndex((g) => g.id === id)
-    if (again >= 0) groups[again] = group
-    else groups.push(group)
-
-    for (const [hostName, inlineVars] of Object.entries(raw?.hosts ?? {})) {
-      const key = hostId(sourceId, hostName, prefix)
-      const entry = seen.get(key) ?? { name: hostName, claims: [] }
-      entry.claims.push({
-        id,
-        depth: path.split('/').length,
-        name,
-        vars: inlineVars ?? {}
-      })
-      seen.set(key, entry)
-    }
-
-    for (const [childName, child] of Object.entries(raw?.children ?? {})) {
-      walk(childName, child, path)
-    }
-  }
-
-  /*
-   * Every key at the top level is a group, and `all` is only the one Ansible
-   * gives a meaning to.
-   *
-   * This used to read `all` and stop, which quietly threw away every other
-   * group in the file. That is not an exotic layout: writing the groups as
-   * siblings of `all` rather than nesting them under `all.children` is the
-   * ordinary way a Kubernetes inventory is laid out, and the hosts still
-   * appeared — they are listed under `all.hosts` as well — so the tree looked
-   * like it had worked and had simply lost every group in the repository.
-   *
-   * Ansible makes every group a child of `all`, so that is where they are put.
-   * A file with no `all` at all keeps them at the top, as before.
-   */
-  const root = doc as Record<string, RawGroup | null>
   const isGroup = (value: unknown): value is RawGroup | null =>
     value === null || (typeof value === 'object' && !Array.isArray(value))
 
-  if ('all' in root) {
-    walk('all', root.all, null)
-    for (const [name, raw] of Object.entries(root)) {
-      if (name !== 'all' && isGroup(raw)) walk(name, raw, 'all')
+  for (const { doc, lookupVars } of docs) {
+    if (!doc || typeof doc !== 'object') continue
+
+    const walk = (name: string, raw: RawGroup | null, parentPath: string | null): void => {
+      const path = parentPath ? `${parentPath}/${name}` : name
+      const id = groupId(sourceId, path, prefix)
+      if (!nodes.has(id)) {
+        nodes.set(id, {
+          id,
+          name,
+          parentId: parentPath ? groupId(sourceId, parentPath, prefix) : null
+        })
+      }
+      const ids = nodesOf.get(name) ?? new Set<string>()
+      ids.add(id)
+      nodesOf.set(name, ids)
+      varsOf.set(name, {
+        ...(varsOf.get(name) ?? lookupVars('group', name)),
+        ...(raw?.vars ?? {})
+      })
+
+      for (const [hostName, inlineVars] of Object.entries(raw?.hosts ?? {})) {
+        const key = hostId(sourceId, hostName, prefix)
+        const entry = seen.get(key) ?? { name: hostName, claims: [], lookupVars }
+        entry.claims.push({ group: name, vars: inlineVars ?? {} })
+        seen.set(key, entry)
+      }
+
+      for (const [childName, child] of Object.entries(raw?.children ?? {})) {
+        walk(childName, child, path)
+      }
     }
-  } else {
-    for (const [name, raw] of Object.entries(root)) {
-      if (isGroup(raw)) walk(name, raw, null)
+
+    /*
+     * Every key at the top level is a group, and `all` is only the one Ansible
+     * gives a meaning to.
+     *
+     * This used to read `all` and stop, which quietly threw away every other
+     * group in the file. That is not an exotic layout: writing the groups as
+     * siblings of `all` rather than nesting them under `all.children` is the
+     * ordinary way a Kubernetes inventory is laid out, and the hosts still
+     * appeared — they are listed under `all.hosts` as well — so the tree looked
+     * like it had worked and had simply lost every group in the repository.
+     *
+     * Ansible makes every group a child of `all`, so that is where they are put.
+     * A file with no `all` at all keeps them at the top, as before.
+     */
+    const root = doc as Record<string, RawGroup | null>
+    if ('all' in root) {
+      walk('all', root.all, null)
+      for (const [name, raw] of Object.entries(root)) {
+        if (name !== 'all' && isGroup(raw)) walk(name, raw, 'all')
+      }
+    } else {
+      implicitAll = { ...implicitAll, ...lookupVars('group', 'all') }
+      for (const [name, raw] of Object.entries(root)) {
+        if (isGroup(raw)) walk(name, raw, null)
+      }
     }
   }
 
+  /** What a node's group says, with an unwritten `all` beneath a top group's own. */
+  const varsAt = (node: { name: string; parentId: string | null }): AnsibleVars =>
+    node.parentId === null && node.name !== 'all'
+      ? { ...implicitAll, ...varsOf.get(node.name) }
+      : (varsOf.get(node.name) ?? {})
+
+  const groups: SessionGroup[] = [...nodes.values()].map((node) => ({
+    ...node,
+    ...varsToAuth(varsAt(node))
+  }))
   const groupById = new Map(groups.map((g) => [g.id, g]))
+  const depthOf = (id: string): number => id.split('/').length
+
+  const hosts: SessionProfile[] = []
+  const memberships: Record<string, string[]> = {}
   for (const [key, entry] of seen) {
-    // Ansible merges group vars parents-first and alphabetically within a level,
-    // with the last one read winning. The same order picks the group whose
-    // connection settings this host inherits.
-    const ordered = [...entry.claims].sort(
-      (a, b) => a.depth - b.depth || a.name.localeCompare(b.name)
+    /*
+     * Every node of every group that names the host. Ansible merges group vars
+     * parents-first and alphabetically within a level, with the last one read
+     * winning; the same order picks the node whose connection settings this
+     * host inherits — and between two nodes of one group, the later path.
+     */
+    const claimed = new Set<string>()
+    for (const claim of entry.claims) {
+      for (const id of nodesOf.get(claim.group) ?? []) claimed.add(id)
+    }
+    const ordered = [...claimed].sort(
+      (a, b) =>
+        depthOf(a) - depthOf(b) ||
+        groupById.get(a)!.name.localeCompare(groupById.get(b)!.name) ||
+        a.localeCompare(b)
     )
     const primary = ordered[ordered.length - 1]
-    // Vars stated at each mention are merged along that same order, so the
-    // group that supplies the settings is also the one that wins a conflict.
-    const inline = ordered.reduce<AnsibleVars>((acc, claim) => ({ ...acc, ...claim.vars }), {})
-    const hostVars = { ...lookupVars('host', entry.name), ...inline }
+    // Vars stated at each mention are merged in the order of their groups, so
+    // the group that supplies the settings is also the one that wins a conflict.
+    const rank = new Map(ordered.map((id, i) => [groupById.get(id)!.name, i]))
+    const inline = [...entry.claims]
+      .sort((a, b) => (rank.get(a.group) ?? 0) - (rank.get(b.group) ?? 0))
+      .reduce<AnsibleVars>((acc, claim) => ({ ...acc, ...claim.vars }), {})
+    const hostVars = { ...entry.lookupVars('host', entry.name), ...inline }
 
     /*
      * Protocol is resolved here rather than inherited, and the difference
@@ -247,21 +304,17 @@ export function parseAnsibleInventory(
      * So the group chain is read at parse time and the answer written onto the
      * host, along the same order that decides which group's settings it takes.
      */
-    // Read once every mention of every group is in: a group's vars can arrive
-    // in a later definition of it than the one that named this host.
     const ancestors = new Map<string, SessionGroup>()
-    for (const claim of ordered) {
-      let group = groupById.get(claim.id)
+    for (const id of ordered) {
+      let group = groupById.get(id)
       while (group && !ancestors.has(group.id)) {
         ancestors.set(group.id, group)
         group = group.parentId ? groupById.get(group.parentId) : undefined
       }
     }
     const fromGroups = [...ancestors.values()]
-      .sort(
-        (a, b) => a.id.split('/').length - b.id.split('/').length || a.name.localeCompare(b.name)
-      )
-      .reduce<AnsibleVars>((acc, group) => ({ ...acc, ...groupVars.get(group.id) }), {})
+      .sort((a, b) => depthOf(a.id) - depthOf(b.id) || a.name.localeCompare(b.name))
+      .reduce<AnsibleVars>((acc, group) => ({ ...acc, ...varsAt(group) }), {})
     const protocol = protocolFromVars(hostVars) ?? protocolFromVars(fromGroups)
 
     hosts.push({
@@ -269,7 +322,7 @@ export function parseAnsibleInventory(
       name: entry.name,
       ...(protocol ? { protocol } : {}),
       host: str(hostVars.ansible_host) ?? entry.name,
-      groupId: primary.id,
+      groupId: primary,
       tags: [],
       logToFile: false,
       portForwards: [],
@@ -277,7 +330,7 @@ export function parseAnsibleInventory(
       updatedAt: now,
       ...portForProtocol(varsToAuth(hostVars), protocol, { ...fromGroups, ...hostVars })
     })
-    memberships[key] = [...new Set(ordered.map((c) => c.id))]
+    memberships[key] = ordered
   }
 
   return { groups, hosts, memberships }
