@@ -1,3 +1,5 @@
+import { protocolOf, type Protocol } from './protocols'
+
 /**
  * A blank field means "not set" everywhere in the app: leaving a form field
  * empty hands the value back to whatever is above it rather than storing an
@@ -25,5 +27,18 @@ export function applyOverride<T extends object, O extends { nodeId: string }>(
 ): T {
   if (!override) return node
   const { nodeId: _addressed, ...patch } = override
-  return { ...node, ...withoutBlanks(patch) }
+  const merged: T = { ...node, ...withoutBlanks(patch) }
+  /*
+   * A repository's port belongs to the protocol the repository named. A host
+   * the inventory calls SSH carries its ansible_port — WinRM's 5985 on a
+   * Windows box — and switched to RDP here it went on dialling that port for a
+   * desktop; a desktop's terminaldeck_port did the same the other way. Unless
+   * the override states a port of its own, a switched host drops the one it
+   * came with and takes its new protocol's default.
+   */
+  const stated = patch as { protocol?: Protocol; port?: unknown }
+  const switched =
+    isSet(stated.protocol) && protocolOf(stated) !== protocolOf(node as { protocol?: Protocol })
+  if (switched && !isSet(stated.port)) delete (merged as { port?: unknown }).port
+  return merged
 }
