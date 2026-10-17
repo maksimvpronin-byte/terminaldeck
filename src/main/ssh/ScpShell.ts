@@ -384,7 +384,8 @@ export class ScpShell {
       count += chunk.length
       progress?.(count, total)
     })
-    await pipeline(read, createWriteStream(local, { flags: 'wx' }))
+    // Into a file the caller created for this download alone; see SFTPManager.download.
+    await pipeline(read, createWriteStream(local, { flags: 'w' }))
   }
   async upload(
     local: string,

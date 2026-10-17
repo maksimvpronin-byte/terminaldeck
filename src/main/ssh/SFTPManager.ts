@@ -3,7 +3,17 @@ import { ScpShell } from './ScpShell'
 import type { Writable } from 'stream'
 import type { SFTPWrapper, Stats } from 'ssh2'
 import { readdir, mkdir, stat, lstat, readFile } from 'fs/promises'
-import { constants, copyFileSync, linkSync, renameSync, rmSync } from 'fs'
+import {
+  chmodSync,
+  closeSync,
+  constants,
+  copyFileSync,
+  linkSync,
+  openSync,
+  renameSync,
+  rmSync,
+  statSync
+} from 'fs'
 import { randomBytes } from 'crypto'
 import { basename, dirname, join } from 'path'
 import { sshManager } from './SSHManager'
@@ -105,6 +115,27 @@ function placeWithoutReplacing(partial: string, dest: string): void {
 
 /** The mode a copy on its way is kept at, whatever the file it becomes. */
 const PARTIAL_MODE = 0o600
+
+/**
+ * Gives a finished download the mode it is to end with: that of the file it
+ * replaces, or the one a new file gets here.
+ *
+ * The rename used to take the partial's mode along with its contents, so a
+ * 0600 file fetched again — an SSH key, a config with a password in it — came
+ * back readable by everyone, and a script lost its executable bit. Not on
+ * Windows, where a mode is a read-only flag and carrying that one onto the
+ * partial would only stop the rename.
+ */
+function giveModeOf(dest: string, partial: string): void {
+  if (process.platform === 'win32') return
+  let mode: number
+  try {
+    mode = statSync(dest).mode & 0o7777
+  } catch {
+    mode = 0o666 & ~process.umask()
+  }
+  chmodSync(partial, mode)
+}
 
 /**
  * Creates `path` for this upload alone and closes it to everyone else.
@@ -407,8 +438,13 @@ class SFTPManager {
      *
      * The unique suffix is not decoration: two panes fetching the same file
      * into the same folder would otherwise write into one another's partial.
+     * Random, and the file created here exclusively and private before a byte
+     * arrives: the name was the process id and a counter, and ssh2 opens what
+     * it is given with `w`, which writes through a link that anyone able to
+     * write to the folder had guessed and put down first.
      */
-    const partial = `${localPath}.part-${process.pid}-${this.nextTransfer++}`
+    const partial = `${localPath}.part-${randomBytes(8).toString('hex')}`
+    closeSync(openSync(partial, 'wx', PARTIAL_MODE))
     try {
       if (shell) await shell.download(remotePath, partial, onProgress)
       else
@@ -416,10 +452,14 @@ class SFTPManager {
           sftp!.fastGet(
             remotePath,
             partial,
-            { step: (transferred, _chunk, total) => onProgress?.(transferred, total) },
+            {
+              mode: PARTIAL_MODE,
+              step: (transferred, _chunk, total) => onProgress?.(transferred, total)
+            },
             (err) => (err ? reject(err) : resolve())
           )
         })
+      giveModeOf(localPath, partial)
       if (replace) renameSync(partial, localPath)
       else placeWithoutReplacing(partial, localPath)
     } catch (err) {
@@ -427,7 +467,7 @@ class SFTPManager {
       try {
         rmSync(partial, { force: true })
       } catch {
-        // Already gone, or never created.
+        // Already gone.
       }
       throw err
     }

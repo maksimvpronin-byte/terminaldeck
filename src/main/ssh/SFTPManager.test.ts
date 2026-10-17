@@ -1,11 +1,14 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import {
+  chmodSync,
   mkdirSync,
   mkdtempSync,
   existsSync,
+  lstatSync,
   readdirSync,
   readFileSync,
   rmSync,
+  statSync,
   writeFileSync
 } from 'fs'
 import { tmpdir } from 'os'
@@ -464,6 +467,93 @@ describe('running a transfer plan', () => {
     expect(readFileSync(dest, 'utf8')).toBe('fetched')
     expect(readdirSync(localDir)).toEqual(['a.txt'])
   })
+
+  /** A download over files already there, each one asked about. */
+  function overwriting(items: TransferItem[]): TransferPlan {
+    const withConflicts = plan('download', items)
+    withConflicts.conflicts = items.map((i) => ({
+      ...i,
+      destSize: 4,
+      destMtime: 0,
+      reason: 'file' as const
+    }))
+    return withConflicts
+  }
+
+  /**
+   * ssh2 opens the local name it is given with `w`, which writes through a
+   * link. The name was the process id and a counter, so anyone able to write
+   * to the folder could put a link there first and have the download written
+   * into a file of their choosing. Now the name cannot be guessed, and the
+   * file is already there — created by this download alone, and private —
+   * by the time ssh2 opens it.
+   */
+  it('fetches into a private file of its own under a name nobody could guess', async () => {
+    mkdirSync(localDir, { recursive: true })
+    const dest = join(localDir, 'a.txt')
+    let during: { mode: number; isFile: boolean } | undefined
+    const calls: Call[] = []
+    attach(
+      'conn',
+      stubSession(
+        calls,
+        { '/srv/a.txt': { size: 1024 } },
+        {
+          duringGet: () => {
+            const partial = calls[calls.length - 1].to!
+            const st = lstatSync(partial)
+            during = { mode: st.mode & 0o777, isFile: st.isFile() }
+          }
+        }
+      )
+    )
+
+    await sftpManager.runPlan('conn', plan('download', [item('/srv/a.txt', dest)]))
+    await sftpManager.runPlan('conn', overwriting([item('/srv/a.txt', dest)]), {
+      [dest]: 'overwrite'
+    })
+
+    expect(calls[0].to).toMatch(/\.part-[0-9a-f]{16}$/)
+    expect(calls[1].to).toMatch(/\.part-[0-9a-f]{16}$/)
+    expect(calls[1].to).not.toBe(calls[0].to)
+    expect(during?.isFile).toBe(true)
+    if (process.platform !== 'win32') expect(during?.mode).toBe(0o600)
+  })
+
+  /**
+   * The partial is private while it fills, and the rename carried that — or,
+   * before, the umask's 0644 — onto the file it replaced.
+   */
+  it.skipIf(process.platform === 'win32')(
+    'keeps the mode of the file it replaces, and gives a new one the usual mode',
+    async () => {
+      mkdirSync(localDir, { recursive: true })
+      const key = join(localDir, 'id_ed25519')
+      const script = join(localDir, 'deploy.sh')
+      const fresh = join(localDir, 'notes.txt')
+      writeFileSync(key, 'old key', { mode: 0o600 })
+      writeFileSync(script, 'old script', { mode: 0o755 })
+      chmodSync(key, 0o600)
+      chmodSync(script, 0o755)
+      attach(
+        'conn',
+        stubSession([], {
+          '/srv/id_ed25519': { size: 1024 },
+          '/srv/deploy.sh': { size: 1024 },
+          '/srv/notes.txt': { size: 1024 }
+        })
+      )
+
+      const replacing = overwriting([item('/srv/id_ed25519', key), item('/srv/deploy.sh', script)])
+      replacing.items.push(item('/srv/notes.txt', fresh))
+      await sftpManager.runPlan('conn', replacing, { [key]: 'overwrite', [script]: 'overwrite' })
+
+      expect(readFileSync(key, 'utf8')).toBe('fetched')
+      expect(statSync(key).mode & 0o777).toBe(0o600)
+      expect(statSync(script).mode & 0o777).toBe(0o755)
+      expect(statSync(fresh).mode & 0o777).toBe(0o666 & ~process.umask())
+    }
+  )
 
   it('reports progress against the file it is moving', async () => {
     attach('conn', stubSession([], { '/srv': { dir: true } }))
