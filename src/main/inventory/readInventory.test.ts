@@ -242,6 +242,82 @@ describe('a group written down in more than one place', () => {
     expect(result.groups.map((g) => g.id)).toEqual(['inv:repo:g:web'])
   })
 
+  /** Ansible reads the group_vars and host_vars beside each file for the whole inventory. */
+  it('reads group_vars and host_vars beside every file, not just the first', () => {
+    const result = read(
+      repo({
+        'one/hosts.yml': 'web:\n  hosts:\n    web1: {}\n',
+        'two/hosts.yml': 'web:\n  hosts:\n    web2: {}\n',
+        'two/group_vars/web.yml': 'ansible_user: deploy\n',
+        'two/host_vars/web1.yml': 'ansible_port: 2222\n'
+      }),
+      ['one/hosts.yml', 'two/hosts.yml']
+    )
+    expect(loginOf(result, 'web1')).toBe('deploy')
+    expect(loginOf(result, 'web2')).toBe('deploy')
+    expect(result.hosts.find((h) => h.name === 'web1')?.port).toBe(2222)
+  })
+
+  it('reads host_vars beside the second file for a host it names too', () => {
+    const result = read(
+      repo({
+        'one/hosts.yml': 'web:\n  hosts:\n    web1: {}\n',
+        'two/hosts.yml': 'db:\n  hosts:\n    web1: {}\n',
+        'two/host_vars/web1.yml': 'ansible_user: deploy\n'
+      }),
+      ['one/hosts.yml', 'two/hosts.yml']
+    )
+    expect(result.hosts.find((h) => h.name === 'web1')?.username).toBe('deploy')
+  })
+
+  it('carries all’s vars from one file to the groups of a file without all', () => {
+    const result = read(
+      repo({
+        'a.yml': 'all:\n  vars:\n    ansible_user: deploy\n',
+        'b.yml': 'web:\n  hosts:\n    web1: {}\n'
+      }),
+      ['a.yml', 'b.yml']
+    )
+    expect(loginOf(result, 'web1')).toBe('deploy')
+  })
+
+  it('carries a parent’s login through a child whose children are given elsewhere', () => {
+    const result = read(
+      repo({
+        'hosts.yml': [
+          'all:',
+          '  children:',
+          '    prod:',
+          '      vars:',
+          '        ansible_user: deploy',
+          '      children:',
+          '        web: {}',
+          '    web:',
+          '      children:',
+          '        leaf:',
+          '          hosts:',
+          '            h1: {}',
+          ''
+        ].join('\n')
+      }),
+      ['hosts.yml']
+    )
+    expect(loginOf(result, 'h1')).toBe('deploy')
+    expect(result.groups.map((g) => g.id)).toContain('inv:repo:g:all/prod/web/leaf')
+  })
+
+  it('stops at a group that is its own ancestor', () => {
+    const result = read(
+      repo({
+        'hosts.yml':
+          'a:\n  children:\n    b:\n      hosts:\n        h1: {}\nb:\n  children:\n    a: {}\n'
+      }),
+      ['hosts.yml']
+    )
+    expect(result.hosts.map((h) => h.name)).toEqual(['h1'])
+    expect(result.groups.length).toBeLessThan(10)
+  })
+
   it('lets a group’s own vars win over group_vars/all without an all key', () => {
     const result = read(
       repo({

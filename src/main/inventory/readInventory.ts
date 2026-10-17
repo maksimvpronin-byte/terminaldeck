@@ -22,6 +22,7 @@ export function readInventory(request: InventoryRead): ParsedInventory & { files
     const base = dirname(file)
     return {
       doc: parse(readFileSync(file, 'utf8')),
+      varsFrom: base,
       lookupVars: (kind, name) => {
         const key = JSON.stringify([base, kind, name])
         if (!vars.has(key))
