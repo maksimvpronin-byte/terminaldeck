@@ -804,7 +804,9 @@ const CHAPTERS: Chapter[] = [
                 what: 'Ansible groups, group_vars and host_vars become groups and connection settings'
               },
               { what: 'A host in several groups is shown under each, marked ×2 — it is one host' },
-              { what: 'Its settings come from one of them: the deepest, alphabetically last' },
+              {
+                what: 'Its settings come from all of them as Ansible reads them: the deepest wins'
+              },
               { what: 'Credentials set on the repository are inherited by every host in it' },
               { what: 'A source follows one branch — empty means the default, usually main' },
               { what: 'The line under a repository states the branch, revision and what was read' },

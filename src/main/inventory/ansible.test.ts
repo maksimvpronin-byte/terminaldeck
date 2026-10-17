@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { parse } from 'yaml'
 import { parseAnsibleInventory, protocolFromVars, varsToAuth, groupId, hostId } from './ansible'
+import { resolveAuth } from '../../shared/authResolution'
 
 const SRC = 'src1'
 
@@ -611,5 +612,81 @@ all:
         SRC
       )
     ).toThrow('Inventory port')
+  })
+})
+
+/**
+ * A host inherits along one chain of groups, and Ansible reads every group
+ * the host is in and all their parents. What the chain does not reach is
+ * carried on the host where Ansible would take it from elsewhere.
+ */
+describe('settings from a group off the host’s own chain', () => {
+  function connects(doc: string, name: string): { username?: string; port: number } {
+    const { groups, hosts } = parseAnsibleInventory(parse(doc), SRC)
+    const host = hosts.find((h) => h.name === name)!
+    const { username, port } = resolveAuth(host, host.groupId ?? null, groups)
+    return { username: username || undefined, port }
+  }
+
+  it('reaches a host through the other parent of its group', () => {
+    const doc = `
+all:
+  children:
+    prod:
+      vars: { ansible_user: deploy, ansible_port: 2222 }
+      children:
+        web:
+          hosts: { h: {} }
+    stage:
+      children:
+        web: {}
+`
+    expect(connects(doc, 'h')).toEqual({ username: 'deploy', port: 2222 })
+  })
+
+  it('carries nothing the chain itself wins', () => {
+    const doc = `
+all:
+  children:
+    prod:
+      vars: { ansible_user: deploy }
+      children:
+        web:
+          hosts: { h: {} }
+    stage:
+      vars: { ansible_user: staging }
+      children:
+        web: {}
+`
+    const { hosts } = parseAnsibleInventory(parse(doc), SRC)
+    // stage is read after prod, and the chain runs through stage.
+    expect(hosts[0].carriedAuth).toBeUndefined()
+    expect(connects(doc, 'h').username).toBe('staging')
+  })
+
+  it('takes a setting from another group the host is in', () => {
+    const doc = `
+all:
+  children:
+    db:
+      vars: { ansible_port: 2200 }
+      hosts: { h: {} }
+    web:
+      hosts: { h: {} }
+`
+    expect(connects(doc, 'h').port).toBe(2200)
+  })
+
+  it('still lets the host’s own settings win', () => {
+    const doc = `
+all:
+  children:
+    db:
+      vars: { ansible_port: 2200 }
+      hosts: { h: {} }
+    web:
+      hosts: { h: { ansible_port: 22 } }
+`
+    expect(connects(doc, 'h').port).toBe(22)
   })
 })

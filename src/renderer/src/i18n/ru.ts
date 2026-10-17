@@ -314,8 +314,8 @@ export const ru: Record<string, string> = {
     'Группы Ansible, group_vars и host_vars становятся группами и настройками подключения',
   'A host in several groups is shown under each, marked ×2 — it is one host':
     'Хост в нескольких группах показан под каждой с пометкой ×2 — это один хост',
-  'Its settings come from one of them: the deepest, alphabetically last':
-    'Настройки берутся из одной: самой глубокой и последней по алфавиту',
+  'Its settings come from all of them as Ansible reads them: the deepest wins':
+    'Настройки берутся из всех, как их читает Ansible: побеждает самая глубокая',
   'Credentials set on the repository are inherited by every host in it':
     'Учётные данные репозитория наследует каждый его хост',
   'Every host is an SSH host unless the inventory says otherwise':

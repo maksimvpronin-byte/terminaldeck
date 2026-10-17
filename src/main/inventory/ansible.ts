@@ -1,5 +1,6 @@
 import { asProtocol, type Protocol } from '../../shared/protocols'
 import type { AuthDefaults, SessionGroup, SessionProfile } from '../../shared/types'
+import { isSet } from '../../shared/overrides'
 
 export interface ParsedInventory {
   groups: SessionGroup[]
@@ -87,6 +88,9 @@ function inventoryPort(value: unknown): number | undefined {
 function spelled(vars: AnsibleVars, plain: string, ssh: string): unknown {
   return vars[ssh] !== undefined && vars[ssh] !== null ? vars[ssh] : vars[plain]
 }
+
+/** Every field `varsToAuth` can set, which is what a group can hand a host. */
+const CONNECTION_KEYS = ['username', 'port', 'privateKeyPath', 'authMethod'] as const
 
 /** Maps the Ansible connection vars we understand onto our own auth fields. */
 export function varsToAuth(vars: AnsibleVars): AuthDefaults {
@@ -410,10 +414,41 @@ export function parseAnsibleInventories(
         group = group.parentId ? groupById.get(group.parentId) : undefined
       }
     }
-    const fromGroups = [...ancestors.values()]
-      .sort((a, b) => depthOf(a.id) - depthOf(b.id) || a.name.localeCompare(b.name))
-      .reduce<AnsibleVars>((acc, group) => ({ ...acc, ...varsAt(group) }), {})
+    const inAnsibleOrder = [...ancestors.values()].sort(
+      (a, b) =>
+        depthOf(a.id) - depthOf(b.id) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id)
+    )
+    const fromGroups = inAnsibleOrder.reduce<AnsibleVars>(
+      (acc, group) => ({ ...acc, ...varsAt(group) }),
+      {}
+    )
     const protocol = protocolFromVars(hostVars) ?? protocolFromVars(fromGroups)
+
+    /*
+     * The host inherits along one chain, its primary group's, and Ansible reads
+     * every group the host is in and all of their parents. With web under both
+     * prod and stage, the chain through stage never saw prod's deploy:2222 and
+     * the host connected as nobody on 22. So where the group Ansible would take
+     * a setting from lies off that chain, the setting is carried on the host,
+     * a level read just above its groups and as a group is read. A setting the
+     * chain itself wins is left to the chain, so editing that group still
+     * reaches the host.
+     */
+    const onChain = new Set<string>()
+    for (let g = groupById.get(primary); g && !onChain.has(g.id);) {
+      onChain.add(g.id)
+      g = g.parentId ? groupById.get(g.parentId) : undefined
+    }
+    const carried: AuthDefaults = {}
+    const carriedFrom = new Set<string>()
+    for (const key of CONNECTION_KEYS) {
+      const winner = inAnsibleOrder.findLast((g) => isSet(g[key]))
+      if (!winner || onChain.has(winner.id)) continue
+      Object.assign(carried, { [key]: winner[key] })
+      carriedFrom.add(winner.name)
+    }
+    const carriedAuth =
+      carriedFrom.size > 0 ? { ...carried, name: [...carriedFrom].join(', ') } : undefined
 
     hosts.push({
       id: key,
@@ -426,7 +461,8 @@ export function parseAnsibleInventories(
       portForwards: [],
       createdAt: now,
       updatedAt: now,
-      ...portForProtocol(varsToAuth(hostVars), protocol, { ...fromGroups, ...hostVars })
+      ...portForProtocol(varsToAuth(hostVars), protocol, { ...fromGroups, ...hostVars }),
+      ...(carriedAuth ? { carriedAuth } : {})
     })
     memberships[key] = ordered
   }
