@@ -15,6 +15,7 @@ import { remoteEdit } from './ssh/RemoteEdit'
 import { remoteMonitor } from './ssh/RemoteMonitor'
 import { sshManager } from './ssh/SSHManager'
 import { registerUpdater } from './updater'
+import { idleLock } from './vault/idleLock'
 import { IPC } from '../shared/ipc-channels'
 import { rememberWindowPlacement, savedWindowPlacement } from './windowState'
 
@@ -174,6 +175,11 @@ function createWindow(): void {
   })
   mainWindow.webContents.on('render-process-gone', releaseSessions)
   mainWindow.on('closed', releaseSessions)
+
+  // The idle lock is counted by the page; with no page, here. See idleLock.
+  mainWindow.webContents.on('did-finish-load', () => idleLock.pageBack())
+  mainWindow.webContents.on('render-process-gone', () => idleLock.pageGone())
+  mainWindow.on('closed', () => idleLock.pageGone())
 
   // Chromium zooms the page on Cmd/Ctrl with +, - or 0 on its own, quite apart
   // from the menu, and swallows the keys before the renderer sees them. Claiming

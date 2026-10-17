@@ -4,6 +4,8 @@ export const IPC = {
   vaultCreate: 'vault:create',
   vaultUnlock: 'vault:unlock',
   vaultLock: 'vault:lock',
+  /** The idle-lock minutes, for the main process to keep while no window is open. */
+  vaultLockAfter: 'vault:lockAfter',
   vaultChangePassword: 'vault:changePassword',
 
   // Trusted host keys

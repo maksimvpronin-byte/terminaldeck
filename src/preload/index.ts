@@ -52,6 +52,7 @@ const api = {
     unlock: (password: string): Promise<{ ok: boolean; error?: string; status?: VaultStatus }> =>
       ipcRenderer.invoke(IPC.vaultUnlock, password),
     lock: (): Promise<VaultStatus> => ipcRenderer.invoke(IPC.vaultLock),
+    lockAfter: (minutes: number): Promise<void> => ipcRenderer.invoke(IPC.vaultLockAfter, minutes),
     changePassword: (current: string, next: string): Promise<{ ok: boolean; error?: string }> =>
       ipcRenderer.invoke(IPC.vaultChangePassword, current, next)
   },

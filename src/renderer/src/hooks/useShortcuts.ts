@@ -344,6 +344,13 @@ export function useZoom(): void {
 export function useIdleLock(): void {
   const minutes = useStore((s) => s.settings.lockAfterMinutes)
 
+  // The main process keeps the count while no window is open; see idleLock.
+  useEffect(() => {
+    window.td.vault.lockAfter(minutes).catch((error) => {
+      console.error('[vault] could not pass on the idle lock', error)
+    })
+  }, [minutes])
+
   useEffect(() => {
     if (!minutes || minutes <= 0) return
     let timer: ReturnType<typeof setTimeout>

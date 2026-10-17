@@ -3,6 +3,7 @@ import { IPC } from '../../shared/ipc-channels'
 import { trustedCertificates } from '../rdp/CertificateTrust'
 import { knownHosts } from '../ssh/KnownHosts'
 import { VaultLockedError, WrongPasswordError, vault } from '../vault/Vault'
+import { idleLock } from '../vault/idleLock'
 
 /** The vault itself, and the keys and certificates trusted by hand. */
 
@@ -27,6 +28,9 @@ export function registerVaultHandlers(): void {
   ipcMain.handle(IPC.vaultLock, () => {
     vault.lock()
     return vault.status()
+  })
+  ipcMain.handle(IPC.vaultLockAfter, (_e, minutes: unknown) => {
+    idleLock.setMinutes(typeof minutes === 'number' ? minutes : 0)
   })
   ipcMain.handle(IPC.vaultChangePassword, async (_e, current: string, next: string) => {
     try {
