@@ -21,9 +21,11 @@ the other produces a version nobody can install, which is how 0.1.10 through
   under a temporary name beside its destination and moved onto it at the
   end. That name was predictable, and the transfer wrote through a link left
   at it, so anyone able to write to the folder could have a download written
-  into a file of their choosing. The name is random now, and the file is
-  created by the download alone, readable only by you, before a byte
-  arrives.
+  into a file of their choosing. The name is random now, the file is created
+  by the download alone, readable only by you, before a byte arrives, and on
+  macOS and Linux it is written through that open file rather than reopened
+  by name — so a link swapped in for it afterwards is not followed, and is
+  not moved into place.
 - **A file downloaded over another keeps its permissions.** Fetching an SSH
   key or a config that was readable only by you again left it readable by
   everyone, and a script lost its executable bit. The new copy takes the
@@ -32,9 +34,11 @@ the other produces a version nobody can install, which is how 0.1.10 through
   folder address such as `https://user:TOKEN@…` was kept as typed — in the
   clear in the data folder, and in a backup exported without credentials.
   The dialogs now refuse one and ask for the secret to go into git's
-  credential helper, and an export writes every address without it. An
-  address saved before this release keeps working until its dialog is next
-  saved.
+  credential helper; an export writes every address without it, and an
+  import of an older backup brings none back. Addresses saved before this
+  release lose the secret when the app starts, and so do the working copies'
+  git settings: such a repository syncs again once the credential helper
+  holds it.
 
 ## 0.28.3
 

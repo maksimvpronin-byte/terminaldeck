@@ -28,7 +28,8 @@ sequential and retain the conflict dialog.
   in a repository's menu shows it on its web page, the same way as for a git folder below
 - Cloned read-only through the **system git**, so existing SSH keys, agents, credential helpers
   and proxies apply as they do in a terminal; nothing is ever pushed. A password or token written
-  into the address itself is refused, and left out of an export: it belongs in the helper
+  into the address itself is refused, left out of exports and imports, and taken out of addresses
+  saved before 0.28.4 when the app starts: it belongs in the helper
 - Ansible groups, `children`, inline `vars`, `group_vars/` and `host_vars/` become groups and
   connection settings
 - **Every host arrives as an SSH host unless the inventory says otherwise**, and Ansible has no
