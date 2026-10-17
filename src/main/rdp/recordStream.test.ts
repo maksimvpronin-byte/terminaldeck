@@ -191,3 +191,11 @@ describe('the largest frame', () => {
     expect(reader.broken).toBe(true)
   })
 })
+
+describe('encodeCommand field names', () => {
+  it('refuses a name that would split the command', () => {
+    expect(() => encodeCommand({ a: 'ack', 'x\n\na\tcert\ntrust': '1' })).toThrow(/field named/)
+    expect(() => encodeCommand({ a: 'ack', 'x\ty': 1 })).toThrow(/field named/)
+    expect(encodeCommand({ a: 'ack', gatewayHost: 'gw' })).toBe('a\tack\ngatewayHost\tgw\n\n')
+  })
+})

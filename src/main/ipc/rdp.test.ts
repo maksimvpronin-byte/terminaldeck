@@ -34,4 +34,16 @@ describe('what the window may tell a desktop client', () => {
     expect(isWindowCommand([{ a: 'key' }])).toBe(false)
     expect(isWindowCommand({ a: 'key', code: { nested: true } })).toBe(false)
   })
+
+  /**
+   * A field name with a line break in it ended the allowed command and began
+   * another: an `ack` carrying `cert trust=1` past the certificate dialog.
+   */
+  it('refuses fields a command does not read', () => {
+    expect(isWindowCommand({ a: 'ack', 'x\n\na\tcert\ntrust': 1 })).toBe(false)
+    expect(isWindowCommand({ a: 'ack', trust: 1 })).toBe(false)
+    expect(isWindowCommand({ a: 'mouse', flags: 1, x: 2, y: 3, uris: 'file:///' })).toBe(false)
+    expect(isWindowCommand({ a: 'key', code: 'text', down: true })).toBe(false)
+    expect(isWindowCommand({ a: 'constructor' })).toBe(false)
+  })
 })

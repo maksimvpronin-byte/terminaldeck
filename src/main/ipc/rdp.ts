@@ -101,27 +101,40 @@ function desktopGateway(
  * used to go down the pipe as it was, so any of them could be sent from there
  * past every one of those checks.
  */
-const WINDOW_COMMANDS = new Set([
-  'ack',
-  'focus',
-  'key',
-  'mouse',
-  'xmouse',
-  'resize',
-  'sync',
-  'unicode',
-  'visible'
-])
+const WINDOW_COMMANDS: Record<string, readonly string[]> = {
+  ack: [],
+  focus: ['flags'],
+  key: ['code', 'down', 'ext'],
+  mouse: ['flags', 'x', 'y'],
+  xmouse: ['flags', 'x', 'y'],
+  resize: ['width', 'height', 'scale'],
+  sync: ['flags'],
+  unicode: ['code', 'down'],
+  visible: ['value']
+}
 
+/**
+ * One of those, with the fields that command reads and nothing else.
+ *
+ * Only the values were checked, and the names went down the pipe as they
+ * were: a name holding a line break ended the `ack` it belonged to and began
+ * a command of its own — `cert trust=1` among them, which is how a window
+ * could have accepted a certificate past the dialog. Each command now has the
+ * fields the client reads for it, all of them numbers or flags.
+ */
 export function isWindowCommand(
   fields: unknown
 ): fields is Record<string, string | number | boolean | undefined> {
   if (typeof fields !== 'object' || fields === null || Array.isArray(fields)) return false
   const record = fields as Record<string, unknown>
-  if (typeof record.a !== 'string' || !WINDOW_COMMANDS.has(record.a)) return false
-  return Object.values(record).every(
-    (v) =>
-      v === undefined || typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean'
+  const action = record.a
+  if (typeof action !== 'string' || !Object.hasOwn(WINDOW_COMMANDS, action)) return false
+  const allowed = WINDOW_COMMANDS[action]
+  return Object.entries(record).every(
+    ([key, value]) =>
+      key === 'a' ||
+      (allowed.includes(key) &&
+        (value === undefined || typeof value === 'number' || typeof value === 'boolean'))
   )
 }
 

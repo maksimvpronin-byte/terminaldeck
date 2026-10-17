@@ -194,6 +194,11 @@ export function encodeCommand(
   let out = ''
   for (const [key, value] of Object.entries(fields)) {
     if (value === undefined) continue
+    // A name is structure, not data, and is never escaped: one holding a tab or
+    // a line break would split the command into others. Only plain names pass.
+    if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(key)) {
+      throw new Error(`Refusing a desktop command field named ${JSON.stringify(key)}`)
+    }
     const text =
       typeof value === 'boolean'
         ? value
