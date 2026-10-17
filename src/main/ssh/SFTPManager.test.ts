@@ -648,6 +648,29 @@ describe('running a transfer plan', () => {
     expect(readFileSync(dest, 'utf8')).toBe('mine, edited since')
   })
 
+  /** Checked before the transfer, the file could still be saved again while it ran. */
+  it('keeps a file another program saved while the download ran', async () => {
+    mkdirSync(localDir, { recursive: true })
+    const dest = join(localDir, 'a.txt')
+    writeFileSync(dest, 'mine', 'utf8')
+    attach(
+      'conn',
+      stubSession(
+        [],
+        { '/srv/a.txt': { size: 1024 } },
+        { duringGet: () => writeFileSync(dest, 'saved meanwhile in an editor', 'utf8') }
+      )
+    )
+
+    const result = await sftpManager.runPlan('conn', overwriting([item('/srv/a.txt', dest)]), {
+      [dest]: 'overwrite'
+    })
+
+    expect(result).toEqual({ written: 0, skipped: 1, changed: [dest] })
+    expect(readFileSync(dest, 'utf8')).toBe('saved meanwhile in an editor')
+    expect(readdirSync(localDir)).toEqual(['a.txt'])
+  })
+
   it('reports progress against the file it is moving', async () => {
     attach('conn', stubSession([], { '/srv': { dir: true } }))
     const seen: Array<[number, number, string]> = []

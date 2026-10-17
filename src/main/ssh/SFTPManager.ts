@@ -156,6 +156,17 @@ function throughDescriptor(fd: number, path: string): string {
   return path
 }
 
+/** Whether the file at `path` is no longer the one a plan found there. */
+function changedSince(path: string, found: { destSize: number; destMtime: number }): boolean {
+  try {
+    const now = lstatSync(path)
+    return now.size !== found.destSize || now.mtimeMs !== found.destMtime
+  } catch {
+    // Gone meanwhile: nothing is lost by putting the download there.
+    return false
+  }
+}
+
 /** Whether `path` still names the file `fd` holds, and not a link put there since. */
 function namesHeldFile(fd: number, path: string): boolean {
   try {
@@ -164,6 +175,14 @@ function namesHeldFile(fd: number, path: string): boolean {
     return held.dev === named.dev && held.ino === named.ino
   } catch {
     return false
+  }
+}
+
+/** The file a download was told to replace was changed while it ran. */
+export class DestinationChanged extends DestinationAppeared {
+  constructor(path: string) {
+    super(path)
+    this.message = `${path} changed during the download and was left alone`
   }
 }
 
@@ -521,7 +540,13 @@ class SFTPManager {
      * that was not there when the transfer was planned: if something takes
      * the name meanwhile, it is kept and DestinationAppeared is thrown.
      */
-    replace = true
+    replace = true,
+    /**
+     * The file being replaced, as the plan found it. Checked again just before
+     * the replacement: saved by another program while the download ran, it is
+     * another file, and is kept.
+     */
+    expected?: { destSize: number; destMtime: number }
   ): Promise<void> {
     const shell = this.getShell(connectionId)
     const sftp = shell ? undefined : await this.getSftp(connectionId)
@@ -572,6 +597,9 @@ class SFTPManager {
       ours = namesHeldFile(fd, partial)
       release()
       if (!ours) throw new PartialReplaced(partial)
+      if (replace && expected && changedSince(localPath, expected)) {
+        throw new DestinationChanged(localPath)
+      }
       if (replace) renameSync(partial, localPath)
       else placeWithoutReplacing(partial, localPath)
     } catch (err) {
@@ -1247,7 +1275,8 @@ class SFTPManager {
             item.sourcePath,
             item.destPath,
             report,
-            conflicted.has(item.destPath)
+            conflicted.has(item.destPath),
+            askedAbout.get(item.destPath)
           )
         } catch (err) {
           if (!(err instanceof DestinationAppeared)) throw err
