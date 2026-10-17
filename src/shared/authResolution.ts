@@ -75,7 +75,20 @@ export function authChain(
 ): AuthDefaults[] {
   const chain = inheritanceChain(own, groupId, groups, optedOut)
   if (context.protocol !== 'rdp') return chain
-  return chain.map((level, i) => (i === 0 ? level : asRdpLevel(level as SessionGroup)))
+  return chain.map((level, i) => (i === 0 ? level : groupLevelFor(level, 'rdp')))
+}
+
+/**
+ * What a group gives a host of this protocol: its RDP side to a desktop, so a
+ * group's `ansible_port` — WinRM's 5985 as often as not — never becomes the
+ * port a desktop is dialled on. Anything that carries a group's settings onto
+ * a host goes through here, so it hands over what resolution would.
+ */
+export function groupLevelFor(
+  group: AuthDefaults & RdpLoginDefaults,
+  protocol: Protocol | undefined
+): AuthDefaults {
+  return protocol === 'rdp' ? asRdpLevel(group) : group
 }
 
 /**
