@@ -42,4 +42,17 @@ describe('translating a phrase', () => {
   it('fills every occurrence of the same placeholder', () => {
     expect(translate('en', '{name} and {name}', { name: 'x' })).toBe('x and x')
   })
+
+  /** A server's login prompt is looked up as well, and can say anything. */
+  it('finds nothing on the prototype, in either language', () => {
+    for (const language of ['en', 'ru'] as const) {
+      for (const text of ['__proto__', 'constructor', 'toString', 'hasOwnProperty']) {
+        expect(translate(language, text)).toBe(text)
+      }
+    }
+  })
+
+  it('fills no placeholder from the prototype', () => {
+    expect(translate('en', 'a {constructor} b {toString}', {})).toBe('a {constructor} b {toString}')
+  })
 })

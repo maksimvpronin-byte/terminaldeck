@@ -38,10 +38,14 @@ export function translate(
   text: string,
   values?: Record<string, string | number>
 ): string {
-  const phrase = DICTIONARIES[language]?.[text] ?? text
+  // Own entries only. Text from outside the app — a server's login prompt —
+  // is looked up too, and `__proto__` or `constructor` found the object's
+  // prototype: something React cannot draw, or a function in place of a label.
+  const dictionary = DICTIONARIES[language]
+  const phrase = dictionary && Object.hasOwn(dictionary, text) ? dictionary[text] : text
   if (!values) return phrase
   return phrase.replace(/\{(\w+)\}/g, (placeholder, name: string) =>
-    name in values ? String(values[name]) : placeholder
+    Object.hasOwn(values, name) ? String(values[name]) : placeholder
   )
 }
 
