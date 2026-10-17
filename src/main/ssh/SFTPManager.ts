@@ -627,7 +627,9 @@ class SFTPManager {
     connectionId: string,
     localPath: string,
     remotePath: string,
-    onProgress?: (transferred: number, total: number) => void
+    onProgress?: (transferred: number, total: number) => void,
+    /** See writeRemoteFile. */
+    beforeReplace?: () => Promise<void>
   ): Promise<void> {
     const shell = this.getShell(connectionId)
     if (shell) return shell.upload(localPath, remotePath, onProgress)
@@ -646,7 +648,8 @@ class SFTPManager {
             },
             (err) => (err ? reject(err) : resolve())
           )
-        })
+        }),
+      beforeReplace
     )
   }
 
@@ -674,11 +677,17 @@ class SFTPManager {
    *
    * A symlink stays a symlink: what it points at is replaced the same way.
    * Renaming over the link itself would turn it into a file.
+   *
+   * `beforeReplace` runs once the copy is ready, just before it goes over the
+   * file it replaces, and throws to keep that file. The destination was
+   * compared with the plan before the bytes went, and a file saved on the
+   * server while they did was then swapped out all the same.
    */
   private async writeRemoteFile(
     sftp: SFTPWrapper,
     remotePath: string,
-    write: (target: string) => Promise<void>
+    write: (target: string) => Promise<void>,
+    beforeReplace?: () => Promise<void>
   ): Promise<void> {
     let target = remotePath
     let existing = await lstatRaw(sftp, remotePath)
@@ -719,6 +728,7 @@ class SFTPManager {
       }
 
       await this.matchMetadata(sftp, partial, existing, target)
+      await beforeReplace?.()
 
       if (supportsPosixRename(sftp)) {
         await sftpCall((cb) => sftp.ext_openssh_rename(partial, target, cb))
@@ -798,7 +808,9 @@ class SFTPManager {
     srcPath: string,
     dstConnectionId: string,
     dstPath: string,
-    onProgress?: (transferred: number, total: number) => void
+    onProgress?: (transferred: number, total: number) => void,
+    /** See writeRemoteFile. */
+    beforeReplace?: () => Promise<void>
   ): Promise<void> {
     const [srcSftp, dstSftp] = await Promise.all([
       this.getShell(srcConnectionId) ?? this.getSftp(srcConnectionId),
@@ -876,7 +888,7 @@ class SFTPManager {
       })
 
     if (dstSftp instanceof ScpShell) await dstSftp.replace(dstPath, copyInto)
-    else await this.writeRemoteFile(dstSftp, dstPath, copyInto)
+    else await this.writeRemoteFile(dstSftp, dstPath, copyInto, beforeReplace)
   }
 
   /**
@@ -1259,12 +1271,42 @@ class SFTPManager {
         totalBytes = total
         onProgress?.(transferred, total, item.sourcePath)
       }
-      if (plan.direction === 'relay') {
-        await this.ensureRemoteDir(destConnectionId!, parentOf(item.destPath), madeDirs)
-        await this.relay(connectionId, item.sourcePath, destConnectionId!, item.destPath, report)
-      } else if (plan.direction === 'upload') {
-        await this.ensureRemoteDir(connectionId, parentOf(item.destPath), madeDirs)
-        await this.upload(connectionId, item.sourcePath, item.destPath, report)
+      if (plan.direction !== 'download') {
+        const host = plan.direction === 'relay' ? destConnectionId! : connectionId
+        // The file asked about, looked at once more as the copy is about to replace it.
+        const beforeReplace = async (): Promise<void> => {
+          const found = await this.destinationNow(plan.direction, host, item.destPath)
+          if (
+            !stillAsPlanned(
+              conflicted.has(item.destPath),
+              found,
+              false,
+              askedAbout.get(item.destPath)
+            )
+          ) {
+            throw new DestinationChanged(item.destPath)
+          }
+        }
+        await this.ensureRemoteDir(host, parentOf(item.destPath), madeDirs)
+        try {
+          if (plan.direction === 'relay') {
+            await this.relay(
+              connectionId,
+              item.sourcePath,
+              host,
+              item.destPath,
+              report,
+              beforeReplace
+            )
+          } else {
+            await this.upload(connectionId, item.sourcePath, item.destPath, report, beforeReplace)
+          }
+        } catch (err) {
+          if (!(err instanceof DestinationChanged)) throw err
+          skipped++
+          changed.push(item.destPath)
+          continue
+        }
       } else {
         // dirname, not a hand-rolled search for the last '/'. This is a local
         // path, and on Windows it holds no forward slash at all: the search

@@ -89,6 +89,8 @@ function stubSession(
     modeAtWrite?: Record<string, number>
     /** Runs while a download is on its way, before it finishes. */
     duringGet?: () => void
+    /** Runs once an upload's bytes are in, before they are moved into place. */
+    duringPut?: () => void
     /** Runs before the stub opens what it was given, the way a racing program would. */
     beforeGet?: () => void
   } = {}
@@ -143,6 +145,7 @@ function stubSession(
         return
       }
       entries[remote] = { size: 1024, mode, uid: 0 }
+      opts.duringPut?.()
       cb(null)
     },
     rename(from: string, to: string, cb: (err?: Error | null) => void): void {
@@ -669,6 +672,30 @@ describe('running a transfer plan', () => {
     expect(result).toEqual({ written: 0, skipped: 1, changed: [dest] })
     expect(readFileSync(dest, 'utf8')).toBe('saved meanwhile in an editor')
     expect(readdirSync(localDir)).toEqual(['a.txt'])
+  })
+
+  /*
+   * The upload's twin. The destination was compared with the plan before the
+   * bytes went, and the finished copy was then swapped in whatever had become
+   * of it: a config saved on the server meanwhile was lost, and the run said
+   * written.
+   */
+  it('keeps a remote file saved again while the upload ran', async () => {
+    const entries: Record<string, Entry> = { '/srv/config': { size: 3 } }
+    attach(
+      'conn',
+      stubSession([], entries, { duringPut: () => (entries['/srv/config'] = { size: 50 }) })
+    )
+    const sending = plan('upload', [item('/local/config', '/srv/config')])
+    sending.conflicts = [
+      { ...item('/local/config', '/srv/config'), destSize: 3, destMtime: 0, reason: 'file' }
+    ]
+
+    const result = await sftpManager.runPlan('conn', sending, { '/srv/config': 'overwrite' })
+
+    expect(result).toEqual({ written: 0, skipped: 1, changed: ['/srv/config'] })
+    expect(entries['/srv/config']).toEqual({ size: 50 })
+    expect(Object.keys(entries).filter((p) => PARTIAL.test(p))).toEqual([])
   })
 
   it('reports progress against the file it is moving', async () => {
