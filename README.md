@@ -27,7 +27,8 @@ sequential and retain the conflict dialog.
   heading adds a repository and ⟳ syncs them all; removing one asks first. **Open in browser**
   in a repository's menu shows it on its web page, the same way as for a git folder below
 - Cloned read-only through the **system git**, so existing SSH keys, agents, credential helpers
-  and proxies apply as they do in a terminal; nothing is ever pushed
+  and proxies apply as they do in a terminal; nothing is ever pushed. A password or token written
+  into the address itself is refused, and left out of an export: it belongs in the helper
 - Ansible groups, `children`, inline `vars`, `group_vars/` and `host_vars/` become groups and
   connection settings
 - **Every host arrives as an SSH host unless the inventory says otherwise**, and Ansible has no
@@ -127,7 +128,8 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   and an idle auto-lock whose delay is set in Settings → Security — fifteen minutes by default,
   anything from a minute to eight hours, and able to be turned off entirely, since the right
   answer depends on the room rather than on the application, and eight hours is there because a
-  working day is the span people actually asked not to be interrupted across; the master
+  working day is the span people actually asked not to be interrupted across. On a Mac a closed
+  window counts as idle, so the vault locks on time with the app still running; the master
   password can be rotated without losing secrets.
   Deleting a host, a group, a repository or a local override takes its stored credential with it,
   rather than leaving it in the vault
