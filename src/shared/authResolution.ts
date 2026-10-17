@@ -76,9 +76,28 @@ export function authChain(
   const chain = inheritanceChain(own, groupId, groups, optedOut)
   // Settings carried from groups the host does not inherit from sit just above it.
   const carried = carriedLevel(own, groups)
-  if (carried && !optedOut(own)) chain.splice(1, 0, carried)
-  if (context.protocol !== 'rdp') return chain
-  return chain.map((level, i) => (i === 0 ? level : groupLevelFor(level, 'rdp')))
+  const hasCarried = carried !== undefined && !optedOut(own)
+  if (hasCarried) chain.splice(1, 0, carried)
+  const seen =
+    context.protocol === 'rdp'
+      ? chain.map((level, i) => (i === 0 ? level : groupLevelFor(level, 'rdp')))
+      : chain
+  /*
+   * A way in carried from elsewhere is complete as it stands. A key or a
+   * secret it did not state was filled in from the host's own groups: z's key
+   * passphrase went to the server as the password b's method asked for.
+   */
+  // A desktop's way in is its RDP login, which an SSH key says nothing about.
+  const statesWay =
+    context.protocol === 'rdp'
+      ? isSet(carried?.rdpUsername) ||
+        isSet(carried?.rdpSecretRef) ||
+        isSet(carried?.rdpCredentialId)
+      : isSet(seen[1]?.authMethod)
+  if (!hasCarried || !statesWay) return seen
+  return seen.map((level, i) =>
+    i < 2 ? level : { ...level, privateKeyPath: undefined, secretRef: undefined }
+  )
 }
 
 /** What signs a host in once its login is known, which belongs together. */
@@ -110,9 +129,18 @@ function carriedLevel(
   }
   // A login comes with the account chosen beside it, which brings its own
   // way in: db's login without db's account signed in as deploy with
-  // nothing saved.
+  // nothing saved. And with the group's RDP login, which a desktop signs in
+  // with in its place; the port with the group's RDP port likewise.
   const login = groupOf('username')
   if (login && isSet(login.credentialId)) level.credentialId = login.credentialId
+  for (const [key, from] of [
+    ['rdpUsername', login],
+    ['rdpSecretRef', login],
+    ['rdpCredentialId', login],
+    ['rdpPort', groupOf('port')]
+  ] as const) {
+    if (from && isSet(from[key])) Object.assign(level, { [key]: from[key] })
+  }
 
   /*
    * The way in — method, key and the secret saved for them — comes whole from
@@ -121,10 +149,15 @@ function carriedLevel(
    * a passphrase saved for one group's key went to the server as the password
    * another group's method asked for, and a key came without its passphrase.
    */
-  const way =
-    groupOf('authMethod') ??
-    groupOf('privateKeyPath') ??
-    (login && isSet(login.authMethod) ? login : undefined)
+  // A way in carried from a group no longer in the tree is the copy's to
+  // give, not the login group's.
+  const wayKey =
+    carriedFrom.authMethod !== undefined
+      ? 'authMethod'
+      : carriedFrom.privateKeyPath !== undefined
+        ? 'privateKeyPath'
+        : undefined
+  const way = wayKey ? groupOf(wayKey) : login && isSet(login.authMethod) ? login : undefined
   if (way) {
     for (const key of SIGN_IN) {
       if (isSet(way[key])) Object.assign(level, { [key]: way[key] })

@@ -790,18 +790,32 @@ all:
 
   /* The way in comes whole from one group, whichever groups the login and the key are from. */
   describe('when the login and the key come from different groups', () => {
-    const resolveWith = (doc: string, local: Record<string, Record<string, unknown>>) => {
+    const resolveWith = (
+      doc: string,
+      local: Record<string, Record<string, unknown>>,
+      { protocol, without }: { protocol?: 'ssh' | 'rdp'; without?: string } = {}
+    ) => {
       const { groups, hosts } = parseAnsibleInventory(parse(doc), SRC)
       const h = hosts[0]
       return resolveAuth(
         h,
         h.groupId ?? null,
-        groups.map((g) => {
-          const name = Object.keys(local).find((n) => g.id === groupId(SRC, `all/${n}`))
-          return applyOverride(g, name ? { nodeId: g.id, ...local[name] } : undefined)
-        })
+        groups
+          .filter((g) => g.id !== (without && groupId(SRC, `all/${without}`)))
+          .map((g) => {
+            const name = Object.keys(local).find((n) => g.id === groupId(SRC, `all/${n}`))
+            return applyOverride(g, name ? { nodeId: g.id, ...local[name] } : undefined)
+          }),
+        { protocol }
       )
     }
+    const threeGroups = `
+all:
+  children:
+    a: { vars: { ansible_user: deploy }, hosts: { h: {} } }
+    b: { vars: { ansible_private_key_file: /keys/b }, hosts: { h: {} } }
+    z: { hosts: { h: {} } }
+`
 
     it('takes the secret from the group the method comes from', () => {
       const auth = resolveWith(
@@ -822,6 +836,52 @@ all:
         authMethod: 'password',
         secretRef: 'password-b'
       })
+    })
+
+    /* b's way in has no secret saved; z's key passphrase was taken for b's password. */
+    it('takes no secret from the chain for a way in carried from elsewhere', () => {
+      const auth = resolveWith(threeGroups, {
+        b: { authMethod: 'password' },
+        z: { authMethod: 'privateKey', privateKeyPath: '/keys/z', secretRef: 'pp-z' }
+      })
+      expect(auth).toMatchObject({ authMethod: 'password' })
+      expect(auth.secretRef).toBeUndefined()
+    })
+
+    /* With b gone from the tree, the copy of its key stands in, not a's way in. */
+    it('keeps the copy of a way in whose group is gone', () => {
+      const auth = resolveWith(
+        threeGroups,
+        { a: { authMethod: 'password', secretRef: 'pw-a' } },
+        { without: 'b' }
+      )
+      expect(auth).toMatchObject({ authMethod: 'privateKey', privateKeyPath: '/keys/b' })
+      expect(auth.secretRef).toBeUndefined()
+    })
+
+    /* A desktop takes db's RDP side as it takes db's SSH side. */
+    it('carries the RDP login and port of the group they come from', () => {
+      const auth = resolveWith(
+        `
+all:
+  children:
+    db: { vars: { ansible_user: deploy, ansible_port: 2200 }, hosts: { h: {} } }
+    web: { hosts: { h: {} } }
+`,
+        { db: { rdpUsername: 'DOMAIN\\admin', rdpSecretRef: 'rdp-pw', rdpPort: 3390 } },
+        { protocol: 'rdp' }
+      )
+      expect(auth).toMatchObject({ username: 'DOMAIN\\admin', secretRef: 'rdp-pw', port: 3390 })
+    })
+
+    /* An SSH key carried from b says nothing about a desktop's login. */
+    it('leaves a desktop the RDP password of its own chain', () => {
+      const auth = resolveWith(
+        threeGroups,
+        { z: { rdpUsername: 'admin', rdpSecretRef: 'rdp-z' } },
+        { protocol: 'rdp' }
+      )
+      expect(auth.secretRef).toBe('rdp-z')
     })
 
     it('brings the passphrase saved with a key carried without the login', () => {
