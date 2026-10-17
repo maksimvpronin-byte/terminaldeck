@@ -9,10 +9,11 @@ import {
   readFileSync,
   rmSync,
   statSync,
+  symlinkSync,
   writeFileSync
 } from 'fs'
 import { tmpdir } from 'os'
-import { join } from 'path'
+import { basename, dirname, join } from 'path'
 import { PassThrough, Writable } from 'stream'
 import type { SFTPWrapper } from 'ssh2'
 import type { SftpEntry, TransferDecisions, TransferItem, TransferPlan } from '../../shared/types'
@@ -88,6 +89,8 @@ function stubSession(
     modeAtWrite?: Record<string, number>
     /** Runs while a download is on its way, before it finishes. */
     duringGet?: () => void
+    /** Runs before the stub opens what it was given, the way a racing program would. */
+    beforeGet?: () => void
   } = {}
 ): SFTPWrapper {
   const move = (from: string, to: string): void => {
@@ -175,6 +178,7 @@ function stubSession(
       cb: (err?: Error | null) => void
     ): void {
       calls.push({ op: 'fastGet', path: remote, to: local })
+      opts.beforeGet?.()
       transfer.step?.(512, 512, 1024)
       // The real one creates the file. The stub has to as well, or it cannot
       // say anything about what happens to it afterwards.
@@ -391,7 +395,6 @@ describe('running a transfer plan', () => {
      * whole one used to be. Nothing partial is left behind either.
      */
     expect(calls[0].to).not.toBe(dest)
-    expect(calls[0].to).toMatch(/\.part-/)
     expect(readdirSync(join(localDir, 'nested', 'deeper'))).toEqual(['a.txt'])
   })
 
@@ -488,21 +491,28 @@ describe('running a transfer plan', () => {
    * file is already there — created by this download alone, and private —
    * by the time ssh2 opens it.
    */
+  /** The partial beside `dest`, by its name; the transfer itself is given a descriptor path. */
+  function partialsOf(dest: string): string[] {
+    const prefix = `${basename(dest)}.part-`
+    return readdirSync(dirname(dest))
+      .filter((name) => name.startsWith(prefix))
+      .map((name) => join(dirname(dest), name))
+  }
+
   it('fetches into a private file of its own under a name nobody could guess', async () => {
     mkdirSync(localDir, { recursive: true })
     const dest = join(localDir, 'a.txt')
-    let during: { mode: number; isFile: boolean } | undefined
-    const calls: Call[] = []
+    const seen: Array<{ path: string; mode: number; isFile: boolean }> = []
     attach(
       'conn',
       stubSession(
-        calls,
+        [],
         { '/srv/a.txt': { size: 1024 } },
         {
           duringGet: () => {
-            const partial = calls[calls.length - 1].to!
+            const [partial] = partialsOf(dest)
             const st = lstatSync(partial)
-            during = { mode: st.mode & 0o777, isFile: st.isFile() }
+            seen.push({ path: partial, mode: st.mode & 0o777, isFile: st.isFile() })
           }
         }
       )
@@ -513,12 +523,52 @@ describe('running a transfer plan', () => {
       [dest]: 'overwrite'
     })
 
-    expect(calls[0].to).toMatch(/\.part-[0-9a-f]{16}$/)
-    expect(calls[1].to).toMatch(/\.part-[0-9a-f]{16}$/)
-    expect(calls[1].to).not.toBe(calls[0].to)
-    expect(during?.isFile).toBe(true)
-    if (process.platform !== 'win32') expect(during?.mode).toBe(0o600)
+    expect(seen).toHaveLength(2)
+    expect(seen[0].path).toMatch(/\.part-[0-9a-f]{16}$/)
+    expect(seen[1].path).not.toBe(seen[0].path)
+    expect(seen.every((s) => s.isFile)).toBe(true)
+    if (process.platform !== 'win32') expect(seen.map((s) => s.mode)).toEqual([0o600, 0o600])
+    expect(readFileSync(dest, 'utf8')).toBe('fetched')
   })
+
+  /**
+   * In a folder where somebody else may delete files, the partial can be
+   * swapped for a link after it was created and before the transfer opens
+   * it. The download is written through its own descriptor, so the file the
+   * link points at is untouched; and the link is not moved into place.
+   */
+  it.skipIf(process.platform === 'win32')(
+    'writes nothing through a link swapped in for its partial',
+    async () => {
+      mkdirSync(localDir, { recursive: true })
+      const dest = join(localDir, 'a.txt')
+      const victim = join(localDir, 'victim.txt')
+      writeFileSync(victim, 'not yours', 'utf8')
+      attach(
+        'conn',
+        stubSession(
+          [],
+          { '/srv/a.txt': { size: 1024 } },
+          {
+            beforeGet: () => {
+              const [partial] = partialsOf(dest)
+              rmSync(partial)
+              symlinkSync(victim, partial)
+            }
+          }
+        )
+      )
+
+      await expect(
+        sftpManager.runPlan('conn', plan('download', [item('/srv/a.txt', dest)]))
+      ).rejects.toThrow(/was replaced while the download ran/)
+
+      expect(readFileSync(victim, 'utf8')).toBe('not yours')
+      expect(existsSync(dest)).toBe(false)
+      // The link is somebody else's; it is left where they put it.
+      expect(partialsOf(dest)).toHaveLength(1)
+    }
+  )
 
   /**
    * The partial is private while it fills, and the rename carried that — or,

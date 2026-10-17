@@ -4,11 +4,13 @@ import type { Writable } from 'stream'
 import type { SFTPWrapper, Stats } from 'ssh2'
 import { readdir, mkdir, stat, lstat, readFile } from 'fs/promises'
 import {
-  chmodSync,
   closeSync,
   constants,
   copyFileSync,
+  fchmodSync,
+  fstatSync,
   linkSync,
+  lstatSync,
   openSync,
   renameSync,
   rmSync,
@@ -122,11 +124,12 @@ const PARTIAL_MODE = 0o600
  *
  * The rename used to take the partial's mode along with its contents, so a
  * 0600 file fetched again — an SSH key, a config with a password in it — came
- * back readable by everyone, and a script lost its executable bit. Not on
- * Windows, where a mode is a read-only flag and carrying that one onto the
- * partial would only stop the rename.
+ * back readable by everyone, and a script lost its executable bit. Through the
+ * descriptor, since the name may no longer be the file's; not on Windows, where
+ * a mode is a read-only flag and carrying that one onto the partial would only
+ * stop the rename.
  */
-function giveModeOf(dest: string, partial: string): void {
+function giveModeOf(dest: string, fd: number): void {
   if (process.platform === 'win32') return
   let mode: number
   try {
@@ -134,7 +137,41 @@ function giveModeOf(dest: string, partial: string): void {
   } catch {
     mode = 0o666 & ~process.umask()
   }
-  chmodSync(partial, mode)
+  fchmodSync(fd, mode)
+}
+
+/**
+ * A path that opens the file `fd` holds, whatever now stands at its name.
+ *
+ * ssh2 takes a path and opens it itself, with `w`, which follows a link. A
+ * partial created exclusively is the download's own when it is created, but
+ * in a folder where somebody else may delete files, the name can be swapped
+ * for a link between that and ssh2's open. These name the open file instead:
+ * on Linux a magic link to it, on a Mac a duplicate of the descriptor. Windows
+ * has neither, and a link there needs a privilege ordinary accounts lack.
+ */
+function throughDescriptor(fd: number, path: string): string {
+  if (process.platform === 'linux') return `/proc/self/fd/${fd}`
+  if (process.platform === 'darwin') return `/dev/fd/${fd}`
+  return path
+}
+
+/** Whether `path` still names the file `fd` holds, and not a link put there since. */
+function namesHeldFile(fd: number, path: string): boolean {
+  try {
+    const held = fstatSync(fd, { bigint: true })
+    const named = lstatSync(path, { bigint: true })
+    return held.dev === named.dev && held.ino === named.ino
+  } catch {
+    return false
+  }
+}
+
+/** A download's partial name stood for something else by the time it was moved. */
+export class PartialReplaced extends Error {
+  constructor(readonly path: string) {
+    super(`${path} was replaced while the download ran, and nothing was moved into place`)
+  }
 }
 
 /**
@@ -441,17 +478,25 @@ class SFTPManager {
      * Random, and the file created here exclusively and private before a byte
      * arrives: the name was the process id and a counter, and ssh2 opens what
      * it is given with `w`, which writes through a link that anyone able to
-     * write to the folder had guessed and put down first.
+     * write to the folder had guessed and put down first. And written through
+     * the descriptor rather than the name; see throughDescriptor.
      */
     const partial = `${localPath}.part-${randomBytes(8).toString('hex')}`
-    closeSync(openSync(partial, 'wx', PARTIAL_MODE))
+    const fd = openSync(partial, 'wx', PARTIAL_MODE)
+    const target = throughDescriptor(fd, partial)
+    let held = true
+    const release = (): void => {
+      if (held) closeSync(fd)
+      held = false
+    }
+    let ours = true
     try {
-      if (shell) await shell.download(remotePath, partial, onProgress)
+      if (shell) await shell.download(remotePath, target, onProgress)
       else
         await new Promise<void>((resolve, reject) => {
           sftp!.fastGet(
             remotePath,
-            partial,
+            target,
             {
               mode: PARTIAL_MODE,
               step: (transferred, _chunk, total) => onProgress?.(transferred, total)
@@ -459,15 +504,25 @@ class SFTPManager {
             (err) => (err ? reject(err) : resolve())
           )
         })
-      giveModeOf(localPath, partial)
+      giveModeOf(localPath, fd)
+      // What is moved is the name, so it has to be ours still. Closed first:
+      // Windows will not always rename a file somebody holds open.
+      ours = namesHeldFile(fd, partial)
+      release()
+      if (!ours) throw new PartialReplaced(partial)
       if (replace) renameSync(partial, localPath)
       else placeWithoutReplacing(partial, localPath)
     } catch (err) {
-      // Nothing half-finished is left lying beside the file it failed to become.
-      try {
-        rmSync(partial, { force: true })
-      } catch {
-        // Already gone.
+      if (held) ours = namesHeldFile(fd, partial)
+      release()
+      // Nothing half-finished is left lying beside the file it failed to
+      // become — but what somebody else put at the name is not ours to remove.
+      if (ours) {
+        try {
+          rmSync(partial, { force: true })
+        } catch {
+          // Already gone.
+        }
       }
       throw err
     }
