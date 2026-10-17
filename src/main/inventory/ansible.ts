@@ -137,7 +137,8 @@ interface RawGroup {
  * Turns a parsed Ansible YAML inventory into our groups and sessions.
  *
  * `lookupVars` supplies group_vars/host_vars content, which is where connection
- * details usually live; inline vars take precedence over it, matching Ansible.
+ * details usually live. It wins over vars written in the inventory itself, as in Ansible;
+ * see `parseAnsibleInventories`.
  */
 export function parseAnsibleInventory(
   doc: unknown,
@@ -305,18 +306,25 @@ export function parseAnsibleInventories(
   }
   for (const name of roots) placeNode(name, null, new Set())
 
-  /** group_vars or host_vars from every place, then what the inventory states itself. */
+  /** group_vars or host_vars from every place, in file order. */
   const fromPlaces = (kind: 'group' | 'host', name: string): AnsibleVars =>
     [...places.values()].reduce<AnsibleVars>(
       (acc, lookup) => ({ ...acc, ...lookup(kind, name) }),
       {}
     )
   const gathered = new Map<string, AnsibleVars>()
-  /** A group's vars, by name: its group_vars from every place, under what it states itself. */
+  /**
+   * A group's vars, by name: what the inventory states for it, under its
+   * group_vars. Ansible reads the group_vars files after the inventory's own
+   * vars — `group_vars/web.yml` saying `ansible_user: deploy` beats `vars:`
+   * under `web` — and this had it the other way round. (Ansible goes one step
+   * further, which a tree read by nearest group cannot: any group's
+   * group_vars beat any other group's inline vars, `all` aside.)
+   */
   const varsOf = (name: string): AnsibleVars => {
     let vars = gathered.get(name)
     if (!vars) {
-      vars = { ...fromPlaces('group', name), ...statedOf.get(name) }
+      vars = { ...statedOf.get(name), ...fromPlaces('group', name) }
       gathered.set(name, vars)
     }
     return vars
@@ -362,7 +370,8 @@ export function parseAnsibleInventories(
     const inline = [...entry.claims]
       .sort((a, b) => (rank.get(a.group) ?? 0) - (rank.get(b.group) ?? 0))
       .reduce<AnsibleVars>((acc, claim) => ({ ...acc, ...claim.vars }), {})
-    const hostVars = { ...fromPlaces('host', entry.name), ...inline }
+    // host_vars over the inventory's own host vars, as Ansible reads them.
+    const hostVars = { ...inline, ...fromPlaces('host', entry.name) }
 
     /*
      * Protocol is resolved here rather than inherited, and the difference

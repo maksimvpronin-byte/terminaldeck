@@ -228,17 +228,21 @@ all:
     expect(hosts.find((h) => h.name === 'db1')!.id).toBe(hostId(SRC, 'db1'))
   })
 
-  it('merges group_vars and host_vars, with inline vars winning', () => {
+  /**
+   * Ansible reads group_vars and host_vars after the inventory's own vars, so
+   * the files win: https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_variables.html#understanding-variable-precedence
+   */
+  it('merges group_vars and host_vars, with the files winning over inline vars', () => {
     const lookup = (kind: 'group' | 'host', name: string): Record<string, unknown> => {
       if (kind === 'group' && name === 'web') return { ansible_user: 'from-group-vars' }
       if (kind === 'host' && name === 'db1') return { ansible_user: 'from-host-vars' }
       return {}
     }
     const { groups, hosts } = parseAnsibleInventory(doc, SRC, lookup)
-    // Inline `vars:` beats group_vars, as in Ansible.
-    expect(groups.find((g) => g.name === 'web')!.username).toBe('nginx')
-    // db1 states its own user inline, so host_vars loses too.
-    expect(hosts.find((h) => h.name === 'db1')!.username).toBe('postgres')
+    // group_vars/web.yml beats `vars:` under web.
+    expect(groups.find((g) => g.name === 'web')!.username).toBe('from-group-vars')
+    // host_vars/db1.yml beats what db1 states inline.
+    expect(hosts.find((h) => h.name === 'db1')!.username).toBe('from-host-vars')
   })
 
   it('applies host_vars when the inventory states nothing inline', () => {
