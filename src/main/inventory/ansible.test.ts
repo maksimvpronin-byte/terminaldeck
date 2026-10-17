@@ -750,6 +750,44 @@ all:
     })
   })
 
+  /*
+   * The secret saved for db is the passphrase of db's key. Carried with the
+   * login and without the key, it was sent to the server as a password.
+   */
+  it('carries a group’s saved secret only with the way it signs in', () => {
+    const { groups, hosts } = parseAnsibleInventory(
+      parse(`
+all:
+  children:
+    db:
+      vars: { ansible_user: deploy }
+      hosts: { h: {} }
+    web:
+      hosts: { h: {} }
+`),
+      SRC
+    )
+    const db = groupId(SRC, 'all/db')
+    const h = hosts[0]
+    const withLocal = (local: Record<string, unknown>) =>
+      resolveAuth(
+        h,
+        h.groupId ?? null,
+        groups.map((g) => applyOverride(g, g.id === db ? { nodeId: db, ...local } : undefined))
+      )
+
+    expect(
+      withLocal({ authMethod: 'privateKey', privateKeyPath: '/keys/encrypted', secretRef: 'pp' })
+    ).toMatchObject({
+      username: 'deploy',
+      authMethod: 'privateKey',
+      privateKeyPath: '/keys/encrypted',
+      secretRef: 'pp'
+    })
+    // A secret saved without saying how it is used stays with db's own hosts.
+    expect(withLocal({ secretRef: 'pw' }).secretRef).toBeUndefined()
+  })
+
   it('still lets the host’s own settings win', () => {
     const doc = `
 all:

@@ -101,12 +101,20 @@ function carriedLevel(
     const group = groups.find((g) => g.id === groupId)
     if (!group) continue
     if (isSet(group[key])) Object.assign(level, { [key]: group[key] })
-    // A login comes with the account and the password saved beside it: db's
-    // login without db's account signed in as deploy with nothing saved.
-    if (key === 'username') {
-      for (const field of ['credentialId', 'secretRef'] as const) {
-        if (isSet(group[field])) Object.assign(level, { [field]: group[field] })
-      }
+    if (key !== 'username') continue
+    // A login comes with the account chosen beside it, which brings its own
+    // way in: db's login without db's account signed in as deploy with
+    // nothing saved.
+    if (isSet(group.credentialId)) level.credentialId = group.credentialId
+    /*
+     * A saved secret only with the way it is used. Carried with the login
+     * alone, the passphrase of db's key went to the server as a password; so
+     * the method, the key and the secret come over together or not at all.
+     */
+    if (isSet(group.authMethod)) {
+      level.authMethod = group.authMethod
+      if (isSet(group.privateKeyPath)) level.privateKeyPath = group.privateKeyPath
+      if (isSet(group.secretRef)) level.secretRef = group.secretRef
     }
   }
   return level
