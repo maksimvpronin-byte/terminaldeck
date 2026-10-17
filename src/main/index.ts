@@ -24,6 +24,9 @@ import { rememberWindowPlacement, savedWindowPlacement } from './windowState'
 /** The smallest the window may be made, and the smallest it is restored at. */
 const MIN_WINDOW = { width: 900, height: 560 }
 
+/** How long a quit or a closing window waits for edited files to go up. */
+const EDIT_FLUSH_LIMIT_MS = 10_000
+
 /**
  * The stock menu binds Cmd/Ctrl +, - and 0 to page zoom, and menu accelerators
  * fire before the renderer sees the key — which stole our terminal font-size
@@ -177,6 +180,17 @@ function createWindow(): void {
   })
   mainWindow.webContents.on('render-process-gone', releaseSessions)
   mainWindow.on('closed', releaseSessions)
+
+  // Closing the window ends its connections; a save on its way goes first.
+  let flushedForClose = false
+  mainWindow.on('close', (event) => {
+    if (flushedForClose || !remoteEdit.hasUnsynced()) return
+    event.preventDefault()
+    flushedForClose = true
+    void remoteEdit.flush(EDIT_FLUSH_LIMIT_MS).finally(() => {
+      if (!mainWindow.isDestroyed()) mainWindow.close()
+    })
+  })
 
   // The idle lock is counted by the page; with no page, here. See idleLock.
   mainWindow.webContents.on('did-finish-load', () => idleLock.pageBack())
@@ -393,11 +407,26 @@ app.whenReady().then(async () => {
  * quit is a quit rather than a race, and a session mid-frame does not hold the
  * far end open while it finishes.
  */
-app.on('before-quit', () => {
+let flushedForQuit = false
+app.on('before-quit', (event) => {
+  // A save still on its way to the server goes first. See RemoteEdit.flush.
+  if (!flushedForQuit && remoteEdit.hasUnsynced()) {
+    event.preventDefault()
+    flushedForQuit = true
+    void remoteEdit.flush(EDIT_FLUSH_LIMIT_MS).finally(() => app.quit())
+    return
+  }
   freeRdpBridge.stopAll()
   remoteMonitor.stopAll()
   // The copies of remote files opened for editing. See RemoteEdit.cleanUp.
-  remoteEdit.cleanUp()
+  const kept = remoteEdit.cleanUp()
+  if (kept.length > 0) {
+    dialog.showMessageBoxSync({
+      type: 'warning',
+      message: 'Some edited files did not reach the server',
+      detail: `Their copies were kept, so nothing saved in them is lost:\n\n${kept.join('\n')}`
+    })
+  }
 })
 
 app.on('window-all-closed', () => {

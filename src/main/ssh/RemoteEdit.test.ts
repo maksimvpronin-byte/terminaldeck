@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { existsSync, writeFileSync } from 'fs'
+import { existsSync, readFileSync, utimesSync, writeFileSync } from 'fs'
 import { basename, dirname } from 'path'
 import type { BrowserWindow } from 'electron'
 
@@ -15,6 +15,20 @@ import type { BrowserWindow } from 'electron'
  */
 
 const fileState = vi.hoisted(() => ({ statError: false }))
+/** What reached the "server", and whether it is reachable at all. */
+const uploads = vi.hoisted(() => {
+  const sent: { remote: string; contents: string }[] = []
+  const state = { fail: false }
+  return {
+    sent,
+    state,
+    run: async (_id: string, local: string, remote: string): Promise<void> => {
+      if (state.fail) throw new Error('Not connected')
+      const { readFileSync: read } = await import('fs')
+      sent.push({ remote, contents: read(local, 'utf8') })
+    }
+  }
+})
 vi.mock('fs', async (original) => {
   const actual = await original<typeof import('fs')>()
   return {
@@ -54,17 +68,26 @@ vi.mock('./SFTPManager', () => ({
     download: vi.fn(async (_id: string, _remote: string, local: string): Promise<void> => {
       writeFileSync(local, 'contents', 'utf8')
     }),
-    upload: async (): Promise<void> => undefined
+    upload: (connectionId: string, local: string, remote: string): Promise<void> =>
+      uploads.run(connectionId, local, remote)
   }
 }))
 
 const { remoteEdit, openInEditor } = await import('./RemoteEdit')
 
-/** The window is only ever sent events; none of them matter here. */
+/** The window is only ever sent events; the ones about saves are kept to look at. */
+const told: unknown[] = []
 const win = {
   isDestroyed: () => false,
-  webContents: { send: () => undefined }
+  webContents: { send: (_channel: string, payload: unknown) => void told.push(payload) }
 } as unknown as BrowserWindow
+
+/** Saves the copy as an editor would, with a modification time that is plainly newer. */
+function save(local: string, contents: string): void {
+  writeFileSync(local, contents, 'utf8')
+  const later = new Date(Date.now() + 5_000)
+  utimesSync(local, later, later)
+}
 
 describe('remote editing', () => {
   it('removes a copy at quit even when its connection closed first', async () => {
@@ -92,6 +115,52 @@ describe('remote editing', () => {
     expect(dirname(local)).toBe(dir)
     expect(basename(local)).toMatch(/evil\.dll$/)
     remoteEdit.cleanUp()
+  })
+
+  /**
+   * A save waits 300 ms for the editor to finish writing. Quitting in that
+   * time cleared the wait and deleted the copy: the server kept the old file,
+   * and the new one was gone.
+   */
+  it('sends a save made just before quitting, then removes the copy', async () => {
+    uploads.sent.length = 0
+    const local = await remoteEdit.open(win, 'connection-4', '/etc/motd', 'true')
+    save(local, 'edited')
+    expect(remoteEdit.hasUnsynced()).toBe(true)
+
+    await remoteEdit.flush(1_000)
+
+    expect(uploads.sent).toEqual([{ remote: '/etc/motd', contents: 'edited' }])
+    expect(remoteEdit.hasUnsynced()).toBe(false)
+    expect(remoteEdit.cleanUp()).toEqual([])
+    expect(existsSync(local)).toBe(false)
+  })
+
+  it('keeps a copy whose save could not be sent, and says where it is', async () => {
+    const local = await remoteEdit.open(win, 'connection-5', '/etc/motd', 'true')
+    save(local, 'edited offline')
+    uploads.state.fail = true
+
+    await remoteEdit.flush(1_000)
+    const kept = remoteEdit.cleanUp()
+
+    expect(kept).toEqual([local])
+    expect(readFileSync(local, 'utf8')).toBe('edited offline')
+  })
+
+  it('tells the window when a closing connection leaves a save unsent', async () => {
+    told.length = 0
+    const local = await remoteEdit.open(win, 'connection-6', '/etc/motd', 'true')
+    save(local, 'edited')
+
+    remoteEdit.stopAllFor('connection-6')
+
+    expect(told).toContainEqual({
+      remotePath: '/etc/motd',
+      error: `Not uploaded. The edited copy is kept at ${local}`
+    })
+    expect(remoteEdit.cleanUp()).toEqual([local])
+    expect(existsSync(local)).toBe(true)
   })
 
   it('removes a copy whose session is still live', async () => {
@@ -177,6 +246,7 @@ describe('a path with a dollar sign in it', () => {
 const { sftpManager } = await import('./SFTPManager')
 afterEach(() => {
   fileState.statError = false
+  uploads.state.fail = false
   remoteEdit.cleanUp()
 })
 

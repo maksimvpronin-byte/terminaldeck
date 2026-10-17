@@ -27,6 +27,9 @@ function describeRule(rule: PortForwardRule): string {
   return `${rule.type} ${src} -> ${rule.dstHost}:${rule.dstPort}`
 }
 
+/** How long closing a pane waits for its edited files to go up. */
+const EDIT_FLUSH_LIMIT_MS = 10_000
+
 export function registerSshHandlers(): void {
   // --- SSH ---
   ipcMain.handle(
@@ -129,7 +132,9 @@ export function registerSshHandlers(): void {
     remoteMonitor.stop(connectionId)
   })
 
-  ipcMain.handle(IPC.sshDisconnect, (_e, connectionId: string) => {
+  ipcMain.handle(IPC.sshDisconnect, async (_e, connectionId: string) => {
+    // A file saved in an editor a moment ago is sent before the link goes.
+    await remoteEdit.flush(EDIT_FLUSH_LIMIT_MS, connectionId)
     // The release above runs from inside this, for both ways out.
     sshManager.disconnect(connectionId)
   })

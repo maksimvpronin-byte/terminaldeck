@@ -1,5 +1,5 @@
 import { shell, type BrowserWindow } from 'electron'
-import { join } from 'path'
+import { dirname, join } from 'path'
 import { spawn } from 'child_process'
 import { mkdtempSync, existsSync, statSync, rmSync, watch, type FSWatcher } from 'fs'
 import { tmpdir } from 'os'
@@ -18,6 +18,10 @@ interface EditSession {
   savedAgain: boolean
   lastMtimeMs: number
   timer?: NodeJS.Timeout
+  /** The upload under way, for a flush to wait on. */
+  inflight?: Promise<void>
+  /** Told when a save is sent, or kept because it could not be. */
+  win: BrowserWindow
 }
 
 /** Splits a command line into program and arguments, honouring quoted paths. */
@@ -218,6 +222,7 @@ class RemoteEditManager {
       uploading: false,
       savedAgain: false,
       lastMtimeMs: statSync(localPath).mtimeMs,
+      win,
       watcher: watch(dir, () => this.onChanged(win, key))
     }
     /*
@@ -260,13 +265,23 @@ class RemoteEditManager {
     // Editors often touch the file several times per save; settle first.
     clearTimeout(session.timer)
     session.timer = setTimeout(() => {
+      session.timer = undefined
       void this.upload(win, key).catch((err) => console.error('[remote edit]', err))
     }, 300)
   }
 
-  private async upload(win: BrowserWindow, key: string): Promise<void> {
+  private upload(win: BrowserWindow, key: string): Promise<void> {
     const session = this.sessions.get(key)
-    if (!session || !existsSync(session.localPath)) return
+    if (!session) return Promise.resolve()
+    const run = this.send(win, key, session).finally(() => {
+      if (session.inflight === run) session.inflight = undefined
+    })
+    session.inflight = run
+    return run
+  }
+
+  private async send(win: BrowserWindow, key: string, session: EditSession): Promise<void> {
+    if (!existsSync(session.localPath)) return
 
     try {
       const mtimeMs = statSync(session.localPath).mtimeMs
@@ -299,15 +314,88 @@ class RemoteEditManager {
     }
   }
 
+  /**
+   * Whether something saved in the editor has not reached the server: the copy
+   * is newer than the last one sent. A pending wait, an upload under way or a
+   * save made during one all show up here, and a wake-up that changed nothing
+   * does not.
+   */
+  private unsynced(session: EditSession): boolean {
+    try {
+      return statSync(session.localPath).mtimeMs !== session.lastMtimeMs
+    } catch {
+      return false
+    }
+  }
+
+  /** Whether any edit — or any on this connection — is still to be sent. */
+  hasUnsynced(connectionId?: string): boolean {
+    return [...this.sessions.values()].some(
+      (s) => (!connectionId || s.connectionId === connectionId) && this.unsynced(s)
+    )
+  }
+
+  /**
+   * Sends what was saved and not yet sent, now, and waits for it — for the
+   * moment a connection, the window or the application is about to go.
+   *
+   * A save waits 300 ms for the editor to finish writing, and the connection
+   * closing in that time cleared the wait: saving and quitting at once kept
+   * the old file on the server and deleted the new one here. Gives up after
+   * `limitMs`; whatever is still unsent then is kept rather than deleted.
+   */
+  async flush(limitMs: number, connectionId?: string): Promise<void> {
+    const pending = [...this.sessions.entries()].filter(
+      ([, s]) => (!connectionId || s.connectionId === connectionId) && this.unsynced(s)
+    )
+    const work = Promise.all(
+      pending.map(async ([key, session]) => {
+        // A save made during the upload is sent after it; a few rounds at most.
+        for (let round = 0; round < 5; round++) {
+          if (this.sessions.get(key) !== session || !this.unsynced(session)) return
+          clearTimeout(session.timer)
+          session.timer = undefined
+          if (session.inflight) await session.inflight
+          else await this.upload(session.win, key)
+        }
+      })
+    )
+    let timer: NodeJS.Timeout | undefined
+    const limit = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, limitMs)
+    })
+    await Promise.race([work, limit])
+    clearTimeout(timer)
+  }
+
+  /** Copies kept because what was saved in them never reached the server. */
+  private kept = new Map<string, string>()
+
+  /**
+   * Lets a session go. One holding an unsent save keeps its copy — the only
+   * place that save now exists — and the window is told where it is.
+   */
+  private release(key: string, session: EditSession): void {
+    clearTimeout(session.timer)
+    session.watcher.close()
+    this.sessions.delete(key)
+    if (!this.unsynced(session)) return
+    this.kept.set(dirname(session.localPath), session.localPath)
+    if (!session.win.isDestroyed()) {
+      session.win.webContents.send(`${IPC.sftpEdited}:${session.connectionId}`, {
+        remotePath: session.remotePath,
+        error: `Not uploaded. The edited copy is kept at ${session.localPath}`
+      })
+    }
+  }
+
   stop(connectionId: string, remotePath: string): void {
     const key = this.key(connectionId, remotePath)
     const token = this.openingTokens.get(key)
     if (token) token.cancelled = true
     const session = this.sessions.get(key)
     if (!session) return
-    clearTimeout(session.timer)
-    session.watcher.close()
-    this.sessions.delete(key)
+    this.release(key, session)
   }
 
   /**
@@ -322,18 +410,16 @@ class RemoteEditManager {
    * Done at quit rather than when a file is closed, because the editor is
    * somebody else's program and this end cannot tell when they have finished
    * with it. After quit there is nothing left to upload to, so a copy that
-   * stays is all cost and no use.
+   * stays is all cost and no use — unless it holds a save that never reached
+   * the server, which is kept, and returned for the person to be told.
    */
-  cleanUp(): void {
+  cleanUp(): string[] {
     for (const token of this.openingTokens.values()) token.cancelled = true
-    for (const session of this.sessions.values()) {
-      clearTimeout(session.timer)
-      session.watcher.close()
-    }
-    this.sessions.clear()
+    for (const [key, session] of [...this.sessions]) this.release(key, session)
 
     // Every directory ever made, not only the ones still being watched.
     for (const dir of this.dirs) {
+      if (this.kept.has(dir)) continue
       try {
         rmSync(dir, { recursive: true, force: true })
       } catch {
@@ -343,6 +429,9 @@ class RemoteEditManager {
       }
     }
     this.dirs.clear()
+    const kept = [...this.kept.values()]
+    this.kept.clear()
+    return kept
   }
 
   /** Which temporary directories are still on disk, for the test to look at. */
@@ -355,11 +444,8 @@ class RemoteEditManager {
     for (const token of this.openingTokens.values()) {
       if (token.connectionId === connectionId) token.cancelled = true
     }
-    for (const [key, session] of this.sessions) {
-      if (session.connectionId !== connectionId) continue
-      clearTimeout(session.timer)
-      session.watcher.close()
-      this.sessions.delete(key)
+    for (const [key, session] of [...this.sessions]) {
+      if (session.connectionId === connectionId) this.release(key, session)
     }
   }
 
