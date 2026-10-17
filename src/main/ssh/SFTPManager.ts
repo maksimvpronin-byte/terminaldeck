@@ -547,7 +547,12 @@ class SFTPManager {
      * the replacement: saved by another program while the download ran, it is
      * another file, and is kept.
      */
-    expected?: { destSize: number; destMtime: number }
+    expected?: { destSize: number; destMtime: number },
+    /**
+     * The folder the download was chosen into, whose links below it are not
+     * followed; see linkBelow. Looked at again once the partial exists.
+     */
+    within?: string
   ): Promise<void> {
     const shell = this.getShell(connectionId)
     const sftp = shell ? undefined : await this.getSftp(connectionId)
@@ -571,6 +576,20 @@ class SFTPManager {
      */
     const partial = `${localPath}.part-${randomBytes(8).toString('hex')}`
     const fd = openSync(partial, 'wx', PARTIAL_MODE)
+    /*
+     * runPlan looks for a link before it calls this, and a folder could still
+     * be swapped for one between that look and the open: the file was then
+     * written wherever the link pointed. Once the partial exists the open has
+     * happened, so a link found now is one it went through, and it goes. One
+     * put there later only stops the rename, which looks for the partial
+     * through it and does not find it.
+     */
+    if (within && (await linkBelow(within, partial))) {
+      const mine = namesHeldFile(fd, partial)
+      closeSync(fd)
+      if (mine) rmSync(partial, { force: true })
+      throw new DestinationAppeared(localPath)
+    }
     const target = throughDescriptor(fd, partial)
     let held = true
     const release = (): void => {
@@ -1324,7 +1343,8 @@ class SFTPManager {
             item.destPath,
             report,
             conflicted.has(item.destPath),
-            askedAbout.get(item.destPath)
+            askedAbout.get(item.destPath),
+            plan.localRoot
           )
         } catch (err) {
           if (!(err instanceof DestinationAppeared)) throw err

@@ -1303,6 +1303,34 @@ describe('downloading a folder', () => {
     }
   )
 
+  /*
+   * The look before writing still left a moment: `logs` swapped for a link
+   * after it and before the partial was opened, and the file was written
+   * wherever the link pointed. The partial is looked at once it exists.
+   */
+  it.skipIf(process.platform === 'win32')(
+    'writes nothing through a link put there after the last look',
+    async () => {
+      const outside = mkdtempSync(join(tmpdir(), 'terminaldeck-outside-'))
+      mkdirSync(localDir, { recursive: true })
+      symlinkSync(outside, join(localDir, 'logs'))
+      attach('conn', stubSession([], { '/srv/logs/new.txt': { size: 3 } }))
+
+      await expect(
+        sftpManager.download(
+          'conn',
+          '/srv/logs/new.txt',
+          join(localDir, 'logs', 'new.txt'),
+          undefined,
+          false,
+          undefined,
+          localDir
+        )
+      ).rejects.toThrow(/left alone/)
+      expect(readdirSync(outside)).toEqual([])
+    }
+  )
+
   /** `..cache` is a folder like any other, not a step out of the one chosen. */
   it('downloads a folder whose name starts with two dots', async () => {
     const entries: Record<string, Entry> = {
