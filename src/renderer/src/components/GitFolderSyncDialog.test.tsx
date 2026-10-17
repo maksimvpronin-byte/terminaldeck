@@ -188,6 +188,26 @@ describe('the sync dialog', () => {
     expect(screen.getByRole('button', { name: 'Apply' })).not.toHaveProperty('disabled', true)
   })
 
+  /** A failed check is not a clean one: Apply waits until one succeeds. */
+  it('keeps Apply shut when it cannot say what Apply would take', async () => {
+    const consequences = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('the read was forgotten'))
+      .mockResolvedValue([{ id: 'h1', name: 'web1', hasLocalSettings: false }])
+    window.td.gitFolder.consequences = consequences
+    render(<GitFolderSyncDialog folderName="Infra" preview={preview} onClose={() => {}} />)
+    const apply = (): HTMLButtonElement =>
+      screen.getByRole('button', { name: 'Apply' }) as HTMLButtonElement
+
+    await userEvent.click(screen.getByRole('button', { name: 'Select none' }))
+    expect(await screen.findByText(/the read was forgotten/)).toBeTruthy()
+    expect(apply().disabled).toBe(true)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Check again' }))
+    expect(await screen.findByText(/1 hosts will disappear/)).toBeTruthy()
+    expect(apply().disabled).toBe(false)
+  })
+
   it('leaves the folder alone when it is closed instead', async () => {
     const onClose = vi.fn()
     render(<GitFolderSyncDialog folderName="Infra" preview={preview} onClose={onClose} />)

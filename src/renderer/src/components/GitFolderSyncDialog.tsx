@@ -31,6 +31,9 @@ export default function GitFolderSyncDialog({
   const [busy, setBusy] = useState(false)
   const [removedHosts, setRemovedHosts] = useState(preview.removedHosts)
   const [checking, setChecking] = useState(false)
+  /** The last check failed: what Apply would take is not known, so it waits. */
+  const [unchecked, setUnchecked] = useState<string>()
+  const [retry, setRetry] = useState(0)
   const asked = useRef(0)
   const opened = useRef(true)
 
@@ -51,15 +54,17 @@ export default function GitFolderSyncDialog({
     window.td.gitFolder
       .consequences(preview.groupId, [...chosen], { includeChildHosts })
       .then((hosts) => {
-        if (n === asked.current) setRemovedHosts(hosts ?? [])
+        if (n !== asked.current) return
+        setRemovedHosts(hosts ?? [])
+        setUnchecked(undefined)
       })
       .catch((err) => {
-        if (n === asked.current) setError(err instanceof Error ? err.message : String(err))
+        if (n === asked.current) setUnchecked(err instanceof Error ? err.message : String(err))
       })
       .finally(() => {
         if (n === asked.current) setChecking(false)
       })
-  }, [chosen, includeChildHosts, preview.groupId])
+  }, [chosen, includeChildHosts, preview.groupId, retry])
 
   const allPaths = preview.groups.map((g) => g.path)
 
@@ -183,6 +188,17 @@ export default function GitFolderSyncDialog({
           </p>
         )}
 
+        {unchecked && (
+          <p className="error-text" role="alert">
+            {t('Could not work out what Apply would remove, so it waits: {error}', {
+              error: unchecked
+            })}{' '}
+            <button onClick={() => setRetry((r) => r + 1)} disabled={checking}>
+              {t('Check again')}
+            </button>
+          </p>
+        )}
+
         {preview.removedGroups.length > 0 && (
           <p className="settings-note">
             {t('Gone from the repository, and about to go from this folder: {groups}', {
@@ -225,7 +241,7 @@ export default function GitFolderSyncDialog({
           <button onClick={onClose} disabled={busy}>
             {t('Cancel')}
           </button>
-          <button className="primary" onClick={apply} disabled={busy || checking}>
+          <button className="primary" onClick={apply} disabled={busy || checking || !!unchecked}>
             {busy ? t('Applying…') : t('Apply')}
           </button>
         </div>

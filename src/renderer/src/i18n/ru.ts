@@ -1294,6 +1294,9 @@ export const ru: Record<string, string> = {
   'Enter a single-line shell launch command.': 'Введите команду запуска оболочки в одну строку.',
   'Linux server with scp and GNU coreutils/find required. The command must allow non-interactive execution; sudo password prompts are not supported. Applies to files after reconnecting, independently of the terminal login.':
     'Нужен Linux-сервер с scp и GNU coreutils/find. Команда должна выполняться без диалога: запрос пароля sudo не поддерживается. Применяется к файлам после переподключения, независимо от входа в терминал.',
+  'Could not work out what Apply would remove, so it waits: {error}':
+    'Не удалось выяснить, что удалит «Применить», поэтому оно недоступно: {error}',
+  'Check again': 'Проверить снова',
   'Select none': 'Снять всё',
   '{count} new since the last sync': 'Новых с прошлой синхронизации: {count}',
   'Gone from the repository, and about to go from this folder: {groups}':
