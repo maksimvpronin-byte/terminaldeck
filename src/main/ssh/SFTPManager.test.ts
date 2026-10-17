@@ -291,6 +291,12 @@ function item(sourcePath: string, destPath: string): TransferItem {
   return { sourcePath, destPath, sourceSize: 1024, sourceMtime: 0 }
 }
 
+/** A local file at the destination, as the plan found it and the dialog asked about it. */
+function asked(i: TransferItem): TransferPlan['conflicts'][number] {
+  const found = statSync(i.destPath)
+  return { ...i, destSize: found.size, destMtime: found.mtimeMs, reason: 'file' }
+}
+
 function plan(direction: TransferPlan['direction'], items: TransferItem[]): TransferPlan {
   return {
     direction,
@@ -485,9 +491,7 @@ describe('running a transfer plan', () => {
     writeFileSync(dest, 'mine', 'utf8')
     attach('conn', stubSession([], { '/srv/a.txt': { size: 1024 } }))
     const withConflict = plan('download', [item('/srv/a.txt', dest)])
-    withConflict.conflicts = [
-      { ...item('/srv/a.txt', dest), destSize: 4, destMtime: 0, reason: 'file' }
-    ]
+    withConflict.conflicts = [asked(item('/srv/a.txt', dest))]
 
     const result = await sftpManager.runPlan('conn', withConflict, { [dest]: 'overwrite' })
 
@@ -499,12 +503,7 @@ describe('running a transfer plan', () => {
   /** A download over files already there, each one asked about. */
   function overwriting(items: TransferItem[]): TransferPlan {
     const withConflicts = plan('download', items)
-    withConflicts.conflicts = items.map((i) => ({
-      ...i,
-      destSize: 4,
-      destMtime: 0,
-      reason: 'file' as const
-    }))
+    withConflicts.conflicts = items.map((i) => asked(i))
     return withConflicts
   }
 
@@ -629,6 +628,25 @@ describe('running a transfer plan', () => {
       expect(statSync(fresh).mode & 0o777).toBe(0o666 & ~process.umask())
     }
   )
+
+  /**
+   * The answer was about the file the plan found. One changed while the
+   * dialog was open, or while the files before it went across, is another
+   * file, and was overwritten all the same.
+   */
+  it('leaves a file that changed after it was asked about', async () => {
+    mkdirSync(localDir, { recursive: true })
+    const dest = join(localDir, 'a.txt')
+    writeFileSync(dest, 'mine', 'utf8')
+    attach('conn', stubSession([], { '/srv/a.txt': { size: 1024 } }))
+    const withConflict = overwriting([item('/srv/a.txt', dest)])
+    writeFileSync(dest, 'mine, edited since', 'utf8')
+
+    const result = await sftpManager.runPlan('conn', withConflict, { [dest]: 'overwrite' })
+
+    expect(result).toEqual({ written: 0, skipped: 1, changed: [dest] })
+    expect(readFileSync(dest, 'utf8')).toBe('mine, edited since')
+  })
 
   it('reports progress against the file it is moving', async () => {
     attach('conn', stubSession([], { '/srv': { dir: true } }))
@@ -1157,6 +1175,22 @@ describe('downloading a folder', () => {
     const planned = await sftpManager.planDownload('conn', '/srv/latest', localDir)
 
     expect(planned.items.map((i) => i.destPath)).toEqual([join(localDir, 'latest', 'a.log')])
+  })
+
+  it('copies a chosen link to a directory to another host under the link’s name', async () => {
+    const entries: Record<string, Entry> = {
+      '/srv/latest': { link: '/srv/logs' },
+      '/srv/logs': { dir: true }
+    }
+    attach(
+      'src',
+      withListing(stubSession([], entries), { '/srv/latest': [{ name: 'a.log', size: 3 }] })
+    )
+    attach('dst', stubSession([], { '/backup': { dir: true } }))
+
+    const planned = await sftpManager.planRelay('src', '/srv/latest', 'dst', '/backup')
+
+    expect(planned.items.map((i) => i.destPath)).toEqual(['/backup/latest/a.log'])
   })
 
   it('puts it under its own name in the directory chosen', async () => {

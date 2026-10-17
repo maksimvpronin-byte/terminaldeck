@@ -226,12 +226,20 @@ function looksBinary(buffer: Buffer): boolean {
 export function stillAsPlanned(
   wasOccupied: boolean,
   now: DestInfo | null,
-  folder = false
+  folder = false,
+  planned?: { destSize: number; destMtime: number }
 ): boolean {
   if (!now) return true
   if (folder) return now.isDirectory && !now.unreadable
   if (!wasOccupied) return false
-  return !now.isDirectory && !now.isSymlink && !now.unreadable
+  if (now.isDirectory || now.isSymlink || now.unreadable) return false
+  /*
+   * The file asked about, and not another one at its name. Only "is it still
+   * occupied" was asked, so a file changed while the conflict dialog was open,
+   * or while the files before it went across, was overwritten with its new
+   * contents on the strength of an answer about the old ones.
+   */
+  return !planned || (now.size === planned.destSize && now.mtime === planned.destMtime)
 }
 
 /** An empty folder in a plan: made at the destination, with nothing to copy into it. */
@@ -1064,7 +1072,12 @@ class SFTPManager {
     destParent: string
   ): Promise<TransferPlan> {
     const source = await this.statPath(srcConnectionId, srcPath)
-    const destDir = source?.isDirectory ? joinRemote(destParent, baseNameOf(srcPath)) : destParent
+    // A chosen link to a directory is copied as that directory, under the
+    // link's name — as a download places it. See remoteTree.
+    const sourceIsDirectory =
+      source?.isDirectory ||
+      (source?.isSymlink && (await this.targetOf(srcConnectionId, srcPath))?.isDirectory)
+    const destDir = sourceIsDirectory ? joinRemote(destParent, baseNameOf(srcPath)) : destParent
     const items = await this.remoteTree(srcConnectionId, srcPath, destDir, joinRemote)
 
     const found = new Map<string, DestInfo | null>()
@@ -1119,6 +1132,7 @@ class SFTPManager {
     /* What the plan found already occupied. A conflict with no answer is left
        alone rather than overwritten; see shouldWrite. */
     const conflicted = conflictedPaths(plan)
+    const askedAbout = new Map(plan.conflicts.map((c) => [c.destPath, c]))
     /** Remote directories this transfer has found or made; see ensureRemoteDir. */
     const madeDirs = new Set<string>()
     for (const item of plan.items) {
@@ -1141,7 +1155,14 @@ class SFTPManager {
         plan.direction === 'relay' ? destConnectionId! : connectionId,
         item.destPath
       )
-      if (!stillAsPlanned(conflicted.has(item.destPath), now, item.isDirectory)) {
+      if (
+        !stillAsPlanned(
+          conflicted.has(item.destPath),
+          now,
+          item.isDirectory,
+          askedAbout.get(item.destPath)
+        )
+      ) {
         skipped++
         changed.push(item.destPath)
         continue
