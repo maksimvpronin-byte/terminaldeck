@@ -410,6 +410,34 @@ class SFTPManager {
     })
   }
 
+  /**
+   * What a link points at, followed to the end — or undefined when it leads
+   * nowhere or cannot be read.
+   */
+  private async targetOf(
+    connectionId: string,
+    remotePath: string
+  ): Promise<{ isDirectory: boolean; size: number; mtime: number } | undefined> {
+    try {
+      const shell = this.getShell(connectionId)
+      if (shell) return (await shell.statPath(remotePath, true)) ?? undefined
+      const sftp = await this.getSftp(connectionId)
+      return await new Promise((resolve, reject) => {
+        sftp.stat(remotePath, (err, stats) =>
+          err
+            ? reject(err)
+            : resolve({
+                isDirectory: stats.isDirectory(),
+                size: stats.size,
+                mtime: (stats.mtime ?? 0) * 1000
+              })
+        )
+      })
+    } catch {
+      return undefined
+    }
+  }
+
   async mkdir(connectionId: string, remotePath: string): Promise<void> {
     const shell = this.getShell(connectionId)
     if (shell) return shell.mkdir(remotePath)
@@ -865,13 +893,17 @@ class SFTPManager {
   ): Promise<TransferItem[]> {
     const info = await this.statPath(connectionId, remotePath)
     if (!info) return []
-    if (!info.isDirectory) {
+    // A link chosen to be fetched is fetched as what it points at; only links
+    // met on the way down are left alone, below.
+    const followed = info.isSymlink ? await this.targetOf(connectionId, remotePath) : undefined
+    if (info.isSymlink && !followed) return []
+    if (!(followed ?? info).isDirectory) {
       return [
         {
           sourcePath: remotePath,
           destPath: joinPath(destDir, info.name),
-          sourceSize: info.size,
-          sourceMtime: info.mtime
+          sourceSize: (followed ?? info).size,
+          sourceMtime: (followed ?? info).mtime
         }
       ]
     }
@@ -882,6 +914,23 @@ class SFTPManager {
       // itself skips them: following one can loop or escape the tree.
       if (entry.isDirectory && !entry.isSymlink) {
         out.push(...(await this.remoteTree(connectionId, entry.path, target, joinPath)))
+      } else if (entry.isSymlink) {
+        /*
+         * A listing describes the link, not what it points at, and every link
+         * used to be planned as a file. One to a file is: its contents are
+         * fetched. One to a directory is skipped like the directories above,
+         * and one that leads nowhere is skipped too — fetched, either failed
+         * partway through the batch.
+         */
+        const pointed = await this.targetOf(connectionId, entry.path)
+        if (pointed && !pointed.isDirectory) {
+          out.push({
+            sourcePath: entry.path,
+            destPath: target,
+            sourceSize: pointed.size,
+            sourceMtime: pointed.mtime
+          })
+        }
       } else if (!entry.isDirectory) {
         out.push({
           sourcePath: entry.path,
@@ -962,9 +1011,13 @@ class SFTPManager {
     exactFile = false
   ): Promise<TransferPlan> {
     const root = exactFile ? undefined : await this.statPath(connectionId, remotePath)
+    // A chosen link to a directory lands under its own name, as a directory does.
+    const rootIsDirectory =
+      root?.isDirectory ||
+      (root?.isSymlink && (await this.targetOf(connectionId, remotePath))?.isDirectory)
     const items = exactFile
       ? await this.singleRemoteItem(connectionId, remotePath, localTarget)
-      : root?.isDirectory
+      : rootIsDirectory && root
         ? await this.remoteTree(connectionId, remotePath, localChild(localTarget, root.name))
         : await this.remoteTree(connectionId, remotePath, localTarget)
     const found = new Map<string, DestInfo | null>()

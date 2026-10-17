@@ -191,6 +191,27 @@ function stubSession(
       entries[path] = { dir: true }
       cb(null)
     },
+    /** Follows a link to what it names, as a server's stat does. */
+    stat(
+      path: string,
+      cb: (err: (Error & { code?: number }) | null, stats?: unknown) => void
+    ): void {
+      let entry = entries[path]
+      for (let hops = 0; entry?.link !== undefined && hops < 8; hops++) entry = entries[entry.link]
+      if (!entry) {
+        cb(Object.assign(new Error('No such file'), { code: 2 }))
+        return
+      }
+      cb(null, {
+        isDirectory: () => entry.dir === true,
+        isSymbolicLink: () => false,
+        size: entry.size ?? 0,
+        mtime: 0,
+        mode: entry.mode ?? 0o644,
+        uid: entry.uid ?? 0,
+        gid: 0
+      })
+    },
     lstat(
       path: string,
       cb: (err: (Error & { code?: number }) | null, stats?: unknown) => void
@@ -1053,7 +1074,7 @@ describe('parallel transfer planning', () => {
 describe('downloading a folder', () => {
   function withListing(
     session: SFTPWrapper,
-    listing: Record<string, { name: string; size: number }[]>
+    listing: Record<string, { name: string; size: number; mode?: number }[]>
   ): SFTPWrapper {
     return Object.assign(session, {
       readdir(path: string, cb: (err: Error | null, list?: unknown[]) => void): void {
@@ -1062,12 +1083,61 @@ describe('downloading a folder', () => {
           (listing[path] ?? []).map((e) => ({
             filename: e.name,
             longname: '',
-            attrs: { mode: 0o100644, size: e.size, mtime: 0 }
+            attrs: { mode: e.mode ?? 0o100644, size: e.size, mtime: 0 }
           }))
         )
       }
     })
   }
+
+  /**
+   * A listing describes a link, not what it names, and every link was planned
+   * as a file: one to a directory then failed the batch when it was fetched.
+   */
+  it('fetches a link to a file, and leaves links to directories and to nothing', async () => {
+    const LINK = 0o120777
+    const entries: Record<string, Entry> = {
+      '/srv/logs': { dir: true },
+      '/srv/logs/a.log': { size: 3 },
+      '/srv/logs/current': { link: '/srv/logs/a.log' },
+      '/srv/logs/archive': { link: '/srv/old' },
+      '/srv/old': { dir: true },
+      '/srv/logs/gone': { link: '/srv/nowhere' }
+    }
+    attach(
+      'conn',
+      withListing(stubSession([], entries), {
+        '/srv/logs': [
+          { name: 'a.log', size: 3 },
+          { name: 'current', size: 15, mode: LINK },
+          { name: 'archive', size: 8, mode: LINK },
+          { name: 'gone', size: 12, mode: LINK }
+        ]
+      })
+    )
+
+    const planned = await sftpManager.planDownload('conn', '/srv/logs', localDir)
+
+    expect(planned.items.map((i) => [i.sourcePath, i.sourceSize])).toEqual([
+      ['/srv/logs/a.log', 3],
+      ['/srv/logs/current', 3]
+    ])
+  })
+
+  it('follows a link that was itself chosen to be downloaded', async () => {
+    const entries: Record<string, Entry> = {
+      '/srv/latest': { link: '/srv/logs' },
+      '/srv/logs': { dir: true }
+    }
+    attach(
+      'conn',
+      withListing(stubSession([], entries), { '/srv/latest': [{ name: 'a.log', size: 3 }] })
+    )
+
+    const planned = await sftpManager.planDownload('conn', '/srv/latest', localDir)
+
+    expect(planned.items.map((i) => i.destPath)).toEqual([join(localDir, 'latest', 'a.log')])
+  })
 
   it('puts it under its own name in the directory chosen', async () => {
     const entries: Record<string, Entry> = { '/srv/logs': { dir: true } }
