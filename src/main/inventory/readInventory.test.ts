@@ -328,4 +328,22 @@ describe('a group written down in more than one place', () => {
     )
     expect(loginOf(result, 'web1')).toBe('www')
   })
+
+  /*
+   * all's vars and the group's were merged as raw vars before either was read,
+   * so all's `ansible_user` beat the group's `ansible_ssh_user`: a spelling
+   * decided between levels. Nested under an explicit all, the group won.
+   */
+  it('lets a group’s own alias win over group_vars/all without an all key', () => {
+    const result = read(
+      repo({
+        'hosts.yml':
+          'web:\n  vars:\n    ansible_ssh_user: admin\n    ansible_ssh_port: 2200\n  hosts:\n    web1: {}\n',
+        'group_vars/all.yml': 'ansible_user: deploy\nansible_port: 2222\n'
+      }),
+      ['hosts.yml']
+    )
+    expect(loginOf(result, 'web1')).toBe('admin')
+    expect(result.groups.find((g) => g.name === 'web')?.port).toBe(2200)
+  })
 })

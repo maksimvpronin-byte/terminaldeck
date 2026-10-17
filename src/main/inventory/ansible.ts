@@ -334,14 +334,20 @@ export function parseAnsibleInventories(
   }
 
   /** What a node's group says, with `all` beneath a top group's own when nothing holds it. */
-  const varsAt = (node: { name: string; parentId: string | null }): AnsibleVars =>
+  const underAll = (node: { name: string; parentId: string | null }): boolean =>
     node.parentId === null && node.name !== 'all'
-      ? { ...varsOf('all'), ...varsOf(node.name) }
-      : varsOf(node.name)
+  const varsAt = (node: { name: string; parentId: string | null }): AnsibleVars =>
+    underAll(node) ? { ...varsOf('all'), ...varsOf(node.name) } : varsOf(node.name)
 
+  /*
+   * Each level read on its own, then laid over the one beneath, as a group
+   * nested under an explicit `all` is. Merged as raw vars first, all's
+   * `ansible_user` beat the group's own `ansible_ssh_user`.
+   */
   const groups: SessionGroup[] = [...nodes.values()].map((node) => ({
     ...node,
-    ...varsToAuth(varsAt(node))
+    ...(underAll(node) ? varsToAuth(varsOf('all')) : {}),
+    ...varsToAuth(varsOf(node.name))
   }))
   const groupById = new Map(groups.map((g) => [g.id, g]))
   const depthOf = (id: string): number => id.split('/').length
