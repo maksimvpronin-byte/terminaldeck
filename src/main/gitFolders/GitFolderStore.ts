@@ -347,19 +347,12 @@ class GitFolderStore {
       }
     })
 
-    // Hosts about to go: what this folder shows now, minus what the chosen
-    // groups would still hold. Local settings are called out — deleting the host
-    // deletes them, and its stored password with them.
-    const wouldKeep = new Set(
-      pruneTree(folderId, repo.tree, included, link.includeChildHosts).sessions.map((s) => s.id)
+    const removedHosts = this.removedHostsFor(
+      folderId,
+      repo,
+      included,
+      link.includeChildHosts ?? false
     )
-    const removedHosts = (this.treeOf(folderId)?.sessions ?? [])
-      .filter((h) => !wouldKeep.has(h.id))
-      .map((h) => ({
-        id: h.id,
-        name: h.name,
-        hasLocalSettings: this.data.overrides.some((o) => o.nodeId === h.id)
-      }))
 
     return {
       groupId: folderId,
@@ -373,6 +366,51 @@ class GitFolderStore {
       files: repo.files,
       warning: repo.warning
     }
+  }
+
+  /**
+   * Hosts about to go: what this folder shows now, minus what the chosen groups
+   * would still hold. Local settings are called out — deleting the host deletes
+   * them, and its stored password with them.
+   */
+  private removedHostsFor(
+    folderId: string,
+    repo: ParsedRepo,
+    included: string[],
+    includeChildHosts: boolean
+  ): GitFolderPreview['removedHosts'] {
+    const wouldKeep = new Set(
+      pruneTree(folderId, repo.tree, included, includeChildHosts).sessions.map((s) => s.id)
+    )
+    return (this.treeOf(folderId)?.sessions ?? [])
+      .filter((h) => !wouldKeep.has(h.id))
+      .map((h) => ({
+        id: h.id,
+        name: h.name,
+        hasLocalSettings: this.data.overrides.some((o) => o.nodeId === h.id)
+      }))
+  }
+
+  /**
+   * What applying this choice would take away — the choice as it stands in the
+   * dialog, not as it stood when the preview was made.
+   *
+   * The preview worked it out once, for the groups chosen last time; ticking
+   * "Select none" afterwards left it saying nothing would go, and Apply then
+   * took every host, its local settings and its saved passwords. Worked out by
+   * the same pruning that `apply` does, over the same read.
+   */
+  consequences(
+    folderId: string,
+    includedGroups: string[],
+    options: GitFolderApplyOptions = {}
+  ): GitFolderPreview['removedHosts'] {
+    const found = this.linkOf(folderId)
+    const repo = this.pending.get(folderId)
+    if (!found || !repo) return []
+    const included = includedGroups.filter((p) => repo.paths.includes(p))
+    const includeChildHosts = options.includeChildHosts ?? found.link.includeChildHosts ?? false
+    return this.removedHostsFor(folderId, repo, included, includeChildHosts)
   }
 
   /**

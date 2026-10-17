@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { GitFolderPreview } from '../../../shared/types'
 import { descendantPaths } from '../../../shared/gitFolders'
 import { useStore } from '../state/store'
@@ -29,6 +29,37 @@ export default function GitFolderSyncDialog({
   const [includeChildHosts, setIncludeChildHosts] = useState(preview.includeChildHosts ?? false)
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
+  const [removedHosts, setRemovedHosts] = useState(preview.removedHosts)
+  const [checking, setChecking] = useState(false)
+  const asked = useRef(0)
+  const opened = useRef(true)
+
+  /*
+   * What Apply would take away, for the groups ticked now. The preview says it
+   * for the choice made last time, and "Select none" used to leave it saying
+   * nothing would go while Apply took every host, its local settings and its
+   * saved passwords. Apply waits for the answer.
+   */
+  useEffect(() => {
+    if (opened.current) {
+      // The preview's own answer is for the choice it opened with.
+      opened.current = false
+      return
+    }
+    const n = ++asked.current
+    setChecking(true)
+    window.td.gitFolder
+      .consequences(preview.groupId, [...chosen], { includeChildHosts })
+      .then((hosts) => {
+        if (n === asked.current) setRemovedHosts(hosts ?? [])
+      })
+      .catch((err) => {
+        if (n === asked.current) setError(err instanceof Error ? err.message : String(err))
+      })
+      .finally(() => {
+        if (n === asked.current) setChecking(false)
+      })
+  }, [chosen, includeChildHosts, preview.groupId])
 
   const allPaths = preview.groups.map((g) => g.path)
 
@@ -57,7 +88,7 @@ export default function GitFolderSyncDialog({
   }
 
   const newCount = preview.groups.filter((g) => g.isNew).length
-  const losingSettings = preview.removedHosts.filter((h) => h.hasLocalSettings)
+  const losingSettings = removedHosts.filter((h) => h.hasLocalSettings)
 
   return (
     <ModalBackdrop
@@ -160,11 +191,11 @@ export default function GitFolderSyncDialog({
           </p>
         )}
 
-        {preview.removedHosts.length > 0 && (
+        {removedHosts.length > 0 && (
           <p className="settings-note">
             {t('{count} hosts will disappear from this folder: {hosts}', {
-              count: preview.removedHosts.length,
-              hosts: preview.removedHosts
+              count: removedHosts.length,
+              hosts: removedHosts
                 .slice(0, 12)
                 .map((h) => h.name)
                 .join(', ')
@@ -194,7 +225,7 @@ export default function GitFolderSyncDialog({
           <button onClick={onClose} disabled={busy}>
             {t('Cancel')}
           </button>
-          <button className="primary" onClick={apply} disabled={busy}>
+          <button className="primary" onClick={apply} disabled={busy || checking}>
             {busy ? t('Applying…') : t('Apply')}
           </button>
         </div>

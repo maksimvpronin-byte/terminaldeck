@@ -43,6 +43,8 @@ export const IPC = {
   gitFolderList: 'gitFolder:list',
   gitFolderPreview: 'gitFolder:preview',
   gitFolderApply: 'gitFolder:apply',
+  /** What applying a choice of groups would take away, for the dialog to say. */
+  gitFolderConsequences: 'gitFolder:consequences',
   gitFolderForgetRepo: 'gitFolder:forgetRepo',
   gitFolderSaveOverride: 'gitFolder:saveOverride',
   gitFolderClearOverride: 'gitFolder:clearOverride',

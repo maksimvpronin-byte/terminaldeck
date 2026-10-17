@@ -124,6 +124,22 @@ describe('a Sessions folder mirroring a repository', () => {
     expect(linkNow().lastSyncedAt).toBeGreaterThan(0)
   })
 
+  /** The dialog asks again as the ticks change; the preview answered only for the old ones. */
+  it('says what a different choice would take away, by the same pruning as apply', async () => {
+    await gitFolderStore.preview(FOLDER)
+    gitFolderStore.apply(FOLDER, ['all', 'all/prod'], forget)
+    gitFolderStore.saveOverride({ nodeId: gitHostId(FOLDER, 'web1'), username: 'me' })
+
+    const preview = await gitFolderStore.preview(FOLDER)
+    expect(preview.removedHosts).toEqual([])
+
+    const none = gitFolderStore.consequences(FOLDER, [])
+    expect(none.map((h) => h.name).sort()).toEqual(['db1', 'web1'])
+    expect(none.find((h) => h.name === 'web1')?.hasLocalSettings).toBe(true)
+    expect(gitFolderStore.consequences(FOLDER, ['all', 'all/prod'])).toEqual([])
+    gitFolderStore.apply(FOLDER, ['all', 'all/prod'], forget)
+  })
+
   it('persists the folder layout and restores it in the next sync preview', async () => {
     await gitFolderStore.preview(FOLDER)
     gitFolderStore.apply(FOLDER, ['all', 'all/prod'], forget, { showGroupFolders: true })

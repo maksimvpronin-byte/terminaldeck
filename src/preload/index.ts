@@ -144,6 +144,12 @@ const api = {
       options?: GitFolderApplyOptions
     ): Promise<GitFolderTree> =>
       ipcRenderer.invoke(IPC.gitFolderApply, groupId, includedGroups, options),
+    consequences: (
+      groupId: string,
+      includedGroups: string[],
+      options?: GitFolderApplyOptions
+    ): Promise<GitFolderPreview['removedHosts']> =>
+      ipcRenderer.invoke(IPC.gitFolderConsequences, groupId, includedGroups, options),
     saveOverride: (
       override: InventoryOverride,
       secret?: string | null,

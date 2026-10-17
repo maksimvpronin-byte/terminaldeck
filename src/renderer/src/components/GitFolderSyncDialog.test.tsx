@@ -158,6 +158,36 @@ describe('the sync dialog', () => {
     )
   })
 
+  /**
+   * The preview says what goes for the choice it opened with. Unticking
+   * everything afterwards left it saying nothing would, and Apply then took
+   * every host with its local settings and saved passwords.
+   */
+  it('says what Apply would take for the groups ticked now', async () => {
+    const consequences = vi.fn((_id: string, included: string[]) =>
+      Promise.resolve(
+        included.length === 0
+          ? [
+              { id: 'h1', name: 'web1', hasLocalSettings: true },
+              { id: 'h2', name: 'db1', hasLocalSettings: false }
+            ]
+          : []
+      )
+    )
+    window.td.gitFolder.consequences = consequences
+    render(<GitFolderSyncDialog folderName="Infra" preview={preview} onClose={() => {}} />)
+    expect(screen.queryByText(/will disappear/)).toBeNull()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Select none' }))
+
+    expect(
+      await screen.findByText(/2 hosts will disappear from this folder: web1, db1/)
+    ).toBeTruthy()
+    expect(screen.getByText(/1 of them have local settings/)).toBeTruthy()
+    expect(consequences).toHaveBeenLastCalledWith('folder-1', [], { includeChildHosts: false })
+    expect(screen.getByRole('button', { name: 'Apply' })).not.toHaveProperty('disabled', true)
+  })
+
   it('leaves the folder alone when it is closed instead', async () => {
     const onClose = vi.fn()
     render(<GitFolderSyncDialog folderName="Infra" preview={preview} onClose={onClose} />)
