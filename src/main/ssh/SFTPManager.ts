@@ -1229,6 +1229,17 @@ class SFTPManager {
         changed.push(item.destPath)
         continue
       }
+      // Looked for again: a link can be put there after the plan was made. An
+      // empty folder is made here and now, so it is looked for before that too.
+      if (
+        plan.direction === 'download' &&
+        plan.localRoot &&
+        (await linkBelow(plan.localRoot, item.destPath))
+      ) {
+        skipped++
+        changed.push(item.destPath)
+        continue
+      }
       if (item.isDirectory) {
         if (plan.direction === 'download') await mkdir(item.destPath, { recursive: true })
         else {
@@ -1261,12 +1272,6 @@ class SFTPManager {
         // name, and every download quietly created a directory beside itself
         // called C:\...\a.tx. It went unnoticed because that same call, being
         // recursive, made the real parent on the way past.
-        // Looked for again: a link can be put there after the plan was made.
-        if (plan.localRoot && (await linkBelow(plan.localRoot, item.destPath))) {
-          skipped++
-          changed.push(item.destPath)
-          continue
-        }
         await mkdir(dirname(item.destPath), { recursive: true })
         try {
           // Replaced only where the plan found a file and was told to overwrite

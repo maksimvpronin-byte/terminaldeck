@@ -1243,6 +1243,39 @@ describe('downloading a folder', () => {
     }
   )
 
+  /*
+   * The plan found no link, and `logs` became one before its turn came. The
+   * files below it were looked at again; an empty folder was made at once,
+   * and through the link.
+   */
+  it.skipIf(process.platform === 'win32')(
+    'makes no empty folder through a link put there after the plan',
+    async () => {
+      const outside = mkdtempSync(join(tmpdir(), 'terminaldeck-outside-'))
+      const entries: Record<string, Entry> = {
+        '/srv/logs': { dir: true },
+        '/srv/logs/empty': { dir: true }
+      }
+      attach(
+        'conn',
+        withListing(stubSession([], entries), {
+          '/srv/logs': [{ name: 'empty', size: 0, mode: 0o040755 }],
+          '/srv/logs/empty': []
+        })
+      )
+
+      const planned = await sftpManager.planDownload('conn', '/srv/logs', localDir)
+      expect(planned.items.filter((i) => i.isDirectory)).toHaveLength(1)
+      mkdirSync(localDir, { recursive: true })
+      symlinkSync(outside, join(localDir, 'logs'))
+
+      const result = await sftpManager.runPlan('conn', planned)
+      expect(result.written).toBe(0)
+      expect(result.changed).toEqual([join(localDir, 'logs', 'empty')])
+      expect(readdirSync(outside)).toEqual([])
+    }
+  )
+
   /** `..cache` is a folder like any other, not a step out of the one chosen. */
   it('downloads a folder whose name starts with two dots', async () => {
     const entries: Record<string, Entry> = {
