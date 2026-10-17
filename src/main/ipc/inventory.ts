@@ -17,8 +17,7 @@ export function registerInventoryHandlers(): void {
     trees: inventoryStore.allTrees()
   }))
   ipcMain.handle(IPC.inventorySaveSource, (_e, source: InventorySource) => {
-    const before = inventoryStore.sources().find((s) => s.id === source.id)
-    refuseRepoSecret(source.repoUrl, before?.repoUrl)
+    refuseRepoSecret(source.repoUrl)
     return inventoryStore.saveSource(source)
   })
   ipcMain.handle(IPC.inventoryRemoveSource, (_e, id: string) => {

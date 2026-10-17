@@ -69,3 +69,15 @@ export function withoutRepoSecret(url: string): string {
   const user = tokenShaped(info.user) ? '' : info.user
   return `${info.before}${user ? `${user}@` : ''}${info.after}`
 }
+
+/** A folder, with any secret taken out of the repository it mirrors. */
+export function groupWithoutRepoSecret<G extends { git?: { repoUrl: string } }>(group: G): G {
+  if (!group.git || !repoUrlHasSecret(group.git.repoUrl)) return group
+  return { ...group, git: { ...group.git, repoUrl: withoutRepoSecret(group.git.repoUrl) } }
+}
+
+/** An inventory source, with any secret taken out of its address. */
+export function sourceWithoutRepoSecret<S extends { repoUrl: string }>(source: S): S {
+  if (!repoUrlHasSecret(source.repoUrl)) return source
+  return { ...source, repoUrl: withoutRepoSecret(source.repoUrl) }
+}

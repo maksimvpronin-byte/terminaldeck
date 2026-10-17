@@ -78,11 +78,4 @@ describe('saving an inventory repository', () => {
     ).toThrow(/password or token/)
     expect(inventoryStore.sources().some((s) => s.id === 'tokened')).toBe(false)
   })
-
-  it('still saves one that already had such an address, as long as it is unchanged', () => {
-    const repoUrl = 'https://user:TOKEN@gitlab.example.com/inv.git'
-    inventoryStore.saveSource({ id: 'old', name: 'Repo', repoUrl, paths: [] })
-    invoke(IPC.inventorySaveSource, { id: 'old', name: 'Renamed', repoUrl, paths: [] })
-    expect(inventoryStore.sources().find((s) => s.id === 'old')?.name).toBe('Renamed')
-  })
 })

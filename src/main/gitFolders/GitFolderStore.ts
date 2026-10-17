@@ -1,5 +1,6 @@
 import { app } from 'electron'
 import { createHash } from 'crypto'
+import { existsSync, renameSync } from 'fs'
 import { basename, join, relative } from 'path'
 import type {
   GitFolderApplyOptions,
@@ -23,7 +24,12 @@ import {
 import { applyOverride } from '../../shared/overrides'
 import { parseInWorker } from '../inventory/parseInWorker'
 import { noInventoryFound } from '../inventory/files'
-import { headRevision, syncRepo } from '../inventory/GitRepo'
+import { headRevision, setOrigin, syncRepo } from '../inventory/GitRepo'
+import {
+  groupWithoutRepoSecret,
+  repoUrlHasSecret,
+  withoutRepoSecret
+} from '../../shared/repoSecret'
 import { removeTree } from './removeTree'
 import { JsonDocument, hasLists, readJson } from '../store/jsonFile'
 import { sessionStore } from '../store/SessionStore'
@@ -165,6 +171,56 @@ class GitFolderStore {
     if (found) found.usedAt = Date.now()
     else repos.push({ url, branch, usedAt: Date.now() })
     draft.repos = repos
+  }
+
+  /**
+   * Takes a password or token out of every folder's repository address, out of
+   * the repositories offered for reuse, and out of the working copies — what
+   * was saved before the dialogs refused one. See repoSecret.
+   *
+   * A working copy is kept under a hash of its address, so it is moved to the
+   * clean address's place and its origin re-pointed; where that place is
+   * already taken, the old copy, token and all, goes.
+   */
+  scrubRepoSecrets(): void {
+    const folders = sessionStore
+      .getAll()
+      .groups.filter((g) => g.git && repoUrlHasSecret(g.git.repoUrl))
+    for (const folder of folders) {
+      const link = folder.git!
+      const clean = withoutRepoSecret(link.repoUrl)
+      sessionStore.saveGroup(groupWithoutRepoSecret(folder))
+      const from = checkoutFor(link.repoUrl, link.branch)
+      const to = checkoutFor(clean, link.branch)
+      if (!existsSync(from)) continue
+      if (existsSync(to)) {
+        removeTree(from)
+        continue
+      }
+      try {
+        renameSync(from, to)
+      } catch (err) {
+        console.error('[git folders] could not move a working copy; it will be cloned again', err)
+        removeTree(from)
+        continue
+      }
+      setOrigin(to, clean).catch((err) => {
+        console.error('[git folders] could not re-point a working copy', err)
+      })
+    }
+
+    if ((this.data.repos ?? []).some((r) => repoUrlHasSecret(r.url))) {
+      this.doc.change((d) => {
+        const kept = new Map<string, GitRepo>()
+        for (const repo of d.repos ?? []) {
+          const url = withoutRepoSecret(repo.url)
+          const key = `${url}\n${repo.branch ?? ''}`
+          const seen = kept.get(key)
+          if (!seen || seen.usedAt < repo.usedAt) kept.set(key, { ...repo, url })
+        }
+        d.repos = [...kept.values()]
+      })
+    }
   }
 
   /** Drops a saved repository. Any folder still reading it is left alone. */

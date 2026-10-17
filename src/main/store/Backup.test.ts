@@ -407,6 +407,39 @@ describe('backup import', () => {
     expect(sessions.find((s) => s.id === 'session-untouched')?.name).toBe('not in the export')
   })
 
+  /** A backup written before exports left tokens out still holds them. */
+  it('brings no token back in from an older backup', async () => {
+    populate()
+    saveTo = FILE
+    await exportToFile(win, false)
+    const file = JSON.parse(readFileSync(FILE, 'utf8'))
+    file.inventorySources[0].repoUrl = 'https://deploy:TOKEN-3@gitlab.example.com/inv.git'
+    file.groups.push({
+      id: 'linked',
+      name: 'From git',
+      parentId: null,
+      git: {
+        repoUrl: 'https://ghp_TOKEN4abcdefghij@github.com/ops/inv.git',
+        paths: [],
+        includedGroups: []
+      }
+    })
+    writeFileSync(FILE, JSON.stringify(file), 'utf8')
+
+    clearStores()
+    openFrom = FILE
+    await importFromFile(win)
+
+    expect(inventoryStore.sources()[0].repoUrl).toBe('https://deploy@gitlab.example.com/inv.git')
+    expect(sessionStore.getAll().groups.find((g) => g.id === 'linked')?.git?.repoUrl).toBe(
+      'https://github.com/ops/inv.git'
+    )
+    for (const name of ['inventories.json', 'sessions.json']) {
+      const path = join(userData, name)
+      if (existsSync(path)) expect(readFileSync(path, 'utf8')).not.toMatch(/TOKEN-3|TOKEN4/)
+    }
+  })
+
   it('refuses a file that is not an export, and changes nothing', async () => {
     populate()
     const before = clone(snapshot())

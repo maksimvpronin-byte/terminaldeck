@@ -8,7 +8,8 @@ import type {
 } from '../../shared/types'
 import { parseInWorker } from './parseInWorker'
 import { noInventoryFound } from './files'
-import { syncRepo, headRevision } from './GitRepo'
+import { syncRepo, headRevision, setOrigin } from './GitRepo'
+import { repoUrlHasSecret, sourceWithoutRepoSecret } from '../../shared/repoSecret'
 import { applyOverride, withoutBlanks } from '../../shared/overrides'
 import { JsonDocument, hasLists, readJson } from '../store/jsonFile'
 
@@ -82,6 +83,26 @@ class InventoryStore {
 
   overrides(): InventoryOverride[] {
     return this.doc.data.overrides
+  }
+
+  /**
+   * Takes a password or token out of every saved address, and out of the
+   * working copy's origin — what was saved before the dialogs refused one.
+   * See repoSecret. Such a source syncs again once git's credential helper
+   * holds the secret.
+   */
+  scrubRepoSecrets(): void {
+    const tainted = this.doc.data.sources.filter((s) => repoUrlHasSecret(s.repoUrl))
+    if (tainted.length === 0) return
+    this.doc.change((d) => {
+      d.sources = d.sources.map(sourceWithoutRepoSecret)
+    })
+    for (const source of tainted) {
+      const clean = sourceWithoutRepoSecret(source).repoUrl
+      setOrigin(join(reposRoot(), source.id), clean).catch((err) => {
+        console.error('[inventory] could not re-point a working copy', err)
+      })
+    }
   }
 
   saveSource(source: InventorySource): InventorySource {

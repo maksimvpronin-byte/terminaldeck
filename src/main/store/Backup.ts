@@ -23,7 +23,7 @@ import type {
   MultiWindow,
   SavedPane
 } from '../../shared/types'
-import { withoutRepoSecret } from '../../shared/repoSecret'
+import { groupWithoutRepoSecret, sourceWithoutRepoSecret } from '../../shared/repoSecret'
 
 interface BackupFile {
   format: 'terminaldeck-backup'
@@ -470,16 +470,12 @@ export async function exportToFile(
     exportedAt: Date.now(),
     // A password or token written into a repository address, from before the
     // dialogs refused one, does not leave in the file; see repoSecret.
-    groups: store.groups.map((g) =>
-      g.git ? { ...g, git: { ...g.git, repoUrl: withoutRepoSecret(g.git.repoUrl) } } : g
-    ),
+    groups: store.groups.map(groupWithoutRepoSecret),
     sessions: store.sessions,
     snippets: snippetStore.list(),
     collections: collectionStore.list(),
     multiWindows: multiWindowStore.list(),
-    inventorySources: inventoryStore
-      .sources()
-      .map((source) => ({ ...source, repoUrl: withoutRepoSecret(source.repoUrl) })),
+    inventorySources: inventoryStore.sources().map(sourceWithoutRepoSecret),
     inventoryOverrides: inventoryStore.overrides(),
     gitFolderOverrides: gitFolderStore.overrides(),
     credentials: credentialStore.list()
@@ -576,11 +572,15 @@ export async function importFromFile(
     secrets = validateSecretMap(decoded)
   }
 
-  const { groups, sessions } = checkRelations(parsed)
+  const checked = checkRelations(parsed)
+  // A token in a repository address, in a backup older than the rule against
+  // one, is not brought back in; see repoSecret.
+  const groups = checked.groups.map(groupWithoutRepoSecret)
+  const sessions = checked.sessions
   const snippets = parsed.snippets ?? []
   const collections = parsed.collections ?? []
   const multiWindows = parsed.multiWindows ?? []
-  const sources = parsed.inventorySources ?? []
+  const sources = (parsed.inventorySources ?? []).map(sourceWithoutRepoSecret)
   const inventoryOverrides = parsed.inventoryOverrides ?? []
   const gitFolderOverrides = parsed.gitFolderOverrides ?? []
   const credentials = parsed.credentials ?? []

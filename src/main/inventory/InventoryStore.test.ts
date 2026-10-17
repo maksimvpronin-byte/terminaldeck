@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mkdtempSync } from 'fs'
+import { mkdtempSync, readFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import type { InventorySource } from '../../shared/types'
@@ -15,9 +15,11 @@ let userData = ''
 vi.mock('electron', () => ({ app: { getPath: (): string => userData } }))
 
 let finishParse: () => void = () => undefined
+const setOrigin = vi.fn(async (_dir: string, _url: string) => undefined)
 vi.mock('./GitRepo', () => ({
   syncRepo: async () => '/checkout',
-  headRevision: async () => 'abc123'
+  headRevision: async () => 'abc123',
+  setOrigin: (dir: string, url: string) => setOrigin(dir, url)
 }))
 vi.mock('./parseInWorker', () => ({
   parseInWorker: () =>
@@ -144,4 +146,35 @@ it('applies saved source credentials to an already loaded tree without waiting f
   expect(inventoryStore.allGroups()[0].username).toBe('old-login')
   inventoryStore.saveMany([{ ...source, username: 'imported-login' }], [])
   expect(inventoryStore.allGroups()[0].username).toBe('imported-login')
+})
+
+/**
+ * Saved before the dialogs refused a token in an address: taken out at start,
+ * from the saved source and from its working copy's origin.
+ */
+it('takes a token out of a saved address, and out of the working copy', () => {
+  setOrigin.mockClear()
+  inventoryStore.saveSource({
+    id: 'tokened',
+    name: 'Old',
+    repoUrl: 'https://deploy:TOKEN-5@gitlab.example.com/inv.git',
+    paths: []
+  })
+  inventoryStore.saveSource({
+    id: 'clean',
+    name: 'Fine',
+    repoUrl: 'git@example.com:x.git',
+    paths: []
+  })
+
+  inventoryStore.scrubRepoSecrets()
+
+  const byId = new Map(inventoryStore.sources().map((s) => [s.id, s.repoUrl]))
+  expect(byId.get('tokened')).toBe('https://deploy@gitlab.example.com/inv.git')
+  expect(byId.get('clean')).toBe('git@example.com:x.git')
+  expect(readFileSync(join(userData, 'inventories.json'), 'utf8')).not.toContain('TOKEN-5')
+  expect(setOrigin).toHaveBeenCalledExactlyOnceWith(
+    join(userData, 'inventory-repos', 'tokened'),
+    'https://deploy@gitlab.example.com/inv.git'
+  )
 })

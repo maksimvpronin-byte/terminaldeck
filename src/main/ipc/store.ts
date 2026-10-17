@@ -102,7 +102,7 @@ export function registerStoreHandlers(): void {
       rdpSecret?: string | null
     ) => {
       const had = sessionStore.getAll().groups.find((g) => g.id === group.id)?.git
-      if (group.git) refuseRepoSecret(group.git.repoUrl, had?.repoUrl)
+      refuseRepoSecret(group.git?.repoUrl)
       const saved = saveWithSecrets(
         group,
         unshareSecrets(

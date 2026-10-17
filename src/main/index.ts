@@ -16,6 +16,8 @@ import { remoteMonitor } from './ssh/RemoteMonitor'
 import { sshManager } from './ssh/SSHManager'
 import { registerUpdater } from './updater'
 import { idleLock } from './vault/idleLock'
+import { inventoryStore } from './inventory/InventoryStore'
+import { gitFolderStore } from './gitFolders/GitFolderStore'
 import { IPC } from '../shared/ipc-channels'
 import { rememberWindowPlacement, savedWindowPlacement } from './windowState'
 
@@ -362,6 +364,10 @@ app.whenReady().then(async () => {
     app.quit()
     return
   }
+
+  // Addresses saved with a token in them, before the dialogs refused one.
+  inventoryStore.scrubRepoSecrets()
+  gitFolderStore.scrubRepoSecrets()
 
   // Before any handler exists, so that every one of them is behind it.
   installSenderCheck(isOwnPage)

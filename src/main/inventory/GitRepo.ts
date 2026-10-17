@@ -122,6 +122,19 @@ export async function syncRepo(
   return dir
 }
 
+/**
+ * Points a working copy's origin at `url`, if there is a working copy.
+ *
+ * The clone keeps the address it was made from in `.git/config`; with the
+ * token taken out of the saved address it would otherwise stay there until
+ * the next sync re-pointed it.
+ */
+export async function setOrigin(dir: string, url: string): Promise<void> {
+  if (!existsSync(join(dir, '.git'))) return
+  refuseOption('repository address', url)
+  await git(['remote', 'set-url', 'origin', url], dir)
+}
+
 export async function headRevision(dir: string): Promise<string> {
   return (await git(['rev-parse', '--short', 'HEAD'], dir)).trim()
 }

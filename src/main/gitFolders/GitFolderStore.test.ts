@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, vi } from 'vitest'
 import { execFileSync } from 'child_process'
-import { mkdtempSync, mkdirSync, readdirSync, writeFileSync, rmSync } from 'fs'
+import { existsSync, mkdtempSync, mkdirSync, readdirSync, writeFileSync, rmSync } from 'fs'
+import { createHash } from 'crypto'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import type { InventoryOverride, SessionGroup } from '../../shared/types'
@@ -327,5 +328,42 @@ describe('a Sessions folder mirroring a repository', () => {
 
     await expect(reading).rejects.toThrow()
     expect(sessionStore.getAll().groups.some((g) => g.id === 'folder-5')).toBe(false)
+  })
+})
+
+/**
+ * Saved before the dialogs refused a token in an address. The working copy
+ * lives under a hash of the address, so it moves to the clean address's place
+ * and its origin is re-pointed, rather than being cloned again.
+ */
+describe('a folder saved with a token in its address', () => {
+  it('loses the token, and its working copy moves with it', async () => {
+    const tokened = 'https://deploy:TOKEN-6@gitlab.example.com/ops/inv.git'
+    const clean = 'https://deploy@gitlab.example.com/ops/inv.git'
+    // The same key the store gives a checkout: see checkoutFor.
+    const keyOf = (url: string): string =>
+      createHash('sha1').update(`${url}\n`).digest('hex').slice(0, 16)
+    const reposRoot = join(userData, 'git-folder-repos')
+    const from = join(reposRoot, keyOf(tokened))
+    mkdirSync(from, { recursive: true })
+    execFileSync('git', ['init', '-q'], { cwd: from })
+    execFileSync('git', ['remote', 'add', 'origin', tokened], { cwd: from })
+    sessionStore.saveGroup({
+      id: 'folder-tokened',
+      name: 'Old',
+      parentId: null,
+      git: { repoUrl: tokened, paths: [], includedGroups: [] }
+    })
+
+    gitFolderStore.scrubRepoSecrets()
+
+    const folder = sessionStore.getAll().groups.find((g) => g.id === 'folder-tokened')
+    expect(folder?.git?.repoUrl).toBe(clean)
+    expect(existsSync(from)).toBe(false)
+    const to = join(reposRoot, keyOf(clean))
+    await vi.waitFor(() => {
+      const origin = execFileSync('git', ['remote', 'get-url', 'origin'], { cwd: to })
+      expect(origin.toString().trim()).toBe(clean)
+    })
   })
 })
