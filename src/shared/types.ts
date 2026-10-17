@@ -810,6 +810,11 @@ export interface TransferPlan {
   /** Two sources landing on one destination; the batch is refused, not merged. */
   collisions: Array<{ destPath: string; sourcePaths: string[] }>
   totalBytes: number
+  /**
+   * For a download, the folder that was chosen. Nothing below it is written
+   * through a link; see SFTPManager.linkBelow.
+   */
+  localRoot?: string
 }
 
 /** Destination path to what to do with it. Anything absent is written. */

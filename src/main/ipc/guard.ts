@@ -202,6 +202,12 @@ export function checkTransferPlan(
   items(p.conflicts, 'plan conflicts')
   if (!Array.isArray(p.collisions)) refuse('plan collisions must be a list')
   isCount(p.totalBytes, 'plan totalBytes')
+  if (
+    p.localRoot !== undefined &&
+    (typeof p.localRoot !== 'string' || p.localRoot.includes('\0'))
+  ) {
+    refuse('plan localRoot must be a path')
+  }
 
   const d = decisions ?? {}
   if (typeof d !== 'object' || Array.isArray(d)) refuse('decisions must be an object')

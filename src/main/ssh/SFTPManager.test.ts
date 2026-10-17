@@ -1193,6 +1193,33 @@ describe('downloading a folder', () => {
     expect(planned.items.map((i) => i.destPath)).toEqual(['/backup/latest/a.log'])
   })
 
+  /**
+   * `logs` in the chosen folder is a link to somewhere else; the files of a
+   * remote `logs` were written there, with no conflict and a report of success.
+   */
+  it.skipIf(process.platform === 'win32')(
+    'writes nothing through a link below the chosen folder',
+    async () => {
+      const outside = mkdtempSync(join(tmpdir(), 'terminaldeck-outside-'))
+      mkdirSync(localDir, { recursive: true })
+      symlinkSync(outside, join(localDir, 'logs'))
+      const entries: Record<string, Entry> = { '/srv/logs': { dir: true } }
+      attach(
+        'conn',
+        withListing(stubSession([], entries), { '/srv/logs': [{ name: 'a.log', size: 3 }] })
+      )
+
+      const planned = await sftpManager.planDownload('conn', '/srv/logs', localDir)
+      expect(planned.conflicts.map((c) => c.reason)).toEqual(['symlink'])
+
+      // Even told to overwrite, it does not go through the link.
+      const dest = join(localDir, 'logs', 'a.log')
+      const result = await sftpManager.runPlan('conn', planned, { [dest]: 'overwrite' })
+      expect(result.written).toBe(0)
+      expect(readdirSync(outside)).toEqual([])
+    }
+  )
+
   it('puts it under its own name in the directory chosen', async () => {
     const entries: Record<string, Entry> = { '/srv/logs': { dir: true } }
     attach(

@@ -17,7 +17,7 @@ import {
   statSync
 } from 'fs'
 import { randomBytes } from 'crypto'
-import { basename, dirname, join } from 'path'
+import { basename, dirname, isAbsolute, join, relative, sep } from 'path'
 import { sshManager } from './SSHManager'
 import { localChild } from '../localName'
 import {
@@ -240,6 +240,32 @@ export function stillAsPlanned(
    * contents on the strength of an answer about the old ones.
    */
   return !planned || (now.size === planned.destSize && now.mtime === planned.destMtime)
+}
+
+/**
+ * The first link between `root` and the folder `path` is written into, if any.
+ *
+ * A download looked only at the file it was about to write: `logs` inside the
+ * chosen folder could be a link to anywhere, and `logs/a.log` was written
+ * there, with no conflict and a report of success. The chosen folder itself
+ * is the person's choice and is followed; what lies below it is not. A path
+ * that is not below `root` at all answers itself.
+ */
+export async function linkBelow(root: string, path: string): Promise<string | undefined> {
+  const rel = relative(root, dirname(path))
+  if (rel === '') return undefined
+  if (rel.startsWith('..') || isAbsolute(rel)) return path
+  let cursor = root
+  for (const part of rel.split(sep)) {
+    cursor = join(cursor, part)
+    try {
+      if ((await lstat(cursor)).isSymbolicLink()) return cursor
+    } catch {
+      // Not there yet: the download makes it, and nothing below it exists.
+      return undefined
+    }
+  }
+  return undefined
 }
 
 /** An empty folder in a plan: made at the destination, with nothing to copy into it. */
@@ -1033,9 +1059,15 @@ class SFTPManager {
       : rootIsDirectory && root
         ? await this.remoteTree(connectionId, remotePath, localChild(localTarget, root.name))
         : await this.remoteTree(connectionId, remotePath, localTarget)
+    const localRoot = exactFile ? undefined : localTarget
     const found = new Map<string, DestInfo | null>()
     const unique = [...new Map(items.map((item) => [item.destPath, item])).values()]
     await forEachConcurrent(unique, async (item) => {
+      // Reached through a link below the chosen folder: refused, as a link is.
+      if (localRoot && (await linkBelow(localRoot, item.destPath))) {
+        found.set(item.destPath, { size: 0, mtime: 0, isDirectory: false, isSymlink: true })
+        return
+      }
       try {
         const info = await lstat(item.destPath)
         found.set(item.destPath, {
@@ -1054,7 +1086,8 @@ class SFTPManager {
         )
       }
     })
-    return buildTransferPlan('download', items, (p) => found.get(p) ?? null)
+    const plan = buildTransferPlan('download', items, (p) => found.get(p) ?? null)
+    return localRoot ? { ...plan, localRoot } : plan
   }
 
   /**
@@ -1199,6 +1232,12 @@ class SFTPManager {
         // name, and every download quietly created a directory beside itself
         // called C:\...\a.tx. It went unnoticed because that same call, being
         // recursive, made the real parent on the way past.
+        // Looked for again: a link can be put there after the plan was made.
+        if (plan.localRoot && (await linkBelow(plan.localRoot, item.destPath))) {
+          skipped++
+          changed.push(item.destPath)
+          continue
+        }
         await mkdir(dirname(item.destPath), { recursive: true })
         try {
           // Replaced only where the plan found a file and was told to overwrite
