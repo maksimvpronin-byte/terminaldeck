@@ -349,11 +349,9 @@ export function parseAnsibleInventories(
     return vars
   }
 
-  /** What a node's group says, with `all` beneath a top group's own when nothing holds it. */
+  /** A top group with no all node above it, which takes all's vars beneath its own. */
   const underAll = (node: { name: string; parentId: string | null }): boolean =>
     node.parentId === null && node.name !== 'all'
-  const varsAt = (node: { name: string; parentId: string | null }): AnsibleVars =>
-    underAll(node) ? { ...varsOf('all'), ...varsOf(node.name) } : varsOf(node.name)
 
   /*
    * Each level read on its own, then laid over the one beneath, as a group
@@ -433,9 +431,11 @@ export function parseAnsibleInventories(
       (a, b) =>
         depthOf(a.id) - depthOf(b.id) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id)
     )
+    // Each group by what it says itself, all first: laid under every top group,
+    // all's vars came back with an empty z, read after a, and beat a's own.
     const fromGroups = inAnsibleOrder.reduce<AnsibleVars>(
-      (acc, group) => ({ ...acc, ...varsAt(group) }),
-      {}
+      (acc, group) => ({ ...acc, ...varsOf(group.name) }),
+      inAnsibleOrder.some(underAll) ? { ...varsOf('all') } : {}
     )
     const protocol = protocolFromVars(hostVars) ?? protocolFromVars(fromGroups)
 

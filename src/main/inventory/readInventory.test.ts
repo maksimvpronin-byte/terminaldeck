@@ -366,6 +366,19 @@ describe('a group written down in more than one place', () => {
     expect(resolveAuth(h, h.groupId ?? null, result.groups).username).toBe('deploy')
   })
 
+  /* The same for what a host speaks and the desktop port: z brought all's 3388 back over a's 3390. */
+  it('lets all’s protocol and desktop port lose to a group’s, all key or not', () => {
+    const result = read(
+      repo({
+        'hosts.yml':
+          'a:\n  vars:\n    terminaldeck_port: 3390\n  hosts:\n    h: {}\nz:\n  hosts:\n    h: {}\n',
+        'group_vars/all.yml': 'terminaldeck_protocol: rdp\nterminaldeck_port: 3388\n'
+      }),
+      ['hosts.yml']
+    )
+    expect(result.hosts.find((x) => x.name === 'h')).toMatchObject({ protocol: 'rdp', port: 3390 })
+  })
+
   /** One group's own vars and its group_vars, in two spellings: Ansible takes ansible_ssh_*. */
   it('takes the ansible_ssh_* spelling from group_vars over ansible_user inline', () => {
     const result = read(
