@@ -273,7 +273,8 @@ export function stillAsPlanned(
 export async function linkBelow(root: string, path: string): Promise<string | undefined> {
   const rel = relative(root, dirname(path))
   if (rel === '') return undefined
-  if (rel.startsWith('..') || isAbsolute(rel)) return path
+  // `..cache` is a folder of that name; only `..` itself, as a whole step, leaves.
+  if (rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return path
   let cursor = root
   for (const part of rel.split(sep)) {
     cursor = join(cursor, part)

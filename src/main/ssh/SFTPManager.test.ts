@@ -1243,6 +1243,23 @@ describe('downloading a folder', () => {
     }
   )
 
+  /** `..cache` is a folder like any other, not a step out of the one chosen. */
+  it('downloads a folder whose name starts with two dots', async () => {
+    const entries: Record<string, Entry> = {
+      '/srv/..cache': { dir: true },
+      '/srv/..cache/a.log': { size: 3 }
+    }
+    attach(
+      'conn',
+      withListing(stubSession([], entries), { '/srv/..cache': [{ name: 'a.log', size: 3 }] })
+    )
+
+    const planned = await sftpManager.planDownload('conn', '/srv/..cache', localDir)
+
+    expect(planned.conflicts).toEqual([])
+    expect(planned.items.map((i) => i.destPath)).toEqual([join(localDir, '..cache', 'a.log')])
+  })
+
   it('puts it under its own name in the directory chosen', async () => {
     const entries: Record<string, Entry> = { '/srv/logs': { dir: true } }
     attach(
