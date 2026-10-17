@@ -54,6 +54,16 @@ function unresolved(value: unknown): boolean {
   return typeof value === 'string' && (value.includes('{{') || value.startsWith('$ANSIBLE_VAULT'))
 }
 
+/**
+ * A string var as it can be used, or nothing. A template used to be taken as
+ * written: `ansible_user: "{{ deploy_user }}"` became the login, and a key file
+ * of `"{{ ssh_key }}"` both a path and key authentication, so the host failed
+ * to connect instead of inheriting what its groups or the source say.
+ */
+function stated(value: unknown): string | undefined {
+  return unresolved(value) ? undefined : str(value)
+}
+
 function inventoryPort(value: unknown): number | undefined {
   if (value === undefined || value === null || value === '' || unresolved(value)) return undefined
   const port = num(value)
@@ -65,9 +75,9 @@ function inventoryPort(value: unknown): number | undefined {
 
 /** Maps the Ansible connection vars we understand onto our own auth fields. */
 export function varsToAuth(vars: AnsibleVars): AuthDefaults {
-  const username = str(vars.ansible_user) ?? str(vars.ansible_ssh_user)
+  const username = stated(vars.ansible_user) ?? stated(vars.ansible_ssh_user)
   const port = inventoryPort(vars.ansible_port) ?? inventoryPort(vars.ansible_ssh_port)
-  const key = str(vars.ansible_ssh_private_key_file) ?? str(vars.ansible_private_key_file)
+  const key = stated(vars.ansible_ssh_private_key_file) ?? stated(vars.ansible_private_key_file)
   return {
     ...(username ? { username } : {}),
     ...(port ? { port } : {}),
@@ -379,7 +389,7 @@ export function parseAnsibleInventories(
       id: key,
       name: entry.name,
       ...(protocol ? { protocol } : {}),
-      host: str(hostVars.ansible_host) ?? entry.name,
+      host: stated(hostVars.ansible_host) ?? entry.name,
       groupId: primary,
       tags: [],
       logToFile: false,

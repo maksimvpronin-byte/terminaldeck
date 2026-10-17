@@ -26,6 +26,28 @@ describe('varsToAuth', () => {
     })
   })
 
+  it('takes nothing from a template it cannot resolve', () => {
+    expect(
+      varsToAuth({
+        ansible_user: '{{ deploy_user }}',
+        ansible_ssh_private_key_file: '{{ ssh_key }}',
+        ansible_port: '{{ port }}'
+      })
+    ).toEqual({})
+    // The alias still counts when the first spelling is a template.
+    expect(varsToAuth({ ansible_user: '{{ u }}', ansible_ssh_user: 'deploy' })).toEqual({
+      username: 'deploy'
+    })
+  })
+
+  it('falls back to the host name when ansible_host is a template', () => {
+    const { hosts } = parseAnsibleInventory(
+      { web: { hosts: { web1: { ansible_host: '{{ lookup("dig", "web1") }}' } } } },
+      'src'
+    )
+    expect(hosts[0].host).toBe('web1')
+  })
+
   it('sets nothing for unrelated or blank vars', () => {
     expect(varsToAuth({ some_var: 'x', ansible_user: '   ' })).toEqual({})
   })
