@@ -76,11 +76,23 @@ function inventoryPort(value: unknown): number | undefined {
   return port
 }
 
+/**
+ * The value Ansible takes when a setting has two spellings: the later one in
+ * the plugin's list that is stated at all, which is always the `ansible_ssh_*`
+ * one. `ansible_user` used to win, so `ansible_user: root` inline and
+ * `ansible_ssh_user: deploy` in group_vars connected as root where Ansible
+ * logs in as deploy. A winner that is a template says nothing: Ansible would
+ * fill it in, and the other spelling is not what it would use.
+ */
+function spelled(vars: AnsibleVars, plain: string, ssh: string): unknown {
+  return vars[ssh] !== undefined && vars[ssh] !== null ? vars[ssh] : vars[plain]
+}
+
 /** Maps the Ansible connection vars we understand onto our own auth fields. */
 export function varsToAuth(vars: AnsibleVars): AuthDefaults {
-  const username = stated(vars.ansible_user) ?? stated(vars.ansible_ssh_user)
-  const port = inventoryPort(vars.ansible_port) ?? inventoryPort(vars.ansible_ssh_port)
-  const key = stated(vars.ansible_ssh_private_key_file) ?? stated(vars.ansible_private_key_file)
+  const username = stated(spelled(vars, 'ansible_user', 'ansible_ssh_user'))
+  const port = inventoryPort(spelled(vars, 'ansible_port', 'ansible_ssh_port'))
+  const key = stated(spelled(vars, 'ansible_private_key_file', 'ansible_ssh_private_key_file'))
   return {
     ...(username ? { username } : {}),
     ...(port ? { port } : {}),
@@ -407,7 +419,7 @@ export function parseAnsibleInventories(
       id: key,
       name: entry.name,
       ...(protocol ? { protocol } : {}),
-      host: stated(hostVars.ansible_host) ?? entry.name,
+      host: stated(spelled(hostVars, 'ansible_host', 'ansible_ssh_host')) ?? entry.name,
       groupId: primary,
       tags: [],
       logToFile: false,

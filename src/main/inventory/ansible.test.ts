@@ -19,6 +19,32 @@ describe('varsToAuth', () => {
     })
   })
 
+  /*
+   * Ansible's ssh plugin lists `ansible_user` then `ansible_ssh_user` (and so
+   * on for the port, the key and the address), and the later one stated wins.
+   */
+  it('lets the ansible_ssh_* spelling win when both are stated, as Ansible does', () => {
+    expect(
+      varsToAuth({
+        ansible_user: 'root',
+        ansible_ssh_user: 'deploy',
+        ansible_port: 22,
+        ansible_ssh_port: 2222,
+        ansible_private_key_file: '/k/plain',
+        ansible_ssh_private_key_file: '/k/ssh'
+      })
+    ).toEqual({
+      username: 'deploy',
+      port: 2222,
+      privateKeyPath: '/k/ssh',
+      authMethod: 'privateKey'
+    })
+  })
+
+  it('says nothing when the spelling Ansible would use is a template', () => {
+    expect(varsToAuth({ ansible_ssh_user: '{{ u }}', ansible_user: 'root' })).toEqual({})
+  })
+
   it('infers key auth from a stated key file', () => {
     expect(varsToAuth({ ansible_ssh_private_key_file: '/k/id' })).toEqual({
       privateKeyPath: '/k/id',
@@ -48,6 +74,16 @@ describe('varsToAuth', () => {
         ansible_port: '{% if prod %}22{% endif %}'
       })
     ).toEqual({})
+  })
+
+  it('reads ansible_ssh_host over ansible_host, as Ansible does', () => {
+    const { hosts } = parseAnsibleInventory(
+      parse(
+        'all:\n  hosts:\n    h:\n      ansible_host: 10.0.0.1\n      ansible_ssh_host: 10.0.0.2\n'
+      ),
+      SRC
+    )
+    expect(hosts[0].host).toBe('10.0.0.2')
   })
 
   it('falls back to the host name when ansible_host is a template', () => {

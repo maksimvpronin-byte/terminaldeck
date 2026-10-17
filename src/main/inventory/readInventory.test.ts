@@ -346,4 +346,18 @@ describe('a group written down in more than one place', () => {
     expect(loginOf(result, 'web1')).toBe('admin')
     expect(result.groups.find((g) => g.name === 'web')?.port).toBe(2200)
   })
+
+  /** One group's own vars and its group_vars, in two spellings: Ansible takes ansible_ssh_*. */
+  it('takes the ansible_ssh_* spelling from group_vars over ansible_user inline', () => {
+    const result = read(
+      repo({
+        'hosts.yml':
+          'web:\n  vars:\n    ansible_user: root\n    ansible_port: 22\n  hosts:\n    web1: {}\n',
+        'group_vars/web.yml': 'ansible_ssh_user: deploy\nansible_ssh_port: 2222\n'
+      }),
+      ['hosts.yml']
+    )
+    expect(loginOf(result, 'web1')).toBe('deploy')
+    expect(result.groups.find((g) => g.name === 'web')?.port).toBe(2222)
+  })
 })
