@@ -74,6 +74,9 @@ export function authChain(
   context: AuthContext = {}
 ): AuthDefaults[] {
   const chain = inheritanceChain(own, groupId, groups, optedOut)
+  // Settings carried for groups a git folder left out sit just above the host.
+  const carried = (own as { carriedAuth?: AuthDefaults & RdpLoginDefaults }).carriedAuth
+  if (carried && !optedOut(own)) chain.splice(1, 0, carried)
   if (context.protocol !== 'rdp') return chain
   return chain.map((level, i) => (i === 0 ? level : groupLevelFor(level, 'rdp')))
 }

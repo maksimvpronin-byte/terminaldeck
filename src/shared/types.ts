@@ -419,6 +419,18 @@ export interface PortForwardRule {
 }
 
 export interface SessionProfile extends AuthDefaults, AppearanceDefaults, RdpDefaults {
+  /**
+   * What groups left out of a git folder said about logging in, for a host
+   * those groups held. Read along the chain after the host's own settings and
+   * before its group's, and read as a group is — so a desktop takes its RDP
+   * side and never its `ansible_port`, whatever protocol the host is switched
+   * to locally. See `pruneTree`.
+   */
+  carriedAuth?: AuthDefaults &
+    RdpLoginDefaults & {
+      /** The groups it came from, for "inherited from" to name. */
+      name?: string
+    }
   id: string
   name: string
   /**

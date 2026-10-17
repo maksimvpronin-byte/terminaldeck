@@ -287,3 +287,32 @@ describe('the RDP half of a group, and default accounts', () => {
     expect(resolveAuth({}, 'acct', mixed, { credentials: [] }).username).toBe('ignored')
   })
 })
+
+/** A level a git folder carried on a host for the groups it left out. */
+describe('settings carried on a host', () => {
+  const groups = [{ id: 'g', name: 'prod', parentId: null, username: 'root', port: 22 }]
+  const host = {
+    username: '',
+    carriedAuth: { username: 'deploy', port: 5985, name: 'web' }
+  }
+
+  it('sit between the host and its group', () => {
+    expect(resolveAuth(host, 'g', groups)).toMatchObject({ username: 'deploy', port: 5985 })
+    expect(resolveAuth({ ...host, username: 'me' }, 'g', groups).username).toBe('me')
+  })
+
+  it('are read as a group is by a desktop, so its port is not taken', () => {
+    expect(resolveAuth(host, 'g', groups, { protocol: 'rdp' })).toMatchObject({
+      username: 'deploy',
+      port: 3389
+    })
+  })
+
+  it('are named where a field says what it inherits', () => {
+    expect(inheritedFrom(host, 'g', groups, 'username')?.name).toBe('web')
+  })
+
+  it('are left out by a host that stands on its own settings', () => {
+    expect(resolveAuth({ ...host, inheritAuth: false }, 'g', groups).username).toBe('')
+  })
+})
