@@ -788,6 +788,61 @@ all:
     expect(withLocal({ secretRef: 'pw' }).secretRef).toBeUndefined()
   })
 
+  /* The way in comes whole from one group, whichever groups the login and the key are from. */
+  describe('when the login and the key come from different groups', () => {
+    const resolveWith = (doc: string, local: Record<string, Record<string, unknown>>) => {
+      const { groups, hosts } = parseAnsibleInventory(parse(doc), SRC)
+      const h = hosts[0]
+      return resolveAuth(
+        h,
+        h.groupId ?? null,
+        groups.map((g) => {
+          const name = Object.keys(local).find((n) => g.id === groupId(SRC, `all/${n}`))
+          return applyOverride(g, name ? { nodeId: g.id, ...local[name] } : undefined)
+        })
+      )
+    }
+
+    it('takes the secret from the group the method comes from', () => {
+      const auth = resolveWith(
+        `
+all:
+  children:
+    a: { vars: { ansible_user: deploy }, hosts: { h: {} } }
+    b: { vars: { ansible_private_key_file: /keys/b }, hosts: { h: {} } }
+    z: { hosts: { h: {} } }
+`,
+        {
+          a: { authMethod: 'privateKey', privateKeyPath: '/keys/a', secretRef: 'pp-a' },
+          b: { authMethod: 'password', secretRef: 'password-b' }
+        }
+      )
+      expect(auth).toMatchObject({
+        username: 'deploy',
+        authMethod: 'password',
+        secretRef: 'password-b'
+      })
+    })
+
+    it('brings the passphrase saved with a key carried without the login', () => {
+      const auth = resolveWith(
+        `
+all:
+  children:
+    db: { vars: { ansible_private_key_file: /keys/encrypted }, hosts: { h: {} } }
+    web: { vars: { ansible_user: deploy }, hosts: { h: {} } }
+`,
+        { db: { authMethod: 'privateKey', secretRef: 'pp-db' } }
+      )
+      expect(auth).toMatchObject({
+        username: 'deploy',
+        authMethod: 'privateKey',
+        privateKeyPath: '/keys/encrypted',
+        secretRef: 'pp-db'
+      })
+    })
+  })
+
   it('still lets the host’s own settings win', () => {
     const doc = `
 all:

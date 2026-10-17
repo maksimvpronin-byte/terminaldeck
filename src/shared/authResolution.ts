@@ -81,6 +81,9 @@ export function authChain(
   return chain.map((level, i) => (i === 0 ? level : groupLevelFor(level, 'rdp')))
 }
 
+/** What signs a host in once its login is known, which belongs together. */
+const SIGN_IN: (keyof AuthDefaults)[] = ['authMethod', 'privateKeyPath', 'secretRef']
+
 /**
  * The level of settings carried on a host. Copied when the repository was
  * read, a setting from a group still in the tree went on saying what the
@@ -97,24 +100,34 @@ function carriedLevel(
   }
   if (!carriedFrom) return carriedAuth
   const level: AuthDefaults & RdpLoginDefaults = { ...carriedAuth }
-  for (const [key, groupId] of Object.entries(carriedFrom) as [keyof AuthDefaults, string][]) {
-    const group = groups.find((g) => g.id === groupId)
-    if (!group) continue
-    if (isSet(group[key])) Object.assign(level, { [key]: group[key] })
-    if (key !== 'username') continue
-    // A login comes with the account chosen beside it, which brings its own
-    // way in: db's login without db's account signed in as deploy with
-    // nothing saved.
-    if (isSet(group.credentialId)) level.credentialId = group.credentialId
-    /*
-     * A saved secret only with the way it is used. Carried with the login
-     * alone, the passphrase of db's key went to the server as a password; so
-     * the method, the key and the secret come over together or not at all.
-     */
-    if (isSet(group.authMethod)) {
-      level.authMethod = group.authMethod
-      if (isSet(group.privateKeyPath)) level.privateKeyPath = group.privateKeyPath
-      if (isSet(group.secretRef)) level.secretRef = group.secretRef
+  const groupOf = (key: keyof AuthDefaults): SessionGroup | undefined =>
+    carriedFrom[key] === undefined ? undefined : groups.find((g) => g.id === carriedFrom[key])
+
+  for (const key of Object.keys(carriedFrom) as (keyof AuthDefaults)[]) {
+    if (SIGN_IN.includes(key)) continue
+    const group = groupOf(key)
+    if (group && isSet(group[key])) Object.assign(level, { [key]: group[key] })
+  }
+  // A login comes with the account chosen beside it, which brings its own
+  // way in: db's login without db's account signed in as deploy with
+  // nothing saved.
+  const login = groupOf('username')
+  if (login && isSet(login.credentialId)) level.credentialId = login.credentialId
+
+  /*
+   * The way in — method, key and the secret saved for them — comes whole from
+   * one group: the one Ansible takes the method or the key from, or else the
+   * login's, when that group says how it signs in. Taken a field at a time,
+   * a passphrase saved for one group's key went to the server as the password
+   * another group's method asked for, and a key came without its passphrase.
+   */
+  const way =
+    groupOf('authMethod') ??
+    groupOf('privateKeyPath') ??
+    (login && isSet(login.authMethod) ? login : undefined)
+  if (way) {
+    for (const key of SIGN_IN) {
+      if (isSet(way[key])) Object.assign(level, { [key]: way[key] })
     }
   }
   return level
