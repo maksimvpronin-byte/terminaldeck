@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { authFieldsState, secretToSave } from './authFields'
+import { resolveAuth } from './authResolution'
+import { applyOverride } from './overrides'
 import type { AuthDefaults, SessionGroup } from './types'
 
 const groups: SessionGroup[] = [
@@ -186,6 +188,28 @@ describe('the credential fields of an editing dialog', () => {
       })
 
       expect(state.effective.username).toBe('ansible')
+    })
+
+    /*
+     * A host the inventory calls SSH, on WinRM's 5985, switched to RDP here.
+     * The connection drops the repository's port and dials 3389; the dialog
+     * layered with a plain spread and said 5985.
+     */
+    it('drops the repository’s port when the override switches protocol', () => {
+      const node = { username: 'ansible', port: 5985, protocol: 'ssh' as const }
+      const override = { nodeId: 'h', protocol: 'rdp' as const }
+      const state = authFieldsState({
+        own: override,
+        beneath: node,
+        parentId: null,
+        groups: [],
+        forgetSecret: false,
+        context: { protocol: 'rdp' }
+      })
+
+      const connects = resolveAuth(applyOverride(node, override), null, [], { protocol: 'rdp' })
+      expect(connects.port).toBe(3389)
+      expect(state.effective.port).toBe(connects.port)
     })
   })
 })

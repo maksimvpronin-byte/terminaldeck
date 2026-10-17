@@ -27,6 +27,16 @@ export function applyOverride<T extends object, O extends { nodeId: string }>(
 ): T {
   if (!override) return node
   const { nodeId: _addressed, ...patch } = override
+  return layerOver(node, patch)
+}
+
+/**
+ * `patch` over `node`, by the rules of an override: blanks shadow nothing, and
+ * a switched protocol takes the node's port with it. The editing dialog lays
+ * its form over an inventory host with this as well, so what it says a host
+ * will connect on is what the connection uses.
+ */
+export function layerOver<T extends object>(node: T, patch: object): T {
   const merged: T = { ...node, ...withoutBlanks(patch) }
   /*
    * A repository's port belongs to the protocol the repository named. A host

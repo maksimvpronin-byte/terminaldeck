@@ -6,8 +6,12 @@ import {
   sourceOf,
   type AuthContext
 } from './authResolution'
-import { isSet, withoutBlanks } from './overrides'
+import { isSet, layerOver } from './overrides'
+import type { Protocol } from './protocols'
 import type { AuthDefaults, AuthMethod, Credential, ResolvedAuth, SessionGroup } from './types'
+
+/** Auth fields, and the protocol they are for, which decides whether a port carries over. */
+type AuthLayer = AuthDefaults & { protocol?: Protocol }
 
 /**
  * What the credential half of an editing dialog needs to know.
@@ -23,13 +27,13 @@ import type { AuthDefaults, AuthMethod, Credential, ResolvedAuth, SessionGroup }
  */
 export interface AuthFieldsInput {
   /** The item being edited, as the form currently has it. */
-  own: AuthDefaults
+  own: AuthLayer
   /**
    * Settings that sit under the item's own but above its groups: an inventory
    * host, which a local override is edited on top of. Absent for a saved host
    * or group, which have nothing between them and their groups.
    */
-  beneath?: AuthDefaults
+  beneath?: AuthLayer
   /** The group this item hangs off — a host's group, or a group's parent. */
   parentId: string | null
   groups: SessionGroup[]
@@ -100,17 +104,16 @@ export function authFieldsState({
   const pending = forgetSecret ? { ...own, secretRef: undefined } : own
 
   /**
-   * Blanks are dropped before layering, the way `applyOverride` does it for
-   * everything else.
+   * Layered by the rules of `applyOverride`, which is how the main process
+   * layers it, or the dialog states one thing and the connection does another.
    *
    * A form field cleared back to "inherit" holds `undefined`, and a plain
    * spread would write that over the inventory's value rather than falling back
    * to it — showing the group's setting for a connection that will use the
-   * repository's. The main process layers with `applyOverride`, so this must
-   * too, or the dialog states one thing and the connection does another.
+   * repository's. And a host switched to another protocol here connects
+   * without the repository's port, which the spread kept on show.
    */
-  const layer = (item: AuthDefaults): AuthDefaults =>
-    beneath ? { ...beneath, ...withoutBlanks(item) } : item
+  const layer = (item: AuthDefaults): AuthDefaults => (beneath ? layerOver(beneath, item) : item)
 
   const layered = layer(pending)
   const effective = resolveAuth(layered, parentId, groups, context)
