@@ -587,6 +587,9 @@ export interface GitFolderApplyOptions {
  * What a sync found, before anything is written. Nothing on disk changes until
  * the choice made in front of this is applied.
  */
+/** What applying a choice of groups would take away; see `GitFolderStore.consequences`. */
+export type GitFolderConsequences = Pick<GitFolderPreview, 'removedHosts' | 'removedGroupSettings'>
+
 export interface GitFolderPreview {
   showGroupFolders?: boolean
   includeChildHosts?: boolean
@@ -598,6 +601,8 @@ export interface GitFolderPreview {
   removedGroups: string[]
   /** Hosts that will disappear with them, and whether they hold local settings. */
   removedHosts: { id: string; name: string; hasLocalSettings: boolean }[]
+  /** Groups left out whose local settings, and any password saved on them, will go. */
+  removedGroupSettings: { id: string; name: string }[]
   revision?: string
   files: string[]
   /** Set when the repository was read but held no inventory file at all. */

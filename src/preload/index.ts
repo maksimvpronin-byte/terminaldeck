@@ -21,6 +21,7 @@ import type {
   InventoryTree,
   ForwardedKey,
   GitFolderApplyOptions,
+  GitFolderConsequences,
   GitFolderPreview,
   GitFolderTree,
   GitRepo,
@@ -148,7 +149,7 @@ const api = {
       groupId: string,
       includedGroups: string[],
       options?: GitFolderApplyOptions
-    ): Promise<GitFolderPreview['removedHosts']> =>
+    ): Promise<GitFolderConsequences> =>
       ipcRenderer.invoke(IPC.gitFolderConsequences, groupId, includedGroups, options),
     saveOverride: (
       override: InventoryOverride,

@@ -133,11 +133,39 @@ describe('a Sessions folder mirroring a repository', () => {
     const preview = await gitFolderStore.preview(FOLDER)
     expect(preview.removedHosts).toEqual([])
 
-    const none = gitFolderStore.consequences(FOLDER, [])
+    const none = gitFolderStore.consequences(FOLDER, []).removedHosts
     expect(none.map((h) => h.name).sort()).toEqual(['db1', 'web1'])
     expect(none.find((h) => h.name === 'web1')?.hasLocalSettings).toBe(true)
-    expect(gitFolderStore.consequences(FOLDER, ['all', 'all/prod'])).toEqual([])
+    expect(gitFolderStore.consequences(FOLDER, ['all', 'all/prod'])).toEqual({
+      removedHosts: [],
+      removedGroupSettings: []
+    })
     gitFolderStore.apply(FOLDER, ['all', 'all/prod'], forget)
+  })
+
+  /**
+   * Leaving out a parent while keeping its child drops no host, and used to
+   * say nothing — but the parent's local settings and saved password went.
+   */
+  it('says which group settings a choice would take, as apply would', async () => {
+    await gitFolderStore.preview(FOLDER)
+    gitFolderStore.apply(FOLDER, ['all', 'all/prod'], forget)
+    const all = gitGroupId(FOLDER, 'all')
+    gitFolderStore.saveOverride({ nodeId: all, username: 'me', secretRef: 'all-login' })
+    await gitFolderStore.preview(FOLDER)
+
+    // all left out, prod kept: no host goes, but all's settings do.
+    const answer = gitFolderStore.consequences(FOLDER, ['all/prod'])
+    expect(answer.removedHosts).toEqual([])
+    expect(answer.removedGroupSettings).toEqual([{ id: all, name: 'all' }])
+
+    forgotten.length = 0
+    gitFolderStore.apply(FOLDER, ['all/prod'], forget)
+    expect(forgotten).toEqual([all])
+
+    await gitFolderStore.preview(FOLDER)
+    gitFolderStore.apply(FOLDER, ['all', 'all/prod'], forget)
+    forgotten.length = 0
   })
 
   it('persists the folder layout and restores it in the next sync preview', async () => {

@@ -55,6 +55,7 @@ const preview: GitFolderPreview = {
   included: ['all', 'all/prod'],
   removedGroups: [],
   removedHosts: [],
+  removedGroupSettings: [],
   revision: 'abc1234',
   files: ['hosts.yml']
 }
@@ -165,14 +166,16 @@ describe('the sync dialog', () => {
    */
   it('says what Apply would take for the groups ticked now', async () => {
     const consequences = vi.fn((_id: string, included: string[]) =>
-      Promise.resolve(
-        included.length === 0
-          ? [
-              { id: 'h1', name: 'web1', hasLocalSettings: true },
-              { id: 'h2', name: 'db1', hasLocalSettings: false }
-            ]
-          : []
-      )
+      Promise.resolve({
+        removedHosts:
+          included.length === 0
+            ? [
+                { id: 'h1', name: 'web1', hasLocalSettings: true },
+                { id: 'h2', name: 'db1', hasLocalSettings: false }
+              ]
+            : [],
+        removedGroupSettings: included.length === 0 ? [{ id: 'g1', name: 'prod' }] : []
+      })
     )
     window.td.gitFolder.consequences = consequences
     render(<GitFolderSyncDialog folderName="Infra" preview={preview} onClose={() => {}} />)
@@ -184,6 +187,7 @@ describe('the sync dialog', () => {
       await screen.findByText(/2 hosts will disappear from this folder: web1, db1/)
     ).toBeTruthy()
     expect(screen.getByText(/1 of them have local settings/)).toBeTruthy()
+    expect(screen.getByText(/Local settings of groups left out go as well.*: prod/)).toBeTruthy()
     expect(consequences).toHaveBeenLastCalledWith('folder-1', [], { includeChildHosts: false })
     expect(screen.getByRole('button', { name: 'Apply' })).not.toHaveProperty('disabled', true)
   })
@@ -193,7 +197,10 @@ describe('the sync dialog', () => {
     const consequences = vi
       .fn()
       .mockRejectedValueOnce(new Error('the read was forgotten'))
-      .mockResolvedValue([{ id: 'h1', name: 'web1', hasLocalSettings: false }])
+      .mockResolvedValue({
+        removedHosts: [{ id: 'h1', name: 'web1', hasLocalSettings: false }],
+        removedGroupSettings: []
+      })
     window.td.gitFolder.consequences = consequences
     render(<GitFolderSyncDialog folderName="Infra" preview={preview} onClose={() => {}} />)
     const apply = (): HTMLButtonElement =>

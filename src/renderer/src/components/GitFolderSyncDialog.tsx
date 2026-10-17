@@ -30,6 +30,9 @@ export default function GitFolderSyncDialog({
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
   const [removedHosts, setRemovedHosts] = useState(preview.removedHosts)
+  const [removedGroupSettings, setRemovedGroupSettings] = useState(
+    preview.removedGroupSettings ?? []
+  )
   const [checking, setChecking] = useState(false)
   /** The last check failed: what Apply would take is not known, so it waits. */
   const [unchecked, setUnchecked] = useState<string>()
@@ -53,9 +56,10 @@ export default function GitFolderSyncDialog({
     setChecking(true)
     window.td.gitFolder
       .consequences(preview.groupId, [...chosen], { includeChildHosts })
-      .then((hosts) => {
+      .then((answer) => {
         if (n !== asked.current) return
-        setRemovedHosts(hosts ?? [])
+        setRemovedHosts(answer?.removedHosts ?? [])
+        setRemovedGroupSettings(answer?.removedGroupSettings ?? [])
         setUnchecked(undefined)
       })
       .catch((err) => {
@@ -224,6 +228,15 @@ export default function GitFolderSyncDialog({
             {t(
               '{count} of them have local settings, which go with them — including any password saved for them here.',
               { count: losingSettings.length }
+            )}
+          </p>
+        )}
+
+        {removedGroupSettings.length > 0 && (
+          <p className="settings-note">
+            {t(
+              'Local settings of groups left out go as well, with any password saved on them: {groups}',
+              { groups: removedGroupSettings.map((g) => g.name).join(', ') }
             )}
           </p>
         )}

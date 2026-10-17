@@ -1296,6 +1296,8 @@ export const ru: Record<string, string> = {
     'Нужен Linux-сервер с scp и GNU coreutils/find. Команда должна выполняться без диалога: запрос пароля sudo не поддерживается. Применяется к файлам после переподключения, независимо от входа в терминал.',
   'Could not work out what Apply would remove, so it waits: {error}':
     'Не удалось выяснить, что удалит «Применить», поэтому оно недоступно: {error}',
+  'Local settings of groups left out go as well, with any password saved on them: {groups}':
+    'Вместе с ними удаляются и локальные настройки исключённых групп, включая сохранённые на них пароли: {groups}',
   'Check again': 'Проверить снова',
   'Select none': 'Снять всё',
   '{count} new since the last sync': 'Новых с прошлой синхронизации: {count}',

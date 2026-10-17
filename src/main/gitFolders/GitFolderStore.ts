@@ -6,6 +6,7 @@ import type {
   GitFolderApplyOptions,
   GitFolderData,
   GitFolderLink,
+  GitFolderConsequences,
   GitFolderPreview,
   GitFolderPreviewGroup,
   GitFolderTree,
@@ -347,7 +348,7 @@ class GitFolderStore {
       }
     })
 
-    const removedHosts = this.removedHostsFor(
+    const { removedHosts, removedGroupSettings } = this.consequencesFor(
       folderId,
       repo,
       included,
@@ -362,6 +363,7 @@ class GitFolderStore {
       included,
       removedGroups,
       removedHosts,
+      removedGroupSettings,
       revision: repo.revision,
       files: repo.files,
       warning: repo.warning
@@ -369,26 +371,43 @@ class GitFolderStore {
   }
 
   /**
-   * Hosts about to go: what this folder shows now, minus what the chosen groups
-   * would still hold. Local settings are called out — deleting the host deletes
-   * them, and its stored password with them.
+   * What applying a choice would take away: the hosts this folder shows now
+   * that the chosen groups would no longer hold, and every local setting that
+   * would be left addressing nothing — on a host, and on a group left out,
+   * along with the password saved on it. Local settings are called out because
+   * `apply` deletes them, by the same test, `orphanedOverrides`.
    */
-  private removedHostsFor(
+  private consequencesFor(
     folderId: string,
     repo: ParsedRepo,
     included: string[],
     includeChildHosts: boolean
-  ): GitFolderPreview['removedHosts'] {
-    const wouldKeep = new Set(
-      pruneTree(folderId, repo.tree, included, includeChildHosts).sessions.map((s) => s.id)
-    )
-    return (this.treeOf(folderId)?.sessions ?? [])
+  ): GitFolderConsequences {
+    const pruned = pruneTree(folderId, repo.tree, included, includeChildHosts)
+    const wouldKeep = new Set(pruned.sessions.map((s) => s.id))
+    const removedHosts = (this.treeOf(folderId)?.sessions ?? [])
       .filter((h) => !wouldKeep.has(h.id))
       .map((h) => ({
         id: h.id,
         name: h.name,
         hasLocalSettings: this.data.overrides.some((o) => o.nodeId === h.id)
       }))
+    const live = new Set([...pruned.groups.map((g) => g.id), ...wouldKeep])
+    const counted = new Set(removedHosts.map((h) => h.id))
+    const current = this.treeOf(folderId)
+    const named = new Map(
+      [
+        ...repo.tree.groups,
+        ...repo.tree.sessions,
+        ...(current?.groups ?? []),
+        ...(current?.sessions ?? [])
+      ].map((n) => [n.id, n.name] as const)
+    )
+    const prefix = gitNodePrefix(folderId)
+    const removedGroupSettings = this.data.overrides
+      .filter((o) => o.nodeId.startsWith(prefix) && !live.has(o.nodeId) && !counted.has(o.nodeId))
+      .map((o) => ({ id: o.nodeId, name: named.get(o.nodeId) ?? o.nodeId.slice(prefix.length) }))
+    return { removedHosts, removedGroupSettings }
   }
 
   /**
@@ -404,13 +423,13 @@ class GitFolderStore {
     folderId: string,
     includedGroups: string[],
     options: GitFolderApplyOptions = {}
-  ): GitFolderPreview['removedHosts'] {
+  ): GitFolderConsequences {
     const found = this.linkOf(folderId)
     const repo = this.pending.get(folderId)
-    if (!found || !repo) return []
+    if (!found || !repo) throw new Error('Sync this folder again: what it read has been forgotten')
     const included = includedGroups.filter((p) => repo.paths.includes(p))
     const includeChildHosts = options.includeChildHosts ?? found.link.includeChildHosts ?? false
-    return this.removedHostsFor(folderId, repo, included, includeChildHosts)
+    return this.consequencesFor(folderId, repo, included, includeChildHosts)
   }
 
   /**
