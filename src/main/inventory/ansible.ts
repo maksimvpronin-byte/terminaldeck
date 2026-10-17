@@ -461,15 +461,17 @@ export function parseAnsibleInventories(
       ...inAnsibleOrder.map((g) => ({ id: g.id, name: g.name, auth: authOf(g.name) }))
     ]
     const carried: AuthDefaults = {}
-    const carriedFrom = new Set<string>()
+    const carriedFrom: Partial<Record<keyof AuthDefaults, string>> = {}
+    const carriedNames = new Set<string>()
     for (const key of CONNECTION_KEYS) {
       const winner = levels.findLast((level) => isSet(level.auth[key]))
       if (!winner?.id || onChain.has(winner.id)) continue
       Object.assign(carried, { [key]: winner.auth[key] })
-      carriedFrom.add(winner.name)
+      carriedFrom[key] = winner.id
+      carriedNames.add(winner.name)
     }
     const carriedAuth =
-      carriedFrom.size > 0 ? { ...carried, name: [...carriedFrom].join(', ') } : undefined
+      carriedNames.size > 0 ? { ...carried, name: [...carriedNames].join(', ') } : undefined
 
     hosts.push({
       id: key,
@@ -483,7 +485,7 @@ export function parseAnsibleInventories(
       createdAt: now,
       updatedAt: now,
       ...portForProtocol(varsToAuth(hostVars), protocol, { ...fromGroups, ...hostVars }),
-      ...(carriedAuth ? { carriedAuth } : {})
+      ...(carriedAuth ? { carriedAuth, carriedFrom } : {})
     })
     memberships[key] = ordered
   }

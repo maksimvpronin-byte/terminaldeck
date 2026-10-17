@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { parse } from 'yaml'
 import { parseAnsibleInventory, protocolFromVars, varsToAuth, groupId, hostId } from './ansible'
 import { resolveAuth } from '../../shared/authResolution'
+import { applyOverride } from '../../shared/overrides'
 
 const SRC = 'src1'
 
@@ -675,6 +676,42 @@ all:
       hosts: { h: {} }
 `
     expect(connects(doc, 'h').port).toBe(2200)
+  })
+
+  /*
+   * Copied when the repository was read, a carried setting went on saying
+   * what db said then: local settings given to db never reached h.
+   */
+  it('reads a carried setting from its group as the group is now', () => {
+    const { groups, hosts } = parseAnsibleInventory(
+      parse(`
+all:
+  children:
+    db:
+      vars: { ansible_user: deploy, ansible_port: 2200 }
+      hosts: { h: {} }
+    web:
+      hosts: { h: {} }
+`),
+      SRC
+    )
+    const db = groupId(SRC, 'all/db')
+    const local = groups.map((g) =>
+      applyOverride(g, g.id === db ? { nodeId: db, username: 'local' } : undefined)
+    )
+    const h = hosts[0]
+    expect(resolveAuth(h, h.groupId ?? null, local)).toMatchObject({
+      username: 'local',
+      port: 2200
+    })
+    // A group gone from the tree leaves the copy to speak for it.
+    expect(
+      resolveAuth(
+        h,
+        h.groupId ?? null,
+        local.filter((g) => g.id !== db)
+      ).username
+    ).toBe('deploy')
   })
 
   it('still lets the host’s own settings win', () => {

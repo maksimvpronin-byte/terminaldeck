@@ -74,11 +74,34 @@ export function authChain(
   context: AuthContext = {}
 ): AuthDefaults[] {
   const chain = inheritanceChain(own, groupId, groups, optedOut)
-  // Settings carried for groups a git folder left out sit just above the host.
-  const carried = (own as { carriedAuth?: AuthDefaults & RdpLoginDefaults }).carriedAuth
+  // Settings carried from groups the host does not inherit from sit just above it.
+  const carried = carriedLevel(own, groups)
   if (carried && !optedOut(own)) chain.splice(1, 0, carried)
   if (context.protocol !== 'rdp') return chain
   return chain.map((level, i) => (i === 0 ? level : groupLevelFor(level, 'rdp')))
+}
+
+/**
+ * The level of settings carried on a host. Copied when the repository was
+ * read, a setting from a group still in the tree went on saying what the
+ * group said then: local settings given to that group never reached the
+ * host. It is read from the group now; the copy speaks for a group gone.
+ */
+function carriedLevel(
+  own: AuthDefaults,
+  groups: SessionGroup[]
+): (AuthDefaults & RdpLoginDefaults) | undefined {
+  const { carriedAuth, carriedFrom } = own as {
+    carriedAuth?: AuthDefaults & RdpLoginDefaults
+    carriedFrom?: Partial<Record<keyof AuthDefaults, string>>
+  }
+  if (!carriedFrom) return carriedAuth
+  const level: AuthDefaults & RdpLoginDefaults = { ...carriedAuth }
+  for (const [key, groupId] of Object.entries(carriedFrom) as [keyof AuthDefaults, string][]) {
+    const group = groups.find((g) => g.id === groupId)
+    if (group && isSet(group[key])) Object.assign(level, { [key]: group[key] })
+  }
+  return level
 }
 
 /**

@@ -420,17 +420,26 @@ export interface PortForwardRule {
 
 export interface SessionProfile extends AuthDefaults, AppearanceDefaults, RdpDefaults {
   /**
-   * What groups left out of a git folder said about logging in, for a host
-   * those groups held. Read along the chain after the host's own settings and
+   * What groups the host does not inherit from said about logging in: those
+   * Ansible takes a setting from off the host's own chain (see
+   * parseAnsibleInventories), and those a git folder left out (see
+   * `pruneTree`). Read along the chain after the host's own settings and
    * before its group's, and read as a group is — so a desktop takes its RDP
    * side and never its `ansible_port`, whatever protocol the host is switched
-   * to locally. See `pruneTree`.
+   * to locally.
    */
   carriedAuth?: AuthDefaults &
     RdpLoginDefaults & {
       /** The groups it came from, for "inherited from" to name. */
       name?: string
     }
+  /**
+   * Which group each carried setting is Ansible's choice from, when that group
+   * is still in the tree. Resolution reads the setting from the group as it is
+   * then, local settings and all, and the copy in carriedAuth only stands in
+   * for a group that is gone. See parseAnsibleInventories.
+   */
+  carriedFrom?: Partial<Record<keyof AuthDefaults, string>>
   id: string
   name: string
   /**
