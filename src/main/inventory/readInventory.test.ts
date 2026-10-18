@@ -8,7 +8,7 @@ import { resolveAuth } from '../../shared/authResolution'
 import { applyOverride } from '../../shared/overrides'
 
 describe('inventory worker parsing', () => {
-  it('keeps first host values, unions membership, reads vars and attaches roots', () => {
+  it('takes host values from the file read last, unions membership, reads vars and attaches roots', () => {
     const dir = mkdtempSync(join(tmpdir(), 'td-inventory-'))
     try {
       writeFileSync(
@@ -29,7 +29,8 @@ describe('inventory worker parsing', () => {
         rootId: 'root'
       })
       expect(result.hosts).toHaveLength(1)
-      expect(result.hosts[0]).toMatchObject({ host: '10.0.0.1', username: 'deploy' })
+      // Ansible loads the files in order, and a host's own vars from the last win.
+      expect(result.hosts[0]).toMatchObject({ host: '10.0.0.2', username: 'deploy' })
       expect(result.groups.every((g) => g.parentId === 'root')).toBe(true)
       // In Ansible's order, whichever file named the group first.
       expect(result.memberships[result.hosts[0].id]).toEqual(['git:repo:g:dev', 'git:repo:g:prod'])
@@ -479,6 +480,23 @@ describe('a group written down in more than one place', () => {
     )
     const h = result.hosts.find((x) => x.name === 'h')!
     expect(resolveAuth(h, h.groupId ?? null, local).username).toBe('root')
+  })
+
+  /*
+   * A host's own inline vars are the host's, and the last read wins, as
+   * Ansible loads them. Sorted by the groups they were written under, both of
+   * a's mentions went before z's and z's address won.
+   */
+  it('takes a host’s inline vars from the mention read last', () => {
+    const result = read(
+      repo({
+        '1.yml': 'a:\n  hosts:\n    h:\n      ansible_host: 10.0.0.1\n',
+        '2.yml': 'z:\n  hosts:\n    h:\n      ansible_host: 10.0.0.2\n',
+        '3.yml': 'a:\n  hosts:\n    h:\n      ansible_host: 10.0.0.1\n'
+      }),
+      ['1.yml', '2.yml', '3.yml']
+    )
+    expect(result.hosts.find((x) => x.name === 'h')?.host).toBe('10.0.0.1')
   })
 
   /** One group's own vars and its group_vars, in two spellings: Ansible takes ansible_ssh_*. */

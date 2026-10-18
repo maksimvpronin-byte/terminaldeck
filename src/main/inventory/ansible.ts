@@ -405,12 +405,11 @@ export function parseAnsibleInventories(
     )
     if (ordered.length === 0) continue
     const primary = ordered[ordered.length - 1]
-    // Vars stated at each mention are merged in the order of their groups, so
-    // the group that supplies the settings is also the one that wins a conflict.
-    const rank = new Map(ordered.map((id, i) => [groupById.get(id)!.name, i]))
-    const inline = [...entry.claims]
-      .sort((a, b) => (rank.get(a.group) ?? 0) - (rank.get(b.group) ?? 0))
-      .reduce<AnsibleVars>((acc, claim) => ({ ...acc, ...claim.vars }), {})
+    // Vars stated at each mention are the host's own, not its groups', and
+    // the last read wins, as Ansible loads them. Sorted by the groups they were
+    // written under, a's two mentions in the first and third files went before
+    // z's in the second, and z's address won.
+    const inline = entry.claims.reduce<AnsibleVars>((acc, claim) => ({ ...acc, ...claim.vars }), {})
     // host_vars over the inventory's own host vars, as Ansible reads them.
     const hostVars = { ...inline, ...fromPlaces('host', entry.name) }
 
