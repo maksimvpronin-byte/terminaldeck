@@ -116,6 +116,12 @@ function stubSession(
     duringPut?: () => void
     /** Runs as a file is opened, the way somebody sharing the folder could. */
     afterOpen?: (path: string) => void
+    /** A server that will not change a file's permissions. */
+    failChmod?: boolean
+    /** A server that says yes to a change of permissions and keeps none (Windows). */
+    ignoreChmod?: boolean
+    /** A server that says, at close, that what was written did not keep. */
+    failClose?: boolean
     /** Runs before the stub opens what it was given, the way a racing program would. */
     beforeGet?: () => void
   } = {}
@@ -161,8 +167,9 @@ function stubSession(
       cb(null, { mode: 0o100000 | (entry?.mode ?? 0), uid: entry?.uid ?? 0, gid: 0 })
     },
     fchmod(handle: Buffer, mode: number, cb: (err?: Error | null) => void): void {
+      if (opts.failChmod) return cb(new Error('Operation unsupported'))
       const entry = heldBy(handle)
-      if (entry) entry.mode = mode
+      if (entry && !opts.ignoreChmod) entry.mode = mode
       cb(null)
     },
     fchown(handle: Buffer, uid: number, _gid: number, cb: (err?: Error | null) => void): void {
@@ -200,7 +207,9 @@ function stubSession(
       cb(null)
     },
     close(handle: Buffer, cb: (err?: Error | null) => void): void {
-      if (written.delete(handle.toString())) opts.duringPut?.()
+      const wasWritten = written.delete(handle.toString())
+      if (wasWritten) opts.duringPut?.()
+      if (wasWritten && opts.failClose) return cb(new Error('Failure'))
       cb(null)
     },
     fastPut(
@@ -808,6 +817,58 @@ describe('running a transfer plan', () => {
     ).rejects.toThrow(/replaced/)
     expect(entries['/root/victim']).toEqual({ size: 5 })
     expect(entries['/srv/drop/a.txt']).toBeUndefined()
+  })
+
+  /*
+   * The copy is narrowed to its owner before a byte goes in. A server that
+   * refused had the new contents of a 0600 key written into a copy anyone on
+   * the server could read; nothing is written into one that is not private.
+   */
+  it('writes nothing into a copy the server will not keep private', async () => {
+    const entries: Record<string, Entry> = { '/srv/key': { size: 3, mode: 0o600, uid: 0 } }
+    const calls: Call[] = []
+    attach('conn', stubSession(calls, entries, { failChmod: true }))
+    const sending = plan('upload', [item('/local/a.txt', '/srv/key')])
+    sending.conflicts = [
+      { ...item('/local/a.txt', '/srv/key'), destSize: 3, destMtime: 0, reason: 'file' }
+    ]
+
+    await expect(sftpManager.runPlan('conn', sending, { '/srv/key': 'overwrite' })).rejects.toThrow(
+      /private/
+    )
+    expect(calls.some((c) => c.op === 'fastPut')).toBe(false)
+    expect(entries['/srv/key']).toEqual({ size: 3, mode: 0o600, uid: 0 })
+  })
+
+  /* A server that keeps no Unix modes, as Windows does, still takes a file that was no secret. */
+  it('still uploads over a file open to others on a server that keeps no modes', async () => {
+    const entries: Record<string, Entry> = { '/srv/a.txt': { size: 3, mode: 0o644, uid: 0 } }
+    attach('conn', stubSession([], entries, { ignoreChmod: true }))
+    const sending = plan('upload', [item('/local/a.txt', '/srv/a.txt')])
+    sending.conflicts = [
+      { ...item('/local/a.txt', '/srv/a.txt'), destSize: 3, destMtime: 0, reason: 'file' }
+    ]
+
+    await expect(
+      sftpManager.runPlan('conn', sending, { '/srv/a.txt': 'overwrite' })
+    ).resolves.toEqual({ written: 1, skipped: 0, changed: [] })
+    expect(entries['/srv/a.txt']).toMatchObject({ size: 1024 })
+  })
+
+  /* A close that reports the write did not keep is a failed upload, not a copy to put in place. */
+  it('leaves the original when closing the copy fails', async () => {
+    const entries: Record<string, Entry> = { '/srv/a.txt': { size: 3, mode: 0o644, uid: 0 } }
+    attach('conn', stubSession([], entries, { failClose: true }))
+    const sending = plan('upload', [item('/local/a.txt', '/srv/a.txt')])
+    sending.conflicts = [
+      { ...item('/local/a.txt', '/srv/a.txt'), destSize: 3, destMtime: 0, reason: 'file' }
+    ]
+
+    await expect(
+      sftpManager.runPlan('conn', sending, { '/srv/a.txt': 'overwrite' })
+    ).rejects.toThrow(/Failure/)
+    expect(entries['/srv/a.txt']).toEqual({ size: 3, mode: 0o644, uid: 0 })
+    expect(Object.keys(entries).filter((p) => PARTIAL.test(p))).toEqual([])
   })
 
   it('reports progress against the file it is moving', async () => {

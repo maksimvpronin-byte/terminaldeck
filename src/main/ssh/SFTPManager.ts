@@ -216,15 +216,19 @@ export class PartialReplaced extends Error {
 function createPrivately(
   sftp: SFTPWrapper,
   path: string
-): Promise<{ handle: Buffer; mode: number | undefined }> {
+): Promise<{ handle: Buffer; mode: number | undefined; private: boolean }> {
   return new Promise((resolve, reject) => {
     sftp.open(path, 'wx', (err, handle) => {
       if (err) return reject(err)
       sftp.fstat(handle, (statErr, stats) => {
         const mode = statErr ? undefined : stats.mode & 0o7777
-        // Nothing has been written yet, so a server that refuses is no worse
-        // off than before; the transfer still sets the mode itself.
-        sftp.fchmod(handle, PARTIAL_MODE, () => resolve({ handle, mode }))
+        // Read back: whether the server really narrowed it is for the caller
+        // to weigh against what the copy is about to hold.
+        sftp.fchmod(handle, PARTIAL_MODE, () =>
+          sftp.fstat(handle, (checkErr, now) =>
+            resolve({ handle, mode, private: !checkErr && (now.mode & 0o077) === 0 })
+          )
+        )
       })
     })
   })
@@ -776,10 +780,18 @@ class SFTPManager {
     let moved = false
     // The copy's own handle, held until it is in shape; see createPrivately.
     let held: Buffer | undefined
-    const letGo = async (): Promise<void> => {
+    /*
+     * A close can be where a server says the writes did not keep, and that
+     * is a failed upload, not a copy to put in place: swallowed, an
+     * incomplete copy replaced the original. Only the last word, after
+     * something else already failed, is let go quietly.
+     */
+    const letGo = async (quietly = false): Promise<void> => {
       const handle = held
       held = undefined
-      if (handle) await sftpCall((cb) => sftp.close(handle, cb)).catch(() => undefined)
+      if (!handle) return
+      const closing = sftpCall((cb) => sftp.close(handle, cb))
+      await (quietly ? closing.catch(() => undefined) : closing)
     }
     /*
      * Moved by name, so the name has to be the copy still. A link put there
@@ -797,6 +809,19 @@ class SFTPManager {
       const opened = await createPrivately(sftp, partial)
       held = opened.handle
       created = true
+      /*
+       * A file only its owner may read keeps its new contents to its owner
+       * while they go up. A server that refused to narrow the copy had a 0600
+       * key's new contents written where anyone on it could read them —
+       * fastPut went on regardless too — so nothing is written into it. A
+       * file open to others already, or a new one, is no secret to keep, and
+       * a server that keeps no Unix modes (Windows) still takes those.
+       */
+      if (existing && (existing.mode & 0o077) === 0 && !opened.private) {
+        throw new Error(
+          `${target} was left unchanged: only its owner may read it, and the server would not keep the new copy private while it was written`
+        )
+      }
       await write(partial, opened.handle)
       if (!existing) {
         // What a new file here has always been given, not the copy's 0600.
@@ -845,7 +870,7 @@ class SFTPManager {
       // The new file is in place; the old one is a hidden leftover at worst.
       await sftpCall((cb) => sftp.unlink(aside, cb)).catch(() => undefined)
     } finally {
-      await letGo()
+      await letGo(true)
       // Only a copy this upload made: a name that was refused is someone else's.
       if (created && !moved) {
         await sftpCall((cb) => sftp.unlink(partial, cb)).catch(() => undefined)
