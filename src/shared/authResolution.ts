@@ -45,8 +45,16 @@ export interface AuthContext {
 function asRdpLevel(group: AuthDefaults & RdpLoginDefaults): AuthDefaults {
   const ownLogin =
     isSet(group.rdpUsername) || isSet(group.rdpSecretRef) || isSet(group.rdpCredentialId)
+  /*
+   * With no RDP login of its own, a group gives a desktop its SSH one — but
+   * a group that signs in with a key or the agent keeps the key's passphrase
+   * where a password would be, and that went to the far end as the Windows
+   * password. Its login comes over; that secret does not.
+   */
+  const keyed = group.authMethod === 'privateKey' || group.authMethod === 'agent'
   return {
     ...group,
+    ...(keyed ? { secretRef: undefined } : {}),
     port: group.rdpPort,
     ...(ownLogin
       ? {

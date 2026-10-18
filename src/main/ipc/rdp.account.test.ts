@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
+import type { SessionProfile } from '../../shared/types'
 
 /**
  * A saved account can sign in with a key, and what the vault keeps for it is
@@ -92,5 +93,31 @@ describe('a saved account on a desktop', () => {
       expect.objectContaining({ password: 'WIN_PASSWORD' }),
       undefined
     )
+  })
+})
+
+/*
+ * A group that signs its SSH hosts in with a key keeps the key's passphrase.
+ * A desktop in it with no RDP login of the group's inherits the group's
+ * login, and the passphrase came with it as the Windows password.
+ */
+describe('a desktop in a group that signs in with a key', () => {
+  it('takes the group’s login and not the key’s passphrase', async () => {
+    const { resolveAuth } = await import('../../shared/authResolution')
+    const groups = [
+      {
+        id: 'g',
+        name: 'servers',
+        parentId: null,
+        username: 'deploy',
+        authMethod: 'privateKey' as const,
+        privateKeyPath: '/k',
+        secretRef: 'pp'
+      }
+    ]
+    const host = { ...desktop, groupId: 'g' } as unknown as SessionProfile
+    const auth = resolveAuth(host, 'g', groups, { protocol: 'rdp' })
+    expect(auth.username).toBe('deploy')
+    expect(auth.secretRef).toBeUndefined()
   })
 })
