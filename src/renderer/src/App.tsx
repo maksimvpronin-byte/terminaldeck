@@ -134,6 +134,15 @@ export default function App(): JSX.Element {
     if (status?.unlocked) loadStore()
   }, [status?.unlocked, loadStore])
 
+  /*
+   * A desktop in full screen is drawn above the page, the lock's cover
+   * included: the vault locked, and what the far end showed stayed on screen
+   * with no way out of it. A lock takes it out of full screen first.
+   */
+  useEffect(() => {
+    if (vaultLocked && document.fullscreenElement) void document.exitFullscreen()
+  }, [vaultLocked])
+
   if (!status) return <div className="gate" />
 
   if (!status.exists) return <CreateVaultScreen onCreated={refreshStatus} />

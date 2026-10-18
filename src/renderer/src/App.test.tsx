@@ -55,6 +55,30 @@ describe('the lock screen', () => {
     expect(background().closest('[inert]')).not.toBeNull()
   })
 
+  /*
+   * A desktop in full screen is drawn above the page, the lock's cover
+   * included: the vault locked and what the far end showed stayed on screen.
+   */
+  it('takes a desktop out of full screen when it locks', async () => {
+    const exitFullscreen = vi.fn(async () => undefined)
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      get: () => document.body
+    })
+    document.exitFullscreen = exitFullscreen
+    try {
+      render(<App />)
+      await screen.findByRole('button', { name: 'a button behind the lock' })
+
+      useStore.setState({ vaultLocked: true })
+      await screen.findByRole('button', { name: 'Unlock' })
+
+      expect(exitFullscreen).toHaveBeenCalled()
+    } finally {
+      Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: () => null })
+    }
+  })
+
   it('keeps the focus on the password field when Tab is pressed', async () => {
     render(<App />)
     await screen.findByRole('button', { name: 'a button behind the lock' })
