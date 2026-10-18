@@ -1,5 +1,14 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, readdirSync, existsSync } from 'fs'
+import {
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+  readdirSync,
+  existsSync,
+  rmSync,
+  symlinkSync,
+  chmodSync
+} from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { JsonDocument, hasLists, readJson, writeJson } from './jsonFile'
@@ -29,14 +38,18 @@ describe('writeJson', () => {
     const before = readFileSync(file(), 'utf8')
 
     /**
-     * A write made to fail, by putting a directory where the temporary file
-     * wants to be. This is the whole difference between the two ways of doing
-     * it: writing in place gets as far as truncating the real file before it
-     * fails, so the contents are gone. Through a temporary, the failure happens
-     * somewhere that does not matter yet.
+     * A write made to fail, by a folder that takes no new file. This is the
+     * whole difference between the two ways of doing it: writing in place
+     * gets as far as truncating the real file before it fails, so the
+     * contents are gone. Through a temporary, the failure happens somewhere
+     * that does not matter yet.
      */
-    mkdirSync(`${file()}.tmp`)
-    expect(() => writeJson(file(), { keep: false })).toThrow()
+    chmodSync(dir, 0o555)
+    try {
+      expect(() => writeJson(file(), { keep: false })).toThrow()
+    } finally {
+      chmodSync(dir, 0o755)
+    }
     expect(readFileSync(file(), 'utf8')).toBe(before)
   })
 
@@ -118,9 +131,13 @@ describe('JsonDocument', () => {
     const doc = new JsonDocument(file, () => ({ hosts: ['a'] }))
     doc.change((d) => d.hosts.push('b'))
 
-    // The same failure as above: something sits where the temporary file goes.
-    mkdirSync(`${file()}.tmp`)
-    expect(() => doc.change((d) => d.hosts.push('c'))).toThrow()
+    // The same failure as above: a folder that takes no new file.
+    chmodSync(dir, 0o555)
+    try {
+      expect(() => doc.change((d) => d.hosts.push('c'))).toThrow()
+    } finally {
+      chmodSync(dir, 0o755)
+    }
 
     expect(doc.data).toEqual({ hosts: ['a', 'b'] })
     expect(JSON.parse(readFileSync(file(), 'utf8'))).toEqual({ hosts: ['a', 'b'] })
@@ -136,5 +153,28 @@ describe('JsonDocument', () => {
     doc.restore(before)
     expect(doc.data).toEqual({ hosts: ['a'] })
     expect(JSON.parse(readFileSync(file(), 'utf8'))).toEqual({ hosts: ['a'] })
+  })
+})
+
+/*
+ * The copy on its way went to `<file>.tmp`, opened with `w`: an export into a
+ * folder that already held that name — or a link by it to another file —
+ * emptied whatever it named and wrote the backup there.
+ */
+describe('writing beside a name that is already taken', () => {
+  it.skipIf(process.platform === 'win32')('leaves a file or link at <file>.tmp alone', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'td-json-'))
+    try {
+      const victim = join(dir, 'victim.txt')
+      writeFileSync(victim, 'keep me', 'utf8')
+      symlinkSync(victim, join(dir, 'export.json.tmp'))
+
+      writeJson(join(dir, 'export.json'), { ok: true })
+
+      expect(readFileSync(victim, 'utf8')).toBe('keep me')
+      expect(JSON.parse(readFileSync(join(dir, 'export.json'), 'utf8'))).toEqual({ ok: true })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })

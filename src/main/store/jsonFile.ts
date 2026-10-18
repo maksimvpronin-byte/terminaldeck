@@ -11,6 +11,7 @@ import {
   writeFileSync
 } from 'fs'
 import { dirname } from 'path'
+import { randomBytes } from 'crypto'
 
 /**
  * Reading and writing the small JSON files this application keeps.
@@ -49,9 +50,14 @@ import { dirname } from 'path'
 export function writeJson(path: string, data: unknown): void {
   const dir = dirname(path)
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-  const tmp = `${path}.tmp`
+  /*
+   * A name of its own, made for this write alone. `<file>.tmp` opened with
+   * `w` emptied whatever already went by that name — in a folder chosen for
+   * an export, a file of somebody's, or a link to one — and wrote there.
+   */
+  const tmp = `${path}.${randomBytes(6).toString('hex')}.tmp`
   try {
-    const fd = openSync(tmp, 'w')
+    const fd = openSync(tmp, 'wx', 0o600)
     try {
       writeFileSync(fd, JSON.stringify(data, null, 2), 'utf8')
       fsyncSync(fd)

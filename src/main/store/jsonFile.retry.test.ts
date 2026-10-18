@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { existsSync, mkdtempSync, readFileSync } from 'fs'
+import { mkdtempSync, readFileSync, readdirSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 
@@ -49,7 +49,7 @@ describe('writeJson when the rename is refused', () => {
     refusals.left = 100
     expect(() => writeJson(file(), { saved: 'after' })).toThrow(/EPERM/)
     expect(JSON.parse(readFileSync(file(), 'utf8'))).toEqual({ saved: 'before' })
-    expect(existsSync(`${file()}.tmp`)).toBe(false)
+    expect(readdirSync(dir).filter((n) => n.endsWith('.tmp'))).toEqual([])
   })
 
   it('does not wait on a failure that is not a scanner', () => {

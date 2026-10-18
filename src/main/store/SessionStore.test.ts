@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, readdirSync, existsSync } from 'fs'
+import { chmodSync, mkdtempSync, readFileSync, writeFileSync, readdirSync, existsSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import type { SessionProfile } from '../../shared/types'
@@ -55,14 +55,18 @@ describe('the session store', () => {
     const before = readFileSync(FILE(), 'utf8')
 
     /**
-     * A write made to fail, by putting a directory where the temporary file
-     * wants to be. This is the whole difference between the two ways of doing
-     * it: writing in place would have got as far as truncating the real file
-     * before failing, and the tree would be gone. Through a temporary, the
-     * failure happens somewhere that does not matter yet.
+     * A write made to fail, by a folder that takes no new file. This is the
+     * whole difference between the two ways of doing it: writing in place
+     * would have got as far as truncating the real file before failing, and
+     * the tree would be gone. Through a temporary, the failure happens
+     * somewhere that does not matter yet.
      */
-    mkdirSync(`${FILE()}.tmp`)
-    expect(() => store.save(host('b'))).toThrow()
+    chmodSync(userData, 0o555)
+    try {
+      expect(() => store.save(host('b'))).toThrow()
+    } finally {
+      chmodSync(userData, 0o755)
+    }
     expect(readFileSync(FILE(), 'utf8')).toBe(before)
   })
 
