@@ -1407,6 +1407,46 @@ describe('uploading to a Windows host', () => {
   )
 })
 
+/*
+ * The folder was looked at once, before it was emptied. Swapped for a link
+ * to another while its files went one by one, the next was removed through
+ * the link, from the folder it named.
+ */
+describe('deleting a folder swapped for a link partway', () => {
+  it('stops at the link, and removes nothing through it', async () => {
+    const calls: Call[] = []
+    const entries: Record<string, Entry> = {
+      '/shared/delete-me': { dir: true },
+      '/shared/delete-me/a': { size: 1 },
+      '/shared/delete-me/b': { size: 1 }
+    }
+    const file = (name: string) => ({
+      filename: name,
+      longname: '',
+      attrs: { mode: 0o100644, size: 1, mtime: 0 }
+    })
+    const base = stubSession(calls, entries)
+    const session = Object.assign(base, {
+      readdir(path: string, cb: (err: Error | null, list?: unknown[]) => void): void {
+        cb(null, path === '/shared/delete-me' ? [file('a'), file('b')] : [])
+      },
+      unlink(path: string, cb: (err?: Error | null) => void): void {
+        calls.push({ op: 'unlink', path })
+        delete entries[path]
+        // Once a is gone, somebody swaps the folder for a link elsewhere.
+        if (path === '/shared/delete-me/a') entries['/shared/delete-me'] = { link: '/important' }
+        cb(null)
+      }
+    })
+    attach('conn', session)
+
+    await expect(sftpManager.delete('conn', '/shared/delete-me', true)).rejects.toThrow(/link/i)
+    expect(calls.filter((c) => c.op === 'unlink').map((c) => c.path)).toEqual([
+      '/shared/delete-me/a'
+    ])
+  })
+})
+
 describe('downloading a folder', () => {
   function withListing(
     session: SFTPWrapper,

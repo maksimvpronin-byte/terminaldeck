@@ -568,13 +568,41 @@ class SFTPManager {
    * tree can't take its target with it.
    */
   async delete(connectionId: string, remotePath: string, listedAsFolder: boolean): Promise<void> {
+    await this.deleteBelow(connectionId, remotePath, listedAsFolder, remotePath)
+  }
+
+  /**
+   * One path of a deletion, inside the one chosen, `root`.
+   *
+   * What it is now, not what the listing said. A folder swapped for a link
+   * to another before Delete was confirmed was walked through the link, and
+   * the folder it named emptied. A link is removed as itself. And the way
+   * down from `root` is looked at again before each removal: a folder
+   * swapped for a link while its files went one by one had the next removed
+   * from the folder the link named. Found, the deletion stops there.
+   */
+  private async deleteBelow(
+    connectionId: string,
+    remotePath: string,
+    listedAsFolder: boolean,
+    root: string
+  ): Promise<void> {
     const shell = this.getShell(connectionId)
     const sftp = shell ? undefined : await this.getSftp(connectionId)
-    /*
-     * What it is now, not what the listing said. A folder swapped for a link
-     * to another before Delete was confirmed was walked through the link, and
-     * the folder it named emptied. A link is removed as itself.
-     */
+    const throughLink = async (): Promise<void> => {
+      if (remotePath === root) return
+      // The folder chosen too: it is being emptied, not followed.
+      const top = await this.statPath(connectionId, root)
+      const link = top?.isSymlink
+        ? root
+        : await this.remoteLinkBelow(connectionId, root, remotePath)
+      if (link) {
+        throw new Error(
+          `${link} became a link while it was being deleted; nothing past it was removed`
+        )
+      }
+    }
+    await throughLink()
     let isDirectory = listedAsFolder
     if (isDirectory) {
       const now = await this.statPath(connectionId, remotePath)
@@ -582,8 +610,14 @@ class SFTPManager {
     }
     if (isDirectory) {
       for (const entry of await this.list(connectionId, remotePath)) {
-        await this.delete(connectionId, entry.path, entry.isDirectory && !entry.isSymlink)
+        await this.deleteBelow(
+          connectionId,
+          entry.path,
+          entry.isDirectory && !entry.isSymlink,
+          root
+        )
       }
+      await throughLink()
     }
     if (shell) return shell.remove(remotePath, isDirectory)
     await new Promise<void>((resolve, reject) => {
