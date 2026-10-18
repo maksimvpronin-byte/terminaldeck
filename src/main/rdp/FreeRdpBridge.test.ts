@@ -232,6 +232,47 @@ describe('clipboard while nobody is here', () => {
     }
   })
 
+  /*
+   * The same for files: published here, they were remembered as the
+   * clipboard's files and counted as nothing new.
+   */
+  it('gives files one desktop copied to another, and not back to the first', async () => {
+    const a = liveSession()
+    const b = liveSession()
+    innards().sessions.set('files-a', a.session)
+    innards().sessions.set('files-b', b.session)
+    try {
+      reset('')
+      vi.mocked(readFileClipboard).mockResolvedValue({ paths: [], version: '1' })
+      innards().lastClipboardVersion = '1'
+      const change = (freeRdpBridge as unknown as { clipboardChange: number }).clipboardChange
+      a.session.clipboardSent = change
+      b.session.clipboardSent = change
+      const bridge = freeRdpBridge as unknown as {
+        beginClipboardDownload: (id: string, session: unknown, manifest: Buffer) => void
+      }
+      bridge.beginClipboardDownload('files-a', a.session, Buffer.alloc(4))
+      const download = a.session.download as unknown as { complete: (paths: string[]) => void }
+      download.complete(['/staged/report.pdf'])
+      await new Promise((resolve) => setImmediate(resolve))
+      expect(writeClipboardFiles).toHaveBeenCalledWith(['/staged/report.pdf'], '1')
+
+      vi.mocked(readFileClipboard).mockResolvedValue({
+        paths: ['/staged/report.pdf'],
+        version: '2'
+      })
+      a.written.length = 0
+      b.written.length = 0
+      await innards().pollClipboard()
+
+      expect(Buffer.concat(b.written).toString()).toContain('report.pdf')
+      expect(Buffer.concat(a.written).toString()).not.toContain('report.pdf')
+    } finally {
+      innards().sessions.delete('files-a')
+      innards().sessions.delete('files-b')
+    }
+  })
+
   it('sends nothing while the vault is locked', async () => {
     const { session, written } = liveSession()
     innards().sessions.set('locked', session)

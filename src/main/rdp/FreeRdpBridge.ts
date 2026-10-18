@@ -651,6 +651,9 @@ class FreeRdpBridge {
       this.lastClipboardVersion = version
       this.lastClipboardFiles = pathsToUris(paths)
       this.lastClipboardText = clipboard.readText()
+      // A change for every other desktop, as with text: the one it came from has it.
+      this.clipboardChange++
+      session.clipboardSent = this.clipboardChange
       diag('clipboard', `${id.slice(0, 8)} desktop copied ${paths.length} files here`)
       this.say(session, id, { e: 'clipboard-transfer', state: 'ready' })
     } catch (error) {
