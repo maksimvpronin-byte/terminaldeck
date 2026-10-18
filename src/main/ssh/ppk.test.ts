@@ -90,15 +90,21 @@ describe('a damaged PuTTY key file', () => {
 describe('a key file under the home folder', () => {
   it('is read through a leading ~', async () => {
     const home = mkdtempSync(join(tmpdir(), 'td-home-'))
-    const before = process.env.HOME
+    // homedir() reads HOME on macOS and Linux, USERPROFILE on Windows.
+    const before = { HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE }
     process.env.HOME = home
+    process.env.USERPROFILE = home
     try {
       mkdirSync(join(home, '.ssh'))
       writeFileSync(join(home, '.ssh', 'id_test'), 'not a ppk')
       const { privateKey } = await readPrivateKey('~/.ssh/id_test', undefined)
       expect(privateKey.toString()).toBe('not a ppk')
     } finally {
-      process.env.HOME = before
+      for (const [name, value] of Object.entries(before)) {
+        // Assigned undefined, an environment variable becomes "undefined".
+        if (value === undefined) delete process.env[name]
+        else process.env[name] = value
+      }
       rmSync(home, { recursive: true, force: true })
     }
   })

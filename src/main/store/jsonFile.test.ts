@@ -33,25 +33,30 @@ describe('writeJson', () => {
     expect(readJson(file(), () => ({ hosts: [] }))).toEqual({ hosts: ['a', 'b'] })
   })
 
-  it('leaves the previous contents when the write fails', () => {
-    writeJson(file(), { keep: true })
-    const before = readFileSync(file(), 'utf8')
+  // A folder marked read-only on Windows still takes new files; the rename's
+  // failure there is tested in jsonFile.retry.test.ts.
+  it.skipIf(process.platform === 'win32')(
+    'leaves the previous contents when the write fails',
+    () => {
+      writeJson(file(), { keep: true })
+      const before = readFileSync(file(), 'utf8')
 
-    /**
-     * A write made to fail, by a folder that takes no new file. This is the
-     * whole difference between the two ways of doing it: writing in place
-     * gets as far as truncating the real file before it fails, so the
-     * contents are gone. Through a temporary, the failure happens somewhere
-     * that does not matter yet.
-     */
-    chmodSync(dir, 0o555)
-    try {
-      expect(() => writeJson(file(), { keep: false })).toThrow()
-    } finally {
-      chmodSync(dir, 0o755)
+      /**
+       * A write made to fail, by a folder that takes no new file. This is the
+       * whole difference between the two ways of doing it: writing in place
+       * gets as far as truncating the real file before it fails, so the
+       * contents are gone. Through a temporary, the failure happens somewhere
+       * that does not matter yet.
+       */
+      chmodSync(dir, 0o555)
+      try {
+        expect(() => writeJson(file(), { keep: false })).toThrow()
+      } finally {
+        chmodSync(dir, 0o755)
+      }
+      expect(readFileSync(file(), 'utf8')).toBe(before)
     }
-    expect(readFileSync(file(), 'utf8')).toBe(before)
-  })
+  )
 
   it('creates the directory it is asked to write into', () => {
     const nested = join(dir, 'a', 'b', 'thing.json')
@@ -127,21 +132,26 @@ describe('readJson checking what it read', () => {
 })
 
 describe('JsonDocument', () => {
-  it('keeps nothing in memory that did not reach the disk', () => {
-    const doc = new JsonDocument(file, () => ({ hosts: ['a'] }))
-    doc.change((d) => d.hosts.push('b'))
+  // A folder marked read-only on Windows still takes new files; the rename's
+  // failure there is tested in jsonFile.retry.test.ts.
+  it.skipIf(process.platform === 'win32')(
+    'keeps nothing in memory that did not reach the disk',
+    () => {
+      const doc = new JsonDocument(file, () => ({ hosts: ['a'] }))
+      doc.change((d) => d.hosts.push('b'))
 
-    // The same failure as above: a folder that takes no new file.
-    chmodSync(dir, 0o555)
-    try {
-      expect(() => doc.change((d) => d.hosts.push('c'))).toThrow()
-    } finally {
-      chmodSync(dir, 0o755)
+      // The same failure as above: a folder that takes no new file.
+      chmodSync(dir, 0o555)
+      try {
+        expect(() => doc.change((d) => d.hosts.push('c'))).toThrow()
+      } finally {
+        chmodSync(dir, 0o755)
+      }
+
+      expect(doc.data).toEqual({ hosts: ['a', 'b'] })
+      expect(JSON.parse(readFileSync(file(), 'utf8'))).toEqual({ hosts: ['a', 'b'] })
     }
-
-    expect(doc.data).toEqual({ hosts: ['a', 'b'] })
-    expect(JSON.parse(readFileSync(file(), 'utf8'))).toEqual({ hosts: ['a', 'b'] })
-  })
+  )
 
   it('never changes what it handed out, so a snapshot can be put back', () => {
     const doc = new JsonDocument(file, () => ({ hosts: ['a'] }))

@@ -49,26 +49,30 @@ describe('the session store', () => {
    * moment anything interrupts it — and this is the file holding every host,
    * group and setting, rewritten on each edit and each drag.
    */
-  it('leaves the tree intact when the write itself fails', async () => {
-    const store = await freshStore()
-    store.save(host('a'))
-    const before = readFileSync(FILE(), 'utf8')
+  // A folder marked read-only on Windows still takes new files.
+  it.skipIf(process.platform === 'win32')(
+    'leaves the tree intact when the write itself fails',
+    async () => {
+      const store = await freshStore()
+      store.save(host('a'))
+      const before = readFileSync(FILE(), 'utf8')
 
-    /**
-     * A write made to fail, by a folder that takes no new file. This is the
-     * whole difference between the two ways of doing it: writing in place
-     * would have got as far as truncating the real file before failing, and
-     * the tree would be gone. Through a temporary, the failure happens
-     * somewhere that does not matter yet.
-     */
-    chmodSync(userData, 0o555)
-    try {
-      expect(() => store.save(host('b'))).toThrow()
-    } finally {
-      chmodSync(userData, 0o755)
+      /**
+       * A write made to fail, by a folder that takes no new file. This is the
+       * whole difference between the two ways of doing it: writing in place
+       * would have got as far as truncating the real file before failing, and
+       * the tree would be gone. Through a temporary, the failure happens
+       * somewhere that does not matter yet.
+       */
+      chmodSync(userData, 0o555)
+      try {
+        expect(() => store.save(host('b'))).toThrow()
+      } finally {
+        chmodSync(userData, 0o755)
+      }
+      expect(readFileSync(FILE(), 'utf8')).toBe(before)
     }
-    expect(readFileSync(FILE(), 'utf8')).toBe(before)
-  })
+  )
 
   /**
    * A damaged file is not silently replaced by an empty tree.
