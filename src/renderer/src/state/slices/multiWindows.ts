@@ -1,6 +1,7 @@
 import type { StateCreator } from 'zustand'
 import { nanoid } from 'nanoid'
-import { allTabs } from '../workspaces'
+import { allTabs, openDesktop } from '../workspaces'
+import { collectLeaves, removePane, type PaneNode } from '../paneTree'
 import { paneNodeOf, savedPaneOf } from '../multiWindow'
 import type { AppState, MultiWindowsSlice } from './types'
 
@@ -59,7 +60,26 @@ export const createMultiWindowsSlice: StateCreator<AppState, [], [], MultiWindow
   openMultiWindow: (id) => {
     const saved = get().multiWindows.find((w) => w.id === id)
     if (!saved) return
-    get().openPanes(saved.name, paneNodeOf(saved.root))
+    /*
+     * A desktop already open for its account stays where it is, woken if it
+     * waits, and the layout opens without it: opened as saved, it was a
+     * second session that Windows signed the first one out for, and each
+     * opening of the layout added another.
+     */
+    let root: PaneNode | null = paneNodeOf(saved.root)
+    let first: { tabId: string; paneId: string } | undefined
+    for (const leaf of collectLeaves(root)) {
+      const place = openDesktop(get(), leaf.target)
+      if (!place || !root) continue
+      first ??= place
+      get().wakePane(place.paneId, false)
+      root = removePane(root, leaf.id)
+    }
+    if (root) get().openPanes(saved.name, root)
+    else if (first) {
+      get().setActiveTab(first.tabId)
+      get().setActivePane(first.tabId, first.paneId)
+    }
     // The keyboard goes to it, as to a host opened from the tree.
     get().focusActivePane()
   }

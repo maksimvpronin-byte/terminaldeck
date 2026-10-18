@@ -1,5 +1,7 @@
-import { collectLeaves, type PaneNode } from './paneTree'
-import type { Workspace, WorkspaceTab } from './slices/types'
+import { collectLeaves, type PaneNode, type PaneTarget } from './paneTree'
+import type { AppState, Workspace, WorkspaceTab } from './slices/types'
+import { findHost } from './hosts'
+import { protocolOf } from '../../../shared/protocols'
 
 /** Shape shared by the store and the persisted layout, so both can be walked. */
 interface HasWorkspaces {
@@ -144,6 +146,25 @@ export function paneToReuse(
     if (leaf) return { tabId: tab.id, paneId: leaf.id }
   }
   return undefined
+}
+
+/**
+ * Where a desktop is already open for this target's account, if it is one.
+ *
+ * A desktop is never opened twice for one account: Windows signs a user's
+ * first session out for a second. openHost brought such a one forward, and
+ * a collection or a saved layout opened it again beside it.
+ */
+export function openDesktop(
+  state: AppState,
+  target: PaneTarget
+): { tabId: string; paneId: string } | undefined {
+  if (target.kind !== 'session') return undefined
+  if (protocolOf(findHost(state, target.sessionId)?.host) !== 'rdp') return undefined
+  return paneToReuse(state, target.sessionId, {
+    credentialId: target.credentialId,
+    admin: target.admin
+  })
 }
 
 /**

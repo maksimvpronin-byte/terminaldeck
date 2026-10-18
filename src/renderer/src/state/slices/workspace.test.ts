@@ -336,6 +336,55 @@ describe('openHost: an open host is brought forward rather than opened again', (
     }
   })
 
+  /* Restored after a restart, a pane waits to be asked; a collection passing it over left it waiting. */
+  it('asks a desktop a collection passes over to connect', () => {
+    seed()
+    const first = open('dc')
+    useStore.setState({ wakeRequest: null })
+    useStore
+      .getState()
+      .openMany([{ title: 'dc', target: { kind: 'session', sessionId: 'dc' } }], 'tabs')
+    expect(useStore.getState().wakeRequest).toMatchObject({ paneId: first, reconnect: false })
+  })
+
+  /* A saved layout opened a desktop already open again, one more with each opening. */
+  it('opens a saved layout without a desktop already open, and wakes that one', () => {
+    seed()
+    const first = open('dc')
+    useStore.setState({
+      wakeRequest: null,
+      multiWindows: [
+        {
+          id: 'desk',
+          name: 'Desk',
+          createdAt: 0,
+          updatedAt: 0,
+          root: {
+            type: 'split',
+            dir: 'row',
+            sizes: [50, 50],
+            children: [
+              { type: 'leaf', sessionId: 'dc', title: 'dc' },
+              { type: 'leaf', sessionId: 'web', title: 'web' }
+            ]
+          }
+        }
+      ]
+    })
+    useStore.getState().openMultiWindow('desk')
+    const leaves = useStore
+      .getState()
+      .workspaces.flatMap((w) => w.tabs)
+      .flatMap((t) => collectLeaves(t.root))
+    expect(
+      leaves.filter((l) => l.target.kind === 'session' && l.target.sessionId === 'dc')
+    ).toHaveLength(1)
+    expect(
+      leaves.filter((l) => l.target.kind === 'session' && l.target.sessionId === 'web')
+    ).toHaveLength(1)
+    expect(useStore.getState().wakeRequest).toMatchObject({ paneId: first })
+  })
+
   it('opens console mode beside an ordinary desktop rather than bringing that one forward', () => {
     seed()
     const ordinary = open('dc')

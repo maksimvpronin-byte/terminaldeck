@@ -18,6 +18,7 @@ import {
   allTabs,
   mapTab,
   nextOpenPaneOf,
+  openDesktop,
   paneToReuse,
   workspaceOfTab
 } from '../workspaces'
@@ -330,22 +331,12 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
   },
 
   openMany: (requested, mode, workspaceTitle, owner) => {
-    /*
-     * A desktop is never opened twice for one account, as openHost has it —
-     * a collection went straight to openTab, and Windows signed the first
-     * session out for the second. One already open is left where it is, and
-     * brought forward if it was all there was to open.
-     */
-    const s = get()
-    const openAlready = (item: (typeof requested)[number]) =>
-      item.target.kind === 'session' &&
-      protocolOf(findHost(s, item.target.sessionId)?.host) === 'rdp'
-        ? paneToReuse(s, item.target.sessionId, {
-            credentialId: item.target.credentialId,
-            admin: item.target.admin
-          })
-        : undefined
-    const places = requested.map(openAlready)
+    // A desktop already open for its account is left where it is, and
+    // brought forward if it was all there was to open; see openDesktop.
+    const places = requested.map((item) => openDesktop(get(), item.target))
+    // Each asked to connect if it is not: restored after a restart, a pane
+    // waits for that, and the collection passing it over left it waiting.
+    for (const place of places) if (place) get().wakePane(place.paneId, false)
     const items = requested.filter((_, i) => !places[i])
     if (items.length === 0) {
       const place = places.find(Boolean)
