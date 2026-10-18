@@ -10,7 +10,7 @@ import { inputLanguage, onInputLanguage } from '../state/inputLanguage'
 import type { ForwardedKey, RdpView } from '../../../shared/types'
 import { isRefusal } from '../../../shared/rdpLogon'
 import { endedBySignOut } from '../../../shared/rdpLogoff'
-import { diag, diagKey } from '../diag'
+import { diag, diagKey, heldForJournal } from '../diag'
 import { describeModifiers, isModifierCode } from '../../../shared/diagnostics'
 
 /**
@@ -1087,7 +1087,7 @@ export default function RemoteScreen({
         return
       }
       const code = substituteCommand(event.code, lookRef.current?.commandAsControl === true)
-      diagKey('rdp', event, `held=${[...held].join(',') || '-'}`)
+      diagKey('rdp', event, `held=${heldForJournal(held)}`)
       // Every key carries the truth about every modifier, so the one this event
       // is about is left alone and the rest are made to agree.
       syncModifiers(event, { ignore: code })
@@ -1185,7 +1185,7 @@ export default function RemoteScreen({
         return
       }
       const code = substituteCommand(event.code, lookRef.current?.commandAsControl === true)
-      diagKey('rdp', event, `held=${[...held].join(',') || '-'}`)
+      diagKey('rdp', event, `held=${heldForJournal(held)}`)
       event.preventDefault()
       event.stopPropagation()
       if (switchingRef.current && (event.code === 'MetaLeft' || event.code === 'MetaRight')) {

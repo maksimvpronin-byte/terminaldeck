@@ -33,3 +33,12 @@ export function diagKey(source: string, event: KeyboardEvent, extra = ''): void 
     `${up} ${describeKeyCode(event.code, m)} mods=${describeModifiers(m)}${extra ? ` ${extra}` : ''}`
   )
 }
+
+/**
+ * The keys a desktop holds down, as the journal may name them: the modifiers.
+ * Every key held went in, a letter among them, and a letter held while a
+ * modifier went down was written by its physical key.
+ */
+export function heldForJournal(held: Iterable<string>): string {
+  return [...held].filter(isModifierCode).join(',') || '-'
+}

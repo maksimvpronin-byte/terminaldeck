@@ -89,6 +89,17 @@ export function describeModifiers(m: HeldModifiers): string {
  */
 export function describeKeyCode(code: string, m: HeldModifiers): string {
   if (isModifierCode(code)) return code
+  /*
+   * With Alt and without ⌘ a character key types a character: AltGr is
+   * Ctrl+Alt and Option is Alt, `@` and `€` among what they type. Written by
+   * its physical key, a password typed so could be read back. Alt with a key
+   * that types nothing — Home, an arrow, F5 — is a shortcut, and says so.
+   */
+  if (m.alt && !m.meta && CHARACTER_KEY.test(code)) return 'key'
   if (m.ctrl || m.alt || m.meta) return code
   return 'key'
 }
+
+/** The physical keys that type a character in some layout. */
+const CHARACTER_KEY =
+  /^(?:Key[A-Z]|Digit\d|Numpad(?:\d|Decimal|Divide|Multiply|Subtract|Add|Comma|Equal)|Minus|Equal|Bracket(?:Left|Right)|Backslash|Semicolon|Quote|Backquote|Comma|Period|Slash|Intl(?:Backslash|Ro|Yen)|Space)$/

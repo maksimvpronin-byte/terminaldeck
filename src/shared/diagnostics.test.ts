@@ -52,3 +52,24 @@ describe('describeModifiers', () => {
     expect(describeModifiers(none)).toBe('-')
   })
 })
+
+/*
+ * AltGr is Ctrl+Alt, and Option is Alt: both type ordinary characters, `@`
+ * and `€` on a German keyboard among them. Written with their physical keys,
+ * a password typed so could be read back out of the journal.
+ */
+describe('keys that type a character with Alt held', () => {
+  it('are written without the key', () => {
+    const altGr = { ctrl: true, alt: true, shift: false, meta: false }
+    expect(describeKeyCode('KeyQ', altGr)).toBe('key')
+    expect(describeKeyCode('Digit2', { ...altGr, ctrl: false })).toBe('key')
+    // A shortcut still says which it was.
+    expect(describeKeyCode('Home', { ...altGr, ctrl: false })).toBe('Home')
+    expect(describeKeyCode('KeyC', { ctrl: false, alt: false, shift: false, meta: true })).toBe(
+      'KeyC'
+    )
+    expect(describeKeyCode('KeyC', { ctrl: true, alt: false, shift: false, meta: false })).toBe(
+      'KeyC'
+    )
+  })
+})
