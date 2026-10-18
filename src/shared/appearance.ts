@@ -1,4 +1,4 @@
-import { inheritanceChain } from './inheritance'
+import { inheritanceChain, walkOf } from './inheritance'
 import { isSet } from './overrides'
 import type { AppearanceDefaults, ResolvedAppearance, SessionGroup } from './types'
 
@@ -106,7 +106,12 @@ export function inheritedAppearance(
   groups: SessionGroup[],
   globals: ResolvedAppearance
 ): ResolvedAppearance {
-  return resolveAppearance({ inheritAppearance: own.inheritAppearance }, groupId, groups, globals)
+  return resolveAppearance(
+    { ...walkOf(own), inheritAppearance: own.inheritAppearance },
+    groupId,
+    groups,
+    globals
+  )
 }
 
 /** The group a blank field takes its value from; undefined means the globals. */
@@ -116,5 +121,10 @@ export function appearanceSource(
   groups: SessionGroup[],
   key: keyof AppearanceDefaults
 ): SessionGroup | undefined {
-  return appearanceInheritedFrom({ inheritAppearance: own.inheritAppearance }, groupId, groups, key)
+  return appearanceInheritedFrom(
+    { ...walkOf(own), inheritAppearance: own.inheritAppearance },
+    groupId,
+    groups,
+    key
+  )
 }

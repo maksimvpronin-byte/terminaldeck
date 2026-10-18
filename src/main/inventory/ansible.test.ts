@@ -3,6 +3,7 @@ import { parse } from 'yaml'
 import { parseAnsibleInventory, protocolFromVars, varsToAuth, groupId, hostId } from './ansible'
 import { resolveAuth } from '../../shared/authResolution'
 import { resolveRdp } from '../../shared/rdpResolution'
+import { appearanceSource, inheritedAppearance } from '../../shared/appearance'
 import { applyOverride } from '../../shared/overrides'
 
 const SRC = 'src1'
@@ -1021,6 +1022,33 @@ all:
     )
     const h = hosts[0]
     expect(resolveRdp(h, h.groupId ?? null, local).gatewayHost).toBe('gw.internal')
+  })
+
+  /* The terminal took a's font size; the dialog named the settings as its source. */
+  it('names the group a host’s look comes from across every group', () => {
+    const { groups, hosts } = parseAnsibleInventory(
+      parse(`
+all:
+  children:
+    a: { hosts: { h: {} } }
+    z: { hosts: { h: {} } }
+`),
+      SRC
+    )
+    const local = groups.map((g) =>
+      applyOverride(g, g.name === 'a' ? { nodeId: g.id, fontSize: 20 } : undefined)
+    )
+    const h = hosts[0]
+    const globals = {
+      fontFamily: 'Menlo',
+      fontSize: 12,
+      themeName: 'dark',
+      cursorStyle: 'block' as const,
+      cursorBlink: true,
+      scrollback: 1000
+    }
+    expect(appearanceSource(h, h.groupId ?? null, local, 'fontSize')?.name).toBe('a')
+    expect(inheritedAppearance(h, h.groupId ?? null, local, globals).fontSize).toBe(20)
   })
 
   it('still lets the host’s own settings win', () => {

@@ -86,3 +86,26 @@ export function inheritanceChain<T>(
     .map((id) => lookup(id)!)
   return [own, ...inventory, ...reached.filter((g) => !listed.has(g.id))]
 }
+
+/**
+ * What an item's walk up starts from, without its settings: kept when a
+ * caller asks what the item would inherit with its own fields left out. Left
+ * behind, a host in several groups was asked along one chain, and the dialog
+ * named the settings as the source of a font size a group gave it.
+ */
+export function walkOf(own: object): {
+  groupOrder?: string[]
+  memberOf?: string[]
+  frozen?: object
+} {
+  const { groupOrder, memberOf, frozen } = own as {
+    groupOrder?: string[]
+    memberOf?: string[]
+    frozen?: object
+  }
+  return {
+    ...(groupOrder ? { groupOrder } : {}),
+    ...(memberOf ? { memberOf } : {}),
+    ...(frozen ? { frozen } : {})
+  }
+}
