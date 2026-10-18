@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
 import { IPC } from '../../shared/ipc-channels'
-import { resolveAuth } from '../../shared/authResolution'
+import { authChain, defaultCredential, resolveAuth } from '../../shared/authResolution'
 import { applyCredential } from '../../shared/credentials'
 import { protocolOf } from '../../shared/protocols'
 import { RDP_FALLBACK, resolveRdp } from '../../shared/rdpResolution'
@@ -46,14 +46,28 @@ function authFor(
   groups: SessionGroup[],
   credentialId?: string
 ): ResolvedAuth {
-  const auth = resolveAuth(profile, profile.groupId, groups, {
-    protocol: 'rdp',
-    credentials: credentialStore.list()
-  })
-  if (!credentialId) return auth
-  const credential = credentialStore.find(credentialId)
-  if (!credential) throw new Error('That saved account no longer exists')
-  return applyCredential(auth, credential)
+  const credentials = credentialStore.list()
+  const resolved = resolveAuth(profile, profile.groupId, groups, { protocol: 'rdp', credentials })
+  let auth = resolved
+  let credential = credentialId ? credentialStore.find(credentialId) : undefined
+  if (credentialId) {
+    if (!credential) throw new Error('That saved account no longer exists')
+    auth = applyCredential(resolved, credential)
+  } else {
+    credential = defaultCredential(
+      authChain(profile, profile.groupId, groups, { protocol: 'rdp' }),
+      credentials
+    )
+  }
+  /*
+   * An account that signs in with a key or the agent keeps the key's
+   * passphrase, if anything: sent as the Windows password, it went to the far
+   * end, and the prompt for a password was skipped. Such an account gives a
+   * desktop its login and nothing else.
+   */
+  return credential && credential.authMethod !== 'password'
+    ? { ...auth, secretRef: undefined }
+    : auth
 }
 
 /**
