@@ -329,8 +329,33 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
     return tab.id
   },
 
-  openMany: (items, mode, workspaceTitle, owner) => {
-    if (items.length === 0) return
+  openMany: (requested, mode, workspaceTitle, owner) => {
+    /*
+     * A desktop is never opened twice for one account, as openHost has it —
+     * a collection went straight to openTab, and Windows signed the first
+     * session out for the second. One already open is left where it is, and
+     * brought forward if it was all there was to open.
+     */
+    const s = get()
+    const openAlready = (item: (typeof requested)[number]) =>
+      item.target.kind === 'session' &&
+      protocolOf(findHost(s, item.target.sessionId)?.host) === 'rdp'
+        ? paneToReuse(s, item.target.sessionId, {
+            credentialId: item.target.credentialId,
+            admin: item.target.admin
+          })
+        : undefined
+    const places = requested.map(openAlready)
+    const items = requested.filter((_, i) => !places[i])
+    if (items.length === 0) {
+      const place = places.find(Boolean)
+      if (place) {
+        get().setActiveTab(place.tabId)
+        get().setActivePane(place.tabId, place.paneId)
+        get().focusActivePane()
+      }
+      return
+    }
     if (mode === 'workspace') {
       // The group's own colour rides along, so the whole strip entry is tinted.
       get().openWorkspace(workspaceTitle, items.find((i) => i.color)?.color, owner)

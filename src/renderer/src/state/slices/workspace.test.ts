@@ -310,6 +310,32 @@ describe('openHost: an open host is brought forward rather than opened again', (
     expect(tabCount()).toBe(2)
   })
 
+  /*
+   * A collection opened tab by tab, as a grid or as a workspace went straight
+   * to openTab: a desktop already open was opened a second time, and Windows
+   * signed the first session out for the second.
+   */
+  it('opens no second desktop from a collection either, whichever way it opens', () => {
+    for (const mode of ['tabs', 'grid', 'workspace'] as const) {
+      seed()
+      open('dc')
+      useStore.getState().openMany(
+        [
+          { title: 'dc', target: { kind: 'session', sessionId: 'dc' } },
+          { title: 'web', target: { kind: 'session', sessionId: 'web' } }
+        ],
+        mode,
+        'set'
+      )
+      const panes = useStore
+        .getState()
+        .workspaces.flatMap((w) => w.tabs)
+        .flatMap((t) => collectLeaves(t.root))
+        .filter((leaf) => leaf.target?.kind === 'session' && leaf.target.sessionId === 'dc')
+      expect(panes).toHaveLength(1)
+    }
+  })
+
   it('opens console mode beside an ordinary desktop rather than bringing that one forward', () => {
     seed()
     const ordinary = open('dc')
