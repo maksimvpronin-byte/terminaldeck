@@ -16,7 +16,7 @@ import { resolveRdp } from '../../../shared/rdpResolution'
 import { asProtocol, PROTOCOLS, protocolOf, traitsOf } from '../../../shared/protocols'
 import { useStore } from '../state/store'
 import AppearanceFields from './AppearanceFields'
-import AuthFields, { type AuthWords } from './AuthFields'
+import AuthFields, { methodLabel, type AuthWords } from './AuthFields'
 import RdpFields from './RdpFields'
 import PagedDialog, { type DialogPage } from './PagedDialog'
 import ColourField from './ColourField'
@@ -30,6 +30,11 @@ import {
   membershipsOf,
   type Membership
 } from '../state/membership'
+
+/** "Пароль" in the middle of a sentence, "Агент SSH" keeping its capitals. */
+function lowerFirst(text: string): string {
+  return text.charAt(0).toLowerCase() + text.slice(1)
+}
 
 interface Props {
   /** The host or Ansible group the local settings apply to. */
@@ -342,7 +347,8 @@ export default function InventoryOverrideDialog({
                 </label>
                 <p className="settings-note">
                   {t('Connects as')} <strong>{effective.username || t('(no user)')}</strong>@
-                  {node.host}:{effective.port} {t('using')} {effective.authMethod}
+                  {node.host}:{effective.port} {t('using')}{' '}
+                  {lowerFirst(methodLabel(t, effective.authMethod))}
                   {effective.jumpHostId
                     ? ` ${t('via {name}', {
                         name:

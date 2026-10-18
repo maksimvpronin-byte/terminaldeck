@@ -1002,6 +1002,19 @@ export const ru: Record<string, string> = {
   'Open in a new workspace ({count})': 'Открыть в новой рабочей области ({count})',
   'Open all in a new workspace ({count})': 'Открыть все в новой рабочей области ({count})',
   '{count} selected': 'Выбрано: {count}',
+  'Broadcast on — typing goes to': 'Трансляция включена — ввод уходит в',
+  '{included} of {total}': '{included} из {total}',
+  'Password required': 'Нужен пароль',
+  'What this does': 'Что это',
+  'Additional authentication': 'Дополнительная проверка',
+  '⏎ open · ⇧⏎ tile · ⌥⏎ new workspace · Tab mark · ↑↓ move · esc close':
+    '⏎ открыть · ⇧⏎ плиткой · ⌥⏎ в новой рабочей области · Tab отметить · ↑↓ выбор · esc закрыть',
+  '{size} at {scale}%': '{size} при {scale}%',
+  'budget {mpx} Mpx': 'бюджет {mpx} Мпикс',
+  'terminals. Use the ⇉ checkbox in a pane to include or exclude it.':
+    'терминалов. Флажок ⇉ на панели включает её в трансляцию или исключает.',
+  '“{title}” is empty — open a host on the left to fill it.':
+    '«{title}» пуста — откройте хост слева, чтобы её заполнить.',
   'Open tiled in one tab': 'Открыть плиткой в одной вкладке',
   'Open every host in a new workspace': 'Открыть все хосты в новой рабочей области',
   'Double-click to open the whole set in a new workspace':

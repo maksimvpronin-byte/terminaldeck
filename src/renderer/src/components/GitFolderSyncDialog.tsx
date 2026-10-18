@@ -120,7 +120,10 @@ export default function GitFolderSyncDialog({
           <p className="settings-note">{t('This repository holds no groups.')}</p>
         ) : (
           <>
-            <div className="modal-actions" style={{ justifyContent: 'flex-start' }}>
+            <div
+              className="modal-actions"
+              style={{ justifyContent: 'flex-start', alignItems: 'center' }}
+            >
               <button onClick={() => setChosen(new Set(allPaths))}>{t('Select all')}</button>
               <button onClick={() => setChosen(new Set())}>{t('Select none')}</button>
               {newCount > 0 && (

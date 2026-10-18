@@ -162,7 +162,7 @@ export default function HostPalette({ onClose }: { onClose: () => void }): JSX.E
         </div>
 
         <div className="palette-footer">
-          <span>⏎ open · ⇧⏎ tile · ⌥⏎ new workspace · Tab mark · ↑↓ move · esc close</span>
+          <span>{t('⏎ open · ⇧⏎ tile · ⌥⏎ new workspace · Tab mark · ↑↓ move · esc close')}</span>
           <span>{matches.length} hosts</span>
         </div>
       </div>

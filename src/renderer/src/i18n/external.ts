@@ -14,7 +14,8 @@
  */
 export const EXTERNAL_PHRASE_SOURCES = [
   'resources/freerdp/shim/td_rdp.c',
-  'src/main/rdp/ClipboardDownload.ts'
+  'src/main/rdp/ClipboardDownload.ts',
+  'src/main/ssh/SSHManager.ts'
 ]
 
 export const EXTERNAL_PHRASES = [
@@ -35,5 +36,9 @@ export const EXTERNAL_PHRASES = [
   'RDP file transfer timed out',
   'The RDP server refused or truncated the file transfer',
   'The remote desktop refused to hand over the file; its policy may forbid copying files out',
-  'Could not write the received file'
+  'Could not write the received file',
+  // The SSH password and keyboard-interactive prompts the app asks itself
+  'Password required',
+  'Password',
+  'Additional authentication'
 ]

@@ -51,13 +51,15 @@ export default function AuthPromptDialog(): JSX.Element | null {
   return (
     <ModalBackdrop onClose={() => respond(null)}>
       <div className="modal-card" style={{ width: 400 }}>
-        <h2>{current.title}</h2>
+        {/* The app's own titles and prompts are in the phrase book; a server's
+            keyboard-interactive text is not, and passes through as it came. */}
+        <h2>{t(current.title)}</h2>
         <p className="settings-note">{current.host}</p>
         {current.instructions && <p className="settings-note">{current.instructions}</p>}
 
         {current.fields.map((field, i) => (
           <label key={`${current.requestId}-${field.prompt}-${i}`}>
-            {field.prompt}
+            {t(field.prompt)}
             <input
               autoFocus={i === 0}
               type={field.echo ? 'text' : 'password'}

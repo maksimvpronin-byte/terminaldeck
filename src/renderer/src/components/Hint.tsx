@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { useT } from '../i18n'
 
 /**
  * A question mark beside a control, holding what used to be a paragraph.
@@ -38,6 +39,7 @@ export default function Hint({
   label?: ReactNode
   children: ReactNode
 }): JSX.Element {
+  const t = useT()
   const buttonRef = useRef<HTMLButtonElement | null>(null)
   const bubbleRef = useRef<HTMLDivElement | null>(null)
   const [open, setOpen] = useState(false)
@@ -69,7 +71,7 @@ export default function Hint({
         ref={buttonRef}
         type="button"
         className="hint-mark"
-        aria-label="What this does"
+        aria-label={t('What this does')}
         aria-expanded={open}
         onMouseEnter={() => setOpen(true)}
         onMouseLeave={() => setOpen(false)}

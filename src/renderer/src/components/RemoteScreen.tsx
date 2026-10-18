@@ -515,7 +515,7 @@ export default function RemoteScreen({
   function measured(got?: { width: number; height: number }): string {
     const density = `×${window.devicePixelRatio}`
     const asked = scaleRef.current
-      ? `${askedRef.current} at ${scaleRef.current}%`
+      ? t('{size} at {scale}%', { size: askedRef.current, scale: scaleRef.current })
       : askedRef.current
     /* The budget, because it is the one input that silently changes the answer.
        A pane that grows past it gets a smaller desktop stretched to fill it,
@@ -523,7 +523,7 @@ export default function RemoteScreen({
        size — the difference took two rounds of screenshots to establish, and
        this is the number that would have settled it in one. */
     const budget = lookRef.current?.pixelBudget
-    const limit = budget && budget < 50 ? ` · budget ${budget} Mpx` : ''
+    const limit = budget && budget < 50 ? ` · ${t('budget {mpx} Mpx', { mpx: budget })}` : ''
     return got
       ? `${asked} → ${got.width}×${got.height} · ${density}${limit}`
       : `${asked} · ${density}${limit}`

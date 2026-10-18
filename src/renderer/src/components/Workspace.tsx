@@ -343,11 +343,11 @@ export default function Workspace(): JSX.Element {
       {broadcast && (
         <div className="broadcast-banner">
           <span>
-            Broadcast on — typing goes to{' '}
+            {t('Broadcast on — typing goes to')}{' '}
             <strong>
-              {includedCount} of {allLeaves.length}
+              {t('{included} of {total}', { included: includedCount, total: allLeaves.length })}
             </strong>{' '}
-            terminals. Use the ⇉ checkbox in a pane to include or exclude it.
+            {t('terminals. Use the ⇉ checkbox in a pane to include or exclude it.')}
           </span>
           <span className="banner-actions">
             <button onClick={() => setAllPanesBroadcast(true)}>{t('All')}</button>
@@ -360,7 +360,9 @@ export default function Workspace(): JSX.Element {
         <div className="empty-workspace">
           {workspaces.length === 0
             ? t('Select a session on the left, or quick-connect above.')
-            : `“${current?.title}” is empty — open a host on the left to fill it.`}
+            : t('“{title}” is empty — open a host on the left to fill it.', {
+                title: current?.title ?? ''
+              })}
         </div>
       )}
 

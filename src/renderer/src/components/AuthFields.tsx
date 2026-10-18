@@ -55,7 +55,7 @@ const ALL_METHODS: AuthMethod[] = ['password', 'privateKey', 'agent']
  * phrase book's coverage test reads the source for `t('…')`, and a key
  * assembled at runtime is invisible to it.
  */
-function methodLabel(t: Translate, method: AuthMethod): string {
+export function methodLabel(t: Translate, method: AuthMethod): string {
   if (method === 'password') return t('Password')
   if (method === 'privateKey') return t('Private key')
   return t('SSH agent')
@@ -119,7 +119,7 @@ export default function AuthFields({
         {t('Auth method')}
         <select value={value.authMethod ?? ''} onChange={(e) => choose(e.target.value)}>
           <option value="">
-            {words.inherit} ({inheritedMethod})
+            {words.inherit} ({methodLabel(t, inheritedMethod)})
           </option>
           {offered.map((method) => (
             <option key={method} value={method}>
