@@ -468,6 +468,47 @@ describe('backup import', () => {
     }
   })
 
+  /*
+   * The step that forgets an untied folder's mirror writes more than once,
+   * and its undo was kept only once all its writes were done: one failing
+   * partway left the mirror gone, while the import said nothing was changed.
+   */
+  it('puts a folder’s mirror back when forgetting it fails partway', async () => {
+    const { gitFolderStore } = await import('../gitFolders/GitFolderStore')
+    const previous = gitFolderStore.snapshot()
+    try {
+      populate()
+      saveTo = FILE
+      await exportToFile(win, false)
+      const file = JSON.parse(readFileSync(FILE, 'utf8'))
+      file.groups.push({ id: 'mirror', name: 'Was from git', parentId: null })
+      writeFileSync(FILE, JSON.stringify(file), 'utf8')
+      sessionStore.saveGroup({
+        id: 'mirror',
+        name: 'From git',
+        parentId: null,
+        git: { repoUrl: 'https://git.example/inv.git', paths: [], includedGroups: [] }
+      })
+      gitFolderStore.restore({
+        ...previous,
+        trees: [{ groupId: 'mirror', groups: [], sessions: [], memberships: {} }]
+      })
+      const forget = gitFolderStore.forget.bind(gitFolderStore)
+      vi.spyOn(gitFolderStore, 'forget').mockImplementationOnce((...args) => {
+        forget(...args)
+        throw new Error('ENOSPC: no space left on device')
+      })
+
+      openFrom = FILE
+      await expect(importFromFile(win)).rejects.toThrow(/nothing was changed/i)
+
+      expect(gitFolderStore.trees().some((t) => t.groupId === 'mirror')).toBe(true)
+      expect(sessionStore.getAll().groups.find((g) => g.id === 'mirror')?.git).toBeDefined()
+    } finally {
+      gitFolderStore.restore(previous)
+    }
+  })
+
   /** A backup written before exports left tokens out still holds them. */
   it('brings no token back in from an older backup', async () => {
     populate()

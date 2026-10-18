@@ -633,10 +633,16 @@ export async function importFromFile(
   const forgotten: InventoryOverride[] = []
 
   const undo: (() => void)[] = []
+  /*
+   * The undo is kept before the write, not after it. A step may write more
+   * than once — the one that forgets untied folders does — and one failing
+   * partway left what it had already written, while the import said nothing
+   * was changed.
+   */
   const step = <T>(snapshot: () => T, restore: (previous: T) => void, write: () => void): void => {
     const previous = snapshot()
-    write()
     undo.push(() => restore(previous))
+    write()
   }
   try {
     if (secrets && Object.keys(secrets).length > 0) {
