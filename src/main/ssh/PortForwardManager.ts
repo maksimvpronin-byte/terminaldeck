@@ -184,6 +184,10 @@ export function handleSocks5(socket: Socket, client: Client): void {
   }
 
   socket.on('data', onData)
+  // Half-open now, a client that ends mid-handshake would wait for the timer.
+  socket.on('end', () => {
+    if (stage !== 'done') give_up()
+  })
   socket.on('error', () => clearTimeout(timer))
   socket.on('close', () => clearTimeout(timer))
 }
@@ -258,7 +262,13 @@ class PortForwardManager {
   private async open(client: Client, entry: ActiveForward): Promise<void> {
     const { rule } = entry
     if (rule.type === 'local' || rule.type === 'dynamic') {
-      const server = net.createServer((socket) => {
+      /*
+       * Half-open: a program that has finished sending may still be waiting
+       * for the answer. A socket made the ordinary way closed its own sending
+       * side as soon as the program ended its side, and the answer from any
+       * service that replies after the end of the question was lost.
+       */
+      const server = net.createServer({ allowHalfOpen: true }, (socket) => {
         this.track(entry, socket)
         if (rule.type === 'dynamic') {
           handleSocks5(socket, client)
@@ -377,7 +387,12 @@ class PortForwardManager {
       answered = true
       reject()
     }
-    const socket = net.connect(rule.dstPort ?? 0, rule.dstHost ?? '127.0.0.1')
+    // Half-open, as the local side is: see `open`.
+    const socket = net.connect({
+      port: rule.dstPort ?? 0,
+      host: rule.dstHost ?? '127.0.0.1',
+      allowHalfOpen: true
+    })
     this.track(entry, socket)
     socket.on('error', refuse)
     // Destroyed before it connected — the forward stopped — says only 'close'.

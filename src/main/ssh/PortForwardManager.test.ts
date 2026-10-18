@@ -111,7 +111,9 @@ describe('connections arriving through remote forwards', () => {
     await portForwardManager.start('r1', remoteRule('b', '10.0.0.2', 8080, 'app-b'))
 
     const { accept } = arrive('10.0.0.2', 8080)
-    expect(vi.mocked(net.connect).mock.calls).toEqual([[80, 'app-b']])
+    expect(vi.mocked(net.connect).mock.calls).toEqual([
+      [{ port: 80, host: 'app-b', allowHalfOpen: true }]
+    ])
     sockets[0].emit('connect')
     expect(accept).toHaveBeenCalledTimes(1)
 
