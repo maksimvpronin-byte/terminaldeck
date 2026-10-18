@@ -128,3 +128,45 @@ it.each(['-1', '65536', '22.5', 'Infinity', 'nonsense'])(
     expect(() => parseSshConfig(`Host prod\n  Port ${port}\n`)).toThrow('Invalid SSH port')
   }
 )
+
+/*
+ * A block of patterns configures the hosts it matches, and was skipped
+ * whole: `Host * !bastion` giving every host but the bastion its login, port
+ * and jump host left them all on 22, as nobody, connecting direct — where
+ * `ssh -G prod` says deploy, 2222 and through bastion.
+ */
+describe('a block of patterns', () => {
+  it('gives the hosts it matches what it says, the first value winning', () => {
+    const hosts = parseSshConfig(
+      [
+        'Host prod',
+        '  HostName 10.0.0.10',
+        'Host bastion',
+        '  HostName bastion.example',
+        'Host * !bastion',
+        '  User deploy',
+        '  Port 2222',
+        '  ProxyJump bastion',
+        'Host *',
+        '  User fallback'
+      ].join('\n')
+    )
+    expect(hosts.find((h) => h.alias === 'prod')).toMatchObject({
+      hostname: '10.0.0.10',
+      user: 'deploy',
+      port: 2222,
+      proxyJump: 'bastion'
+    })
+    // Not matched by `* !bastion`; only `Host *` speaks for it.
+    const bastion = hosts.find((h) => h.alias === 'bastion')
+    expect(bastion).toMatchObject({ hostname: 'bastion.example', user: 'fallback', port: 22 })
+    expect(bastion?.proxyJump).toBeUndefined()
+  })
+
+  it('lets a host’s own block, read first, win over a pattern after it', () => {
+    const hosts = parseSshConfig(
+      ['Host web', '  Port 2200', 'Host w*', '  Port 22', '  User ops'].join('\n')
+    )
+    expect(hosts[0]).toMatchObject({ alias: 'web', port: 2200, user: 'ops' })
+  })
+})

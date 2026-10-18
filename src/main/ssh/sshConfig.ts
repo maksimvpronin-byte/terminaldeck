@@ -34,92 +34,111 @@ function configPath(): string {
   return join(homedir(), '.ssh', 'config')
 }
 
+/** One `Host` line and what follows it, or the lines before any; a `Match` block has no patterns. */
+interface Block {
+  patterns: string[] | null
+  settings: Array<[keyword: string, value: string]>
+}
+
+/** `*` and `?` as ssh_config(5) has them, case aside. */
+function globMatches(pattern: string, name: string): boolean {
+  const source = pattern
+    .split('')
+    .map((c) => (c === '*' ? '.*' : c === '?' ? '.' : c.replace(/[.+^${}()|[\]\\]/g, '\\$&')))
+    .join('')
+  return new RegExp(`^${source}$`, 'i').test(name)
+}
+
+/** Whether a block speaks for `alias`: a pattern matches it and no negated one does. */
+function applies(block: Block, alias: string): boolean {
+  if (block.patterns === null) return false
+  const negated = block.patterns.filter((p) => p.startsWith('!')).map((p) => p.slice(1))
+  if (negated.some((p) => globMatches(p, alias))) return false
+  return block.patterns.some((p) => !p.startsWith('!') && globMatches(p, alias))
+}
+
+const isPattern = (token: string): boolean =>
+  token.includes('*') || token.includes('?') || token.startsWith('!')
+
 /**
- * Parses ~/.ssh/config well enough to seed session profiles. Patterns containing
- * wildcards are skipped: they configure other hosts rather than name one, and so
- * are negated ones (`!bastion`), which name a host only to exclude it.
+ * Parses ~/.ssh/config well enough to seed session profiles. A block whose
+ * `Host` names a host with no pattern is one to import; every block whose
+ * patterns match that name — `Host *`, `Host * !bastion` — gives it settings
+ * too, the first value for each keyword winning, in the order they come.
+ * Pattern blocks were skipped whole, and with them the login, port and jump
+ * host they gave: `ssh -G prod` said deploy on 2222 through bastion, and the
+ * import connected as nobody on 22, direct.
  *
- * Three rules of ssh_config(5) it follows, each of which it used to break:
+ * Three more rules of ssh_config(5) it follows, each of which it used to break:
  *
  * - A keyword and its value may be joined by `=` with no space around it:
  *   `HostName=example.com`. Those lines were taken for a keyword with no value
  *   and dropped.
- * - A `Match` line ends the `Host` block above it. What followed a Match was
- *   applied to that host, so a `User` meant for some other set of machines
- *   became its login.
- * - The first value given for a keyword is the one used; later ones in the
- *   same block are ignored.
+ * - A `Match` line ends the `Host` block above it, and what it selects is not
+ *   known here, so nothing in it is given to anyone. What followed a Match was
+ *   applied to the host above it, so a `User` meant for some other set of
+ *   machines became its login.
+ * - The first value given for a keyword is the one used; later ones are ignored.
  */
 export function parseSshConfig(text: string): SshConfigHost[] {
-  const hosts: SshConfigHost[] = []
-  let current: SshConfigHost | null = null
-  let portSet = false
-
-  const flush = (): void => {
-    // Blocks without an explicit HostName are kept; the alias stands in for it below.
-    if (current) hosts.push(current)
-    current = null
-  }
-
+  const blocks: Block[] = [{ patterns: ['*'], settings: [] }]
   for (const rawLine of text.split(/\r?\n/)) {
     const line = stripComment(rawLine).trim()
     if (line === '' || line.startsWith('#')) continue
-
     const match = line.match(/^([^\s=]+)\s*(?:=\s*|\s+)(.*)$/)
     if (!match) continue
     const keyword = match[1].toLowerCase()
     const value = match[2].trim()
-
     if (keyword === 'host') {
-      flush()
-      const aliases = value
-        .split(/\s+/)
-        .filter((a) => !a.includes('*') && !a.includes('?') && !a.startsWith('!'))
-      if (aliases.length === 0) continue
-      current = { alias: unquote(aliases[0]), hostname: '', port: 22 }
-      portSet = false
-      continue
-    }
-    if (keyword === 'match') {
-      // What follows belongs to whatever the Match selects, not to this host.
-      flush()
-      continue
-    }
-
-    if (!current) continue
-    const host: SshConfigHost = current
-
-    switch (keyword) {
-      case 'hostname':
-        if (!host.hostname) host.hostname = unquote(value)
-        break
-      case 'user':
-        host.user ??= unquote(value)
-        break
-      case 'port':
-        if (!portSet) {
-          const port = Number(unquote(value))
-          if (!Number.isInteger(port) || port < 1 || port > 65535) {
-            throw new Error(`Invalid SSH port for ${host.alias}: ${value}`)
-          }
-          host.port = port
-          portSet = true
-        }
-        break
-      case 'identityfile':
-        host.identityFile ??= expandHome(unquote(value))
-        break
-      case 'proxyjump':
-        host.proxyJump ??= value
-        break
-      default:
-        break
+      blocks.push({ patterns: value.split(/\s+/).map(unquote), settings: [] })
+    } else if (keyword === 'match') {
+      blocks.push({ patterns: null, settings: [] })
+    } else {
+      blocks[blocks.length - 1].settings.push([keyword, value])
     }
   }
-  flush()
 
-  // A Host block without an explicit HostName resolves to the alias itself.
-  return hosts.map((h) => ({ ...h, hostname: h.hostname || h.alias }))
+  const hosts: SshConfigHost[] = []
+  for (const block of blocks.slice(1)) {
+    const alias = block.patterns?.find((p) => !isPattern(p))
+    if (!alias) continue
+    const host: SshConfigHost = { alias, hostname: '', port: 22 }
+    const taken = new Set<string>()
+    for (const from of blocks) {
+      if (from !== block && !applies(from, alias)) continue
+      for (const [keyword, value] of from.settings) {
+        if (taken.has(keyword)) continue
+        switch (keyword) {
+          case 'hostname':
+            host.hostname = unquote(value)
+            break
+          case 'user':
+            host.user = unquote(value)
+            break
+          case 'port': {
+            const port = Number(unquote(value))
+            if (!Number.isInteger(port) || port < 1 || port > 65535) {
+              throw new Error(`Invalid SSH port for ${alias}: ${value}`)
+            }
+            host.port = port
+            break
+          }
+          case 'identityfile':
+            host.identityFile = expandHome(unquote(value))
+            break
+          case 'proxyjump':
+            host.proxyJump = value
+            break
+          default:
+            continue
+        }
+        taken.add(keyword)
+      }
+    }
+    // A Host block without an explicit HostName resolves to the alias itself.
+    hosts.push({ ...host, hostname: host.hostname || host.alias })
+  }
+  return hosts
 }
 
 export function readSshConfigHosts(): SshConfigHost[] {
