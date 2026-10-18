@@ -860,6 +860,12 @@ export interface TransferPlan {
    * through a link; see SFTPManager.linkBelow.
    */
   localRoot?: string
+  /**
+   * The remote folder an upload or a host-to-host copy was chosen into. It is
+   * followed, being the person's choice; a link below it is not, as with
+   * `localRoot` on this side.
+   */
+  remoteRoot?: string
 }
 
 /** Destination path to what to do with it. Anything absent is written. */

@@ -1277,7 +1277,8 @@ describe('parallel transfer planning', () => {
     })
     const planned = await sftpManager.planUpload('conn', localDir, '/remote')
     expect(peak).toBe(8)
-    expect(stat).toHaveBeenCalledTimes(24)
+    // The 24 files, and once the folder they go into, looked at for a link.
+    expect(stat).toHaveBeenCalledTimes(25)
     expect(planned.items).toHaveLength(24)
     expect(planned.conflicts).toHaveLength(1)
     expect(planned.conflicts[0]).toMatchObject({ reason: 'unreadable' })
@@ -1538,6 +1539,37 @@ describe('downloading a folder', () => {
     await expect(sftpManager.planRelay('src', '/export', 'dst', '/selected')).rejects.toThrow(
       /unsafe/i
     )
+  })
+
+  /*
+   * The folder chosen on the far side is followed; a link below it is not,
+   * as a download treats one on this side. `tree` in /allowed being a link
+   * to /outside, an upload and a host-to-host copy wrote straight through it.
+   */
+  it('writes nothing through a link below the remote folder chosen', async () => {
+    const tree = join(localDir, 'tree')
+    mkdirSync(tree, { recursive: true })
+    writeFileSync(join(tree, 'key'), 'secret', 'utf8')
+    const entries: Record<string, Entry> = {
+      '/allowed': { dir: true },
+      '/allowed/tree': { link: '/outside' },
+      '/outside': { dir: true }
+    }
+    attach('conn', stubSession([], entries))
+
+    const planned = await sftpManager.planUpload('conn', tree, '/allowed')
+    expect(planned.conflicts.map((c) => c.reason)).toEqual(['symlink'])
+    const result = await sftpManager.runPlan('conn', planned, { '/allowed/tree/key': 'overwrite' })
+    expect(result.written).toBe(0)
+    expect(entries['/outside/key']).toBeUndefined()
+
+    const source: Record<string, Entry> = {
+      '/src/tree': { dir: true },
+      '/src/tree/key': { size: 6 }
+    }
+    attach('src', withListing(stubSession([], source), { '/src/tree': [{ name: 'key', size: 6 }] }))
+    const copied = await sftpManager.planRelay('src', '/src/tree', 'conn', '/allowed')
+    expect(copied.conflicts.map((c) => c.reason)).toEqual(['symlink'])
   })
 
   it('puts it under its own name in the directory chosen', async () => {

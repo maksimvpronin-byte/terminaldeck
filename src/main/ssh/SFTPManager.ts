@@ -1026,6 +1026,46 @@ class SFTPManager {
    * a folder of a thousand files asks the server about its parent once rather
    * than a thousand times — each a round trip before the file could start.
    */
+  /**
+   * The first link between `root` and the folder `path` goes into, on a host.
+   *
+   * The far side's twin of linkBelow: `tree` in the folder chosen there could
+   * be a link to anywhere, and an upload or a copy from another host wrote
+   * through it with no conflict and a report of success. Folders not there
+   * yet are made by the transfer, and nothing below them exists. `known`
+   * remembers what one plan or one run has already looked at.
+   */
+  private async remoteLinkBelow(
+    connectionId: string,
+    root: string,
+    path: string,
+    known: Map<string, Promise<boolean | null>> = new Map()
+  ): Promise<string | undefined> {
+    const base = root.replace(/\/+$/, '') || '/'
+    const parent = parentOf(path)
+    if (parent === base) return undefined
+    const prefix = base === '/' ? '/' : `${base}/`
+    if (!parent.startsWith(prefix)) return path
+    let cursor = base
+    for (const part of parent.slice(prefix.length).split('/')) {
+      cursor = joinRemote(cursor, part)
+      // The look itself is kept, not its answer: a plan asks for many files
+      // at once, and every one of them asked for the same folder before the
+      // first answer came back.
+      let look = known.get(cursor)
+      if (!look) {
+        look = this.statPath(connectionId, cursor)
+          .then((info) => (info ? info.isSymlink : null))
+          .catch(() => null)
+        known.set(cursor, look)
+      }
+      const link = await look
+      if (link === null) return undefined
+      if (link) return cursor
+    }
+    return undefined
+  }
+
   private async ensureRemoteDir(
     connectionId: string,
     dir: string,
@@ -1165,7 +1205,13 @@ class SFTPManager {
     const items = await this.localTree(localPath, remoteParent)
     const found = new Map<string, DestInfo | null>()
     const unique = [...new Map(items.map((item) => [item.destPath, item])).values()]
+    const known = new Map<string, Promise<boolean | null>>()
     await forEachConcurrent(unique, async (item) => {
+      // Reached through a link below the chosen folder: refused, as a link is.
+      if (await this.remoteLinkBelow(connectionId, remoteParent, item.destPath, known)) {
+        found.set(item.destPath, { size: 0, mtime: 0, isDirectory: false, isSymlink: true })
+        return
+      }
       try {
         const info = await this.statPath(connectionId, item.destPath)
         found.set(
@@ -1190,7 +1236,10 @@ class SFTPManager {
         })
       }
     })
-    return buildTransferPlan('upload', items, (p) => found.get(p) ?? null)
+    return {
+      ...buildTransferPlan('upload', items, (p) => found.get(p) ?? null),
+      remoteRoot: remoteParent
+    }
   }
 
   /**
@@ -1281,7 +1330,12 @@ class SFTPManager {
 
     const found = new Map<string, DestInfo | null>()
     const unique = [...new Map(items.map((item) => [item.destPath, item])).values()]
+    const known = new Map<string, Promise<boolean | null>>()
     await forEachConcurrent(unique, async (item) => {
+      if (await this.remoteLinkBelow(dstConnectionId, destParent, item.destPath, known)) {
+        found.set(item.destPath, { size: 0, mtime: 0, isDirectory: false, isSymlink: true })
+        return
+      }
       try {
         const info = await this.statPath(dstConnectionId, item.destPath)
         found.set(
@@ -1306,7 +1360,10 @@ class SFTPManager {
         })
       }
     })
-    return buildTransferPlan('relay', items, (p) => found.get(p) ?? null)
+    return {
+      ...buildTransferPlan('relay', items, (p) => found.get(p) ?? null),
+      remoteRoot: destParent
+    }
   }
 
   /**
@@ -1334,6 +1391,8 @@ class SFTPManager {
     const askedAbout = new Map(plan.conflicts.map((c) => [c.destPath, c]))
     /** Remote directories this transfer has found or made; see ensureRemoteDir. */
     const madeDirs = new Set<string>()
+    /** Remote folders this run has looked at for links; see remoteLinkBelow. */
+    const remoteFolders = new Map<string, Promise<boolean | null>>()
     for (const item of plan.items) {
       if (!shouldWrite(item.destPath, decisions, conflicted)) {
         skipped++
@@ -1372,6 +1431,21 @@ class SFTPManager {
         plan.direction === 'download' &&
         plan.localRoot &&
         (await linkBelow(plan.localRoot, item.destPath))
+      ) {
+        skipped++
+        changed.push(item.destPath)
+        continue
+      }
+      // The same on the far side, once per folder for the run.
+      if (
+        plan.direction !== 'download' &&
+        plan.remoteRoot &&
+        (await this.remoteLinkBelow(
+          plan.direction === 'relay' ? destConnectionId! : connectionId,
+          plan.remoteRoot,
+          item.destPath,
+          remoteFolders
+        ))
       ) {
         skipped++
         changed.push(item.destPath)
