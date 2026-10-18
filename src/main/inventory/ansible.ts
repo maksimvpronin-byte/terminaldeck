@@ -94,7 +94,15 @@ function spelled(vars: AnsibleVars, plain: string, ssh: string): unknown {
  * a tie of depth the wrong group's settings won.
  */
 function byCodePoint(a: string, b: string): number {
-  return a < b ? -1 : a > b ? 1 : 0
+  // Not `<`: that compares UTF-16 units, and U+10400, a surrogate pair
+  // starting D801, came before U+FF21 where Python puts it after.
+  const x = [...a]
+  const y = [...b]
+  for (let i = 0; i < Math.min(x.length, y.length); i++) {
+    const d = x[i].codePointAt(0)! - y[i].codePointAt(0)!
+    if (d !== 0) return d
+  }
+  return x.length - y.length
 }
 
 /** Maps the Ansible connection vars we understand onto our own auth fields. */

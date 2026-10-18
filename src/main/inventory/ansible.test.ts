@@ -1069,6 +1069,21 @@ all:
     expect(resolveAuth(h, h.groupId ?? null, groups).username).toBe('lower')
   })
 
+  /* By code point, not by UTF-16 unit: U+10400 comes after U+FF21, as Python has it. */
+  it('orders names beyond the basic plane by code point', () => {
+    const { groups, hosts } = parseAnsibleInventory(
+      parse(`
+all:
+  children:
+    "\\uFF21": { vars: { ansible_user: bmp }, hosts: { h: {} } }
+    "\\U00010400": { vars: { ansible_user: astral }, hosts: { h: {} } }
+`),
+      SRC
+    )
+    const h = hosts[0]
+    expect(resolveAuth(h, h.groupId ?? null, groups).username).toBe('astral')
+  })
+
   it('still lets the host’s own settings win', () => {
     const doc = `
 all:
