@@ -86,6 +86,27 @@ describe('a desktop whose password was wrong', () => {
   })
 })
 
+/*
+ * Whether a password is saved was asked once, when the pane opened. With the
+ * host's saved password removed since, Try again went on sending none, and
+ * no field to type one in was offered.
+ */
+describe('Try again after the saved password was removed', () => {
+  it('asks again, and offers the password field', async () => {
+    open(true)
+    await act(async () => {})
+    expect(attempts).toEqual([undefined])
+
+    window.td.rdp.login = vi.fn(async () => ({ username: 'admin', hasPassword: false }))
+    fireEvent.click(screen.getByText('Try again'))
+    await act(async () => {})
+
+    expect(window.td.rdp.login).toHaveBeenCalled()
+    expect(attempts).toEqual([undefined])
+    expect(screen.getByPlaceholderText('Password')).toBeTruthy()
+  })
+})
+
 /**
  * A desktop typed into Quick connect: no saved host behind it, so nothing to
  * look up — the address, the login and a typed password are all there is.

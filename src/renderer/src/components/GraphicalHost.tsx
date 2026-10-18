@@ -279,8 +279,25 @@ export default function GraphicalHost({
   function tryAgain(): void {
     // The stored password is used again without ever being shown here; only a
     // host with nothing saved is asked.
-    if (hasStoredPassword || lastTyped.current) start(lastTyped.current)
-    else setPhase({ at: 'password' })
+    if (lastTyped.current || isQuick || !sessionId) {
+      if (hasStoredPassword || lastTyped.current) start(lastTyped.current)
+      else setPhase({ at: 'password' })
+      return
+    }
+    /*
+     * Whether one is saved is asked again, not taken from when the pane
+     * opened: with the host's saved password removed since, this went on
+     * sending none, and offered no field to type one in.
+     */
+    void window.td.rdp
+      .login(sessionId, credentialId)
+      .then((stored) => {
+        setUsername(stored.username)
+        setHasStoredPassword(stored.hasPassword)
+        if (stored.hasPassword) start(undefined)
+        else setPhase({ at: 'password' })
+      })
+      .catch((err: Error) => setPhase({ at: 'failed', reason: err.message }))
   }
 
   function start(typed: string | undefined): void {
