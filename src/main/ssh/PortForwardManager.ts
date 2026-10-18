@@ -93,7 +93,7 @@ function discard(stream: Duplex): void {
  * of that matter — the first cost the main process an uncaught `RangeError`,
  * and the second silently swallowed the first thing a pipelining client said.
  */
-function handleSocks5(socket: Socket, client: Client): void {
+export function handleSocks5(socket: Socket, client: Client): void {
   // Annotated: `alloc` yields a buffer tied to its own ArrayBuffer, while the
   // slices a parser hands back are views onto another, and the two disagree.
   let buf: Buffer = Buffer.alloc(0)
@@ -112,14 +112,24 @@ function handleSocks5(socket: Socket, client: Client): void {
 
   const onData = (chunk: Buffer): void => {
     buf = buf.length === 0 ? chunk : Buffer.concat([buf, chunk])
-    if (buf.length > HANDSHAKE_LIMIT) {
+    /*
+     * The limit is on a handshake that has not finished, not on the bytes
+     * that came with it: a client may send its first data for the far end in
+     * the same packet as the CONNECT, and a TLS hello of 2 KB after one had
+     * its socket destroyed.
+     */
+    const tooLong = (): boolean => {
+      if (buf.length <= HANDSHAKE_LIMIT) return false
       give_up()
-      return
+      return true
     }
 
     if (stage === 'greeting') {
       const greeting = parseGreeting(buf)
-      if (greeting.status === 'incomplete') return
+      if (greeting.status === 'incomplete') {
+        tooLong()
+        return
+      }
       if (greeting.status === 'invalid') {
         give_up()
         return
@@ -133,7 +143,10 @@ function handleSocks5(socket: Socket, client: Client): void {
     }
 
     const request = parseRequest(buf)
-    if (request.status === 'incomplete') return
+    if (request.status === 'incomplete') {
+      tooLong()
+      return
+    }
     if (request.status === 'invalid') {
       give_up()
       return

@@ -44,7 +44,7 @@ const client = Object.assign(new EventEmitter(), {
 }) as unknown as Client
 vi.mock('./SSHManager', () => ({ sshManager: { getClientChain: () => [client] } }))
 
-const { portForwardManager, pipeStreams } = await import('./PortForwardManager')
+const { portForwardManager, pipeStreams, handleSocks5 } = await import('./PortForwardManager')
 const net = (await import('net')).default
 
 const rule = {
@@ -227,5 +227,32 @@ describe('a remote forward the server never answers', () => {
       silent = false
       vi.useRealTimers()
     }
+  })
+})
+
+/*
+ * A client may send its first bytes for the far end in the same packet as
+ * the CONNECT. The limit on a handshake counted them as handshake, and a
+ * CONNECT followed by 2 KB of a TLS hello had its socket destroyed.
+ */
+describe('a SOCKS client that sends data with its CONNECT', () => {
+  it('connects and passes the data on', () => {
+    const written: Buffer[] = []
+    const socket = Object.assign(new EventEmitter(), {
+      destroyed: false,
+      write: (b: Buffer) => written.push(b),
+      destroy: vi.fn(),
+      pause: () => undefined,
+      resume: () => undefined
+    })
+    const forwardOut = vi.fn()
+    handleSocks5(socket as never, { forwardOut } as never)
+
+    socket.emit('data', Buffer.from([0x05, 0x01, 0x00]))
+    const connect = Buffer.from([0x05, 0x01, 0x00, 0x01, 0x7f, 0x00, 0x00, 0x01, 0x01, 0xbb])
+    socket.emit('data', Buffer.concat([connect, Buffer.alloc(2048, 0x16)]))
+
+    expect(socket.destroy).not.toHaveBeenCalled()
+    expect(forwardOut).toHaveBeenCalledWith('127.0.0.1', 0, '127.0.0.1', 443, expect.any(Function))
   })
 })
