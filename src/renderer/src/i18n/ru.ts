@@ -1393,6 +1393,10 @@ export const ru: Record<string, string> = {
     'Собственные переменные хоста, записанные в нескольких файлах, берутся из прочитанного последним',
   'So are those of a group left out, and the dialog names those groups too':
     'Как и у неотмеченной группы — диалог называет и такие группы',
+  'Host * and other pattern blocks give the hosts they match their login, port and jump host':
+    'Блоки-шаблоны вроде Host * отдают подходящим хостам логин, порт и бастион',
+  'A collection, a saved layout or a split brings such a desktop forward instead':
+    'Коллекция, сохранённая раскладка или разделение панели выводят такой рабочий стол вперёд',
   'What has left the repository leaves the folder, and the dialog says what goes':
     'Ушедшее из репозитория уходит из папки, и диалог говорит, что именно',
   'Local settings and passwords kept for a host that goes are deleted with it':

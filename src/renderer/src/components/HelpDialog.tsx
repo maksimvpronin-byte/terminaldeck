@@ -66,6 +66,9 @@ const CHAPTERS: Chapter[] = [
               {
                 what: '⇩ beside + Group imports hosts from ~/.ssh/config, ProxyJump links included'
               },
+              {
+                what: 'Host * and other pattern blocks give the hosts they match their login, port and jump host'
+              },
               { what: 'The mark in front of a name says what it opens: a terminal or a desktop' },
               { what: 'It turns green while that machine is open, desktops and terminals alike' },
               { what: 'A host given a colour wears it as its own background and a coloured edge' },
@@ -98,6 +101,9 @@ const CHAPTERS: Chapter[] = [
               },
               {
                 what: 'A desktop is never opened twice for one account: Windows keeps one session per user'
+              },
+              {
+                what: 'A collection, a saved layout or a split brings such a desktop forward instead'
               },
               { what: 'A desktop just opened takes the keyboard, as a new terminal does' },
               { what: 'Right-click for connect, split, duplicate, edit and delete' },
