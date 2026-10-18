@@ -6,6 +6,78 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.29.1
+
+A review of the whole application after 0.29.0. Nothing here was reported
+from use; each was found, reproduced as a failing test and fixed.
+
+### Security
+
+- **File transfers write only where they were sent.**
+  - A copy between two hosts took the names in the source server's listing
+    as written: a name such as `../../outside.txt`, or a folder name with
+    backslashes copied to a Windows server, was written outside the folder
+    chosen there. A name is now taken as one plain segment, under Windows'
+    rules on a Windows host, and an upload's own names are held to the same.
+  - An upload or a copy between hosts went through a link below the folder
+    chosen on the server — one already there, or one put there between two
+    files or during the write. Such a file is now refused, and looked for
+    before each file, once its copy exists, and before it is moved into place.
+  - An upload's copy was closed after it was created and opened again by name
+    to be written, so a link put at that name in a folder somebody else could
+    write to had the upload written into any file the link named. The copy is
+    now written through the handle it was created with.
+  - Over a file only its owner could read, a server that refused to narrow
+    the new copy had the new contents written where anyone on it could read
+    them. Nothing is written into such a copy any more.
+  - Deleting a folder that had been swapped for a link after it was listed
+    emptied the folder the link named. What the path is now is looked at
+    before it is emptied, and a link is removed as itself.
+- **No SSH key passphrase is sent to a desktop as its password.** A saved
+  account or a group that signs in with a key keeps the key's passphrase,
+  and a desktop using that account, or in such a group — or under a group
+  whose parent uses a key — sent it to the far end as the Windows password.
+- **A token in a repository address is found however it is written.** An
+  address with a space before it, or with a git transport in front
+  (`https::https://…`), kept its token in the clear and in a backup exported
+  without credentials.
+- **The diagnostics journal keeps no character typed with AltGr or Option.**
+  Those keys type ordinary characters, `@` and `€` among them, and the
+  journal wrote them by their physical key; a password typed so could be
+  read back.
+- **Saving a file never writes through a name already taken beside it.** The
+  stores, the vault and an exported backup went to `<file>.tmp`, emptying
+  whatever went by that name — in a folder chosen for an export, somebody's
+  file or a link to one. The temporary name is now random and created
+  afresh, and the files are written readable by you alone.
+
+### Changed
+
+- **Importing `~/.ssh/config` applies `Host *` and other pattern blocks** to
+  the hosts they match, as `ssh -G` does: the login, port, key and jump host
+  they give used to be dropped.
+- **Split right, Connect in split, a collection and a saved layout open no
+  second desktop for one account**; the one already open is brought forward
+  and asked to connect if it waits.
+
+### Fixed
+
+- A damaged PuTTY key file could hang the whole application.
+- A key file given as `~/.ssh/…`, as Ansible inventories give one, was not found.
+- A remote forward the server never answered kept the pane connecting for
+  ever; tunnels now come up beside the shell, and such a forward gives up
+  after 15 seconds.
+- A SOCKS tunnel dropped a connection whose first data came in the same
+  packet as its CONNECT.
+- Groups of an Ansible inventory are ordered by name as Ansible orders them,
+  capitals first and code point by code point.
+- A desktop in a background tab cancelled the file another desktop was
+  copying through the clipboard.
+- Opening several restored desktops at once connected only the last.
+- Try again on a desktop whose saved password had been removed sent none
+  again instead of asking for one.
+- A click in the host palette could open the row above the one clicked.
+
 ## 0.29.0
 
 0.28.5 was built and never published; what it held is here, under Security.
