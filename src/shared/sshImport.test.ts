@@ -90,3 +90,15 @@ describe('importing hosts from ~/.ssh/config', () => {
     expect(plan.ok && plan.profiles[0].jumpHostId).toBe('v6')
   })
 })
+
+/* `ProxyJump bastion` to a host whose Host line says `jump bastion` was missing, and nothing imported. */
+describe('a jump host named by another of its names', () => {
+  it('is found by any name its Host line gives', () => {
+    const jump = { ...host('jump'), otherAliases: ['bastion'] }
+    const plan = planSshImport([jump, host('app', 'bastion')], [], [], makeId, 1)
+    expect(plan.ok).toBe(true)
+    if (!plan.ok) return
+    const [first, app] = plan.profiles
+    expect(app.jumpHostId).toBe(first.id)
+  })
+})

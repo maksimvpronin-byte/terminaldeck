@@ -804,6 +804,11 @@ export type UpdateState =
 
 export interface SshConfigHost {
   alias: string
+  /**
+   * The other plain names its Host line gives it. ssh takes every one of
+   * them for this host, and a ProxyJump naming the second went unfound.
+   */
+  otherAliases?: string[]
   hostname: string
   user?: string
   port: number

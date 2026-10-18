@@ -170,3 +170,13 @@ describe('a block of patterns', () => {
     expect(hosts[0]).toMatchObject({ alias: 'web', port: 2200, user: 'ops' })
   })
 })
+
+/* Every plain name on a Host line names the host, as ssh reads it, not the first alone. */
+describe('a Host line of several names', () => {
+  it('keeps the other names of the host', () => {
+    const hosts = parseSshConfig('Host jump bastion\n  HostName bastion.example\n')
+    expect(hosts).toEqual([
+      { alias: 'jump', otherAliases: ['bastion'], hostname: 'bastion.example', port: 22 }
+    ])
+  })
+})

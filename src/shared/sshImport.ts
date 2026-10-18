@@ -63,8 +63,16 @@ export function planSshImport(
       updatedAt: now
     })
   }
+  // By every name its Host line gives it: ssh takes `bastion` in
+  // `Host jump bastion` for the same host, and a ProxyJump naming it was missing.
+  const named = new Map(created)
+  for (const h of chosen) {
+    for (const other of h.otherAliases ?? []) {
+      if (!named.has(other)) named.set(other, created.get(h.alias)!)
+    }
+  }
   const find = (alias: string): SessionProfile | undefined =>
-    created.get(alias) ?? saved.find((s) => s.name === alias)
+    named.get(alias) ?? saved.find((s) => s.name === alias)
 
   const problems: SshImportProblem[] = []
   const chains = new Map<string, SessionProfile[]>()

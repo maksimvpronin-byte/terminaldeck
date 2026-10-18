@@ -100,9 +100,14 @@ export function parseSshConfig(text: string): SshConfigHost[] {
 
   const hosts: SshConfigHost[] = []
   for (const block of blocks.slice(1)) {
-    const alias = block.patterns?.find((p) => !isPattern(p))
+    const [alias, ...others] = block.patterns?.filter((p) => !isPattern(p)) ?? []
     if (!alias) continue
-    const host: SshConfigHost = { alias, hostname: '', port: 22 }
+    const host: SshConfigHost = {
+      alias,
+      ...(others.length > 0 ? { otherAliases: others } : {}),
+      hostname: '',
+      port: 22
+    }
     const taken = new Set<string>()
     for (const from of blocks) {
       if (from !== block && !applies(from, alias)) continue
