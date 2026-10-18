@@ -1369,6 +1369,30 @@ export const ru: Record<string, string> = {
     '«Учитывать хосты дочерних групп»: группа берёт все хосты под собой, дочерние группы ищутся по имени, как у Ansible',
   'An unticked group still gives its hosts its settings, each read in its own place':
     'Неотмеченная группа всё равно отдаёт хостам свои настройки, каждая на своём месте',
+  'A link inside the folder you chose is never written through, even told to overwrite':
+    'Через ссылку внутри выбранной папки ничего не пишется, даже при «Заменить»',
+  'A file changed while the transfer ran is kept as it is and reported, not replaced':
+    'Файл, изменившийся во время передачи, остаётся как есть, и об этом сообщается',
+  'Downloading a link to a folder downloads the folder':
+    'Скачивание ссылки на папку скачивает саму папку',
+  'A save made just before its tab or connection closes is still sent':
+    'Сохранение, сделанное перед самым закрытием вкладки или соединения, всё равно отправляется',
+  'A copy that could not be sent is kept and listed when you quit, not deleted':
+    'Копия, которую не удалось отправить, сохраняется и показывается при выходе, а не удаляется',
+  'Switched to another protocol there, a host drops the inventory’s port for the new default':
+    'Переключённый там на другой протокол хост забывает порт из инвентаря и берёт порт по умолчанию',
+  'A group written in several places or files is one group, as Ansible reads it':
+    'Группа, описанная в нескольких местах или файлах, — одна группа, как у Ansible',
+  'group_vars and host_vars win over the vars written in the inventory itself':
+    'group_vars и host_vars побеждают переменные, записанные в самом инвентаре',
+  'ansible_ssh_user and the other ansible_ssh_* spellings win over the plain ones':
+    'ansible_ssh_user и другие написания ansible_ssh_* побеждают обычные',
+  'A Jinja template or a vault value is skipped, and the setting is inherited instead':
+    'Шаблон Jinja или значение vault пропускаются, и настройка наследуется',
+  'A host’s own vars written in several files come from the one read last':
+    'Собственные переменные хоста, записанные в нескольких файлах, берутся из прочитанного последним',
+  'So are those of a group left out, and the dialog names those groups too':
+    'Как и у неотмеченной группы — диалог называет и такие группы',
   'What has left the repository leaves the folder, and the dialog says what goes':
     'Ушедшее из репозитория уходит из папки, и диалог говорит, что именно',
   'Local settings and passwords kept for a host that goes are deleted with it':

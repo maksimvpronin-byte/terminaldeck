@@ -511,6 +511,13 @@ const CHAPTERS: Chapter[] = [
               { what: 'Anything that would overwrite is listed first, both ways, and asked about' },
               { what: 'Every clash starts on Skip; nothing is remembered between transfers' },
               { what: 'A folder where a file must go is refused rather than replaced' },
+              {
+                what: 'A link inside the folder you chose is never written through, even told to overwrite'
+              },
+              {
+                what: 'A file changed while the transfer ran is kept as it is and reported, not replaced'
+              },
+              { what: 'Downloading a link to a folder downloads the folder' },
               { what: 'SCP / Shell can be set on a group, for every SSH host inside it' },
               {
                 what: 'With it, files are reached as another user, through a command such as sudo -n -i -u postgres'
@@ -524,6 +531,10 @@ const CHAPTERS: Chapter[] = [
             title: 'Editing and comparing',
             rows: [
               { what: '"Edit locally" opens a file in your editor and uploads it on every save' },
+              { what: 'A save made just before its tab or connection closes is still sent' },
+              {
+                what: 'A copy that could not be sent is kept and listed when you quit, not deleted'
+              },
               {
                 what: 'Pick that editor in Settings → Files; otherwise a plain text editor is used'
               },
@@ -807,6 +818,19 @@ const CHAPTERS: Chapter[] = [
               {
                 what: 'Its settings come from all of them as Ansible reads them: the deepest wins'
               },
+              {
+                what: 'A group written in several places or files is one group, as Ansible reads it'
+              },
+              {
+                what: 'group_vars and host_vars win over the vars written in the inventory itself'
+              },
+              {
+                what: 'ansible_ssh_user and the other ansible_ssh_* spellings win over the plain ones'
+              },
+              {
+                what: 'A Jinja template or a vault value is skipped, and the setting is inherited instead'
+              },
+              { what: 'A host’s own vars written in several files come from the one read last' },
               { what: 'Credentials set on the repository are inherited by every host in it' },
               { what: 'A source follows one branch — empty means the default, usually main' },
               { what: 'The line under a repository states the branch, revision and what was read' },
@@ -846,7 +870,10 @@ terminaldeck_protocol: rdp`
   terminaldeck_port: 33890`
               },
               { what: 'An inventory that says nothing is corrected in the host’s local settings' },
-              { what: 'Right-click the host → Local settings…, and set Protocol there' }
+              { what: 'Right-click the host → Local settings…, and set Protocol there' },
+              {
+                what: 'Switched to another protocol there, a host drops the inventory’s port for the new default'
+              }
             ]
           }
         ]
@@ -903,6 +930,7 @@ terminaldeck_protocol: rdp`
               {
                 what: 'Local settings and passwords kept for a host that goes are deleted with it'
               },
+              { what: 'So are those of a group left out, and the dialog names those groups too' },
               {
                 what: 'Nothing on disk changes until you press Apply; Cancel leaves the folder as it was'
               },
