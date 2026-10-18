@@ -522,6 +522,16 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
   },
 
   splitPaneWith: (tabId, paneId, dir, position, title, target, color, viaCollectionId) => {
+    // Split right on a desktop, or Connect in split, made a second session of
+    // one already open; that one is brought forward instead. See openDesktop.
+    const place = openDesktop(get(), target)
+    if (place) {
+      get().setActiveTab(place.tabId)
+      get().setActivePane(place.tabId, place.paneId)
+      get().focusActivePane()
+      get().wakePane(place.paneId, false)
+      return
+    }
     set((s) => ({
       workspaces: mapTab(s.workspaces, tabId, (t) => {
         const newLeaf = makeLeaf(title, target, color, viaCollectionId)

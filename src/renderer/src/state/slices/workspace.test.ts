@@ -365,6 +365,28 @@ describe('openHost: an open host is brought forward rather than opened again', (
     expect(wakes[b]?.n).toBeGreaterThan(0)
   })
 
+  /* Split right and Connect in split made a second session of a desktop open already. */
+  it('splits no second desktop for one account off a pane', () => {
+    seed()
+    const first = open('dc')
+    const tab = useStore.getState().workspaces[0].tabs[0]
+    useStore
+      .getState()
+      .splitPaneWith(tab.id, first, 'row', 'after', 'dc', { kind: 'session', sessionId: 'dc' })
+    const leaves = useStore
+      .getState()
+      .workspaces.flatMap((w) => w.tabs)
+      .flatMap((t) => collectLeaves(t.root))
+    expect(leaves).toHaveLength(1)
+    // Another account is another session, and splits as before.
+    useStore.getState().splitPaneWith(tab.id, first, 'row', 'after', 'dc', {
+      kind: 'session',
+      sessionId: 'dc',
+      credentialId: 'admin'
+    })
+    expect(collectLeaves(useStore.getState().workspaces[0].tabs[0].root)).toHaveLength(2)
+  })
+
   /* A saved layout opened a desktop already open again, one more with each opening. */
   it('opens a saved layout without a desktop already open, and wakes that one', () => {
     seed()
