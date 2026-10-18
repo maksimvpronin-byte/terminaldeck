@@ -1354,6 +1354,8 @@ export const ru: Record<string, string> = {
     'Снятая вами подгруппа остаётся снятой — как новую её больше не предлагают',
   'Include hosts of child groups: a group brings every host beneath it, children found by name as Ansible does':
     '«Учитывать хосты дочерних групп»: группа берёт все хосты под собой, дочерние группы ищутся по имени, как у Ansible',
+  'An unticked group still gives its hosts its settings, each read in its own place':
+    'Неотмеченная группа всё равно отдаёт хостам свои настройки, каждая на своём месте',
   'What has left the repository leaves the folder, and the dialog says what goes':
     'Ушедшее из репозитория уходит из папки, и диалог говорит, что именно',
   'Local settings and passwords kept for a host that goes are deleted with it':

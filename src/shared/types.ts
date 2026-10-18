@@ -369,6 +369,20 @@ export interface SessionGroup
    */
   allId?: string
   /**
+   * The group's parent in the repository, when a git folder left that parent
+   * out and hangs the group from a group further up: the walk up goes there,
+   * through `frozen`, before it goes on to the parent shown.
+   */
+  repoParentId?: string
+  /**
+   * Groups a git folder left out, as the repository read them, keyed by id:
+   * the ones this group sits below. Left out of the tree, not out of the
+   * inheritance — `all` is rarely ticked, and is where an inventory usually
+   * says who logs in — so resolution reads each in its own place, in
+   * Ansible's order, rather than folded into the group that takes its place.
+   */
+  frozen?: Record<string, SessionGroup>
+  /**
    * Worn by the folder in the tree, and by every host inside it that has no
    * colour of its own — in the tree and on the tabs they open. The nearest
    * colour wins: a host's own, then its folder's, then that folder's parent's.
@@ -433,18 +447,8 @@ export interface PortForwardRule {
 }
 
 export interface SessionProfile extends AuthDefaults, AppearanceDefaults, RdpDefaults {
-  /**
-   * What groups left out of a git folder said about logging in, for a host
-   * those groups held. Read along the chain after the host's own settings and
-   * before its group's, and read as a group is — so a desktop takes its RDP
-   * side and never its `ansible_port`, whatever protocol the host is switched
-   * to locally. See `pruneTree`.
-   */
-  carriedAuth?: AuthDefaults &
-    RdpLoginDefaults & {
-      /** The groups it came from, for "inherited from" to name. */
-      name?: string
-    }
+  /** Groups a git folder left out that this host is in or below; see SessionGroup.frozen. */
+  frozen?: Record<string, SessionGroup>
   /**
    * Every group an inventory puts this host in, and all their parents, in the
    * order Ansible reads them: shallower first, by name within a level. Set

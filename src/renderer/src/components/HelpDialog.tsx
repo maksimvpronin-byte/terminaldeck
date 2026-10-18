@@ -892,6 +892,9 @@ terminaldeck_protocol: rdp`
                 what: 'Include hosts of child groups: a group brings every host beneath it, children found by name as Ansible does'
               },
               {
+                what: 'An unticked group still gives its hosts its settings, each read in its own place'
+              },
+              {
                 what: 'Arrange hosts in group folders, in the same dialog, nests them by group instead of one list'
               },
               {

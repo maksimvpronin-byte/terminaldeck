@@ -121,6 +121,130 @@ describe('pruneTree', () => {
     expect(web?.parentId).toBe(gitGroupId(FOLDER, 'all'))
   })
 
+  it('keeps what a dropped ancestor says about logging in', () => {
+    // group_vars/all.yml saying ansible_user: deploy, with only web ticked
+    const full = tree()
+    full.groups = full.groups.map((g) =>
+      g.name === 'all'
+        ? { ...g, username: 'deploy', port: 2222 }
+        : g.name === 'prod'
+          ? { ...g, port: 22, username: '' }
+          : g
+    )
+    const pruned = pruneTree(FOLDER, full, ['all/prod/web'])
+    const web = pruned.groups[0]
+    expect(web).toMatchObject({ name: 'web', parentId: FOLDER })
+    // Frozen rather than folded in: web says nothing itself, and reads all and prod.
+    expect(web.username).toBeUndefined()
+    expect(resolveAuth(web, web.parentId, pruned.groups)).toMatchObject({
+      username: 'deploy',
+      port: 22
+    })
+  })
+
+  /**
+   * prod ticked with the hosts of its children: web's hosts arrive through prod
+   * and are placed there, but what web said about logging in is theirs still.
+   */
+  /** How a pruned host will connect, as resolution reads it. */
+  function connectsWith(
+    pruned: ReturnType<typeof pruneTree>,
+    name: string,
+    protocol: 'ssh' | 'rdp' = 'ssh'
+  ): { username: string; port: number } {
+    const host = pruned.sessions.find((s) => s.name === name)!
+    const { username, port } = resolveAuth(host, host.groupId ?? null, pruned.groups, { protocol })
+    return { username, port }
+  }
+
+  /**
+   * prod ticked with the hosts of its children: web's hosts arrive through prod
+   * and are placed there, but what web said about logging in is theirs still.
+   */
+  it('keeps what a host’s own dropped group said when it arrives through a parent', () => {
+    const full = tree()
+    full.groups = full.groups.map((g) =>
+      g.name === 'web'
+        ? { ...g, username: 'deploy', port: 2222 }
+        : g.name === 'prod'
+          ? { ...g, username: 'root', port: 22 }
+          : g
+    )
+    const pruned = pruneTree(FOLDER, full, ['all', 'all/prod'], true)
+    expect(pruned.sessions.find((s) => s.name === 'web1')?.groupId).toBe(
+      gitGroupId(FOLDER, 'all/prod')
+    )
+    expect(connectsWith(pruned, 'web1')).toEqual({ username: 'deploy', port: 2222 })
+    // A host that prod names itself takes prod's settings as before.
+    expect(connectsWith(pruned, 'db1')).toEqual({ username: 'root', port: 22 })
+  })
+
+  /**
+   * A group's port is ansible_port — WinRM's 5985 — and a desktop is not dialled
+   * on it, whether the repository says the host is a desktop or it is switched
+   * to one here afterwards.
+   */
+  it('carries a dropped group so that a desktop still reads it as a desktop', () => {
+    const full = tree()
+    full.groups = full.groups.map((g) =>
+      g.name === 'web' ? { ...g, username: 'EXAMPLE\\admin', port: 5985 } : g
+    )
+    const pruned = pruneTree(FOLDER, full, ['all', 'all/prod'], true)
+    expect(connectsWith(pruned, 'web1', 'rdp')).toEqual({ username: 'EXAMPLE\\admin', port: 3389 })
+    expect(connectsWith(pruned, 'web1', 'ssh')).toEqual({ username: 'EXAMPLE\\admin', port: 5985 })
+  })
+
+  /*
+   * Folded into z, which takes all's place, all's root:22 counted as z's own
+   * and beat a's deploy:2222, which Ansible reads after all.
+   */
+  it('reads a dropped all in its own place, below the groups kept', () => {
+    const id = (path: string) => gitGroupId(FOLDER, path)
+    const h = {
+      ...host('h', 'all/z'),
+      groupOrder: [id('all'), id('all/a'), id('all/z')],
+      memberOf: [id('all/a'), id('all/z')]
+    }
+    const full: GitFolderTree = {
+      groupId: FOLDER,
+      groups: [
+        { ...group('all', FOLDER), username: 'root', port: 22 },
+        { ...group('all/a', id('all')), username: 'deploy', port: 2222 },
+        group('all/z', id('all'))
+      ],
+      sessions: [h],
+      memberships: { [h.id]: [id('all/a'), id('all/z')] }
+    }
+    expect(connectsWith(pruneTree(FOLDER, full, ['all/a', 'all/z']), 'h')).toEqual({
+      username: 'deploy',
+      port: 2222
+    })
+  })
+
+  it('lets the host’s own values win over a dropped group’s', () => {
+    const full = tree()
+    full.groups = full.groups.map((g) => (g.name === 'web' ? { ...g, username: 'deploy' } : g))
+    full.sessions = full.sessions.map((h) => (h.name === 'web1' ? { ...h, username: 'me' } : h))
+    const pruned = pruneTree(FOLDER, full, ['all', 'all/prod'], true)
+    expect(connectsWith(pruned, 'web1').username).toBe('me')
+  })
+
+  it('lets a kept group and a kept ancestor say it themselves', () => {
+    const full = tree()
+    full.groups = full.groups.map((g) =>
+      g.name === 'all'
+        ? { ...g, username: 'deploy' }
+        : g.name === 'web'
+          ? { ...g, username: 'www' }
+          : g
+    )
+    const pruned = pruneTree(FOLDER, full, ['all', 'all/prod/web'])
+    expect(pruned.groups.find((g) => g.name === 'web')?.username).toBe('www')
+    // all is still in the tree, so prod's absence folds nothing from it
+    const viaAll = pruneTree(FOLDER, full, ['all', 'all/dev'])
+    expect(viaAll.groups.find((g) => g.name === 'dev')?.username).toBeUndefined()
+  })
+
   it('hangs a group with no chosen ancestor off the folder itself', () => {
     const pruned = pruneTree(FOLDER, tree(), ['all/prod/web'])
     expect(pruned.groups.map((g) => g.parentId)).toEqual([FOLDER])

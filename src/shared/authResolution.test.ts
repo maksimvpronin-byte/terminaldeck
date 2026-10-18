@@ -288,31 +288,32 @@ describe('the RDP half of a group, and default accounts', () => {
   })
 })
 
-/** A level a git folder carried on a host for the groups it left out. */
-describe('settings carried on a host', () => {
+/**
+ * A group a git folder left out, frozen on the host it held: read in its own
+ * place, between the host and the group the host now hangs off.
+ */
+describe('a frozen group on a host', () => {
   const groups = [{ id: 'g', name: 'prod', parentId: null, username: 'root', port: 22 }]
-  const host = {
-    username: '',
-    carriedAuth: { username: 'deploy', port: 5985, name: 'web' }
-  }
+  const web = { id: 'w', name: 'web', parentId: 'g', username: 'deploy', port: 5985 }
+  const host = { username: '', frozen: { w: web }, groupOrder: ['g', 'w'], memberOf: ['g', 'w'] }
 
-  it('sit between the host and its group', () => {
+  it('sits between the host and its group', () => {
     expect(resolveAuth(host, 'g', groups)).toMatchObject({ username: 'deploy', port: 5985 })
     expect(resolveAuth({ ...host, username: 'me' }, 'g', groups).username).toBe('me')
   })
 
-  it('are read as a group is by a desktop, so its port is not taken', () => {
+  it('is read as a group is by a desktop, so its port is not taken', () => {
     expect(resolveAuth(host, 'g', groups, { protocol: 'rdp' })).toMatchObject({
       username: 'deploy',
       port: 3389
     })
   })
 
-  it('are named where a field says what it inherits', () => {
+  it('is named where a field says what it inherits', () => {
     expect(inheritedFrom(host, 'g', groups, 'username')?.name).toBe('web')
   })
 
-  it('are left out by a host that stands on its own settings', () => {
+  it('is left out by a host that stands on its own settings', () => {
     expect(resolveAuth({ ...host, inheritAuth: false }, 'g', groups).username).toBe('')
   })
 })

@@ -77,9 +77,6 @@ export function authChain(
   context: AuthContext = {}
 ): AuthDefaults[] {
   const chain = withAll(levelsOf(own, groupId, groups))
-  // Settings carried for groups a git folder left out sit just above the host.
-  const carried = (own as { carriedAuth?: AuthDefaults & RdpLoginDefaults }).carriedAuth
-  if (carried && !optedOut(own)) chain.splice(1, 0, carried)
   if (context.protocol !== 'rdp') return chain
   return chain.map((level, i) => (i === 0 ? level : groupLevelFor(level, 'rdp')))
 }
@@ -104,29 +101,46 @@ function levelsOf(
 ): AuthDefaults[] {
   if (optedOut(own)) return [own]
   const byId = new Map(groups.map((g) => [g.id, g]))
-  const { groupOrder, memberOf, allId } = own as {
+  type Walked = {
     groupOrder?: string[]
     memberOf?: string[]
-    allId?: string
+    frozen?: Record<string, SessionGroup>
   }
+  const { groupOrder, memberOf } = own as Walked
   /*
-   * Up from each start, in the order found, stopping at a group that opts
-   * out. A top group below another file's all goes there first, and all
-   * leads on to the same parent — for a group being shown as for a host:
-   * a's local settings said nothing of the all it inherits from.
+   * Groups a git folder left out, read in their place. The host and every
+   * group reached bring the ones they sit below; see SessionGroup.frozen.
    */
+  const frozen = new Map(Object.entries((own as Walked).frozen ?? {}))
+  const lookup = (id: string | null | undefined): SessionGroup | undefined =>
+    id ? (byId.get(id) ?? frozen.get(id)) : undefined
+  /*
+   * The next step up. A top group below another file's all goes there first,
+   * and all leads on to the same parent — for a group being shown as for a
+   * host: a's local settings said nothing of the all it inherits from. A group
+   * a git folder hangs lower goes to its parent in the repository.
+   */
+  const above = (level: { allId?: string; repoParentId?: string }, parentId: string | null) =>
+    lookup(level.allId)?.id ?? lookup(level.repoParentId)?.id ?? parentId
+
+  // Up from each start, in the order found, stopping at a group that opts out.
   const reached: SessionGroup[] = []
   const seen = new Set<string>()
-  const firstStep = allId && byId.has(allId) ? allId : groupId
-  for (const start of [firstStep, ...(groupOrder ? (memberOf ?? []) : [])]) {
+  for (const start of [
+    above(own as SessionGroup, groupId),
+    ...(groupOrder ? (memberOf ?? []) : [])
+  ]) {
     let id = start
-    let group = id ? byId.get(id) : undefined
+    let group = lookup(id)
     while (id && group && !seen.has(id)) {
       seen.add(id)
       reached.push(group)
+      for (const [key, level] of Object.entries(group.frozen ?? {})) {
+        if (!frozen.has(key)) frozen.set(key, level)
+      }
       if (optedOut(group)) break
-      id = group.allId && byId.has(group.allId) ? group.allId : group.parentId
-      group = id ? byId.get(id) : undefined
+      id = above(group, group.parentId)
+      group = lookup(id)
     }
   }
   if (!groupOrder) return [own, ...reached]
@@ -138,7 +152,7 @@ function levelsOf(
   const inventory = [...groupOrder]
     .reverse()
     .filter((id) => found.has(id))
-    .map((id) => byId.get(id)!)
+    .map((id) => lookup(id)!)
   return [own, ...inventory, ...reached.filter((g) => !listed.has(g.id))]
 }
 

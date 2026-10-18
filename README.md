@@ -90,6 +90,10 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   `k8s_cluster: children: kube_node:` — a reference to a group whose hosts are listed elsewhere —
   brings those hosts in rather than nothing. The counts in the dialog follow the checkbox, and the
   choice is remembered
+- A group you leave **unticked leaves the tree, not the inheritance**: `group_vars/all.yml` is
+  where an inventory usually says who logs in, and `all` is rarely ticked. What an unticked group
+  says still reaches the hosts below it, read in its own place in Ansible's order, so a group
+  Ansible reads after it still wins
 - A sync brings the folder to what the repository says now, so **a group or host that has left it
   leaves the folder** — the dialog lists what is about to go, and how many of those hosts hold
   local settings, because those and any password saved for them go with them

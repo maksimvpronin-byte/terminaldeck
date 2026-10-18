@@ -182,25 +182,85 @@ export function pruneTree(
     return folderId
   }
 
+  /*
+   * A dropped group leaves the tree, not the inheritance. `group_vars/all.yml`
+   * is where an inventory usually says who logs in, and `all` is rarely
+   * ticked: dropped outright, every host below lost its login. Folded into
+   * the group taking its place, what it said counted as that group's own and
+   * beat groups Ansible reads after it — all's root:22 copied into z beat a's
+   * deploy:2222. So what is left out goes along as it was read, frozen, and
+   * resolution reads each frozen group in its own place.
+   */
+  const byId = new Map(full.groups.map((g) => [g.id, g]))
+  /** The dropped groups above these, up to the kept ones, which bring their own. */
+  const droppedFrom = (starts: (string | null | undefined)[]): Record<string, SessionGroup> => {
+    const out: Record<string, SessionGroup> = {}
+    const stack = [...starts]
+    while (stack.length > 0) {
+      const id = stack.pop()
+      const group = id ? byId.get(id) : undefined
+      if (!id || !group || keptIds.has(id) || out[id]) continue
+      out[id] = group
+      stack.push(group.parentId, group.allId)
+    }
+    return out
+  }
+  const withFrozen = (frozen: Record<string, SessionGroup>) =>
+    Object.keys(frozen).length > 0 ? { frozen } : {}
+
   const groups: SessionGroup[] = full.groups
     .filter((g) => keptIds.has(g.id))
-    .map((g) => ({ ...g, parentId: nearestKept(g.parentId) }))
+    .map((g) => {
+      const parentId = nearestKept(g.parentId)
+      const { frozen: _frozen, repoParentId: _repoParent, ...plain } = g
+      const frozen = droppedFrom([g.parentId, g.allId])
+      return {
+        ...plain,
+        parentId,
+        ...(g.parentId && frozen[g.parentId] ? { repoParentId: g.parentId } : {}),
+        ...withFrozen(frozen)
+      }
+    })
 
   const inherited = includeChildHosts ? hostsWithChildren(full) : undefined
   const sessions: SessionProfile[] = []
   const memberships: Record<string, string[]> = {}
   for (const host of full.sessions) {
-    const claims = (full.memberships[host.id] ?? (host.groupId ? [host.groupId] : [])).filter(
-      (id) => keptIds.has(id)
-    )
+    const named = full.memberships[host.id] ?? (host.groupId ? [host.groupId] : [])
+    const claims = named.filter((id) => keptIds.has(id))
     const through = inherited
       ? groups.filter((g) => !claims.includes(g.id) && inherited.get(g.id)?.has(host.id))
       : []
     if (claims.length === 0 && through.length === 0) continue
     const primary = claims.length > 0 ? claims[claims.length - 1] : through[through.length - 1].id
-    // The groups that still hold the host, which resolution walks up from.
+    // The groups that hold the host in the folder.
     const held = [...claims, ...through.map((g) => g.id)]
-    sessions.push({ ...host, groupId: primary, ...(host.memberOf ? { memberOf: held } : {}) })
+
+    /*
+     * A host moved to another group keeps what its own groups said. One that
+     * arrives through a chosen parent — prod ticked, its child web not —
+     * used to take prod's settings, and web's deploy:2222 became root:22. Its
+     * dropped groups go along frozen, and the walk up starts from them too,
+     * in the order the repository gives them.
+     */
+    const frozen = droppedFrom(named)
+    const chain: string[] = []
+    for (let c = host.groupId ?? null; c && byId.has(c) && !chain.includes(c);) {
+      chain.unshift(c)
+      c = parentOf.get(c) ?? null
+    }
+    const walk =
+      Object.keys(frozen).length > 0
+        ? {
+            frozen,
+            groupOrder: host.groupOrder ?? chain,
+            memberOf: [...new Set([...named, ...held])]
+          }
+        : host.memberOf
+          ? { memberOf: held }
+          : {}
+    const { frozen: _frozen, ...plain } = host
+    sessions.push({ ...plain, groupId: primary, ...walk })
     memberships[host.id] = held
   }
 
