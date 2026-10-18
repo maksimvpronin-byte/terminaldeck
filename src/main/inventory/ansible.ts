@@ -460,7 +460,9 @@ export function parseAnsibleInventories(
       onChain.add(g.id)
       g = g.parentId ? groupById.get(g.parentId) : undefined
     }
-    const spread = inAnsibleOrder.some((g) => !onChain.has(g.id))
+    // Also when several groups of one chain name it: a child opting out of
+    // inheriting must not hide a parent that names the host itself.
+    const spread = ordered.length > 1 || inAnsibleOrder.some((g) => !onChain.has(g.id))
 
     hosts.push({
       id: key,

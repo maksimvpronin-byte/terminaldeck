@@ -972,6 +972,34 @@ all:
     })
   })
 
+  /*
+   * prod and web both name h, one chain. web opting out of inheriting hid
+   * prod too, which names h itself, because one chain kept no memberships.
+   */
+  it('reads a group that names the host itself past a child that opts out', () => {
+    const { groups, hosts } = parseAnsibleInventory(
+      parse(`
+all:
+  children:
+    prod:
+      vars: { ansible_user: deploy, ansible_port: 2222 }
+      hosts: { h: {} }
+      children:
+        web:
+          hosts: { h: {} }
+`),
+      SRC
+    )
+    const local = groups.map((g) =>
+      applyOverride(g, g.name === 'web' ? { nodeId: g.id, inheritAuth: false } : undefined)
+    )
+    const h = hosts[0]
+    expect(resolveAuth(h, h.groupId ?? null, local)).toMatchObject({
+      username: 'deploy',
+      port: 2222
+    })
+  })
+
   it('still lets the host’s own settings win', () => {
     const doc = `
 all:
