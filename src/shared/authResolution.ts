@@ -107,23 +107,27 @@ function levelsOf(
   const { groupOrder, memberOf } = own as { groupOrder?: string[]; memberOf?: string[] }
   if (!groupOrder || optedOut(own)) return chain
   const byId = new Map(groups.map((g) => [g.id, g]))
+  const listed = new Set(groupOrder)
   const reached = new Set<string>()
+  // What lies above the inventory's groups, from whichever walk reaches it:
+  // taken from the host's own chain alone, a group there opting out lost the
+  // source's login and jump host that another group still led up to.
+  const above: SessionGroup[] = []
   for (const start of [groupId, ...(memberOf ?? [])]) {
     let id = start
     let group = id ? byId.get(id) : undefined
     while (id && group && !reached.has(id)) {
       reached.add(id)
+      if (!listed.has(id)) above.push(group)
       if (optedOut(group)) break
       id = group.parentId
       group = id ? byId.get(id) : undefined
     }
   }
-  const listed = new Set(groupOrder)
   const inventory = [...groupOrder]
     .reverse()
     .filter((id) => reached.has(id))
     .map((id) => byId.get(id)!)
-  const above = chain.slice(1).filter((level) => !listed.has((level as SessionGroup).id))
   return [chain[0], ...inventory, ...above]
 }
 
@@ -133,13 +137,15 @@ function levelsOf(
  * A top group of an inventory with no `all` holds what all says beneath its
  * own; merged into the group, all's root counted as z's and beat a's deploy
  * for a host in both. It goes once, after the last group that holds it — the
- * shallowest of the inventory's — unless that group opts out of inheriting.
+ * shallowest of the inventory's — unless every group holding it opts out.
  */
 function withAll(levels: AuthDefaults[]): AuthDefaults[] {
-  const last = levels.findLastIndex((level) => (level as SessionGroup).fromAll !== undefined)
+  const holds = (level: AuthDefaults): boolean => (level as SessionGroup).fromAll !== undefined
+  const last = levels.findLastIndex(holds)
   if (last < 0) return levels
+  // Read while any group holding it still inherits, not only the last one.
+  if (levels.every((level) => !holds(level) || optedOut(level))) return levels
   const top = levels[last] as SessionGroup
-  if (optedOut(top)) return levels
   const all = { ...top.fromAll, id: `${top.id}#all`, name: 'all', parentId: null }
   return [...levels.slice(0, last + 1), all, ...levels.slice(last + 1)]
 }

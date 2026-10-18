@@ -416,6 +416,22 @@ describe('a group written down in more than one place', () => {
     }
   })
 
+  /* a opts out of inheriting; z, which h is in too, still reads all. */
+  it('reads all for a host while one of its groups still inherits', () => {
+    const result = read(
+      repo({
+        'hosts.yml': 'a:\n  hosts:\n    h: {}\nz:\n  hosts:\n    h: {}\n',
+        'group_vars/all.yml': 'ansible_user: root\n'
+      }),
+      ['hosts.yml']
+    )
+    const local = result.groups.map((g) =>
+      applyOverride(g, g.name === 'a' ? { nodeId: g.id, inheritAuth: false } : undefined)
+    )
+    const h = result.hosts.find((x) => x.name === 'h')!
+    expect(resolveAuth(h, h.groupId ?? null, local).username).toBe('root')
+  })
+
   /** One group's own vars and its group_vars, in two spellings: Ansible takes ansible_ssh_*. */
   it('takes the ansible_ssh_* spelling from group_vars over ansible_user inline', () => {
     const result = read(

@@ -934,6 +934,44 @@ all:
     expect(resolveAuth(h, h.groupId ?? null, local)).toMatchObject({ username: '', port: 22 })
   })
 
+  /*
+   * z, the group h hangs off, opts out of inheriting; a does not, and leads
+   * up to the source's own settings — its login and its jump host. Taken from
+   * z's chain alone, they were lost, and h was dialled directly as nobody.
+   */
+  it('reaches what lies above the inventory through any group that inherits', () => {
+    const { groups, hosts } = parseAnsibleInventory(
+      parse(`
+all:
+  children:
+    a: { hosts: { h: {} } }
+    z: { hosts: { h: {} } }
+`),
+      SRC
+    )
+    const source = {
+      id: 'source',
+      name: 'source',
+      parentId: null,
+      username: 'deploy',
+      jumpHostId: 'bastion'
+    }
+    const local = [
+      source,
+      ...groups.map((g) =>
+        applyOverride(
+          g.parentId === null ? { ...g, parentId: source.id } : g,
+          g.name === 'z' ? { nodeId: g.id, inheritAuth: false } : undefined
+        )
+      )
+    ]
+    const h = hosts[0]
+    expect(resolveAuth(h, h.groupId ?? null, local)).toMatchObject({
+      username: 'deploy',
+      jumpHostId: 'bastion'
+    })
+  })
+
   it('still lets the host’s own settings win', () => {
     const doc = `
 all:
