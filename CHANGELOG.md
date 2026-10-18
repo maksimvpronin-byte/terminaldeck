@@ -6,7 +6,44 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
-## 0.28.5
+## 0.29.0
+
+0.28.5 was built and never published; what it held is here, under Security.
+
+### Behaviour changes
+
+An Ansible inventory is now read the way Ansible reads it. Most inventories
+connect exactly as before; one that leaned on the old shortcuts may, after
+this update, connect a host as another user, on another port or to another
+address — the one `ansible-playbook` would use.
+
+- **A host takes its settings from every group it is in.** Its login, key,
+  port, desktop settings and look come from all the groups that name it and
+  all their parents, in Ansible's order — shallower first, by name within a
+  level, the last to state a setting winning — each with its local settings.
+  They used to come from one group, the deepest and alphabetically last: a
+  host in `db`, which sets port 2200, and in `web`, which sets nothing, was
+  dialled on 22 and is now dialled on 2200.
+- **A group is its name, across every place and file it is written.** A
+  group defined in one file and given vars in another, or named as a child
+  with its hosts listed elsewhere, used to lose what the other place said.
+  `group_vars/` and `host_vars/` beside every file count for the whole
+  inventory, and `all` — written as a group or not — is the shallowest of a
+  host's groups.
+- **`group_vars/` and `host_vars/` win over vars written in the inventory**,
+  as in Ansible; it was the other way round.
+- **The `ansible_ssh_*` spellings win** within a group or a host:
+  `ansible_ssh_user` over `ansible_user`, and so on for the port and key file.
+  `ansible_ssh_host` is read as an address.
+- **A host's own vars written in more than one file come from the one read
+  last**, files in the order given. The first file's used to be kept.
+- **A Jinja template or an inline vault value is skipped**, for the login,
+  key file, address and port, and the setting is inherited instead. A
+  template used to become the login as written, and `{% … %}` in a port
+  stopped the whole inventory from being read.
+- **A group left unticked in a git folder still gives its hosts its
+  settings.** `all` is rarely ticked and usually says who logs in; dropped,
+  every host below fell back to this machine's user.
 
 ### Security
 
@@ -39,6 +76,42 @@ the other produces a version nobody can install, which is how 0.1.10 through
   release lose the secret when the app starts, and so do the working copies'
   git settings: such a repository syncs again once the credential helper
   holds it.
+- **The window sends a desktop only the fields each command reads.** The
+  protocol to the desktop client escaped values but not field names, so a
+  name holding a line break ended one command and began another —
+  `cert trust=1` among them, accepting a certificate past the dialog.
+- **No download is written through a link below the folder chosen.** A
+  `logs` folder there that was a link to anywhere had a remote `logs/a.log`
+  written wherever it pointed, reported as a success. Such a file is now
+  refused, and looked for again just before and just after it is opened.
+
+### Fixed
+
+- **A file saved in an editor just before its tab or connection closes is
+  still sent.** Closing in the 300 ms after a save lost it, and quitting
+  deleted the copy. A copy that cannot be sent is now kept and listed when
+  the application quits.
+- **A file changed while a transfer ran is kept.** One saved again during a
+  download or an upload, or changed while the conflict dialog was open, was
+  replaced anyway; it is now left alone and reported as changed.
+- **A replaced file keeps its setuid and setgid bits.** The copy was given
+  its mode before its owner, and the change of owner cleared them.
+- **Links in a transfer go by what they point at.** A link to a folder in a
+  downloaded folder failed the batch; downloading a link to a folder, from
+  the menu or between hosts, now brings the folder. A folder whose name
+  only begins with two dots, such as `..cache`, downloads.
+- **Local settings show the port a host will use.** A host switched there to
+  another protocol drops the inventory's port for the new protocol's
+  default, and the dialog said the old one. The dialog also showed what an
+  override had made of the host as what the inventory said.
+- **A git folder sync says what Apply takes away for the groups ticked
+  now**, including the local settings of groups left out, and keeps Apply
+  shut while it cannot say.
+- **Reconnecting while an edit is being sent keeps its tunnels.** The old
+  forwarded ports waited for the edit, still bound, and the new ones never
+  started.
+- **The last English in a Russian window is translated**, and Local settings
+  name the sign-in method rather than its internal word.
 
 ## 0.28.3
 
