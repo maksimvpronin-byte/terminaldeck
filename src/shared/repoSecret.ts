@@ -27,6 +27,17 @@ interface Userinfo {
 }
 
 function userinfoOf(url: string): Userinfo | undefined {
+  /*
+   * `<transport>::<address>` is git's too — `https::https://…` names the
+   * helper that fetches it — and only `scheme://` was read: the token in
+   * such an address was neither found nor taken out. The address after the
+   * transport is read as any other, and the transport kept in front.
+   */
+  const transport = /^[a-z][a-z0-9+.-]*::/i.exec(url)
+  if (transport) {
+    const inner = userinfoOf(url.slice(transport[0].length))
+    return inner && { ...inner, before: transport[0] + inner.before }
+  }
   const scheme = /^[a-z][a-z0-9+.-]*:\/\//i.exec(url)
   if (!scheme) return undefined
   const start = scheme[0].length

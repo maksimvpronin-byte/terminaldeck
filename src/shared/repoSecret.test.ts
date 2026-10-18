@@ -63,3 +63,16 @@ describe('an address with space around it', () => {
     expect(sourceWithoutRepoSecret({ repoUrl: url }).repoUrl).not.toContain('TOKEN')
   })
 })
+
+/*
+ * Git takes `<transport>::<address>` — `https::https://…` names the helper
+ * that fetches it — and only `scheme://` was read: the token in such an
+ * address was neither found nor taken out, and was kept and exported.
+ */
+describe('an address with a transport in front', () => {
+  it('has its secret found and taken out', () => {
+    const url = 'https::https://alice:TOKEN@git.example/repo.git'
+    expect(repoUrlHasSecret(url)).toBe(true)
+    expect(withoutRepoSecret(url)).toBe('https::https://alice@git.example/repo.git')
+  })
+})
