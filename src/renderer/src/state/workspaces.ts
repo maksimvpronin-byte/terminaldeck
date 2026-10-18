@@ -177,6 +177,20 @@ export function openDesktop(
 }
 
 /**
+ * What makes two panes the same Windows session — host, account, console or
+ * not — or nothing for a target that is not a desktop.
+ */
+export function desktopKey(state: AppState, target: PaneTarget): string | undefined {
+  if (target.kind !== 'session') return undefined
+  if (protocolOf(findHost(state, target.sessionId)?.host) !== 'rdp') return undefined
+  const account =
+    target.credentialId === defaultAccountOf(state, target.sessionId)
+      ? undefined
+      : target.credentialId
+  return JSON.stringify([target.sessionId, account ?? null, target.admin === true])
+}
+
+/**
  * The account a desktop opens with when none is named. Connect as… naming
  * it is the same Windows session, and was taken for another.
  */

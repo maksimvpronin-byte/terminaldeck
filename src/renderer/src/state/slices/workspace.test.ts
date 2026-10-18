@@ -449,6 +449,38 @@ describe('openHost: an open host is brought forward rather than opened again', (
     expect(tabCount()).toBe(1)
   })
 
+  /* Two panes of one desktop in a layout saw only what was open already, not each other. */
+  it('opens one desktop once from a layout that holds it twice', () => {
+    seed()
+    useStore.setState({
+      multiWindows: [
+        {
+          id: 'twice',
+          name: 'Twice',
+          createdAt: 0,
+          updatedAt: 0,
+          root: {
+            type: 'split',
+            dir: 'row',
+            sizes: [50, 50],
+            children: [
+              { type: 'leaf', sessionId: 'dc', title: 'dc' },
+              { type: 'leaf', sessionId: 'dc', title: 'dc' }
+            ]
+          }
+        }
+      ]
+    })
+    useStore.getState().openMultiWindow('twice')
+    const leaves = useStore
+      .getState()
+      .workspaces.flatMap((w) => w.tabs)
+      .flatMap((t) => collectLeaves(t.root))
+    expect(
+      leaves.filter((l) => l.target.kind === 'session' && l.target.sessionId === 'dc')
+    ).toHaveLength(1)
+  })
+
   it('opens console mode beside an ordinary desktop rather than bringing that one forward', () => {
     seed()
     const ordinary = open('dc')

@@ -1,6 +1,6 @@
 import type { StateCreator } from 'zustand'
 import { nanoid } from 'nanoid'
-import { allTabs, openDesktop } from '../workspaces'
+import { allTabs, desktopKey, openDesktop } from '../workspaces'
 import { collectLeaves, removePane, type PaneNode } from '../paneTree'
 import { paneNodeOf, savedPaneOf } from '../multiWindow'
 import type { AppState, MultiWindowsSlice } from './types'
@@ -68,12 +68,22 @@ export const createMultiWindowsSlice: StateCreator<AppState, [], [], MultiWindow
      */
     let root: PaneNode | null = paneNodeOf(saved.root)
     let first: { tabId: string; paneId: string } | undefined
+    // And once within the layout: two panes of one desktop in it saw only
+    // what was open already, not each other.
+    const opening = new Set<string>()
     for (const leaf of collectLeaves(root)) {
+      if (!root) break
       const place = openDesktop(get(), leaf.target)
-      if (!place || !root) continue
-      first ??= place
-      get().wakePane(place.paneId, false)
-      root = removePane(root, leaf.id)
+      if (place) {
+        first ??= place
+        get().wakePane(place.paneId, false)
+        root = removePane(root, leaf.id)
+        continue
+      }
+      const key = desktopKey(get(), leaf.target)
+      if (key === undefined) continue
+      if (opening.has(key)) root = removePane(root, leaf.id)
+      else opening.add(key)
     }
     if (root) get().openPanes(saved.name, root)
     else if (first) {
