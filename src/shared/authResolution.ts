@@ -79,8 +79,11 @@ export function authChain(
 ): AuthDefaults[] {
   const chain = withAll(inheritanceChain(own, groupId, groups, optedOut))
   if (context.protocol !== 'rdp') return chain
-  return withoutPassphrases(
-    chain.map((level, i) => (i === 0 ? level : groupLevelFor(level, 'rdp')))
+  // Passphrases out first, by the methods the levels sign in with: seen as a
+  // desktop sees it, a key group with an RDP login says "password", and the
+  // child's passphrase for that group's key looked like a password beneath it.
+  return withoutPassphrases(chain).map((level, i) =>
+    i === 0 ? level : groupLevelFor(level, 'rdp')
   )
 }
 

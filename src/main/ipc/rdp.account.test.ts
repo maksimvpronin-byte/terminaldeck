@@ -148,3 +148,29 @@ describe('a desktop in a group whose key method comes from above', () => {
     expect(resolveAuth(own, 'c', groups, { protocol: 'rdp' }).secretRef).toBe('win')
   })
 })
+
+/*
+ * The parent signs in with a key and has an RDP login of its own; seen as a
+ * desktop sees it, that parent says "password", and the child's passphrase
+ * for the parent's key looked like a password beneath it.
+ */
+describe('a desktop under a key group that has an RDP login', () => {
+  it('still takes no passphrase from the child group', async () => {
+    const { resolveAuth } = await import('../../shared/authResolution')
+    const groups = [
+      {
+        id: 'p',
+        name: 'parent',
+        parentId: null,
+        authMethod: 'privateKey' as const,
+        privateKeyPath: '/k',
+        rdpUsername: 'alice'
+      },
+      { id: 'c', name: 'child', parentId: 'p', secretRef: 'pp' }
+    ]
+    const host = { ...desktop, groupId: 'c' } as unknown as SessionProfile
+    const auth = resolveAuth(host, 'c', groups, { protocol: 'rdp' })
+    expect(auth.username).toBe('alice')
+    expect(auth.secretRef).toBeUndefined()
+  })
+})
