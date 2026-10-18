@@ -3,6 +3,7 @@ import type { AppState, Workspace, WorkspaceTab } from './slices/types'
 import { findHost } from './hosts'
 import { protocolOf } from '../../../shared/protocols'
 import { authChain, defaultCredential } from '../../../shared/authResolution'
+import { resolveRdp } from '../../../shared/rdpResolution'
 
 /** Shape shared by the store and the persisted layout, so both can be walked. */
 interface HasWorkspaces {
@@ -132,6 +133,8 @@ export function paneToReuse(
     admin?: boolean
     /** The account the host opens with when none is named: naming it is the same session. */
     defaultCredentialId?: string
+    /** The host opens in console mode anyway: asking for it is the same session. */
+    consoleSession?: boolean
   }
 ): { tabId: string; paneId: string } | undefined {
   const named = (id: string | undefined): string | undefined =>
@@ -141,7 +144,8 @@ export function paneToReuse(
     leaf.target.sessionId === sessionId &&
     (!account ||
       (named(leaf.target.credentialId) === named(account.credentialId) &&
-        (leaf.target.admin === true) === (account.admin === true)))
+        (leaf.target.admin === true || account.consoleSession === true) ===
+          (account.admin === true || account.consoleSession === true)))
   const current = activeTab(state)
   const front = current && collectLeaves(current.root).find((l) => l.id === current.activePaneId)
   if (current && front && fits(front)) return { tabId: current.id, paneId: front.id }
@@ -172,8 +176,20 @@ export function openDesktop(
   return paneToReuse(state, target.sessionId, {
     credentialId: target.credentialId,
     admin: target.admin,
-    defaultCredentialId: defaultAccountOf(state, target.sessionId)
+    defaultCredentialId: defaultAccountOf(state, target.sessionId),
+    consoleSession: opensInConsole(state, target.sessionId)
   })
+}
+
+/**
+ * Whether a desktop connects in console mode without being asked: its own or
+ * its groups' setting, which the connection takes with `/admin` as it does a
+ * Connect in console mode. Asked for as well, it is the same session.
+ */
+export function opensInConsole(state: AppState, sessionId: string): boolean {
+  const found = findHost(state, sessionId)
+  if (!found) return false
+  return resolveRdp(found.host, found.host.groupId ?? null, found.groups).consoleSession
 }
 
 /**
@@ -187,7 +203,8 @@ export function desktopKey(state: AppState, target: PaneTarget): string | undefi
     target.credentialId === defaultAccountOf(state, target.sessionId)
       ? undefined
       : target.credentialId
-  return JSON.stringify([target.sessionId, account ?? null, target.admin === true])
+  const admin = target.admin === true || opensInConsole(state, target.sessionId)
+  return JSON.stringify([target.sessionId, account ?? null, admin])
 }
 
 /**

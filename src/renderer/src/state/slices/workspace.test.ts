@@ -481,6 +481,25 @@ describe('openHost: an open host is brought forward rather than opened again', (
     ).toHaveLength(1)
   })
 
+  /* Connect several times… on a desktop: the copies of one request did not see each other. */
+  it('opens one desktop once from a request that names it twice', () => {
+    seed()
+    const twice = { title: 'dc', target: { kind: 'session' as const, sessionId: 'dc' } }
+    useStore.getState().openMany([twice, twice], 'tabs')
+    expect(tabCount()).toBe(1)
+  })
+
+  /* A host saved to connect in console mode opens with /admin either way: one session. */
+  it('takes console mode asked for as the one a host already opens in', () => {
+    seed()
+    useStore.setState((st) => ({
+      sessions: st.sessions.map((h) => (h.id === 'dc' ? { ...h, consoleSession: true } : h))
+    }))
+    const first = open('dc')
+    expect(open('dc', { admin: true })).toBe(first)
+    expect(tabCount()).toBe(1)
+  })
+
   it('opens console mode beside an ordinary desktop rather than bringing that one forward', () => {
     seed()
     const ordinary = open('dc')

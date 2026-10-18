@@ -19,7 +19,9 @@ import {
   mapTab,
   nextOpenPaneOf,
   defaultAccountOf,
+  desktopKey,
   openDesktop,
+  opensInConsole,
   paneToReuse,
   workspaceOfTab
 } from '../workspaces'
@@ -294,7 +296,8 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
             ? {
                 credentialId: target.credentialId,
                 admin: target.admin,
-                defaultCredentialId: defaultAccountOf(s, target.sessionId)
+                defaultCredentialId: defaultAccountOf(s, target.sessionId),
+                consoleSession: opensInConsole(s, target.sessionId)
               }
             : undefined
         )
@@ -351,7 +354,17 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
     // Each asked to connect if it is not: restored after a restart, a pane
     // waits for that, and the collection passing it over left it waiting.
     for (const place of places) if (place) get().wakePane(place.paneId, false)
-    const items = requested.filter((_, i) => !places[i])
+    // And once within the request: Connect several times… on a desktop asked
+    // for copies of one session, and they did not see each other.
+    const asked = new Set<string>()
+    const items = requested.filter((item, i) => {
+      if (places[i]) return false
+      const key = desktopKey(get(), item.target)
+      if (key === undefined) return true
+      if (asked.has(key)) return false
+      asked.add(key)
+      return true
+    })
     if (items.length === 0) {
       const place = places.find(Boolean)
       if (place) {
