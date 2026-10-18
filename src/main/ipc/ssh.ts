@@ -133,6 +133,10 @@ export function registerSshHandlers(): void {
   })
 
   ipcMain.handle(IPC.sshDisconnect, async (_e, connectionId: string) => {
+    // The tunnels go at once: sending an edit needs none of them, and while
+    // they waited with it a reconnect found its ports taken, and its own
+    // tunnels never started once the old ones closed.
+    portForwardManager.stopAllForConnection(connectionId)
     // A file saved in an editor a moment ago is sent before the link goes.
     await remoteEdit.flush(EDIT_FLUSH_LIMIT_MS, connectionId)
     // The release above runs from inside this, for both ways out.
