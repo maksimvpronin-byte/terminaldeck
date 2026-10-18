@@ -13,6 +13,9 @@ import {
 } from './socks5'
 import type { PortForwardRule } from '../../shared/types'
 
+/** How long a server is given to say it listens for a remote forward. */
+const REMOTE_BIND_TIMEOUT_MS = 15_000
+
 interface ActiveForward {
   rule: PortForwardRule
   /**
@@ -280,10 +283,30 @@ class PortForwardManager {
      * that is the port connections then arrive on and the one to stop: the
      * rule's 0 matched nothing, and stopping asked the server to close port 0.
      */
+    /*
+     * And within a time. A server that takes the request and never answers
+     * left the tunnel opening for ever, and the pane that started it waiting
+     * with it; an answer that comes after giving up lets the port go again.
+     */
     const port = await new Promise<number>((resolve, reject) => {
-      client.forwardIn(rule.srcHost, rule.srcPort, (err, bound) =>
-        err ? reject(err) : resolve(bound || rule.srcPort)
-      )
+      let gaveUp = false
+      const timer = setTimeout(() => {
+        gaveUp = true
+        reject(
+          new Error(
+            `The server did not answer the request to listen on ${rule.srcHost}:${rule.srcPort}`
+          )
+        )
+      }, REMOTE_BIND_TIMEOUT_MS)
+      client.forwardIn(rule.srcHost, rule.srcPort, (err, bound) => {
+        clearTimeout(timer)
+        if (gaveUp) {
+          if (!err) client.unforwardIn(rule.srcHost, bound || rule.srcPort, () => undefined)
+          return
+        }
+        if (err) reject(err)
+        else resolve(bound || rule.srcPort)
+      })
     })
     const route: RemoteRoute = { entry, bindHost: rule.srcHost, port }
     this.addRoute(client, route)

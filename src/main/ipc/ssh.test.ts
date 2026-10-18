@@ -8,7 +8,11 @@ import { describe, it, expect, vi } from 'vitest'
 
 const handlers = new Map<string, (...args: unknown[]) => unknown>()
 vi.mock('electron', () => ({
-  BrowserWindow: { fromWebContents: () => null, getAllWindows: () => [] },
+  BrowserWindow: {
+    fromWebContents: () => null,
+    getAllWindows: () => [{}],
+    getFocusedWindow: () => ({})
+  },
   ipcMain: {
     handle: (channel: string, fn: (...args: unknown[]) => unknown): void => {
       handlers.set(channel, fn)
@@ -20,8 +24,9 @@ vi.mock('electron', () => ({
 let finishFlush: () => void = () => undefined
 const stopForwards = vi.fn()
 const disconnect = vi.fn()
+const startForward = vi.fn()
 vi.mock('../ssh/PortForwardManager', () => ({
-  portForwardManager: { stopAllForConnection: stopForwards }
+  portForwardManager: { stopAllForConnection: stopForwards, start: startForward }
 }))
 vi.mock('../ssh/RemoteEdit', () => ({
   remoteEdit: {
@@ -31,10 +36,14 @@ vi.mock('../ssh/RemoteEdit', () => ({
 }))
 vi.mock('../ssh/RemoteMonitor', () => ({ remoteMonitor: { stop: vi.fn() } }))
 vi.mock('../ssh/SFTPManager', () => ({ sftpManager: { releaseConnection: vi.fn() } }))
-vi.mock('../ssh/SSHManager', () => ({ sshManager: { disconnect, onClosed: vi.fn() } }))
+const connectProfile = vi.fn()
+vi.mock('../ssh/SSHManager', () => ({
+  sshManager: { disconnect, onClosed: vi.fn(), connectProfile, reportError: vi.fn() }
+}))
 vi.mock('../ssh/sshConfig', () => ({ readSshConfigHosts: vi.fn() }))
 vi.mock('../store/CredentialStore', () => ({ credentialStore: {} }))
-vi.mock('../store/hosts', () => ({ findProfile: vi.fn() }))
+const findProfile = vi.fn()
+vi.mock('../store/hosts', () => ({ findProfile }))
 
 const { registerSshHandlers } = await import('./ssh')
 const { IPC } = await import('../../shared/ipc-channels')
@@ -51,5 +60,23 @@ describe('closing a session with an edit still on its way', () => {
     finishFlush()
     await closing
     expect(disconnect).toHaveBeenCalledWith('c1')
+  })
+})
+
+/*
+ * A remote forward the server never answers held the connection back from
+ * the pane, which stayed connecting for ever: tunnels come up beside the
+ * shell, not in front of it.
+ */
+describe('connecting a host with tunnels', () => {
+  it('hands the pane its connection without waiting for the tunnels', async () => {
+    findProfile.mockReturnValue({ id: 's1', portForwards: [{ id: 'r1', type: 'remote' }] })
+    connectProfile.mockResolvedValue('c9')
+    startForward.mockReturnValue(new Promise(() => undefined))
+
+    await expect(handlers.get(IPC.sshConnect)!({}, 's1', 80, 24)).resolves.toEqual({
+      connectionId: 'c9'
+    })
+    expect(startForward).toHaveBeenCalledWith('c9', { id: 'r1', type: 'remote' })
   })
 })

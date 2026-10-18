@@ -70,19 +70,25 @@ export function registerSshHandlers(): void {
         credential,
         typeof attemptId === 'string' ? attemptId : undefined
       )
-      // Bring the profile's tunnels up automatically; a failure here (busy port,
-      // server refusing a remote bind) must not take the shell down with it.
-      for (const rule of profile.portForwards) {
-        try {
-          await portForwardManager.start(connectionId, rule)
-        } catch (err) {
-          sshManager.reportError(
-            win,
-            connectionId,
-            `tunnel ${describeRule(rule)} failed: ${(err as Error).message}`
-          )
+      /*
+       * Bring the profile's tunnels up automatically; a failure here (busy
+       * port, server refusing a remote bind) must not take the shell down with
+       * it. Beside the shell, not in front of it: awaited here, a remote
+       * forward the server never answered kept the pane connecting for ever.
+       */
+      void (async () => {
+        for (const rule of profile.portForwards) {
+          try {
+            await portForwardManager.start(connectionId, rule)
+          } catch (err) {
+            sshManager.reportError(
+              win,
+              connectionId,
+              `tunnel ${describeRule(rule)} failed: ${(err as Error).message}`
+            )
+          }
         }
-      }
+      })()
       return { connectionId }
     }
   )

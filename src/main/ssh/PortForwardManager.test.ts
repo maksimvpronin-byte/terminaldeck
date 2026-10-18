@@ -26,12 +26,16 @@ vi.mock('net', () => {
 /** What the server was asked to listen on, and what it was asked to stop. */
 const forwardedIn: Array<[string, number]> = []
 const unforwarded: Array<[string, number]> = []
+/** A server that keeps the request to listen and answers only when told to. */
+let silent = false
+let answerLater: () => void = () => undefined
 /** The port the server says it chose when asked for 0. */
 const CHOSEN_PORT = 40001
 const client = Object.assign(new EventEmitter(), {
   forwardIn: (host: string, port: number, cb: (err: Error | null, bound: number) => void) => {
     forwardedIn.push([host, port])
-    cb(null, port === 0 ? CHOSEN_PORT : port)
+    if (silent) answerLater = () => cb(null, port)
+    else cb(null, port === 0 ? CHOSEN_PORT : port)
   },
   unforwardIn: (host: string, port: number, cb: () => void) => {
     unforwarded.push([host, port])
@@ -198,5 +202,30 @@ describe('the two ends of one tunnelled connection', () => {
     expect(channel.written).toBe('last words')
     expect(channel.writableEnded).toBe(true)
     expect(channel.destroyed).toBe(false)
+  })
+})
+
+/*
+ * A server that takes the request to listen and never answers left the
+ * tunnel opening for ever, and the pane that started it waiting with it.
+ */
+describe('a remote forward the server never answers', () => {
+  it('gives up after a while, and lets the port go if the answer comes late', async () => {
+    vi.useFakeTimers()
+    silent = true
+    try {
+      const remote = { ...rule, id: 'quiet', type: 'remote' as const, srcPort: 18080 }
+      const opening = portForwardManager.start('quiet-conn', remote)
+      const failed = expect(opening).rejects.toThrow(/did not answer/)
+      await vi.advanceTimersByTimeAsync(20_000)
+      await failed
+      expect(portForwardManager.listActive('quiet-conn')).toEqual([])
+
+      answerLater()
+      expect(unforwarded).toContainEqual(['127.0.0.1', 18080])
+    } finally {
+      silent = false
+      vi.useRealTimers()
+    }
   })
 })
