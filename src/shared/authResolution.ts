@@ -45,16 +45,8 @@ export interface AuthContext {
 function asRdpLevel(group: AuthDefaults & RdpLoginDefaults): AuthDefaults {
   const ownLogin =
     isSet(group.rdpUsername) || isSet(group.rdpSecretRef) || isSet(group.rdpCredentialId)
-  /*
-   * With no RDP login of its own, a group gives a desktop its SSH one — but
-   * a group that signs in with a key or the agent keeps the key's passphrase
-   * where a password would be, and that went to the far end as the Windows
-   * password. Its login comes over; that secret does not.
-   */
-  const keyed = group.authMethod === 'privateKey' || group.authMethod === 'agent'
   return {
     ...group,
-    ...(keyed ? { secretRef: undefined } : {}),
     port: group.rdpPort,
     ...(ownLogin
       ? {
@@ -87,7 +79,31 @@ export function authChain(
 ): AuthDefaults[] {
   const chain = withAll(inheritanceChain(own, groupId, groups, optedOut))
   if (context.protocol !== 'rdp') return chain
-  return chain.map((level, i) => (i === 0 ? level : groupLevelFor(level, 'rdp')))
+  return withoutPassphrases(
+    chain.map((level, i) => (i === 0 ? level : groupLevelFor(level, 'rdp')))
+  )
+}
+
+/**
+ * A desktop's chain with the secrets kept for keys taken out.
+ *
+ * With no RDP login of its own, a group gives a desktop its SSH one, and a
+ * group that signs in with a key or the agent keeps the key's passphrase
+ * where a password would be: it went to the far end as the Windows password.
+ * The way in can be a parent's and the secret a child's, so each group is
+ * weighed by the method it signs in with, its own or the one it inherits
+ * from further along. The desktop's own secret is its own password.
+ */
+function withoutPassphrases(chain: AuthDefaults[]): AuthDefaults[] {
+  let method: AuthDefaults['authMethod']
+  const out = [...chain]
+  for (let i = out.length - 1; i > 0; i--) {
+    method = out[i].authMethod ?? method
+    if ((method === 'privateKey' || method === 'agent') && isSet(out[i].secretRef)) {
+      out[i] = { ...out[i], secretRef: undefined }
+    }
+  }
+  return out
 }
 
 /**

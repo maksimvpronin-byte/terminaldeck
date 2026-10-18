@@ -121,3 +121,30 @@ describe('a desktop in a group that signs in with a key', () => {
     expect(auth.secretRef).toBeUndefined()
   })
 })
+
+/*
+ * The way in can come from a parent and the secret from a child: the child
+ * group keeps the passphrase of the key its parent signs in with, and a
+ * check of the child's own method saw no key.
+ */
+describe('a desktop in a group whose key method comes from above', () => {
+  it('takes no passphrase a group keeps for an inherited key', async () => {
+    const { resolveAuth } = await import('../../shared/authResolution')
+    const groups = [
+      {
+        id: 'p',
+        name: 'parent',
+        parentId: null,
+        username: 'deploy',
+        authMethod: 'privateKey' as const,
+        privateKeyPath: '/k'
+      },
+      { id: 'c', name: 'child', parentId: 'p', secretRef: 'pp' }
+    ]
+    const host = { ...desktop, groupId: 'c' } as unknown as SessionProfile
+    expect(resolveAuth(host, 'c', groups, { protocol: 'rdp' }).secretRef).toBeUndefined()
+    // A desktop's own password is its own, whatever its groups sign in with.
+    const own = { ...desktop, groupId: 'c', secretRef: 'win' } as unknown as SessionProfile
+    expect(resolveAuth(own, 'c', groups, { protocol: 'rdp' }).secretRef).toBe('win')
+  })
+})
