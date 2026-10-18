@@ -1,5 +1,7 @@
 import { createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from 'crypto'
 import { readFileSync } from 'fs'
+import { homedir } from 'os'
+import { join } from 'path'
 import { argon2dAsync, argon2iAsync, argon2idAsync } from '@noble/hashes/argon2.js'
 
 /**
@@ -48,6 +50,11 @@ function parseFile(text: string): PpkFile {
     if (name.endsWith('-Lines')) {
       // "Public-Lines: 6" is followed by six lines of base64 making up "Public".
       const count = Number(value)
+      // The file's own word, and a damaged file's: -1 stepped back onto this
+      // line for ever, synchronously, and stopped the whole main process.
+      if (!Number.isInteger(count) || count < 0 || count > lines.length - i - 1) {
+        throw new PpkError(`PuTTY key file states an impossible line count for ${name}`)
+      }
       fields.set(name.slice(0, -'-Lines'.length), lines.slice(i + 1, i + 1 + count).join(''))
       i += count
     } else {
@@ -257,6 +264,15 @@ export async function ppkToOpenSsh(text: string, passphrase?: string): Promise<s
 }
 
 /**
+ * `~/.ssh/id_ed25519` as the home folder's, the way Ansible and ssh open it.
+ * An inventory states key files so, and the path was read as a relative one.
+ */
+function expandHome(path: string): string {
+  if (path === '~') return homedir()
+  return path.startsWith('~/') || path.startsWith('~\\') ? join(homedir(), path.slice(2)) : path
+}
+
+/**
  * A key file as ssh2 wants it: a PuTTY one converted, anything else as it is.
  * The passphrase goes along only when ssh2 still has something to decrypt.
  */
@@ -264,7 +280,7 @@ export async function readPrivateKey(
   path: string,
   passphrase: string | undefined
 ): Promise<{ privateKey: Buffer | string; passphrase?: string }> {
-  const data = readFileSync(path)
+  const data = readFileSync(expandHome(path))
   if (!isPpk(data)) return { privateKey: data, passphrase }
   return { privateKey: await ppkToOpenSsh(data.toString('utf8'), passphrase) }
 }

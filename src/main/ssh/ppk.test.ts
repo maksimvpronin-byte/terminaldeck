@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { utils, type ParsedKey } from 'ssh2'
-import { isPpk, ppkToOpenSsh } from './ppk'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs'
+import { tmpdir } from 'os'
+import { join } from 'path'
+import { isPpk, ppkToOpenSsh, readPrivateKey } from './ppk'
 import { FIXTURES } from './ppk.fixtures'
 
 function publicBlobOf(ppk: string): Buffer {
@@ -63,5 +66,40 @@ describe('PuTTY key files', () => {
 
   it('refuses the SSH-1 era format by name', async () => {
     await expect(ppkToOpenSsh(plain.text.replace(/File-\d/, 'File-1'))).rejects.toThrow('version 1')
+  })
+})
+
+/**
+ * A line count is the file's to state, and a damaged one is a damaged file.
+ * -1 stepped the parser back onto the same line for ever, synchronously, in
+ * the main process: every window and connection stopped with it.
+ */
+describe('a damaged PuTTY key file', () => {
+  it('is refused when it states a line count it cannot have', async () => {
+    for (const count of ['-1', '1.5', '999']) {
+      const text = `PuTTY-User-Key-File-3: ssh-ed25519\nPublic-Lines: ${count}\nAAAA\n`
+      await expect(ppkToOpenSsh(text, undefined)).rejects.toThrow(/line count/i)
+    }
+  })
+})
+
+/**
+ * An inventory states its key files as Ansible takes them, and Ansible opens
+ * `~/.ssh/id_ed25519` in the home folder. It was read as a relative path.
+ */
+describe('a key file under the home folder', () => {
+  it('is read through a leading ~', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'td-home-'))
+    const before = process.env.HOME
+    process.env.HOME = home
+    try {
+      mkdirSync(join(home, '.ssh'))
+      writeFileSync(join(home, '.ssh', 'id_test'), 'not a ppk')
+      const { privateKey } = await readPrivateKey('~/.ssh/id_test', undefined)
+      expect(privateKey.toString()).toBe('not a ppk')
+    } finally {
+      process.env.HOME = before
+      rmSync(home, { recursive: true, force: true })
+    }
   })
 })
