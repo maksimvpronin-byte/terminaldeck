@@ -357,10 +357,13 @@ export function parseAnsibleInventories(
    * both. See SessionGroup.fromAll.
    */
   const allAuth = varsToAuth(varsOf('all'))
+  // A file that states all gives it a node, and a top group of another file
+  // reads that node itself — local settings and all — rather than a copy.
+  const allNode = nodes.get(groupId(sourceId, 'all', prefix))
   const groups: SessionGroup[] = [...nodes.values()].map((node) => ({
     ...node,
     ...varsToAuth(varsOf(node.name)),
-    ...(underAll(node) && Object.keys(allAuth).length > 0 ? { fromAll: allAuth } : {})
+    ...(!allNode && underAll(node) && Object.keys(allAuth).length > 0 ? { fromAll: allAuth } : {})
   }))
   const groupById = new Map(groups.map((g) => [g.id, g]))
   /**
@@ -426,6 +429,10 @@ export function parseAnsibleInventories(
         group = group.parentId ? groupById.get(group.parentId) : undefined
       }
     }
+    // Every group is below all: with all a node of its own, a host reached
+    // only through another file's top group is below it too.
+    const belowAll = allNode && !ancestors.has(allNode.id) && [...ancestors.values()].some(underAll)
+    if (belowAll) ancestors.set(allNode.id, groupById.get(allNode.id)!)
     const inAnsibleOrder = [...ancestors.values()].sort(
       (a, b) =>
         depthOf(a.id) - depthOf(b.id) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id)
@@ -464,7 +471,12 @@ export function parseAnsibleInventories(
       createdAt: now,
       updatedAt: now,
       ...portForProtocol(varsToAuth(hostVars), protocol, { ...fromGroups, ...hostVars }),
-      ...(spread ? { groupOrder: inAnsibleOrder.map((g) => g.id), memberOf: ordered } : {})
+      ...(spread
+        ? {
+            groupOrder: inAnsibleOrder.map((g) => g.id),
+            memberOf: belowAll ? [...ordered, allNode.id] : ordered
+          }
+        : {})
     })
     memberships[key] = ordered
   }

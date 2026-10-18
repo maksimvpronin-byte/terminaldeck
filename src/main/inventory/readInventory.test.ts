@@ -5,6 +5,7 @@ import { dirname, join } from 'path'
 import { readInventory } from './readInventory'
 import { reallyInsideCheckout } from './checkout'
 import { resolveAuth } from '../../shared/authResolution'
+import { applyOverride } from '../../shared/overrides'
 
 describe('inventory worker parsing', () => {
   it('keeps first host values, unions membership, reads vars and attaches roots', () => {
@@ -390,6 +391,29 @@ describe('a group written down in more than one place', () => {
     const h = result.hosts.find((x) => x.name === 'h')!
     expect(result.groups.find((g) => g.id === h.groupId)?.name).toBe('a')
     expect(resolveAuth(h, h.groupId ?? null, result.groups).username).toBe('deploy')
+  })
+
+  /*
+   * Another file's all holds a top group too. A copy of what it said was
+   * laid beneath the group and read before all itself, so local settings
+   * given to all lost to the copy; and a host only in a never saw them.
+   */
+  it('reads another file’s all as itself beneath a top group', () => {
+    const result = read(
+      repo({
+        '1.yml': 'all:\n  vars:\n    ansible_user: root\n  hosts:\n    h: {}\n',
+        '2.yml': 'a:\n  hosts:\n    h: {}\n    k: {}\n'
+      }),
+      ['1.yml', '2.yml']
+    )
+    const all = result.groups.find((g) => g.name === 'all')!
+    const local = result.groups.map((g) =>
+      applyOverride(g, g.id === all.id ? { nodeId: all.id, username: 'deploy' } : undefined)
+    )
+    for (const name of ['h', 'k']) {
+      const host = result.hosts.find((x) => x.name === name)!
+      expect(resolveAuth(host, host.groupId ?? null, local).username).toBe('deploy')
+    }
   })
 
   /** One group's own vars and its group_vars, in two spellings: Ansible takes ansible_ssh_*. */
