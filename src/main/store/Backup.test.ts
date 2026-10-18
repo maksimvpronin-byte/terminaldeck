@@ -407,6 +407,67 @@ describe('backup import', () => {
     expect(sessions.find((s) => s.id === 'session-untouched')?.name).toBe('not in the export')
   })
 
+  /*
+   * A group untied from its repository by the import kept, in the git
+   * folders' file, the hosts it mirrored and their local settings: they
+   * stayed in the palette, and deleting the group, no longer a git folder,
+   * cleaned up nothing.
+   */
+  it('forgets what a folder untied by the import mirrored', async () => {
+    const { gitFolderStore } = await import('../gitFolders/GitFolderStore')
+    const { gitHostId } = await import('../../shared/gitFolders')
+    const previous = gitFolderStore.snapshot()
+    try {
+      populate()
+      saveTo = FILE
+      await exportToFile(win, false)
+      const file = JSON.parse(readFileSync(FILE, 'utf8'))
+      file.groups.push({ id: 'mirror', name: 'Was from git', parentId: null })
+      writeFileSync(FILE, JSON.stringify(file), 'utf8')
+
+      sessionStore.saveGroup({
+        id: 'mirror',
+        name: 'From git',
+        parentId: null,
+        git: { repoUrl: 'https://git.example/inv.git', paths: [], includedGroups: [] }
+      })
+      const hostId = gitHostId('mirror', 'web1')
+      gitFolderStore.restore({
+        ...previous,
+        trees: [
+          {
+            groupId: 'mirror',
+            groups: [],
+            sessions: [
+              {
+                id: hostId,
+                name: 'web1',
+                host: 'web1',
+                groupId: null,
+                tags: [],
+                logToFile: false,
+                portForwards: [],
+                createdAt: 0,
+                updatedAt: 0
+              }
+            ],
+            memberships: {}
+          }
+        ],
+        overrides: [{ nodeId: hostId, username: 'local' }]
+      })
+
+      openFrom = FILE
+      await importFromFile(win)
+
+      expect(sessionStore.getAll().groups.find((g) => g.id === 'mirror')?.git).toBeUndefined()
+      expect(gitFolderStore.trees().some((t) => t.groupId === 'mirror')).toBe(false)
+      expect(gitFolderStore.overrides().some((o) => o.nodeId === hostId)).toBe(false)
+    } finally {
+      gitFolderStore.restore(previous)
+    }
+  })
+
   /** A backup written before exports left tokens out still holds them. */
   it('brings no token back in from an older backup', async () => {
     populate()

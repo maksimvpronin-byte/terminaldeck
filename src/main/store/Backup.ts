@@ -24,6 +24,7 @@ import type {
   SavedPane
 } from '../../shared/types'
 import { groupWithoutRepoSecret, sourceWithoutRepoSecret } from '../../shared/repoSecret'
+import { forgetSecret, forgetSecretAt } from '../ipc/secrets'
 
 interface BackupFile {
   format: 'terminaldeck-backup'
@@ -616,6 +617,21 @@ export async function importFromFile(
     credentials: credentialStore.snapshot()
   } satisfies ImportJournal)
 
+  /*
+   * A folder the import unties from its repository leaves what it mirrored
+   * behind in the git folders' file — hosts in the palette, their local
+   * settings — and deleting it afterwards, no longer a git folder, cleaned up
+   * nothing. Editing the folder forgets them; the import does the same.
+   */
+  const linked = new Map(
+    sessionStore
+      .snapshot()
+      .groups.filter((g) => g.git)
+      .map((g) => [g.id, g.git!] as const)
+  )
+  const untied = groups.filter((g) => linked.has(g.id) && !g.git).map((g) => g.id)
+  const forgotten: InventoryOverride[] = []
+
   const undo: (() => void)[] = []
   const step = <T>(snapshot: () => T, restore: (previous: T) => void, write: () => void): void => {
     const previous = snapshot()
@@ -659,7 +675,10 @@ export async function importFromFile(
     step(
       () => gitFolderStore.snapshot(),
       (previous) => gitFolderStore.restore(previous),
-      () => gitFolderStore.saveOverrides(gitFolderOverrides)
+      () => {
+        gitFolderStore.saveOverrides(gitFolderOverrides)
+        for (const id of untied) gitFolderStore.forget(id, (o) => forgotten.push(o), linked.get(id))
+      }
     )
     step(
       () => credentialStore.snapshot(),
@@ -685,6 +704,11 @@ export async function importFromFile(
     )
   }
   rmSync(journalPath(), { force: true })
+  // Their passwords only once the import stands: a vault entry cannot be put back.
+  for (const override of forgotten) {
+    forgetSecret(override)
+    forgetSecretAt(override, 'gatewaySecretRef')
+  }
 
   return {
     groups: groups.length,
