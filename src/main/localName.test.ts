@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { dirname, resolve } from 'path'
-import { localChild, safeLocalName } from './localName'
+import { localChild, safeLocalName, remoteChild } from './localName'
 
 /**
  * Names chosen by the far end, becoming places on this disk. Each case here is
@@ -66,5 +66,25 @@ describe('safeLocalName', () => {
     for (const name of ['', '.', '..', '...']) {
       expect(safeLocalName(name, 'win32'), name).toBe('file')
     }
+  })
+})
+
+/*
+ * A Windows server's OpenSSH takes a backslash for a separator, so
+ * `x\..\..\escape.txt` from a Linux source, joined to a folder chosen there,
+ * stepped out of it. A folder written the way Windows hosts write theirs is
+ * held to Windows' rules.
+ */
+describe('remoteChild', () => {
+  it('holds a Windows folder to Windows rules', () => {
+    expect(() => remoteChild('/C:/Users/u/chosen', 'x\\..\\..\\escape.txt')).toThrow(/unsafe/)
+    expect(() => remoteChild('/C:/Users/u/chosen', 'a:b')).toThrow(/unsafe/)
+    expect(remoteChild('/C:/Users/u/chosen', 'report.txt')).toBe('/C:/Users/u/chosen/report.txt')
+  })
+
+  it('keeps a backslash an ordinary character on a POSIX host', () => {
+    expect(remoteChild('/home/u', 'a\\b')).toBe('/home/u/a\\b')
+    expect(() => remoteChild('/home/u', '..')).toThrow(/unsafe/)
+    expect(() => remoteChild('/home/u', 'a/b')).toThrow(/unsafe/)
   })
 })

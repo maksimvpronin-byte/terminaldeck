@@ -1386,6 +1386,23 @@ describe('deleting a folder', () => {
   })
 })
 
+/* A backslash is a character in a Mac file name and a separator to a Windows server. */
+describe('uploading to a Windows host', () => {
+  it.skipIf(process.platform === 'win32')(
+    'refuses a local name that would leave the folder chosen there',
+    async () => {
+      const folder = join(localDir, 'up')
+      mkdirSync(folder, { recursive: true })
+      writeFileSync(join(folder, 'x\\..\\..\\escape.txt'), 'data')
+      attach('conn', stubSession([], { '/C:/Users/u/chosen': { dir: true } }))
+
+      await expect(sftpManager.planUpload('conn', folder, '/C:/Users/u/chosen')).rejects.toThrow(
+        /unsafe/i
+      )
+    }
+  )
+})
+
 describe('downloading a folder', () => {
   function withListing(
     session: SFTPWrapper,

@@ -87,10 +87,14 @@ export function safeLocalName(
  * and the names are the first server's to choose: `../../outside.txt`, joined
  * as written and normalised, was written outside the folder chosen. Only a
  * single plain segment is taken; the far side is a POSIX path, whatever this
- * machine is.
+ * machine is, unless it is a Windows one.
  */
 export function remoteChild(parent: string, name: string): string {
-  if (unsafeSegment(name, 'linux')) {
+  // A folder as a Windows host writes it — /C:/Users/… — is under Windows'
+  // rules: its OpenSSH takes a backslash for a separator, and
+  // `x\..\..\escape.txt` stepped out of the folder chosen there.
+  const platform = /^\/?[A-Za-z]:([/\\]|$)/.test(parent) ? 'win32' : 'linux'
+  if (unsafeSegment(name, platform)) {
     throw new Error(`Refusing unsafe remote file name: ${JSON.stringify(name)}`)
   }
   return `${parent.replace(/\/+$/, '')}/${name}`

@@ -1100,7 +1100,10 @@ class SFTPManager {
   /** Every file an upload of `localPath` into `remoteParent` would write. */
   private async localTree(localPath: string, remoteParent: string): Promise<TransferItem[]> {
     const info = await stat(localPath)
-    const dest = `${remoteParent.replace(/\/$/, '')}/${basename(localPath)}`
+    // A name of this machine's, to a host that may read it otherwise: a
+    // backslash is a character in a Mac file name and a separator to a
+    // Windows server. See remoteChild.
+    const dest = remoteChild(remoteParent, basename(localPath))
     if (!info.isDirectory()) {
       return [
         {
@@ -1119,7 +1122,7 @@ class SFTPManager {
         const childInfo = await stat(child)
         out.push({
           sourcePath: child,
-          destPath: `${dest}/${entry.name}`,
+          destPath: remoteChild(dest, entry.name),
           sourceSize: childInfo.size,
           sourceMtime: childInfo.mtimeMs
         })
