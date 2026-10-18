@@ -1051,6 +1051,24 @@ all:
     expect(inheritedAppearance(h, h.groupId ?? null, local, globals).fontSize).toBe(20)
   })
 
+  /*
+   * Ansible sorts groups by name as Python compares strings, code point by
+   * code point: Z before a. localeCompare put a first, and Z's login won.
+   */
+  it('orders groups by name as Ansible does, capitals first', () => {
+    const { groups, hosts } = parseAnsibleInventory(
+      parse(`
+all:
+  children:
+    a: { vars: { ansible_user: lower }, hosts: { h: {} } }
+    Z: { vars: { ansible_user: upper }, hosts: { h: {} } }
+`),
+      SRC
+    )
+    const h = hosts[0]
+    expect(resolveAuth(h, h.groupId ?? null, groups).username).toBe('lower')
+  })
+
   it('still lets the host’s own settings win', () => {
     const doc = `
 all:

@@ -88,6 +88,15 @@ function spelled(vars: AnsibleVars, plain: string, ssh: string): unknown {
   return vars[ssh] !== undefined && vars[ssh] !== null ? vars[ssh] : vars[plain]
 }
 
+/**
+ * Names compared as Ansible compares them — as Python compares strings, code
+ * point by code point, so Z comes before a. localeCompare put a first, and in
+ * a tie of depth the wrong group's settings won.
+ */
+function byCodePoint(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0
+}
+
 /** Maps the Ansible connection vars we understand onto our own auth fields. */
 export function varsToAuth(vars: AnsibleVars): AuthDefaults {
   const username = stated(spelled(vars, 'ansible_user', 'ansible_ssh_user'))
@@ -400,8 +409,8 @@ export function parseAnsibleInventories(
     const ordered = [...claimed].sort(
       (a, b) =>
         depthOf(a) - depthOf(b) ||
-        groupById.get(a)!.name.localeCompare(groupById.get(b)!.name) ||
-        a.localeCompare(b)
+        byCodePoint(groupById.get(a)!.name, groupById.get(b)!.name) ||
+        byCodePoint(a, b)
     )
     if (ordered.length === 0) continue
     const primary = ordered[ordered.length - 1]
@@ -437,7 +446,7 @@ export function parseAnsibleInventories(
     }
     const inAnsibleOrder = [...ancestors.values()].sort(
       (a, b) =>
-        depthOf(a.id) - depthOf(b.id) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id)
+        depthOf(a.id) - depthOf(b.id) || byCodePoint(a.name, b.name) || byCodePoint(a.id, b.id)
     )
     // Each group by what it says itself, all first: laid under every top group,
     // all's vars came back with an empty z, read after a, and beat a's own.
