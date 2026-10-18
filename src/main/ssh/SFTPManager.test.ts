@@ -116,6 +116,8 @@ function stubSession(
     duringPut?: () => void
     /** Runs as a file is opened, the way somebody sharing the folder could. */
     afterOpen?: (path: string) => void
+    /** Runs once a file is moved into place. */
+    afterRename?: (to: string) => void
     /** A server that will not change a file's permissions. */
     failChmod?: boolean
     /** A server that says yes to a change of permissions and keeps none (Windows). */
@@ -244,11 +246,13 @@ function stubSession(
       // SSH_FXP_RENAME as most servers have it: never over an existing name.
       if (entries[to]) return cb(new Error('Failure'))
       move(from, to)
+      opts.afterRename?.(to)
       cb(null)
     },
     ext_openssh_rename(from: string, to: string, cb: (err?: Error | null) => void): void {
       calls.push({ op: 'posixRename', path: from, to })
       move(from, to)
+      opts.afterRename?.(to)
       cb(null)
     },
     chmod(path: string, mode: number, cb: (err?: Error | null) => void): void {
@@ -1641,6 +1645,52 @@ describe('downloading a folder', () => {
     attach('src', withListing(stubSession([], source), { '/src/tree': [{ name: 'key', size: 6 }] }))
     const copied = await sftpManager.planRelay('src', '/src/tree', 'conn', '/allowed')
     expect(copied.conflicts.map((c) => c.reason)).toEqual(['symlink'])
+  })
+
+  /*
+   * The look before each write was kept for the whole run: `tree` swapped
+   * for a link after the first file went in, the second went through it.
+   */
+  it('looks for a link again before every file of a run', async () => {
+    const tree = join(localDir, 'tree')
+    mkdirSync(tree, { recursive: true })
+    writeFileSync(join(tree, 'a'), 'a', 'utf8')
+    writeFileSync(join(tree, 'b'), 'b', 'utf8')
+    const entries: Record<string, Entry> = { '/allowed': { dir: true } }
+    attach(
+      'conn',
+      stubSession([], entries, {
+        afterRename: () => {
+          entries['/allowed/tree'] = { link: '/outside' }
+        }
+      })
+    )
+
+    const planned = await sftpManager.planUpload('conn', tree, '/allowed')
+    const result = await sftpManager.runPlan('conn', planned)
+    expect(result.written).toBe(1)
+    expect(result.changed).toHaveLength(1)
+  })
+
+  /* Swapped for a link once the run had looked, the copy was made beyond it. */
+  it('looks for a link again once the copy exists', async () => {
+    const tree = join(localDir, 'tree2')
+    mkdirSync(tree, { recursive: true })
+    writeFileSync(join(tree, 'a'), 'a', 'utf8')
+    const entries: Record<string, Entry> = { '/allowed': { dir: true } }
+    attach(
+      'conn',
+      stubSession([], entries, {
+        afterOpen: (path) => {
+          if (PARTIAL.test(path)) entries['/allowed/tree2'] = { link: '/outside' }
+        }
+      })
+    )
+
+    const planned = await sftpManager.planUpload('conn', tree, '/allowed')
+    const result = await sftpManager.runPlan('conn', planned)
+    expect(result).toEqual({ written: 0, skipped: 1, changed: ['/allowed/tree2/a'] })
+    expect(Object.keys(entries).filter((p) => PARTIAL.test(p))).toEqual([])
   })
 
   it('puts it under its own name in the directory chosen', async () => {

@@ -719,7 +719,9 @@ class SFTPManager {
     remotePath: string,
     onProgress?: (transferred: number, total: number) => void,
     /** See writeRemoteFile. */
-    beforeReplace?: () => Promise<void>
+    beforeReplace?: () => Promise<void>,
+    /** See writeRemoteFile. */
+    stillInside?: () => Promise<void>
   ): Promise<void> {
     const shell = this.getShell(connectionId)
     if (shell) return shell.upload(localPath, remotePath, onProgress)
@@ -728,7 +730,8 @@ class SFTPManager {
       sftp,
       remotePath,
       (_target, handle) => putThroughHandle(sftp, handle, localPath, onProgress),
-      beforeReplace
+      beforeReplace,
+      stillInside
     )
   }
 
@@ -766,7 +769,14 @@ class SFTPManager {
     sftp: SFTPWrapper,
     remotePath: string,
     write: (target: string, handle: Buffer) => Promise<void>,
-    beforeReplace?: () => Promise<void>
+    beforeReplace?: () => Promise<void>,
+    /**
+     * Throws if a link now stands between the folder chosen and the copy.
+     * Looked for before the transfer, a folder swapped for one just after
+     * had the copy made beyond it; so it is asked once the copy exists, and
+     * again before it is moved into place.
+     */
+    stillInside?: () => Promise<void>
   ): Promise<void> {
     let target = remotePath
     let existing = await lstatRaw(sftp, remotePath)
@@ -819,6 +829,7 @@ class SFTPManager {
       const opened = await createPrivately(sftp, partial)
       held = opened.handle
       created = true
+      await stillInside?.()
       /*
        * A file only its owner may read keeps its new contents to its owner
        * while they go up. A server that refused to narrow the copy had a 0600
@@ -840,6 +851,7 @@ class SFTPManager {
           await sftpCall((cb) => sftp.fchmod(opened.handle, newFileMode, cb))
         }
         await letGo()
+        await stillInside?.()
         await stillOurs()
         await sftpCall((cb) => sftp.rename(partial, target, cb)).catch((err: Error) => {
           throw new Error(
@@ -853,6 +865,7 @@ class SFTPManager {
       await this.matchMetadata(sftp, opened.handle, existing, target)
       await letGo()
       await beforeReplace?.()
+      await stillInside?.()
       await stillOurs()
 
       if (supportsPosixRename(sftp)) {
@@ -939,7 +952,9 @@ class SFTPManager {
     dstPath: string,
     onProgress?: (transferred: number, total: number) => void,
     /** See writeRemoteFile. */
-    beforeReplace?: () => Promise<void>
+    beforeReplace?: () => Promise<void>,
+    /** See writeRemoteFile. */
+    stillInside?: () => Promise<void>
   ): Promise<void> {
     const [srcSftp, dstSftp] = await Promise.all([
       this.getShell(srcConnectionId) ?? this.getSftp(srcConnectionId),
@@ -1021,7 +1036,7 @@ class SFTPManager {
       })
 
     if (dstSftp instanceof ScpShell) await dstSftp.replace(dstPath, copyInto)
-    else await this.writeRemoteFile(dstSftp, dstPath, copyInto, beforeReplace)
+    else await this.writeRemoteFile(dstSftp, dstPath, copyInto, beforeReplace, stillInside)
   }
 
   /**
@@ -1404,8 +1419,6 @@ class SFTPManager {
     const askedAbout = new Map(plan.conflicts.map((c) => [c.destPath, c]))
     /** Remote directories this transfer has found or made; see ensureRemoteDir. */
     const madeDirs = new Set<string>()
-    /** Remote folders this run has looked at for links; see remoteLinkBelow. */
-    const remoteFolders = new Map<string, Promise<boolean | null>>()
     for (const item of plan.items) {
       if (!shouldWrite(item.destPath, decisions, conflicted)) {
         skipped++
@@ -1449,15 +1462,16 @@ class SFTPManager {
         changed.push(item.destPath)
         continue
       }
-      // The same on the far side, once per folder for the run.
+      // The same on the far side, looked at afresh for every file: an answer
+      // kept for the run let a folder swapped for a link after the first
+      // file have the next written through it.
       if (
         plan.direction !== 'download' &&
         plan.remoteRoot &&
         (await this.remoteLinkBelow(
           plan.direction === 'relay' ? destConnectionId! : connectionId,
           plan.remoteRoot,
-          item.destPath,
-          remoteFolders
+          item.destPath
         ))
       ) {
         skipped++
@@ -1499,6 +1513,15 @@ class SFTPManager {
             throw new DestinationChanged(item.destPath)
           }
         }
+        // And no link put below the folder chosen since the look before.
+        const root = plan.remoteRoot
+        const stillInside = root
+          ? async (): Promise<void> => {
+              if (await this.remoteLinkBelow(host, root, item.destPath)) {
+                throw new DestinationChanged(item.destPath)
+              }
+            }
+          : undefined
         await this.ensureRemoteDir(host, parentOf(item.destPath), madeDirs)
         try {
           if (plan.direction === 'relay') {
@@ -1508,10 +1531,18 @@ class SFTPManager {
               host,
               item.destPath,
               report,
-              beforeReplace
+              beforeReplace,
+              stillInside
             )
           } else {
-            await this.upload(connectionId, item.sourcePath, item.destPath, report, beforeReplace)
+            await this.upload(
+              connectionId,
+              item.sourcePath,
+              item.destPath,
+              report,
+              beforeReplace,
+              stillInside
+            )
           }
         } catch (err) {
           if (!(err instanceof DestinationChanged)) throw err
