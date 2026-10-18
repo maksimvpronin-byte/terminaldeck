@@ -121,6 +121,7 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
   lastSelectedHostId: null,
   focusRequest: 0,
   wakeRequest: null,
+  wakes: {},
   hostMenuRequest: null,
 
   // --- selecting hosts in the tree ---
@@ -313,7 +314,13 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
   },
 
   wakePane: (paneId, reconnect) =>
-    set((s) => ({ wakeRequest: { paneId, n: (s.wakeRequest?.n ?? 0) + 1, reconnect } })),
+    set((s) => {
+      const n = (s.wakeRequest?.n ?? 0) + 1
+      return {
+        wakeRequest: { paneId, n, reconnect },
+        wakes: { ...s.wakes, [paneId]: { n, reconnect } }
+      }
+    }),
 
   requestHostMenu: (request) => set({ hostMenuRequest: request }),
 

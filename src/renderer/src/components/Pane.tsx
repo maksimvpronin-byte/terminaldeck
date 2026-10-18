@@ -47,11 +47,9 @@ function Pane({
   const splitPaneWith = useStore((s) => s.splitPaneWith)
   const mergeTabInto = useStore((s) => s.mergeTabInto)
   /** The host was opened again and this pane was chosen for it: see `openHost`. */
-  const wake = useStore((s) => (s.wakeRequest?.paneId === node.id ? s.wakeRequest.n : 0))
+  const wake = useStore((s) => s.wakes[node.id]?.n ?? 0)
   /** That request asks a connected pane to start over as well. */
-  const wakeReconnect = useStore(
-    (s) => s.wakeRequest?.paneId === node.id && s.wakeRequest.reconnect === true
-  )
+  const wakeReconnect = useStore((s) => s.wakes[node.id]?.reconnect === true)
 
   // Read from the profile rather than copied onto the leaf: changing a host's
   // protocol should take effect in its open panes, not only in the next one.

@@ -311,6 +311,13 @@ export interface WorkspaceSlice {
    * `reconnectOnDoubleClick` on.
    */
   wakeRequest: { paneId: string; n: number; reconnect?: boolean } | null
+  /**
+   * The same, kept for each pane. One request at a time was overwritten by
+   * the next: a collection waking two desktops restored after a restart
+   * woke the last, and the first went on waiting. `wakeRequest` is the
+   * latest of them.
+   */
+  wakes: Record<string, { n: number; reconnect?: boolean }>
   /** Makes a `wakeRequest` for one pane; `reconnect` starts a connected one over. */
   wakePane: (paneId: string, reconnect: boolean) => void
   /**

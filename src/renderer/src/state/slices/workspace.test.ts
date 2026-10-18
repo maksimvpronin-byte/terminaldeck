@@ -347,6 +347,24 @@ describe('openHost: an open host is brought forward rather than opened again', (
     expect(useStore.getState().wakeRequest).toMatchObject({ paneId: first, reconnect: false })
   })
 
+  /* One request at a time: the second overwrote the first, and only the last desktop woke. */
+  it('wakes every desktop a collection passes over, not only the last', () => {
+    seed()
+    useStore.setState((st) => ({ sessions: [...st.sessions, host('dc2', 'rdp')], wakes: {} }))
+    const a = open('dc')
+    const b = open('dc2')
+    useStore.getState().openMany(
+      [
+        { title: 'dc', target: { kind: 'session', sessionId: 'dc' } },
+        { title: 'dc2', target: { kind: 'session', sessionId: 'dc2' } }
+      ],
+      'tabs'
+    )
+    const wakes = useStore.getState().wakes
+    expect(wakes[a]?.n).toBeGreaterThan(0)
+    expect(wakes[b]?.n).toBeGreaterThan(0)
+  })
+
   /* A saved layout opened a desktop already open again, one more with each opening. */
   it('opens a saved layout without a desktop already open, and wakes that one', () => {
     seed()
