@@ -449,6 +449,22 @@ describe('a group written down in more than one place', () => {
     expect(resolveAuth(h, h.groupId ?? null, local).username).toBe('all-user')
   })
 
+  /* The local settings of a show what a inherits, all of the other file included. */
+  it('shows a top group what another file’s all gives it', () => {
+    const result = read(
+      repo({
+        '1.yml': 'all:\n  vars:\n    ansible_user: deploy\n    ansible_port: 2222\n',
+        '2.yml': 'a:\n  hosts:\n    h: {}\n'
+      }),
+      ['1.yml', '2.yml']
+    )
+    const a = result.groups.find((g) => g.name === 'a')!
+    expect(resolveAuth(a, a.parentId, result.groups)).toMatchObject({
+      username: 'deploy',
+      port: 2222
+    })
+  })
+
   /* a opts out of inheriting; z, which h is in too, still reads all. */
   it('reads all for a host while one of its groups still inherits', () => {
     const result = read(

@@ -1,5 +1,4 @@
 import { applyCredential } from './credentials'
-import { inheritanceChain } from './inheritance'
 import { isSet } from './overrides'
 import type { Protocol } from './protocols'
 import type {
@@ -103,34 +102,44 @@ function levelsOf(
   groupId: string | null,
   groups: SessionGroup[]
 ): AuthDefaults[] {
-  const chain = inheritanceChain(own, groupId, groups, optedOut)
-  const { groupOrder, memberOf } = own as { groupOrder?: string[]; memberOf?: string[] }
-  if (!groupOrder || optedOut(own)) return chain
+  if (optedOut(own)) return [own]
   const byId = new Map(groups.map((g) => [g.id, g]))
-  const listed = new Set(groupOrder)
-  const reached = new Set<string>()
-  // What lies above the inventory's groups, from whichever walk reaches it:
-  // taken from the host's own chain alone, a group there opting out lost the
-  // source's login and jump host that another group still led up to.
-  const above: SessionGroup[] = []
-  for (const start of [groupId, ...(memberOf ?? [])]) {
+  const { groupOrder, memberOf, allId } = own as {
+    groupOrder?: string[]
+    memberOf?: string[]
+    allId?: string
+  }
+  /*
+   * Up from each start, in the order found, stopping at a group that opts
+   * out. A top group below another file's all goes there first, and all
+   * leads on to the same parent — for a group being shown as for a host:
+   * a's local settings said nothing of the all it inherits from.
+   */
+  const reached: SessionGroup[] = []
+  const seen = new Set<string>()
+  const firstStep = allId && byId.has(allId) ? allId : groupId
+  for (const start of [firstStep, ...(groupOrder ? (memberOf ?? []) : [])]) {
     let id = start
     let group = id ? byId.get(id) : undefined
-    while (id && group && !reached.has(id)) {
-      reached.add(id)
-      if (!listed.has(id)) above.push(group)
+    while (id && group && !seen.has(id)) {
+      seen.add(id)
+      reached.push(group)
       if (optedOut(group)) break
-      // A top group below another file's all goes there first; all leads on
-      // to the same parent.
       id = group.allId && byId.has(group.allId) ? group.allId : group.parentId
       group = id ? byId.get(id) : undefined
     }
   }
+  if (!groupOrder) return [own, ...reached]
+  // The inventory's groups in Ansible's order, latest first, then what lies
+  // above them — the source's login and jump host — from whichever walk got
+  // there: from the host's own chain alone, a group there opting out lost it.
+  const listed = new Set(groupOrder)
+  const found = new Set(reached.map((g) => g.id))
   const inventory = [...groupOrder]
     .reverse()
-    .filter((id) => reached.has(id))
+    .filter((id) => found.has(id))
     .map((id) => byId.get(id)!)
-  return [chain[0], ...inventory, ...above]
+  return [own, ...inventory, ...reached.filter((g) => !listed.has(g.id))]
 }
 
 /**
