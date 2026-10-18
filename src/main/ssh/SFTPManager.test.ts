@@ -1348,6 +1348,26 @@ describe('downloading a folder', () => {
     expect(planned.items.map((i) => i.destPath)).toEqual([join(localDir, '..cache', 'a.log')])
   })
 
+  /*
+   * The names in a listing are the source server's to choose. Joined to the
+   * destination folder as written, `../../outside.txt` from one host was
+   * written outside the folder chosen on the other.
+   */
+  it('refuses a name from one host that would leave the folder chosen on another', async () => {
+    const entries: Record<string, Entry> = { '/export': { dir: true } }
+    attach(
+      'src',
+      withListing(stubSession([], entries), {
+        '/export': [{ name: '../../outside.txt', size: 3 }]
+      })
+    )
+    attach('dst', stubSession([], { '/selected': { dir: true } }))
+
+    await expect(sftpManager.planRelay('src', '/export', 'dst', '/selected')).rejects.toThrow(
+      /unsafe/i
+    )
+  })
+
   it('puts it under its own name in the directory chosen', async () => {
     const entries: Record<string, Entry> = { '/srv/logs': { dir: true } }
     attach(

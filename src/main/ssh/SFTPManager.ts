@@ -19,7 +19,7 @@ import {
 import { randomBytes } from 'crypto'
 import { basename, dirname, isAbsolute, join, relative, sep } from 'path'
 import { sshManager } from './SSHManager'
-import { localChild } from '../localName'
+import { localChild, remoteChild } from '../localName'
 import {
   buildTransferPlan,
   conflictedPaths,
@@ -1171,7 +1171,9 @@ class SFTPManager {
       source?.isDirectory ||
       (source?.isSymlink && (await this.targetOf(srcConnectionId, srcPath))?.isDirectory)
     const destDir = sourceIsDirectory ? joinRemote(destParent, baseNameOf(srcPath)) : destParent
-    const items = await this.remoteTree(srcConnectionId, srcPath, destDir, joinRemote)
+    // Each name from the source's listing taken as one plain segment, as a
+    // download takes it with localChild.
+    const items = await this.remoteTree(srcConnectionId, srcPath, destDir, remoteChild)
 
     const found = new Map<string, DestInfo | null>()
     const unique = [...new Map(items.map((item) => [item.destPath, item])).values()]

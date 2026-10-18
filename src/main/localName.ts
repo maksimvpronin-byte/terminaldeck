@@ -79,3 +79,19 @@ export function safeLocalName(
   if (!name || name === '.' || name === '..') return 'file'
   return name
 }
+
+/**
+ * Joins one name from a remote listing to a remote directory, or refuses.
+ *
+ * A host-to-host copy writes what one server names into a folder on another,
+ * and the names are the first server's to choose: `../../outside.txt`, joined
+ * as written and normalised, was written outside the folder chosen. Only a
+ * single plain segment is taken; the far side is a POSIX path, whatever this
+ * machine is.
+ */
+export function remoteChild(parent: string, name: string): string {
+  if (unsafeSegment(name, 'linux')) {
+    throw new Error(`Refusing unsafe remote file name: ${JSON.stringify(name)}`)
+  }
+  return `${parent.replace(/\/+$/, '')}/${name}`
+}
