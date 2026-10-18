@@ -567,9 +567,19 @@ class SFTPManager {
    * Symlinks are unlinked rather than followed, so a link pointing outside the
    * tree can't take its target with it.
    */
-  async delete(connectionId: string, remotePath: string, isDirectory: boolean): Promise<void> {
+  async delete(connectionId: string, remotePath: string, listedAsFolder: boolean): Promise<void> {
     const shell = this.getShell(connectionId)
     const sftp = shell ? undefined : await this.getSftp(connectionId)
+    /*
+     * What it is now, not what the listing said. A folder swapped for a link
+     * to another before Delete was confirmed was walked through the link, and
+     * the folder it named emptied. A link is removed as itself.
+     */
+    let isDirectory = listedAsFolder
+    if (isDirectory) {
+      const now = await this.statPath(connectionId, remotePath)
+      isDirectory = !!now && now.isDirectory && !now.isSymlink
+    }
     if (isDirectory) {
       for (const entry of await this.list(connectionId, remotePath)) {
         await this.delete(connectionId, entry.path, entry.isDirectory && !entry.isSymlink)

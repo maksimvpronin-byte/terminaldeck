@@ -1249,6 +1249,18 @@ describe('SCP/Shell routing', () => {
     const list = vi.spyOn(ScpShell.prototype, 'list').mockResolvedValue([])
     const mkdir = vi.spyOn(ScpShell.prototype, 'mkdir').mockResolvedValue()
     const remove = vi.spyOn(ScpShell.prototype, 'remove').mockResolvedValue()
+    // A deletion looks at what the path is now before emptying it.
+    vi.spyOn(ScpShell.prototype, 'statPath').mockResolvedValue({
+      name: 'new',
+      path: '/srv/private/new',
+      isDirectory: true,
+      isSymlink: false,
+      size: 0,
+      mtime: 0,
+      permissions: '755',
+      owner: 'postgres',
+      group: 'postgres'
+    })
     const close = vi.spyOn(ScpShell.prototype, 'close')
     await sftpManager.list('scp-routing', '/srv/private')
     await sftpManager.mkdir('scp-routing', '/srv/private/new')
@@ -1332,6 +1344,48 @@ describe('parallel transfer planning', () => {
  * server's: on a Unix host `..\..\Startup` is one ordinary folder name, and on
  * Windows it took the download out of the directory that had been chosen.
  */
+/*
+ * What a deletion empties is decided by the listing the window showed. A
+ * folder swapped for a link to another before Delete was confirmed was
+ * walked through the link, and the folder it named emptied.
+ */
+describe('deleting a folder', () => {
+  it('removes a link put in the folder’s place, and nothing it points at', async () => {
+    const calls: Call[] = []
+    const entries: Record<string, Entry> = {
+      '/shared/trash': { link: '/home/user/important' },
+      '/home/user/important': { dir: true },
+      '/home/user/important/thesis.tex': { size: 9 }
+    }
+    const session = Object.assign(stubSession(calls, entries), {
+      readdir(path: string, cb: (err: Error | null, list?: unknown[]) => void): void {
+        // A listing follows a link, as a server's does.
+        cb(
+          null,
+          path === '/shared/trash'
+            ? [
+                {
+                  filename: 'thesis.tex',
+                  longname: '',
+                  attrs: { mode: 0o100644, size: 9, mtime: 0 }
+                }
+              ]
+            : []
+        )
+      },
+      rmdir(_path: string, cb: (err?: Error | null) => void): void {
+        cb(new Error('Not a directory'))
+      }
+    })
+    attach('conn', session)
+
+    await sftpManager.delete('conn', '/shared/trash', true)
+
+    expect(calls.filter((c) => c.op === 'unlink').map((c) => c.path)).toEqual(['/shared/trash'])
+    expect(entries['/home/user/important/thesis.tex']).toEqual({ size: 9 })
+  })
+})
+
 describe('downloading a folder', () => {
   function withListing(
     session: SFTPWrapper,
