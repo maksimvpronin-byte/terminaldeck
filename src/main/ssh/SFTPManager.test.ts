@@ -1693,6 +1693,21 @@ describe('downloading a folder', () => {
     expect(Object.keys(entries).filter((p) => PARTIAL.test(p))).toEqual([])
   })
 
+  /* The folder chosen on the source is named by the source too, and joined under the same rules. */
+  it('refuses a source folder name that would leave the folder chosen there', async () => {
+    const name = 'x\\..\\..\\escape'
+    const entries: Record<string, Entry> = { [`/src/${name}`]: { dir: true } }
+    attach(
+      'src',
+      withListing(stubSession([], entries), { [`/src/${name}`]: [{ name: 'f.txt', size: 1 }] })
+    )
+    attach('dst', stubSession([], { '/C:/Allowed': { dir: true } }))
+
+    await expect(
+      sftpManager.planRelay('src', `/src/${name}`, 'dst', '/C:/Allowed')
+    ).rejects.toThrow(/unsafe/i)
+  })
+
   it('puts it under its own name in the directory chosen', async () => {
     const entries: Record<string, Entry> = { '/srv/logs': { dir: true } }
     attach(

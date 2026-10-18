@@ -1351,7 +1351,8 @@ class SFTPManager {
     const sourceIsDirectory =
       source?.isDirectory ||
       (source?.isSymlink && (await this.targetOf(srcConnectionId, srcPath))?.isDirectory)
-    const destDir = sourceIsDirectory ? joinRemote(destParent, baseNameOf(srcPath)) : destParent
+    // The source's name for it, under the rules the names inside it are held to.
+    const destDir = sourceIsDirectory ? remoteChild(destParent, baseNameOf(srcPath)) : destParent
     // Each name from the source's listing taken as one plain segment, as a
     // download takes it with localChild.
     const items = await this.remoteTree(srcConnectionId, srcPath, destDir, remoteChild)
