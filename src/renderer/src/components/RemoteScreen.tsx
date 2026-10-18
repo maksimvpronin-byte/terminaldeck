@@ -1219,7 +1219,9 @@ export default function RemoteScreen({
 
     /** Everything still down goes up, because nothing else will report it. */
     const releaseAll = (): void => {
-      diag('rdp', `focus lost, releasing ${[...held].join(',') || 'nothing'}`)
+      // Named as the journal may name them: a letter held as the focus went
+      // is one of a password's, and was written by its physical key.
+      diag('rdp', `focus lost, releasing ${heldForJournal(held, 'nothing')}`)
       for (const code of held) sendKey(code, false)
       held.clear()
       typed.clear()

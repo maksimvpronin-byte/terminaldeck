@@ -39,6 +39,10 @@ export function diagKey(source: string, event: KeyboardEvent, extra = ''): void 
  * Every key held went in, a letter among them, and a letter held while a
  * modifier went down was written by its physical key.
  */
-export function heldForJournal(held: Iterable<string>): string {
-  return [...held].filter(isModifierCode).join(',') || '-'
+export function heldForJournal(held: Iterable<string>, none = '-'): string {
+  const all = [...held]
+  const named = all.filter(isModifierCode)
+  const others = all.length - named.length
+  const parts = [...named, ...(others > 0 ? [`${others} other key${others === 1 ? '' : 's'}`] : [])]
+  return parts.join(',') || none
 }

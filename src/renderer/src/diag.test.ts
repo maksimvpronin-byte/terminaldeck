@@ -4,7 +4,10 @@ import { heldForJournal } from './diag'
 /* A letter held while a modifier went down was written by its physical key. */
 describe('the keys a desktop holds, in the journal', () => {
   it('names the modifiers and no other key', () => {
-    expect(heldForJournal(['ShiftLeft', 'KeyQ', 'AltRight', 'Digit2'])).toBe('ShiftLeft,AltRight')
-    expect(heldForJournal(['KeyQ'])).toBe('-')
+    expect(heldForJournal(['ShiftLeft', 'KeyQ', 'AltRight', 'Digit2'])).toBe(
+      'ShiftLeft,AltRight,2 other keys'
+    )
+    expect(heldForJournal(['KeyQ'])).toBe('1 other key')
+    expect(heldForJournal([], 'nothing')).toBe('nothing')
   })
 })
