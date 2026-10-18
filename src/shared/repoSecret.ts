@@ -63,9 +63,13 @@ export function repoUrlHasSecret(url: string): boolean {
 }
 
 /** The address with any password or token taken out, and an ordinary user kept. */
-export function withoutRepoSecret(url: string): string {
+export function withoutRepoSecret(raw: string): string {
+  // Trimmed, as it is looked for: a space before https:// had the token found
+  // by repoUrlHasSecret and then left in place here, and exported with it.
+  const url = raw.trim()
   const info = userinfoOf(url)
-  if (!info || (!info.password && !tokenShaped(info.user))) return url
+  // One with nothing to take out stays exactly as it was.
+  if (!info || (!info.password && !tokenShaped(info.user))) return raw
   const user = tokenShaped(info.user) ? '' : info.user
   return `${info.before}${user ? `${user}@` : ''}${info.after}`
 }

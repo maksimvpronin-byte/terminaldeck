@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { repoUrlHasSecret, withoutRepoSecret } from './repoSecret'
+import { repoUrlHasSecret, sourceWithoutRepoSecret, withoutRepoSecret } from './repoSecret'
 
 describe('repoUrlHasSecret', () => {
   it('finds a password or token after a user', () => {
@@ -47,5 +47,19 @@ describe('withoutRepoSecret', () => {
     ]) {
       expect(withoutRepoSecret(url)).toBe(url)
     }
+  })
+})
+
+/*
+ * The secret was looked for in the address trimmed and taken out of it as
+ * written: a space before https:// was enough for the token to be found,
+ * left in place, and exported with a backup made without credentials.
+ */
+describe('an address with space around it', () => {
+  it('has its secret taken out all the same', () => {
+    const url = ' https://alice:TOKEN@git.example/repo.git '
+    expect(repoUrlHasSecret(url)).toBe(true)
+    expect(withoutRepoSecret(url)).toBe('https://alice@git.example/repo.git')
+    expect(sourceWithoutRepoSecret({ repoUrl: url }).repoUrl).not.toContain('TOKEN')
   })
 })
