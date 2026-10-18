@@ -202,6 +202,36 @@ describe('clipboard while nobody is here', () => {
     innards().nextFilesPoll = Date.now() + 60_000
   }
 
+  /*
+   * Text one desktop copied went onto this machine's clipboard and was
+   * remembered as already sent, so the next poll saw nothing new: another
+   * desktop open beside it went on pasting what it had before.
+   */
+  it('gives what one desktop copied to another, and not back to the first', async () => {
+    const a = liveSession()
+    const b = liveSession()
+    innards().sessions.set('copy-a', a.session)
+    innards().sessions.set('copy-b', b.session)
+    try {
+      reset('old')
+      const change = (freeRdpBridge as unknown as { clipboardChange: number }).clipboardChange
+      a.session.clipboardSent = change
+      b.session.clipboardSent = change
+
+      innards().receive('copy-a', a.session, RECORD.clipboard, Buffer.from('new from a'))
+      vi.mocked(clipboard.readText).mockReturnValue('new from a')
+      a.written.length = 0
+      b.written.length = 0
+      await innards().pollClipboard()
+
+      expect(Buffer.concat(b.written).toString()).toContain('new from a')
+      expect(Buffer.concat(a.written).toString()).not.toContain('new from a')
+    } finally {
+      innards().sessions.delete('copy-a')
+      innards().sessions.delete('copy-b')
+    }
+  })
+
   it('sends nothing while the vault is locked', async () => {
     const { session, written } = liveSession()
     innards().sessions.set('locked', session)

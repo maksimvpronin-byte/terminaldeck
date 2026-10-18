@@ -795,6 +795,14 @@ class FreeRdpBridge {
        */
       this.lastClipboardText = text
       clipboard.writeText(text)
+      /*
+       * A change of this machine's clipboard all the same, for every other
+       * desktop: remembered as already sent, the next poll saw nothing new,
+       * and one open beside it went on pasting what it had before. The
+       * desktop it came from has it, and is not sent it back.
+       */
+      this.clipboardChange++
+      session.clipboardSent = this.clipboardChange
       diag('clipboard', `${id.slice(0, 8)} desktop copied ${text.length} chars here`)
       this.lastClipboardFiles = ''
       this.lastClipboardVersion = ''
