@@ -233,7 +233,7 @@ export function pruneTree(
       : []
     if (claims.length === 0 && through.length === 0) continue
     const primary = claims.length > 0 ? claims[claims.length - 1] : through[through.length - 1].id
-    // The groups that hold the host in the folder.
+    // The groups that hold the host in the folder, as the tree shows it.
     const held = [...claims, ...through.map((g) => g.id)]
 
     /*
@@ -249,15 +249,17 @@ export function pruneTree(
       chain.unshift(c)
       c = parentOf.get(c) ?? null
     }
+    /*
+     * The walk starts from the groups that name the host — kept, or frozen
+     * when dropped — and not from those it only arrives through: all, holding
+     * h with child hosts on, became a start of its own and reached h past the
+     * groups naming it that opt out of inheriting.
+     */
     const walk =
       Object.keys(frozen).length > 0
-        ? {
-            frozen,
-            groupOrder: host.groupOrder ?? chain,
-            memberOf: [...new Set([...named, ...held])]
-          }
+        ? { frozen, groupOrder: host.groupOrder ?? chain, memberOf: named }
         : host.memberOf
-          ? { memberOf: held }
+          ? { memberOf: named }
           : {}
     const { frozen: _frozen, ...plain } = host
     sessions.push({ ...plain, groupId: primary, ...walk })

@@ -378,6 +378,32 @@ describe('pruneTree with the hosts of child groups', () => {
     expect(resolveAuth(kept, kept.groupId ?? null, pruned.groups).username).toBe('all-user')
   })
 
+  /*
+   * a and z, which name h, opt out of inheriting. With child hosts on, all
+   * holds h too, and it became a start of the walk up of its own: all's root
+   * reached h past both.
+   */
+  it('walks up from the groups that name a host, not those it arrives through', () => {
+    const id = (path: string) => gitGroupId(FOLDER, path)
+    const h = { ...host('h', 'all/z'), memberOf: [id('all/a'), id('all/z')] }
+    const full: GitFolderTree = {
+      groupId: FOLDER,
+      groups: [
+        { ...group('all', FOLDER), username: 'root' },
+        group('all/a', id('all')),
+        group('all/z', id('all'))
+      ],
+      sessions: [{ ...h, groupOrder: [id('all'), id('all/a'), id('all/z')] }],
+      memberships: { [h.id]: [id('all/a'), id('all/z')] }
+    }
+    const pruned = pruneTree(FOLDER, full, ['all', 'all/a', 'all/z'], true)
+    const local = pruned.groups.map((g) =>
+      g.name === 'all' ? g : { ...g, inheritAuth: false as const }
+    )
+    const kept = pruned.sessions[0]
+    expect(resolveAuth(kept, kept.groupId ?? null, local).username).toBe('')
+  })
+
   it('keeps settings from the group a host names, and lists it under both', () => {
     const pruned = pruneTree(FOLDER, referenced(), ['all/cluster', 'all/worker'], true)
     const w1 = pruned.sessions.find((s) => s.name === 'w1')!
