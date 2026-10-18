@@ -12,6 +12,7 @@ export default function BackupSettings(): JSX.Element {
   const loadGitFolders = useStore((s) => s.loadGitFolders)
   const loadCollections = useStore((s) => s.loadCollections)
   const loadCredentials = useStore((s) => s.loadCredentials)
+  const loadMultiWindows = useStore((s) => s.loadMultiWindows)
 
   // Off by default: an export leaves the machine and the OS account that
   // protects the vault, so including credentials must be a deliberate choice.
@@ -58,7 +59,10 @@ export default function BackupSettings(): JSX.Element {
         loadInventory(),
         loadGitFolders(),
         loadCollections(),
-        loadCredentials()
+        loadCredentials(),
+        // The saved layouts come with a backup too. Left as they were here,
+        // renaming one saved the old layout whole over the one just imported.
+        loadMultiWindows()
       ])
       setImportPassword('')
       // One sentence rather than five fragments: the numbers land where each
