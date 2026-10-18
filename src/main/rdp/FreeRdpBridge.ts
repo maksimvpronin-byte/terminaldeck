@@ -387,14 +387,17 @@ class FreeRdpBridge {
 
   private cancelClipboardDownloads(): void {
     this.clipboardEpoch++
-    for (const [id, session] of this.sessions) {
-      if (session.download?.active || session.filesWaiting)
-        this.say(session, id, { e: 'clipboard-transfer', state: 'cancelled' })
-      session.filesWaiting = undefined
-      clearTimeout(session.clipboardManifestTimer)
-      session.clipboardManifestTimer = undefined
-      session.download?.cancel()
-    }
+    for (const [id, session] of this.sessions) this.cancelDownloadOf(session, id)
+  }
+
+  /** One desktop's file copy given up: its own clipboard moved on. */
+  private cancelDownloadOf(session: Session, id: string): void {
+    if (session.download?.active || session.filesWaiting)
+      this.say(session, id, { e: 'clipboard-transfer', state: 'cancelled' })
+    session.filesWaiting = undefined
+    clearTimeout(session.clipboardManifestTimer)
+    session.clipboardManifestTimer = undefined
+    session.download?.cancel()
   }
 
   private watchClipboard(): void {
@@ -730,6 +733,16 @@ class FreeRdpBridge {
      * machine's clipboard while so.
      */
     if (type === RECORD.clipboardReset) {
+      /*
+       * A desktop out of sight, or behind another application, has no say
+       * over this machine's clipboard, and a copy of its own cancelled the
+       * file download another desktop, in use, had going. It gives up only
+       * what it was itself sending.
+       */
+      if (session.clipboard && !this.mayGiveClipboard(session)) {
+        this.cancelDownloadOf(session, id)
+        return
+      }
       if (session.clipboard) {
         this.cancelClipboardDownloads()
         // Set again below only if this copy is announced as on its way.

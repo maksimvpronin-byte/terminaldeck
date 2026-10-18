@@ -450,3 +450,33 @@ describe('a desktop client that is not there', () => {
     expect(missingClient('linux')).not.toContain('npm run')
   })
 })
+
+/*
+ * One desktop copying from its own clipboard while it is out of sight has no
+ * say over this machine's: it cancelled the file download another desktop,
+ * in use, had going.
+ */
+describe('a desktop out of sight that copies', () => {
+  it('leaves another desktop’s file download alone', () => {
+    const active = stubSession().session
+    const cancel = vi.fn()
+    active.download = { active: true, cancel }
+    const said: unknown[] = []
+    ;(active.window as { webContents: { send: unknown } }).webContents.send = (
+      _channel: string,
+      payload: unknown
+    ) => said.push(payload)
+    const background = { ...stubSession().session, hidden: true }
+    innards().sessions.set('d-active', active)
+    innards().sessions.set('d-background', background)
+    try {
+      innards().receive('d-background', background, RECORD.clipboardReset, Buffer.from([0]))
+
+      expect(cancel).not.toHaveBeenCalled()
+      expect(said).toEqual([])
+    } finally {
+      innards().sessions.delete('d-active')
+      innards().sessions.delete('d-background')
+    }
+  })
+})
