@@ -2,7 +2,7 @@ import { forEachConcurrent } from './parallel'
 import { ScpShell } from './ScpShell'
 import type { Writable } from 'stream'
 import type { SFTPWrapper, Stats } from 'ssh2'
-import { readdir, mkdir, stat, lstat, readFile } from 'fs/promises'
+import { readdir, mkdir, stat, lstat, readFile, open as openLocal } from 'fs/promises'
 import {
   closeSync,
   constants,
@@ -206,20 +206,77 @@ export class PartialReplaced extends Error {
  * given the protected file's mode only once every byte was in — so for the
  * length of the transfer, the new contents of a 0600 file were readable by
  * anyone who could read the directory.
+ *
+ * And kept open, its handle returned: everything after goes through it. The
+ * copy was closed here and opened again by name to be written, and in a
+ * folder somebody else could write to, the name could be swapped for a link
+ * in between — root uploading into such a folder then wrote the file into
+ * whatever the link named.
  */
-function createPrivately(sftp: SFTPWrapper, path: string): Promise<number | undefined> {
+function createPrivately(
+  sftp: SFTPWrapper,
+  path: string
+): Promise<{ handle: Buffer; mode: number | undefined }> {
   return new Promise((resolve, reject) => {
     sftp.open(path, 'wx', (err, handle) => {
       if (err) return reject(err)
-      const close = (mode: number | undefined): void => sftp.close(handle, () => resolve(mode))
       sftp.fstat(handle, (statErr, stats) => {
         const mode = statErr ? undefined : stats.mode & 0o7777
         // Nothing has been written yet, so a server that refuses is no worse
         // off than before; the transfer still sets the mode itself.
-        sftp.fchmod(handle, PARTIAL_MODE, () => close(mode))
+        sftp.fchmod(handle, PARTIAL_MODE, () => resolve({ handle, mode }))
       })
     })
   })
+}
+
+/** Pieces a local file goes up in, and how many are in flight, as ssh2's fastPut has them. */
+const PUT_CHUNK = 32 * 1024
+const PUT_IN_FLIGHT = 64
+
+/**
+ * Sends a local file into a remote file already open, at `handle`.
+ *
+ * fastPut takes a name and opens it itself, which is what a copy created and
+ * held cannot afford; this writes the same way, several pieces in flight at
+ * once, through the handle.
+ */
+async function putThroughHandle(
+  sftp: SFTPWrapper,
+  handle: Buffer,
+  localPath: string,
+  onProgress?: (transferred: number, total: number) => void
+): Promise<void> {
+  const file = await openLocal(localPath, 'r')
+  try {
+    const { size } = await file.stat()
+    let next = 0
+    let sent = 0
+    let failed = false
+    const worker = async (): Promise<void> => {
+      while (!failed && next < size) {
+        const start = next
+        const length = Math.min(PUT_CHUNK, size - start)
+        next += length
+        const buffer = Buffer.allocUnsafe(length)
+        const { bytesRead } = await file.read(buffer, 0, length, start)
+        if (bytesRead !== length) throw new Error(`${localPath} changed while it was being sent`)
+        await sftpCall((cb) => sftp.write(handle, buffer, 0, length, start, cb))
+        sent += length
+        onProgress?.(sent, size)
+      }
+    }
+    await Promise.all(
+      Array.from({ length: PUT_IN_FLIGHT }, () =>
+        worker().catch((err) => {
+          failed = true
+          throw err
+        })
+      )
+    )
+  } finally {
+    await file.close()
+  }
 }
 
 /**
@@ -656,18 +713,7 @@ class SFTPManager {
     await this.writeRemoteFile(
       sftp,
       remotePath,
-      (target) =>
-        new Promise<void>((resolve, reject) => {
-          sftp.fastPut(
-            localPath,
-            target,
-            {
-              mode: PARTIAL_MODE,
-              step: (transferred, _chunk, total) => onProgress?.(transferred, total)
-            },
-            (err) => (err ? reject(err) : resolve())
-          )
-        }),
+      (_target, handle) => putThroughHandle(sftp, handle, localPath, onProgress),
       beforeReplace
     )
   }
@@ -705,7 +751,7 @@ class SFTPManager {
   private async writeRemoteFile(
     sftp: SFTPWrapper,
     remotePath: string,
-    write: (target: string) => Promise<void>,
+    write: (target: string, handle: Buffer) => Promise<void>,
     beforeReplace?: () => Promise<void>
   ): Promise<void> {
     let target = remotePath
@@ -728,15 +774,38 @@ class SFTPManager {
     const partial = partialNameFor(target)
     let created = false
     let moved = false
+    // The copy's own handle, held until it is in shape; see createPrivately.
+    let held: Buffer | undefined
+    const letGo = async (): Promise<void> => {
+      const handle = held
+      held = undefined
+      if (handle) await sftpCall((cb) => sftp.close(handle, cb)).catch(() => undefined)
+    }
+    /*
+     * Moved by name, so the name has to be the copy still. A link put there
+     * would be renamed into the destination's place; refused, it and what it
+     * names are left alone.
+     */
+    const stillOurs = async (): Promise<void> => {
+      const now = await lstatRaw(sftp, partial)
+      if (!now || !now.isFile()) {
+        created = false
+        throw new PartialReplaced(partial)
+      }
+    }
     try {
-      const newFileMode = await createPrivately(sftp, partial)
+      const opened = await createPrivately(sftp, partial)
+      held = opened.handle
       created = true
-      await write(partial)
+      await write(partial, opened.handle)
       if (!existing) {
         // What a new file here has always been given, not the copy's 0600.
+        const newFileMode = opened.mode
         if (newFileMode !== undefined) {
-          await sftpCall((cb) => sftp.chmod(partial, newFileMode, cb))
+          await sftpCall((cb) => sftp.fchmod(opened.handle, newFileMode, cb))
         }
+        await letGo()
+        await stillOurs()
         await sftpCall((cb) => sftp.rename(partial, target, cb)).catch((err: Error) => {
           throw new Error(
             `${target} could not be put in place (${err.message}). If something appeared there during the transfer, it was left alone.`
@@ -746,8 +815,10 @@ class SFTPManager {
         return
       }
 
-      await this.matchMetadata(sftp, partial, existing, target)
+      await this.matchMetadata(sftp, opened.handle, existing, target)
+      await letGo()
       await beforeReplace?.()
+      await stillOurs()
 
       if (supportsPosixRename(sftp)) {
         await sftpCall((cb) => sftp.ext_openssh_rename(partial, target, cb))
@@ -774,6 +845,7 @@ class SFTPManager {
       // The new file is in place; the old one is a hidden leftover at worst.
       await sftpCall((cb) => sftp.unlink(aside, cb)).catch(() => undefined)
     } finally {
+      await letGo()
       // Only a copy this upload made: a name that was refused is someone else's.
       if (created && !moved) {
         await sftpCall((cb) => sftp.unlink(partial, cb)).catch(() => undefined)
@@ -791,14 +863,17 @@ class SFTPManager {
    */
   private async matchMetadata(
     sftp: SFTPWrapper,
-    partial: string,
+    handle: Buffer,
     existing: Stats,
     target: string
   ): Promise<void> {
-    const written = await lstatRaw(sftp, partial)
+    // Through the copy's handle, not its name: see createPrivately.
+    const written = await new Promise<Stats | undefined>((resolve) =>
+      sftp.fstat(handle, (err, stats) => resolve(err ? undefined : stats))
+    )
     if (written && (written.uid !== existing.uid || written.gid !== existing.gid)) {
       try {
-        await sftpCall((cb) => sftp.chown(partial, existing.uid, existing.gid, cb))
+        await sftpCall((cb) => sftp.fchown(handle, existing.uid, existing.gid, cb))
       } catch {
         throw new Error(
           `${target} was left unchanged: it belongs to ${existing.uid}:${existing.gid}, and this login cannot give a new copy that owner. Replacing it would change who owns it, and writing over it in place would destroy it if the transfer stopped halfway. Upload it as its owner, or remove it first.`
@@ -806,7 +881,7 @@ class SFTPManager {
       }
     }
     try {
-      await sftpCall((cb) => sftp.chmod(partial, existing.mode & 0o7777, cb))
+      await sftpCall((cb) => sftp.fchmod(handle, existing.mode & 0o7777, cb))
     } catch (err) {
       throw new Error(
         `${target} was left unchanged: the new copy could not be given its permissions (${(err as Error).message}).`
@@ -857,7 +932,7 @@ class SFTPManager {
      * because the destination may need writing twice: once under a partial name,
      * and again in place if that name could not be moved over the original.
      */
-    const copyInto = (target: string): Promise<void> =>
+    const copyInto = (target: string, handle?: Buffer): Promise<void> =>
       new Promise<void>((resolve, reject) => {
         const read = srcSftp.createReadStream(srcPath)
         let write: Writable | null = null
@@ -882,14 +957,18 @@ class SFTPManager {
           write =
             dstSftp instanceof ScpShell
               ? dstSftp.createWriteStream(target, total, destinationMode)
-              : // Kept to its owner until it is in place. The default here is
-                // 0666, applied with fchmod and so past the umask: a new file
-                // relayed to a host came out writable by everyone on it.
-                dstSftp.createWriteStream(target, { mode: PARTIAL_MODE })
+              : handle
+                ? // The copy writeRemoteFile holds open; it closes it itself.
+                  dstSftp.createWriteStream(target, { handle, autoClose: false })
+                : // Kept to its owner until it is in place. The default here is
+                  // 0666, applied with fchmod and so past the umask: a new file
+                  // relayed to a host came out writable by everyone on it.
+                  dstSftp.createWriteStream(target, { mode: PARTIAL_MODE })
           write.on('error', fail)
           // 'close', not 'finish': ssh2 emits it once the remote handle is really
           // closed, and resolving earlier races whatever reads the file next.
-          write.on('close', () => {
+          // A handle held open is closed by its owner, and finishing is all.
+          write.on(handle ? 'finish' : 'close', () => {
             if (settled) return
             settled = true
             resolve()

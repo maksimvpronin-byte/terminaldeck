@@ -39,6 +39,29 @@ vi.mock('electron', () => ({
   dialog: { showMessageBox: async () => ({ response: 0 }) }
 }))
 
+/*
+ * The plans here name local files under /local that are not on any disk: an
+ * upload reads one as 1024 bytes, as the stub's old fastPut pretended to.
+ * Everything else opens as it would.
+ */
+vi.mock('fs/promises', async (importOriginal) => {
+  const real = await importOriginal<typeof import('fs/promises')>()
+  return {
+    ...real,
+    open: async (path: string, flags?: string) => {
+      if (!String(path).startsWith('/local/')) return real.open(path, flags)
+      return {
+        stat: async () => ({ size: 1024 }),
+        read: async (buffer: Buffer, offset: number, length: number) => {
+          buffer.fill(120, offset, offset + length)
+          return { bytesRead: length, buffer }
+        },
+        close: async () => undefined
+      }
+    }
+  }
+})
+
 userData = mkdtempSync(join(tmpdir(), 'terminaldeck-sftp-'))
 const { sftpManager } = await import('./SFTPManager')
 const { sshManager } = await import('./SSHManager')
@@ -91,6 +114,8 @@ function stubSession(
     duringGet?: () => void
     /** Runs once an upload's bytes are in, before they are moved into place. */
     duringPut?: () => void
+    /** Runs as a file is opened, the way somebody sharing the folder could. */
+    afterOpen?: (path: string) => void
     /** Runs before the stub opens what it was given, the way a racing program would. */
     beforeGet?: () => void
   } = {}
@@ -103,6 +128,14 @@ function stubSession(
       delete opts.received[from]
     }
   }
+  /*
+   * What each open handle holds: the file as it was when opened, whatever is
+   * put at its name afterwards — the way a server's handle is the file and
+   * not the name.
+   */
+  const held = new Map<string, Entry>()
+  const heldBy = (handle: Buffer): Entry | undefined => held.get(handle.toString())
+  const written = new Set<string>()
   const session = {
     _extensions: opts.noPosixRename ? {} : { 'posix-rename@openssh.com': '1' },
     realpath(path: string, cb: (err: Error | null, resolved?: string) => void): void {
@@ -114,18 +147,60 @@ function stubSession(
      */
     open(path: string, flags: string, cb: (err: Error | null, handle?: Buffer) => void): void {
       if (flags.includes('x') && entries[path]) return cb(new Error('Failure'))
-      entries[path] = { size: 0, mode: opts.newFileMode ?? 0o644, uid: 0 }
+      const entry: Entry = { size: 0, mode: opts.newFileMode ?? 0o644, uid: 0 }
+      entries[path] = entry
+      held.set(path, entry)
+      opts.afterOpen?.(path)
       cb(null, Buffer.from(path))
     },
-    fstat(handle: Buffer, cb: (err: Error | null, stats?: { mode: number }) => void): void {
-      cb(null, { mode: 0o100000 | (entries[handle.toString()]?.mode ?? 0) })
+    fstat(
+      handle: Buffer,
+      cb: (err: Error | null, stats?: { mode: number; uid: number; gid: number }) => void
+    ): void {
+      const entry = heldBy(handle)
+      cb(null, { mode: 0o100000 | (entry?.mode ?? 0), uid: entry?.uid ?? 0, gid: 0 })
     },
     fchmod(handle: Buffer, mode: number, cb: (err?: Error | null) => void): void {
-      const entry = entries[handle.toString()]
+      const entry = heldBy(handle)
       if (entry) entry.mode = mode
       cb(null)
     },
-    close(_handle: Buffer, cb: (err?: Error | null) => void): void {
+    fchown(handle: Buffer, uid: number, _gid: number, cb: (err?: Error | null) => void): void {
+      if (opts.failChown) return cb(new Error('Permission denied'))
+      // As a server does: a change of owner clears setuid and setgid.
+      const entry = heldBy(handle)
+      if (entry) {
+        entry.uid = uid
+        entry.mode = (entry.mode ?? 0o644) & ~0o6000
+      }
+      cb(null)
+    },
+    /** Writes into the file the handle holds, as an upload does piece by piece. */
+    write(
+      handle: Buffer,
+      _data: Buffer,
+      _offset: number,
+      length: number,
+      position: number,
+      cb: (err?: Error | null) => void
+    ): void {
+      const path = handle.toString()
+      const entry = heldBy(handle)
+      if (!written.has(path)) {
+        written.add(path)
+        calls.push({ op: 'fastPut', path, to: path })
+        if (opts.modeAtWrite) opts.modeAtWrite[path] = entry?.mode ?? 0
+      }
+      if (opts.failWrite) {
+        if (entry) entry.size = 512
+        cb(new Error('Connection lost'))
+        return
+      }
+      if (entry) entry.size = Math.max(entry.size ?? 0, position + length)
+      cb(null)
+    },
+    close(handle: Buffer, cb: (err?: Error | null) => void): void {
+      if (written.delete(handle.toString())) opts.duringPut?.()
       cb(null)
     },
     fastPut(
@@ -135,6 +210,13 @@ function stubSession(
       cb: (err?: Error | null) => void
     ): void {
       calls.push({ op: 'fastPut', path: local, to: remote })
+      // Opened by name with `w`, which follows a link to what it names.
+      const link = entries[remote]?.link
+      if (link !== undefined) {
+        entries[link] = { ...entries[link], size: 1024 }
+        cb(null)
+        return
+      }
       // ssh2 opens the destination and applies `mode` before the first byte.
       const mode = transfer.mode ?? entries[remote]?.mode ?? opts.newFileMode ?? 0o644
       if (opts.modeAtWrite) opts.modeAtWrite[remote] = mode
@@ -231,6 +313,7 @@ function stubSession(
       cb(null, {
         isDirectory: () => entry.dir === true,
         isSymbolicLink: () => entry.link !== undefined,
+        isFile: () => entry.dir !== true && entry.link === undefined,
         size: entry.size ?? 0,
         mtime: 0,
         mode: entry.mode ?? 0o644,
@@ -260,10 +343,12 @@ function stubSession(
      * its sides are done. Nothing reads the far side of a PassThrough here, so
      * one would finish, never close, and hang the transfer.
      */
-    createWriteStream(path: string, options?: { mode?: number }): Writable {
+    createWriteStream(path: string, options?: { mode?: number; handle?: Buffer }): Writable {
       calls.push({ op: 'write', path })
+      const into = options?.handle ? heldBy(options.handle) : undefined
       // Opened, then fchmod to `mode`: 0666 when none is given, as in ssh2.
-      const mode = options?.mode ?? 0o666
+      // Handed a handle, it writes into what that holds, at the mode it has.
+      const mode = into ? (into.mode ?? 0o666) : (options?.mode ?? 0o666)
       if (opts.modeAtWrite) opts.modeAtWrite[path] = mode
       const chunks: Buffer[] = []
       return new Writable({
@@ -273,7 +358,8 @@ function stubSession(
         },
         final(cb: (err?: Error | null) => void): void {
           if (opts.received) opts.received[path] = Buffer.concat(chunks).toString('utf8')
-          entries[path] = { size: Buffer.concat(chunks).length, mode }
+          if (into) into.size = Buffer.concat(chunks).length
+          else entries[path] = { size: Buffer.concat(chunks).length, mode }
           cb()
         }
       })
@@ -328,7 +414,7 @@ describe('running a transfer plan', () => {
     expect(result).toEqual({ written: 2, skipped: 0, changed: [] })
     // Each goes up under a name of its own and is moved into place at the end.
     const puts = calls.filter((c) => c.op === 'fastPut')
-    expect(puts.map((c) => c.path)).toEqual(['/local/a.txt', '/local/b.txt'])
+    expect(puts).toHaveLength(2)
     for (const put of puts) expect(put.to).toMatch(PARTIAL)
     expect(calls.filter((c) => c.op === 'rename').map((c) => c.to)).toEqual([
       '/srv/a.txt',
@@ -698,6 +784,32 @@ describe('running a transfer plan', () => {
     expect(Object.keys(entries).filter((p) => PARTIAL.test(p))).toEqual([])
   })
 
+  /*
+   * The copy was created, closed, and opened again by name to be written. In
+   * a folder somebody else can write to, the name swapped for a link in
+   * between had the upload written into whatever the link named.
+   */
+  it('writes nothing through a link put at its copy’s name', async () => {
+    const entries: Record<string, Entry> = {
+      '/srv/drop': { dir: true },
+      '/root/victim': { size: 5 }
+    }
+    attach(
+      'conn',
+      stubSession([], entries, {
+        afterOpen: (path) => {
+          if (PARTIAL.test(path)) entries[path] = { link: '/root/victim' }
+        }
+      })
+    )
+
+    await expect(
+      sftpManager.runPlan('conn', plan('upload', [item('/local/a.txt', '/srv/drop/a.txt')]))
+    ).rejects.toThrow(/replaced/)
+    expect(entries['/root/victim']).toEqual({ size: 5 })
+    expect(entries['/srv/drop/a.txt']).toBeUndefined()
+  })
+
   it('reports progress against the file it is moving', async () => {
     attach('conn', stubSession([], { '/srv': { dir: true } }))
     const seen: Array<[number, number, string]> = []
@@ -709,10 +821,9 @@ describe('running a transfer plan', () => {
       (transferred, total, path) => seen.push([transferred, total, path])
     )
 
-    expect(seen).toEqual([
-      [512, 1024, '/local/a.txt'],
-      [1024, 1024, '/local/a.txt']
-    ])
+    expect(seen.length).toBeGreaterThan(0)
+    for (const [, total, path] of seen) expect([total, path]).toEqual([1024, '/local/a.txt'])
+    expect(seen[seen.length - 1]).toEqual([1024, 1024, '/local/a.txt'])
   })
 
   it('refuses a host-to-host copy with nowhere to put it', async () => {
