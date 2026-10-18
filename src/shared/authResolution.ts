@@ -1,4 +1,5 @@
 import { applyCredential } from './credentials'
+import { inheritanceChain } from './inheritance'
 import { isSet } from './overrides'
 import type { Protocol } from './protocols'
 import type {
@@ -64,7 +65,7 @@ function asRdpLevel(group: AuthDefaults & RdpLoginDefaults): AuthDefaults {
  * that group's parent, and so on. Nearest definition wins.
  *
  * A host an inventory puts in groups beyond that one chain reads them all,
- * latest in Ansible's order first; see `levelsOf`. And a top group that no
+ * latest in Ansible's order first; see `inheritanceChain`. And a top group that no
  * `all` holds has all's word just beneath it; see `withAll`.
  *
  * For an RDP host every group is seen through `asRdpLevel`; the host itself is
@@ -76,84 +77,9 @@ export function authChain(
   groups: SessionGroup[],
   context: AuthContext = {}
 ): AuthDefaults[] {
-  const chain = withAll(levelsOf(own, groupId, groups))
+  const chain = withAll(inheritanceChain(own, groupId, groups, optedOut))
   if (context.protocol !== 'rdp') return chain
   return chain.map((level, i) => (i === 0 ? level : groupLevelFor(level, 'rdp')))
-}
-
-/**
- * The item and the groups above it, nearest first.
- *
- * Ansible reads every group a host is in and all of their parents, in one
- * order — shallower first, by name within a level — and the last to state a
- * setting wins. One chain up from the host's group missed the rest: with web
- * under both prod and stage, the chain through stage never saw prod's
- * deploy:2222. So for a host with `groupOrder` every group it reaches is read
- * in that order, each as it stands with its local settings, and what lies
- * above the inventory's groups — a source's own settings, a folder of the
- * user's — comes after them, as it did. A group that opts out of inheriting
- * still ends the walk up through it.
- */
-function levelsOf(
-  own: AuthDefaults,
-  groupId: string | null,
-  groups: SessionGroup[]
-): AuthDefaults[] {
-  if (optedOut(own)) return [own]
-  const byId = new Map(groups.map((g) => [g.id, g]))
-  type Walked = {
-    groupOrder?: string[]
-    memberOf?: string[]
-    frozen?: Record<string, SessionGroup>
-  }
-  const { groupOrder, memberOf } = own as Walked
-  /*
-   * Groups a git folder left out, read in their place. The host and every
-   * group reached bring the ones they sit below; see SessionGroup.frozen.
-   */
-  const frozen = new Map(Object.entries((own as Walked).frozen ?? {}))
-  const lookup = (id: string | null | undefined): SessionGroup | undefined =>
-    id ? (byId.get(id) ?? frozen.get(id)) : undefined
-  /*
-   * The next step up. A top group below another file's all goes there first,
-   * and all leads on to the same parent — for a group being shown as for a
-   * host: a's local settings said nothing of the all it inherits from. A group
-   * a git folder hangs lower goes to its parent in the repository.
-   */
-  const above = (level: { allId?: string; repoParentId?: string }, parentId: string | null) =>
-    lookup(level.allId)?.id ?? lookup(level.repoParentId)?.id ?? parentId
-
-  // Up from each start, in the order found, stopping at a group that opts out.
-  const reached: SessionGroup[] = []
-  const seen = new Set<string>()
-  for (const start of [
-    above(own as SessionGroup, groupId),
-    ...(groupOrder ? (memberOf ?? []) : [])
-  ]) {
-    let id = start
-    let group = lookup(id)
-    while (id && group && !seen.has(id)) {
-      seen.add(id)
-      reached.push(group)
-      for (const [key, level] of Object.entries(group.frozen ?? {})) {
-        if (!frozen.has(key)) frozen.set(key, level)
-      }
-      if (optedOut(group)) break
-      id = above(group, group.parentId)
-      group = lookup(id)
-    }
-  }
-  if (!groupOrder) return [own, ...reached]
-  // The inventory's groups in Ansible's order, latest first, then what lies
-  // above them — the source's login and jump host — from whichever walk got
-  // there: from the host's own chain alone, a group there opting out lost it.
-  const listed = new Set(groupOrder)
-  const found = new Set(reached.map((g) => g.id))
-  const inventory = [...groupOrder]
-    .reverse()
-    .filter((id) => found.has(id))
-    .map((id) => lookup(id)!)
-  return [own, ...inventory, ...reached.filter((g) => !listed.has(g.id))]
 }
 
 /**

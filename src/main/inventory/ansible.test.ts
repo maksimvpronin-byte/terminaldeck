@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { parse } from 'yaml'
 import { parseAnsibleInventory, protocolFromVars, varsToAuth, groupId, hostId } from './ansible'
 import { resolveAuth } from '../../shared/authResolution'
+import { resolveRdp } from '../../shared/rdpResolution'
 import { applyOverride } from '../../shared/overrides'
 
 const SRC = 'src1'
@@ -998,6 +999,28 @@ all:
       username: 'deploy',
       port: 2222
     })
+  })
+
+  /*
+   * The desktop settings went by the group the host hangs off alone: a
+   * gateway set on a, with h placed under z, was lost and h unreachable.
+   */
+  it('reads desktop settings from every group too', () => {
+    const { groups, hosts } = parseAnsibleInventory(
+      parse(`
+all:
+  vars: { terminaldeck_protocol: rdp }
+  children:
+    a: { hosts: { h: {} } }
+    z: { hosts: { h: {} } }
+`),
+      SRC
+    )
+    const local = groups.map((g) =>
+      applyOverride(g, g.name === 'a' ? { nodeId: g.id, gatewayHost: 'gw.internal' } : undefined)
+    )
+    const h = hosts[0]
+    expect(resolveRdp(h, h.groupId ?? null, local).gatewayHost).toBe('gw.internal')
   })
 
   it('still lets the host’s own settings win', () => {

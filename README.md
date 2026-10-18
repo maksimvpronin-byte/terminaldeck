@@ -43,7 +43,8 @@ sequential and retain the conflict dialog.
   there and survive every sync
 - A host named by **several groups appears under each of them**, marked with the count, and stays
   a single host throughout — one set of local overrides, one entry in a collection, one terminal.
-  Its connection settings come from **every group that names it and all their parents**, in
+  Its connection settings — and its desktop settings and look — come from **every group that
+  names it and all their parents**, in
   Ansible's order: deeper groups after shallower ones, alphabetically within a level, the last to
   state a setting winning. Each group is read as it stands, local settings included, so a local
   login on any of them takes its place in that order — and `all`, stated or not, is the
