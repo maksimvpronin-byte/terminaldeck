@@ -416,6 +416,39 @@ describe('a group written down in more than one place', () => {
     }
   })
 
+  /* A top group that opts out of inheriting does not lead up to another file's all. */
+  it('stops at a top group that opts out, before another file’s all', () => {
+    const result = read(
+      repo({
+        '1.yml': 'all:\n  vars:\n    ansible_user: all-user\n',
+        '2.yml': 'a:\n  hosts:\n    h: {}\n'
+      }),
+      ['1.yml', '2.yml']
+    )
+    const local = result.groups.map((g) =>
+      applyOverride(g, g.name === 'a' ? { nodeId: g.id, inheritAuth: false } : undefined)
+    )
+    const h = result.hosts.find((x) => x.name === 'h')!
+    expect(resolveAuth(h, h.groupId ?? null, local).username).toBe('')
+  })
+
+  /* a, below all, opts out; z of the other file still leads up to all. */
+  it('reaches another file’s all through a top group that inherits', () => {
+    const result = read(
+      repo({
+        '1.yml':
+          'all:\n  vars:\n    ansible_user: all-user\n  children:\n    a:\n      hosts:\n        h: {}\n',
+        '2.yml': 'z:\n  hosts:\n    h: {}\n'
+      }),
+      ['1.yml', '2.yml']
+    )
+    const local = result.groups.map((g) =>
+      applyOverride(g, g.name === 'a' ? { nodeId: g.id, inheritAuth: false } : undefined)
+    )
+    const h = result.hosts.find((x) => x.name === 'h')!
+    expect(resolveAuth(h, h.groupId ?? null, local).username).toBe('all-user')
+  })
+
   /* a opts out of inheriting; z, which h is in too, still reads all. */
   it('reads all for a host while one of its groups still inherits', () => {
     const result = read(

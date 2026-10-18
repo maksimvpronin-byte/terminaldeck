@@ -362,6 +362,13 @@ export interface SessionGroup
    */
   fromAll?: AuthDefaults
   /**
+   * The `all` node another file states, for a top group of a file that does
+   * not: every group is below all, and the walk up from this one goes there
+   * before its parent — so a group that opts out of inheriting stops short of
+   * it, and another that does not still leads to it.
+   */
+  allId?: string
+  /**
    * Worn by the folder in the tree, and by every host inside it that has no
    * colour of its own — in the tree and on the tabs they open. The nearest
    * colour wins: a host's own, then its folder's, then that folder's parent's.

@@ -238,6 +238,22 @@ describe('pruneTree with the hosts of child groups', () => {
     expect(resolveAuth(h, h.groupId ?? null, pruned.groups).username).toBe('deploy')
   })
 
+  /* a, of a file without all, sits below another file's all, which is kept. */
+  it('keeps another file’s all above a top group it holds', () => {
+    const all = { ...group('all', FOLDER), username: 'all-user' }
+    const a = { ...group('a', FOLDER), allId: all.id }
+    const h = { ...host('h', 'a'), groupOrder: [all.id, a.id] }
+    const full: GitFolderTree = {
+      groupId: FOLDER,
+      groups: [all, a],
+      sessions: [h],
+      memberships: { [h.id]: [a.id] }
+    }
+    const pruned = pruneTree(FOLDER, full, ['all', 'a'])
+    const kept = pruned.sessions[0]
+    expect(resolveAuth(kept, kept.groupId ?? null, pruned.groups).username).toBe('all-user')
+  })
+
   it('keeps settings from the group a host names, and lists it under both', () => {
     const pruned = pruneTree(FOLDER, referenced(), ['all/cluster', 'all/worker'], true)
     const w1 = pruned.sessions.find((s) => s.name === 'w1')!

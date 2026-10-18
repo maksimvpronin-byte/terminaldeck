@@ -363,7 +363,8 @@ export function parseAnsibleInventories(
   const groups: SessionGroup[] = [...nodes.values()].map((node) => ({
     ...node,
     ...varsToAuth(varsOf(node.name)),
-    ...(!allNode && underAll(node) && Object.keys(allAuth).length > 0 ? { fromAll: allAuth } : {})
+    ...(!allNode && underAll(node) && Object.keys(allAuth).length > 0 ? { fromAll: allAuth } : {}),
+    ...(allNode && underAll(node) ? { allId: allNode.id } : {})
   }))
   const groupById = new Map(groups.map((g) => [g.id, g]))
   /**
@@ -430,9 +431,11 @@ export function parseAnsibleInventories(
       }
     }
     // Every group is below all: with all a node of its own, a host reached
-    // only through another file's top group is below it too.
-    const belowAll = allNode && !ancestors.has(allNode.id) && [...ancestors.values()].some(underAll)
-    if (belowAll) ancestors.set(allNode.id, groupById.get(allNode.id)!)
+    // through another file's top group is below it too, and reads it in its
+    // place; the walk up gets there through the group's allId.
+    if (allNode && [...ancestors.values()].some(underAll)) {
+      ancestors.set(allNode.id, groupById.get(allNode.id)!)
+    }
     const inAnsibleOrder = [...ancestors.values()].sort(
       (a, b) =>
         depthOf(a.id) - depthOf(b.id) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id)
@@ -474,7 +477,7 @@ export function parseAnsibleInventories(
       ...(spread
         ? {
             groupOrder: inAnsibleOrder.map((g) => g.id),
-            memberOf: belowAll ? [...ordered, allNode.id] : ordered
+            memberOf: ordered
           }
         : {})
     })

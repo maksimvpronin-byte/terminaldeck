@@ -120,7 +120,9 @@ function levelsOf(
       reached.add(id)
       if (!listed.has(id)) above.push(group)
       if (optedOut(group)) break
-      id = group.parentId
+      // A top group below another file's all goes there first; all leads on
+      // to the same parent.
+      id = group.allId && byId.has(group.allId) ? group.allId : group.parentId
       group = id ? byId.get(id) : undefined
     }
   }
