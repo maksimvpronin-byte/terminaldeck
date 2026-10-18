@@ -53,14 +53,15 @@ export default function HostPalette({ onClose }: { onClose: () => void }): JSX.E
     listRef.current?.querySelector('.palette-row.active')?.scrollIntoView({ block: 'nearest' })
   }, [cursor])
 
-  function chosen(): Entry[] {
+  /** What opening means now: the marked hosts, or the one at `at` — the cursor's row unless said. */
+  function chosen(at = cursor): Entry[] {
     if (picked.size > 0) return matches.filter((e) => picked.has(e.id))
-    const one = matches[cursor]
+    const one = matches[at]
     return one ? [one] : []
   }
 
-  function open(mode: OpenMode): void {
-    const list = chosen()
+  function open(mode: OpenMode, at?: number): void {
+    const list = chosen(at)
     if (list.length === 0) return
     if (list.length === 1 && mode === 'tabs') {
       openHost(list[0].title, list[0].target, list[0].color)
@@ -139,7 +140,10 @@ export default function HostPalette({ onClose }: { onClose: () => void }): JSX.E
               onMouseEnter={() => setCursor(i)}
               onClick={() => {
                 setCursor(i)
-                open('tabs')
+                // Its own row, said outright: the cursor set just above has
+                // not landed yet, and with the arrow keys having moved it
+                // since the pointer came in, the row above was opened.
+                open('tabs', i)
               }}
             >
               <span
