@@ -2,6 +2,7 @@ import { collectLeaves, type PaneNode, type PaneTarget } from './paneTree'
 import type { AppState, Workspace, WorkspaceTab } from './slices/types'
 import { findHost } from './hosts'
 import { protocolOf } from '../../../shared/protocols'
+import { authChain, defaultCredential } from '../../../shared/authResolution'
 
 /** Shape shared by the store and the persisted layout, so both can be walked. */
 interface HasWorkspaces {
@@ -126,13 +127,20 @@ export function nextOpenPaneOf(
 export function paneToReuse(
   state: HasWorkspaces,
   sessionId: string,
-  account?: { credentialId: string | undefined; admin?: boolean }
+  account?: {
+    credentialId: string | undefined
+    admin?: boolean
+    /** The account the host opens with when none is named: naming it is the same session. */
+    defaultCredentialId?: string
+  }
 ): { tabId: string; paneId: string } | undefined {
+  const named = (id: string | undefined): string | undefined =>
+    id === account?.defaultCredentialId ? undefined : id
   const fits = (leaf: ReturnType<typeof collectLeaves>[number]): boolean =>
     leaf.target.kind === 'session' &&
     leaf.target.sessionId === sessionId &&
     (!account ||
-      (leaf.target.credentialId === account.credentialId &&
+      (named(leaf.target.credentialId) === named(account.credentialId) &&
         (leaf.target.admin === true) === (account.admin === true)))
   const current = activeTab(state)
   const front = current && collectLeaves(current.root).find((l) => l.id === current.activePaneId)
@@ -163,8 +171,22 @@ export function openDesktop(
   if (protocolOf(findHost(state, target.sessionId)?.host) !== 'rdp') return undefined
   return paneToReuse(state, target.sessionId, {
     credentialId: target.credentialId,
-    admin: target.admin
+    admin: target.admin,
+    defaultCredentialId: defaultAccountOf(state, target.sessionId)
   })
+}
+
+/**
+ * The account a desktop opens with when none is named. Connect as… naming
+ * it is the same Windows session, and was taken for another.
+ */
+export function defaultAccountOf(state: AppState, sessionId: string): string | undefined {
+  const found = findHost(state, sessionId)
+  if (!found) return undefined
+  return defaultCredential(
+    authChain(found.host, found.host.groupId ?? null, found.groups, { protocol: 'rdp' }),
+    state.credentials
+  )?.id
 }
 
 /**

@@ -18,6 +18,7 @@ import {
   allTabs,
   mapTab,
   nextOpenPaneOf,
+  defaultAccountOf,
   openDesktop,
   paneToReuse,
   workspaceOfTab
@@ -289,7 +290,13 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
         paneToReuse(
           s,
           target.sessionId,
-          desktop ? { credentialId: target.credentialId, admin: target.admin } : undefined
+          desktop
+            ? {
+                credentialId: target.credentialId,
+                admin: target.admin,
+                defaultCredentialId: defaultAccountOf(s, target.sessionId)
+              }
+            : undefined
         )
       if (place) {
         get().setActiveTab(place.tabId)

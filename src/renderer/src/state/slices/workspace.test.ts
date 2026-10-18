@@ -425,6 +425,30 @@ describe('openHost: an open host is brought forward rather than opened again', (
     expect(useStore.getState().wakeRequest).toMatchObject({ paneId: first })
   })
 
+  /*
+   * The host's own account, named in Connect as…, is the account it opens
+   * with anyway — one Windows session — and was taken for another.
+   */
+  it('takes Connect as… the host’s own account for the desktop already open', () => {
+    seed()
+    useStore.setState((st) => ({
+      credentials: [
+        {
+          id: 'ops',
+          name: 'Ops',
+          username: 'ops',
+          authMethod: 'password',
+          createdAt: 0,
+          updatedAt: 0
+        }
+      ],
+      sessions: st.sessions.map((h) => (h.id === 'dc' ? { ...h, credentialId: 'ops' } : h))
+    }))
+    const first = open('dc')
+    expect(open('dc', { credentialId: 'ops' })).toBe(first)
+    expect(tabCount()).toBe(1)
+  })
+
   it('opens console mode beside an ordinary desktop rather than bringing that one forward', () => {
     seed()
     const ordinary = open('dc')
