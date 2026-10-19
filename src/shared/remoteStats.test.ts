@@ -33,6 +33,16 @@ tmpfs              400000     1000    399000       1% /run
 `
 
 describe('parseProbe', () => {
+  /*
+   * guest and guest_nice are already inside user and nice; summed again, a
+   * host running virtual machines read busier than it was — 66.7% for 50.
+   */
+  it('counts the time spent running guests once', () => {
+    const sample = parseProbe('#cpu\ncpu  50 0 0 50 0 0 0 0 50 0\n', 0)
+    expect(sample.cpuTotal).toBe(100)
+    expect(sample.cpuBusy).toBe(50)
+  })
+
   it('reads every section out of one round trip', () => {
     const s = parseProbe(PROBE, 1000)
     expect(s.user).toBe('max')

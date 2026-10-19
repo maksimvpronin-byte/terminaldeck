@@ -87,7 +87,10 @@ export function parseProbe(output: string, at: number): RemoteSample {
       // themselves and would overwrite it with one core's figures.
     } else if (section === 'cpu' && /^cpu\s/.test(line)) {
       // user nice system idle iowait irq softirq steal …
-      const fields = line.split(/\s+/).slice(1).map(Number).filter(Number.isFinite)
+      // Up to steal, and no further: guest and guest_nice, after it, are
+      // already counted inside user and nice, and summed again they made a
+      // host running virtual machines read busier than top says it is.
+      const fields = line.split(/\s+/).slice(1, 9).map(Number).filter(Number.isFinite)
       if (fields.length >= 5) {
         const total = fields.reduce((sum, n) => sum + n, 0)
         // Waiting on disk is not the processor working, so iowait joins idle.
