@@ -6,7 +6,20 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
-## 0.29.3
+## 0.30.0
+
+0.29.3 was built and never published; what it held is here, under Fixed.
+
+### Added
+
+- **Scroll up in vi to see what came before it.** A full-screen program —
+  vi, nano, top — draws on a screen of its own with no history, so the
+  wheel there reached nothing. Wheel up now lays the terminal's history over
+  the pane with the program's screen at the bottom, so the program slides
+  down and what was there before it comes in above. Scroll down past the end,
+  or press any key, to go back; the program is not touched. `less` and
+  `man` keep the wheel as before, and so does a program that takes the mouse
+  itself.
 
 ### Fixed
 
