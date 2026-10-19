@@ -488,9 +488,31 @@ class SFTPManager {
     const shell = this.getShell(connectionId)
     if (shell) return shell.realpath(remotePath)
     const sftp = await this.getSftp(connectionId)
-    return new Promise((resolve, reject) => {
-      sftp.realpath(remotePath, (err, resolved) => (err ? reject(err) : resolve(resolved)))
-    })
+    const ask = (path: string): Promise<string> =>
+      new Promise((resolve, reject) => {
+        sftp.realpath(path, (err, resolved) => (err ? reject(err) : resolve(resolved)))
+      })
+    /*
+     * `~` is the shell's word and not SFTP's: OpenSSH's REALPATH takes it as
+     * a folder of that name in the one SFTP started in, and the path bar went
+     * nowhere. The server expands it where it offers to — `~postgres` too;
+     * elsewhere `~` is the folder SFTP started in, which is the home folder
+     * unless the server says otherwise.
+     */
+    if (remotePath.startsWith('~')) {
+      const offered = (sftp as unknown as { _extensions?: Record<string, string> })._extensions
+      if (offered?.['expand-path@openssh.com']) {
+        const expanded = await new Promise<string>((resolve, reject) =>
+          sftp.ext_openssh_expandPath(remotePath, (err, path) =>
+            err ? reject(err) : resolve(path)
+          )
+        )
+        return ask(expanded)
+      }
+      if (remotePath === '~') return ask('.')
+      if (remotePath.startsWith('~/')) return ask(joinRemote(await ask('.'), remotePath.slice(2)))
+    }
+    return ask(remotePath)
   }
 
   /** A stat that answers "missing" rather than throwing, for existence checks. */

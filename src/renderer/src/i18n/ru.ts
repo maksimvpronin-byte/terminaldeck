@@ -1377,6 +1377,8 @@ export const ru: Record<string, string> = {
     'Файл, изменившийся во время передачи, остаётся как есть, и об этом сообщается',
   'Downloading a link to a folder downloads the folder':
     'Скачивание ссылки на папку скачивает саму папку',
+  'A path typed there may start with ~, or ~user where the server allows it':
+    'Набранный там путь может начинаться с ~, а где сервер позволяет — и с ~user',
   'Inside a folder, a link to a file goes as the file, both ways; a link to a folder is left out':
     'Внутри папки ссылка на файл передаётся как сам файл, в обе стороны; ссылка на папку пропускается',
   'A save made just before its tab or connection closes is still sent':

@@ -489,6 +489,7 @@ const CHAPTERS: Chapter[] = [
               },
               { what: 'Right-click a result for Show in its folder' },
               { what: '⊞ in the path bar shows a folder tree beside the listing' },
+              { what: 'A path typed there may start with ~, or ~user where the server allows it' },
               { what: 'Columns give size, date, permissions, owner and group, coloured by kind' },
               { what: 'Drag a column’s edge to widen it; widths and the sort order are remembered' }
             ]

@@ -1231,6 +1231,47 @@ describe('links in a folder being uploaded', () => {
   })
 })
 
+/*
+ * `~` is the shell's word and not SFTP's: OpenSSH's REALPATH takes it as a
+ * folder of that name in the one SFTP started in. Typed into the path bar, it
+ * went nowhere.
+ */
+describe('a path that starts at home', () => {
+  function homeSession(expand?: (path: string) => string): SFTPWrapper {
+    return {
+      _extensions: expand ? { 'expand-path@openssh.com': '1' } : {},
+      realpath(path: string, cb: (err: Error | null, resolved?: string) => void): void {
+        if (path === '.') return cb(null, '/home/u')
+        cb(null, path.startsWith('/') ? path : `/home/u/${path}`)
+      },
+      ext_openssh_expandPath(path: string, cb: (err: Error | null, out?: string) => void): void {
+        cb(null, expand!(path))
+      }
+    } as unknown as SFTPWrapper
+  }
+
+  it('opens the folder SFTP started in for ~, and below it for ~/…', async () => {
+    attach('home', homeSession())
+    await expect(sftpManager.realpath('home', '~')).resolves.toBe('/home/u')
+    await expect(sftpManager.realpath('home', '~/logs')).resolves.toBe('/home/u/logs')
+  })
+
+  it("asks the server to expand it where the server offers to, someone else's home too", async () => {
+    attach(
+      'home',
+      homeSession((p) => p.replace(/^~postgres/, '/var/lib/pgsql'))
+    )
+    await expect(sftpManager.realpath('home', '~postgres/data')).resolves.toBe(
+      '/var/lib/pgsql/data'
+    )
+  })
+
+  it('leaves every other path to the server as it was typed', async () => {
+    attach('home', homeSession())
+    await expect(sftpManager.realpath('home', 'logs/~x')).resolves.toBe('/home/u/logs/~x')
+  })
+})
+
 describe('SCP/Shell routing', () => {
   it.each(['source', 'destination'])(
     'relays between SFTP and SCP with the SCP endpoint as %s',
