@@ -5,6 +5,7 @@ import { join } from 'path'
 import {
   ClipboardDownload,
   cleanClipboardDownloads,
+  keepOnlyClipboardDownload,
   readFileDescriptors
 } from './ClipboardDownload'
 
@@ -208,4 +209,31 @@ it('ends at once, saying so, when the host refuses to hand the file over', () =>
   expect(status.mock.lastCall?.[2]).toMatch(/refused to hand over/)
   vi.advanceTimersByTime(60000)
   expect(requests).toHaveLength(1)
+})
+
+/*
+ * Finished downloads were kept until the application quit: a day of copying
+ * large files out of desktops filled the system disk. The clipboard offers
+ * one batch at a time, and the rest go once a newer one is on it.
+ */
+it('lets go of earlier copies once a newer one is on the clipboard', () => {
+  const finished: string[] = []
+  const fetch = (): void => {
+    const requests: Array<{ stream: number }> = []
+    const download = new ClipboardDownload(
+      (r) => requests.push(r),
+      (paths) => finished.push(join(paths[0], '..')),
+      () => undefined
+    )
+    download.start(manifest([{ name: 'big.iso', size: 4 }]))
+    download.receive(packet(requests[0].stream, Buffer.from('data')))
+  }
+  fetch()
+  fetch()
+  expect(finished.every((dir) => existsSync(dir))).toBe(true)
+
+  keepOnlyClipboardDownload(finished[1])
+
+  expect(existsSync(finished[0])).toBe(false)
+  expect(existsSync(finished[1])).toBe(true)
 })

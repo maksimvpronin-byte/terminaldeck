@@ -65,6 +65,28 @@ export function readFileDescriptors(data: Buffer): ClipboardEntry[] {
 
 let nextStream = 1
 const completedDirectories = new Set<string>()
+/**
+ * Lets go of every finished download but the one now on this machine's
+ * clipboard.
+ *
+ * They were kept until the application quit, the clipboard having moved on
+ * long before: a day of copying large files out of desktops filled the
+ * system disk, and the next copy failed for want of the space the old ones
+ * held. One the clipboard no longer offers is not needed any more — the
+ * newest is kept, since something it was pasted into may read it later.
+ */
+export function keepOnlyClipboardDownload(dir: string): void {
+  for (const old of completedDirectories) {
+    if (old === dir) continue
+    try {
+      rmSync(old, { recursive: true, force: true })
+      completedDirectories.delete(old)
+    } catch {
+      /* An external application may still hold a file; tried again later. */
+    }
+  }
+}
+
 export function cleanClipboardDownloads(): void {
   for (const dir of completedDirectories) {
     try {

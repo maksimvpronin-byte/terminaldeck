@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from 'child_process'
-import { join } from 'path'
+import { dirname, join } from 'path'
 import { X509Certificate } from 'crypto'
 import { app, clipboard, type BrowserWindow } from 'electron'
 import { IPC } from '../../shared/ipc-channels'
@@ -7,7 +7,11 @@ import { askAboutCertificate } from './certificateVerifier'
 import { isUnlocked, requireUnlocked } from '../vault/locked'
 import { createRecordReader, encodeCommand, readCursor, readFrame, RECORD } from './recordStream'
 import { complaintIn, failureText, isEcho } from './clientLog'
-import { ClipboardDownload, cleanClipboardDownloads } from './ClipboardDownload'
+import {
+  ClipboardDownload,
+  cleanClipboardDownloads,
+  keepOnlyClipboardDownload
+} from './ClipboardDownload'
 import { pathsToUris, readFileClipboard, writeClipboardFiles } from './clipboardFiles'
 import { currentInputLanguage, keyboardLayoutFor } from '../inputLanguage'
 import { diag } from '../diagnostics'
@@ -650,6 +654,8 @@ class FreeRdpBridge {
       }
       this.lastClipboardVersion = version
       this.lastClipboardFiles = pathsToUris(paths)
+      // What the clipboard offered before is not offered any more.
+      if (paths.length > 0) keepOnlyClipboardDownload(dirname(paths[0]))
       this.lastClipboardText = clipboard.readText()
       // A change for every other desktop, as with text: the one it came from has it.
       this.clipboardChange++
