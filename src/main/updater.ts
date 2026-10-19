@@ -32,7 +32,12 @@ const RECHECK_MS = 60 * 60 * 1000
  * this module imports Electron and cannot be loaded outside it.
  */
 function selfUpdating(): boolean {
-  return canReplaceItself(process.platform, existsSync(join(process.resourcesPath, ADHOC_MARKER)))
+  return canReplaceItself(
+    process.platform,
+    existsSync(join(process.resourcesPath, ADHOC_MARKER)),
+    // Set by electron-builder's portable launcher, and by nothing else.
+    Boolean(process.env.PORTABLE_EXECUTABLE_FILE)
+  )
 }
 
 let state: UpdateState = { status: 'idle' }

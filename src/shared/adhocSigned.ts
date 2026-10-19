@@ -16,10 +16,19 @@ export const ADHOC_MARKER = 'adhoc-signed'
 /**
  * Whether a build can install an update over itself.
  *
- * Only macOS can answer no, and only for the reason above. On Windows and Linux
- * an unsigned update installs perfectly well — SmartScreen complains about the
- * installer, which is a different conversation and not this one.
+ * Two cannot. An ad-hoc signed Mac build, for the reason above. And the
+ * portable Windows build: what the updater downloads and runs is the NSIS
+ * installer, which installs a copy of its own elsewhere and leaves the
+ * portable file as it was — started again, it was the old version, offering
+ * the same update. Otherwise an unsigned update installs perfectly well on
+ * Windows and Linux; SmartScreen complains about the installer, which is a
+ * different conversation and not this one.
  */
-export function canReplaceItself(platform: string, adhocSigned: boolean): boolean {
+export function canReplaceItself(
+  platform: string,
+  adhocSigned: boolean,
+  portable = false
+): boolean {
+  if (portable) return false
   return platform !== 'darwin' || !adhocSigned
 }

@@ -27,3 +27,9 @@ describe('whether a build can update itself', () => {
     expect(canReplaceItself('linux', true)).toBe(true)
   })
 })
+
+/* The portable build's update installed a separate copy and left it as it was. */
+it('leaves the portable Windows build to be replaced by hand', () => {
+  expect(canReplaceItself('win32', false, true)).toBe(false)
+  expect(canReplaceItself('win32', false, false)).toBe(true)
+})

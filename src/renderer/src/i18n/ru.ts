@@ -1388,6 +1388,8 @@ export const ru: Record<string, string> = {
     'Через ссылку внутри выбранной папки ничего не пишется, даже при «Заменить»',
   'A file changed while the transfer ran is kept as it is and reported, not replaced':
     'Файл, изменившийся во время передачи, остаётся как есть, и об этом сообщается',
+  'The portable Windows build points to the download page instead: an installer would not replace it':
+    'Переносная сборка для Windows вместо этого ведёт на страницу загрузки: установщик её не заменил бы',
   'A vars file may have no extension, or be .yml, .yaml or .json, as Ansible takes it':
     'Файл переменных может быть без расширения, .yml, .yaml или .json — как у Ansible',
   'A host range such as web[01:03].example.com becomes the hosts it names':

@@ -827,6 +827,9 @@ const CHAPTERS: Chapter[] = [
               },
               { what: 'Settings → About shows the version and asks for an update on the spot' },
               { what: 'After an update a plate above the window says what came with it' },
+              {
+                what: 'The portable Windows build points to the download page instead: an installer would not replace it'
+              },
               { what: 'What’s new, beside the version, reads the last few releases again' },
               {
                 what: 'An update installs now, at the next quit, or later — open connections are named first'
