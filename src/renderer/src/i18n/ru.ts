@@ -1005,6 +1005,9 @@ export const ru: Record<string, string> = {
   'Broadcast on — typing goes to': 'Трансляция включена — ввод уходит в',
   '{included} of {total}': '{included} из {total}',
   'Password required': 'Нужен пароль',
+  'Passphrase required': 'Нужна парольная фраза ключа',
+  'A key locked with a passphrase that is not saved asks for it on connecting':
+    'Для зашифрованного ключа без сохранённой фразы фразу спросят при подключении',
   'What this does': 'Что это',
   'Additional authentication': 'Дополнительная проверка',
   '⏎ open · ⇧⏎ tile · ⌥⏎ new workspace · Tab mark · ↑↓ move · esc close':

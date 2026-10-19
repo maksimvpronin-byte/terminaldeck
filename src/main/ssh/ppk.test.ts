@@ -3,7 +3,7 @@ import { utils, type ParsedKey } from 'ssh2'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { isPpk, ppkToOpenSsh, readPrivateKey } from './ppk'
+import { isPpk, keyNeedsPassphrase, ppkToOpenSsh, readPrivateKey } from './ppk'
 import { FIXTURES } from './ppk.fixtures'
 
 function publicBlobOf(ppk: string): Buffer {
@@ -107,5 +107,47 @@ describe('a key file under the home folder', () => {
       }
       rmSync(home, { recursive: true, force: true })
     }
+  })
+})
+
+/*
+ * A key locked with a passphrase that was not saved failed to connect with
+ * "no passphrase given"; ssh asks for it. This is how the connect knows to.
+ */
+describe('whether a key file needs its passphrase', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'td-keylock-'))
+  const write = (name: string, text: string): string => {
+    const path = join(dir, name)
+    writeFileSync(path, text)
+    return path
+  }
+
+  it('reads it from an OpenSSH key', () => {
+    const open = utils.generateKeyPairSync('ed25519').private
+    const locked = utils.generateKeyPairSync('ed25519', {
+      passphrase: 'secret',
+      cipher: 'aes256-ctr',
+      rounds: 2
+    }).private
+    expect(keyNeedsPassphrase(write('open', open))).toBe(false)
+    expect(keyNeedsPassphrase(write('locked', locked))).toBe(true)
+  })
+
+  it('reads it from a PuTTY key', () => {
+    for (const fixture of FIXTURES) {
+      expect(keyNeedsPassphrase(write(`f${FIXTURES.indexOf(fixture)}.ppk`, fixture.text))).toBe(
+        Boolean(fixture.passphrase)
+      )
+    }
+  })
+
+  it('reads it from the older PEM forms', () => {
+    const legacy =
+      '-----BEGIN RSA PRIVATE KEY-----\nProc-Type: 4,ENCRYPTED\nDEK-Info: AES-128-CBC,00\n\nAAAA\n-----END RSA PRIVATE KEY-----\n'
+    const pkcs8 =
+      '-----BEGIN ENCRYPTED PRIVATE KEY-----\nAAAA\n-----END ENCRYPTED PRIVATE KEY-----\n'
+    expect(keyNeedsPassphrase(write('legacy', legacy))).toBe(true)
+    expect(keyNeedsPassphrase(write('pkcs8', pkcs8))).toBe(true)
+    expect(keyNeedsPassphrase(join(dir, 'missing'))).toBe(false)
   })
 })

@@ -58,6 +58,15 @@ vi.mock('electron', () => ({
 const requestAuth = vi.fn()
 vi.mock('./authPrompt', () => ({ requestAuth: (...args: unknown[]) => requestAuth(...args) }))
 vi.mock('./hostVerifier', () => ({ makeHostVerifier: () => () => undefined }))
+const keyFile = { locked: false }
+const readPrivateKey = vi.fn(async (_path: string, passphrase?: string) => ({
+  privateKey: 'key',
+  passphrase
+}))
+vi.mock('./ppk', () => ({
+  keyNeedsPassphrase: () => keyFile.locked,
+  readPrivateKey: (path: string, passphrase?: string) => readPrivateKey(path, passphrase)
+}))
 vi.mock('../vault/locked', () => ({ requireUnlocked: () => undefined }))
 vi.mock('../vault/Vault', () => ({ vault: { getSecret: () => undefined } }))
 vi.mock('../inventory/InventoryStore', () => ({
@@ -86,12 +95,13 @@ function host(id: string, extra: Partial<SessionProfile> = {}): SessionProfile {
 
 const bastion = host('bastion')
 const target = host('target', { jumpHostId: 'bastion' })
+const keyed = host('keyed', { authMethod: 'privateKey', privateKeyPath: '/keys/id_ed25519' })
 const orphan = host('orphan', { jumpHostId: 'a-bastion-that-was-deleted' })
 const loopA = host('loopA', { jumpHostId: 'loopB' })
 const loopB = host('loopB', { jumpHostId: 'loopA' })
 vi.mock('../store/SessionStore', () => ({
   sessionStore: {
-    getAll: () => ({ sessions: [bastion, target, orphan, loopA, loopB], groups: [] })
+    getAll: () => ({ sessions: [bastion, target, keyed, orphan, loopA, loopB], groups: [] })
   }
 }))
 
@@ -196,5 +206,27 @@ describe('a route through jump hosts', () => {
   it('refuses jump hosts that lead back to themselves', async () => {
     await expect(sshManager.connectProfile(win, loopA, 80, 24)).rejects.toThrow(/lead back/)
     expect(clients).toEqual([])
+  })
+})
+
+/* A key locked with a passphrase nobody saved was refused with "no passphrase given". */
+describe('a key whose passphrase is not saved', () => {
+  it('is asked for, and the key read with the answer', async () => {
+    keyFile.locked = true
+    requestAuth.mockResolvedValueOnce(['typed passphrase'])
+    try {
+      await sshManager.connectProfile(win, keyed, 80, 24)
+      expect(requestAuth).toHaveBeenCalledTimes(1)
+      expect(readPrivateKey).toHaveBeenLastCalledWith('/keys/id_ed25519', 'typed passphrase')
+    } finally {
+      keyFile.locked = false
+      sshManager.releaseAll()
+    }
+  })
+
+  it('is not asked for a key that has none', async () => {
+    await sshManager.connectProfile(win, keyed, 80, 24)
+    expect(requestAuth).not.toHaveBeenCalled()
+    sshManager.releaseAll()
   })
 })

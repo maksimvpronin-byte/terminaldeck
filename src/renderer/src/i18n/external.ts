@@ -40,5 +40,7 @@ export const EXTERNAL_PHRASES = [
   // The SSH password and keyboard-interactive prompts the app asks itself
   'Password required',
   'Password',
+  'Passphrase required',
+  'Passphrase',
   'Additional authentication'
 ]

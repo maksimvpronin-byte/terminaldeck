@@ -193,6 +193,9 @@ const CHAPTERS: Chapter[] = [
                 what: 'Keys can be OpenSSH files or PuTTY .ppk of any version, with no converting'
               },
               {
+                what: 'A key locked with a passphrase that is not saved asks for it on connecting'
+              },
+              {
                 what: 'On Windows the SSH agent is Pageant or the OpenSSH Authentication Agent service'
               }
             ]

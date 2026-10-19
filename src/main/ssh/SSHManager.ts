@@ -25,7 +25,7 @@ import { vault } from '../vault/Vault'
 import { makeHostVerifier } from './hostVerifier'
 import { requireUnlocked } from '../vault/locked'
 import { requestAuth } from './authPrompt'
-import { readPrivateKey } from './ppk'
+import { keyNeedsPassphrase, readPrivateKey } from './ppk'
 import { AnsweringPageant } from './pageant'
 import { diag } from '../diagnostics'
 import { describeInput } from '../../shared/diagnostics'
@@ -348,11 +348,43 @@ async function buildAuthConfig(
   }
   if (auth.authMethod === 'privateKey') {
     if (!auth.privateKeyPath) throw new Error('No private key path configured')
-    const passphrase = auth.secretRef ? vault.getSecret(auth.secretRef) : undefined
+    let passphrase = auth.secretRef ? vault.getSecret(auth.secretRef) : undefined
+    // Locked and nothing saved for it: asked for, as `ssh` asks, rather than
+    // refused by ssh2 with "no passphrase given".
+    if (!passphrase && keyNeedsPassphrase(auth.privateKeyPath)) {
+      passphrase = await askPassphrase(
+        win,
+        `${auth.username}@${profile.host}`,
+        auth.privateKeyPath,
+        signal
+      )
+    }
     return { ...(await readPrivateKey(auth.privateKeyPath, passphrase)), ...forwarding(auth) }
   }
   // agent
   return { agent: localAgent(), agentForward: auth.agentForward }
+}
+
+/** Asks for a key's passphrase, for this connection only; nothing is saved. */
+async function askPassphrase(
+  win: BrowserWindow,
+  host: string,
+  keyPath: string,
+  signal?: AbortSignal
+): Promise<string> {
+  const answers = await requestAuth(
+    win,
+    {
+      host,
+      title: 'Passphrase required',
+      instructions: keyPath,
+      fields: [{ prompt: 'Passphrase', echo: false }]
+    },
+    { signal }
+  )
+  if (signal?.aborted) throw new ConnectCancelledError()
+  if (!answers) throw new Error('Authentication cancelled')
+  return answers[0]
 }
 
 /**
@@ -893,7 +925,18 @@ class SSHManager {
           ? { password: params.password }
           : params.authMethod === 'privateKey'
             ? params.privateKeyPath
-              ? await readPrivateKey(params.privateKeyPath, params.passphrase)
+              ? await readPrivateKey(
+                  params.privateKeyPath,
+                  params.passphrase ||
+                    (keyNeedsPassphrase(params.privateKeyPath)
+                      ? await askPassphrase(
+                          win,
+                          `${params.username}@${params.host}`,
+                          params.privateKeyPath,
+                          signal
+                        )
+                      : undefined)
+                )
               : { passphrase: params.passphrase }
             : { agent: localAgent() }
 

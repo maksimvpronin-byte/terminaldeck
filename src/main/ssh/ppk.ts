@@ -276,6 +276,37 @@ function expandHome(path: string): string {
  * A key file as ssh2 wants it: a PuTTY one converted, anything else as it is.
  * The passphrase goes along only when ssh2 still has something to decrypt.
  */
+/**
+ * Whether a key file is locked with a passphrase, read from the file itself.
+ *
+ * ssh2 is handed the key and refuses an encrypted one without its passphrase,
+ * and a host whose passphrase was not saved — the usual way to keep one —
+ * failed to connect with "no passphrase given" where `ssh` asks for it. This
+ * says when to ask. OpenSSH's own format names its cipher; the older PEM ones
+ * say so in a header; PuTTY's in its Encryption line.
+ */
+export function keyNeedsPassphrase(path: string): boolean {
+  let data: Buffer
+  try {
+    data = readFileSync(expandHome(path))
+  } catch {
+    return false
+  }
+  const text = data.toString('utf8')
+  if (isPpk(data)) return !/^Encryption:\s*none\s*$/m.test(text)
+  if (/-----BEGIN ENCRYPTED PRIVATE KEY-----/.test(text)) return true
+  if (/^Proc-Type:\s*4,ENCRYPTED/m.test(text)) return true
+  const body =
+    /-----BEGIN OPENSSH PRIVATE KEY-----([\s\S]*?)-----END OPENSSH PRIVATE KEY-----/.exec(text)
+  if (!body) return false
+  const raw = Buffer.from(body[1].replace(/\s+/g, ''), 'base64')
+  const magic = Buffer.from('openssh-key-v1\0', 'latin1')
+  if (raw.length < magic.length + 4 || !raw.subarray(0, magic.length).equals(magic)) return false
+  const length = raw.readUInt32BE(magic.length)
+  const cipher = raw.subarray(magic.length + 4, magic.length + 4 + length).toString('latin1')
+  return cipher !== 'none'
+}
+
 export async function readPrivateKey(
   path: string,
   passphrase: string | undefined
