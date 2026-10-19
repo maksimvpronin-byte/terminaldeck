@@ -288,6 +288,34 @@ describe('the RDP half of a group, and default accounts', () => {
   })
 })
 
+/*
+ * An SSH host switched to RDP keeps the method it had, and the dialog goes on
+ * showing that method's box: a key's passphrase, not a Windows password. That
+ * passphrase went to the desktop as the password.
+ */
+describe('a desktop that still says it signs in with a key', () => {
+  it('sends the far end no passphrase as its password', () => {
+    const own = { authMethod: 'privateKey' as const, privateKeyPath: '/k', secretRef: 'pp' }
+    expect(resolveAuth(own, null, [], { protocol: 'rdp' }).secretRef).toBeUndefined()
+    expect(
+      resolveAuth({ ...own, authMethod: 'agent' as const }, null, [], { protocol: 'rdp' }).secretRef
+    ).toBeUndefined()
+  })
+
+  it('keeps a desktop’s own password under a group that signs in with a key', () => {
+    const groups: SessionGroup[] = [
+      { id: 'keys', name: 'Keys', parentId: null, authMethod: 'privateKey', privateKeyPath: '/k' }
+    ]
+    expect(resolveAuth({ secretRef: 'win' }, 'keys', groups, { protocol: 'rdp' }).secretRef).toBe(
+      'win'
+    )
+    expect(
+      resolveAuth({ authMethod: 'password', secretRef: 'win' }, null, [], { protocol: 'rdp' })
+        .secretRef
+    ).toBe('win')
+  })
+})
+
 /**
  * A group a git folder left out, frozen on the host it held: read in its own
  * place, between the host and the group the host now hangs off.

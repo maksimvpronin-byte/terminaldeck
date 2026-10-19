@@ -106,6 +106,21 @@ function withoutPassphrases(chain: AuthDefaults[]): AuthDefaults[] {
       out[i] = { ...out[i], secretRef: undefined }
     }
   }
+  /*
+   * The host itself, by the method it states and not one it inherits: its
+   * own password stays under a group that signs in with a key. An SSH host
+   * switched to RDP keeps saying "private key", though, and its dialog goes on
+   * showing that method's box — a passphrase, which went to the desktop as
+   * the password.
+   */
+  const own = out[0]
+  if (
+    own &&
+    (own.authMethod === 'privateKey' || own.authMethod === 'agent') &&
+    isSet(own.secretRef)
+  ) {
+    out[0] = { ...own, secretRef: undefined }
+  }
   return out
 }
 
