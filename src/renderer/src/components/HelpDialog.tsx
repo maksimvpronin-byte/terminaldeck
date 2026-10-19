@@ -527,6 +527,9 @@ const CHAPTERS: Chapter[] = [
                 what: 'A file changed while the transfer ran is kept as it is and reported, not replaced'
               },
               { what: 'Downloading a link to a folder downloads the folder' },
+              {
+                what: 'Inside a folder, a link to a file goes as the file, both ways; a link to a folder is left out'
+              },
               { what: 'SCP / Shell can be set on a group, for every SSH host inside it' },
               {
                 what: 'With it, files are reached as another user, through a command such as sudo -n -i -u postgres'

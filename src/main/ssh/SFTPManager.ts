@@ -1167,8 +1167,18 @@ class SFTPManager {
     for (const entry of await readdir(localPath, { withFileTypes: true })) {
       const child = join(localPath, entry.name)
       if (entry.isDirectory()) out.push(...(await this.localTree(child, dest)))
-      else if (entry.isFile()) {
-        const childInfo = await stat(child)
+      else if (entry.isFile() || entry.isSymbolicLink()) {
+        /*
+         * A link is taken as a download takes one: to a file, it goes as that
+         * file's contents; to a folder, or to nothing, it is left out — a
+         * folder link can loop, or lead out of the tree. It used to be
+         * neither a file nor a folder here, and went missing without a word:
+         * `libapp.so` beside `libapp.so.1` never reached the server.
+         */
+        const childInfo = entry.isSymbolicLink()
+          ? await stat(child).catch(() => undefined)
+          : await stat(child)
+        if (!childInfo?.isFile()) continue
         out.push({
           sourcePath: child,
           destPath: remoteChild(dest, entry.name),

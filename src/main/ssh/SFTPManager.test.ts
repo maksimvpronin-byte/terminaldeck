@@ -1201,6 +1201,36 @@ describe('folders with nothing in them', () => {
   })
 })
 
+/*
+ * A link inside a folder being uploaded was neither a file nor a folder to
+ * the planner, and went missing without a word: `libapp.so` beside
+ * `libapp.so.1` never reached the server. Taken as a download takes it now —
+ * a link to a file goes as that file's contents; one to a folder, or to
+ * nothing, is left out.
+ */
+describe('links in a folder being uploaded', () => {
+  it('sends a link to a file as the file, and leaves out the others', async () => {
+    const lib = join(localDir, 'linked', 'lib')
+    mkdirSync(join(lib, 'sub'), { recursive: true })
+    writeFileSync(join(lib, 'libapp.so.1'), 'library', 'utf8')
+    symlinkSync('libapp.so.1', join(lib, 'libapp.so'))
+    symlinkSync('sub', join(lib, 'current'))
+    symlinkSync('missing', join(lib, 'dangling'))
+    const calls: Call[] = []
+    const entries: Record<string, Entry> = { '/srv': { dir: true } }
+    attach('conn', stubSession(calls, entries))
+
+    const planned = await sftpManager.planUpload('conn', lib, '/srv')
+
+    expect(planned.items.map((i) => i.destPath).sort()).toEqual([
+      '/srv/lib/libapp.so',
+      '/srv/lib/libapp.so.1',
+      '/srv/lib/sub'
+    ])
+    expect(planned.items.find((i) => i.destPath === '/srv/lib/libapp.so')?.sourceSize).toBe(7)
+  })
+})
+
 describe('SCP/Shell routing', () => {
   it.each(['source', 'destination'])(
     'relays between SFTP and SCP with the SCP endpoint as %s',
