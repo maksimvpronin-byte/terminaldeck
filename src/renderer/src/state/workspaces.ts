@@ -2,7 +2,7 @@ import { collectLeaves, type PaneNode, type PaneTarget } from './paneTree'
 import type { AppState, Workspace, WorkspaceTab } from './slices/types'
 import { findHost } from './hosts'
 import { protocolOf } from '../../../shared/protocols'
-import { authChain, defaultCredential } from '../../../shared/authResolution'
+import { authChain, defaultCredential, resolveAuth } from '../../../shared/authResolution'
 import { resolveRdp } from '../../../shared/rdpResolution'
 
 /** Shape shared by the store and the persisted layout, so both can be walked. */
@@ -135,6 +135,8 @@ export function paneToReuse(
     defaultCredentialId?: string
     /** The host opens in console mode anyway: asking for it is the same session. */
     consoleSession?: boolean
+    /** Who an account — undefined for the host's own — signs in as; see desktopLogin. */
+    loginOf?: (credentialId: string | undefined) => string | undefined
   }
 ): { tabId: string; paneId: string } | undefined {
   // The account each side really signs in as. A live pane opened with none
@@ -149,9 +151,22 @@ export function paneToReuse(
     leaf.target.kind === 'session' &&
     leaf.target.sessionId === sessionId &&
     (!account ||
-      (signsInAs(leaf) === (account.credentialId ?? account.defaultCredentialId) &&
+      (sameAccount(signsInAs(leaf), account.credentialId ?? account.defaultCredentialId) &&
         (leaf.target.admin === true || account.consoleSession === true) ===
           (account.admin === true || account.consoleSession === true)))
+  /*
+   * One account, or two that sign in as one user: a saved account with the
+   * login the host already has is that user's session all the same, and
+   * Connect as… it opened a second one, which Windows takes the first away
+   * for.
+   */
+  const sameAccount = (a: string | undefined, b: string | undefined): boolean => {
+    if (a === b) return true
+    const login = account?.loginOf
+    if (!login) return false
+    const left = login(a)
+    return left !== undefined && left === login(b)
+  }
   const current = activeTab(state)
   const front = current && collectLeaves(current.root).find((l) => l.id === current.activePaneId)
   if (current && front && fits(front)) return { tabId: current.id, paneId: front.id }
@@ -183,8 +198,32 @@ export function openDesktop(
     credentialId: target.credentialId,
     admin: target.admin,
     defaultCredentialId: defaultAccountOf(state, target.sessionId),
-    consoleSession: opensInConsole(state, target.sessionId)
+    consoleSession: opensInConsole(state, target.sessionId),
+    loginOf: (id) => desktopLogin(state, target.sessionId, id)
   })
+}
+
+/**
+ * Who a desktop signs in as with an account, or with the host's own login for
+ * none: lower-cased, since Windows reads user names without case. Undefined
+ * where nothing is known, which matches nothing.
+ */
+export function desktopLogin(
+  state: AppState,
+  sessionId: string,
+  credentialId: string | undefined
+): string | undefined {
+  const name = credentialId
+    ? state.credentials.find((c) => c.id === credentialId)?.username
+    : ((): string | undefined => {
+        const found = findHost(state, sessionId)
+        if (!found) return undefined
+        return resolveAuth(found.host, found.host.groupId ?? null, found.groups, {
+          protocol: 'rdp',
+          credentials: state.credentials
+        }).username
+      })()
+  return name?.trim() ? name.trim().toLowerCase() : undefined
 }
 
 /**

@@ -530,6 +530,31 @@ describe('openHost: an open host is brought forward rather than opened again', (
     expect(open('dc')).toBe(second)
   })
 
+  /*
+   * The host's own login and a saved account with the same one are one Windows
+   * user: Connect as… the account opened a second session, and Windows took
+   * the first away for it.
+   */
+  it('takes an account with the host’s own login for the desktop already open', () => {
+    seed()
+    useStore.setState((st) => ({
+      credentials: [
+        {
+          id: 'alice',
+          name: 'Alice',
+          username: 'corp\\Alice',
+          authMethod: 'password' as const,
+          createdAt: 0,
+          updatedAt: 0
+        }
+      ],
+      sessions: st.sessions.map((h) => (h.id === 'dc' ? { ...h, username: 'CORP\\alice' } : h))
+    }))
+    const first = open('dc')
+    expect(open('dc', { credentialId: 'alice' })).toBe(first)
+    expect(tabCount()).toBe(1)
+  })
+
   /* Two panes of one desktop in a layout saw only what was open already, not each other. */
   it('opens one desktop once from a layout that holds it twice', () => {
     seed()

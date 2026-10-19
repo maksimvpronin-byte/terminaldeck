@@ -21,6 +21,7 @@ import {
   nextOpenPaneOf,
   defaultAccountOf,
   desktopKey,
+  desktopLogin,
   openDesktop,
   opensInConsole,
   paneToReuse,
@@ -311,7 +312,8 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
                 credentialId: target.credentialId,
                 admin: target.admin,
                 defaultCredentialId: defaultAccountOf(s, target.sessionId),
-                consoleSession: opensInConsole(s, target.sessionId)
+                consoleSession: opensInConsole(s, target.sessionId),
+                loginOf: (id) => desktopLogin(s, target.sessionId, id)
               }
             : undefined
         )
