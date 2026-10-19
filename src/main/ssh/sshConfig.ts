@@ -98,20 +98,19 @@ export function parseSshConfig(text: string): SshConfigHost[] {
     }
   }
 
-  const hosts: SshConfigHost[] = []
-  for (const block of blocks.slice(1)) {
-    const [alias, ...others] = block.patterns?.filter((p) => !isPattern(p)) ?? []
-    if (!alias) continue
-    const host: SshConfigHost = {
-      alias,
-      ...(others.length > 0 ? { otherAliases: others } : {}),
-      hostname: '',
-      port: 22
-    }
+  /** One name as OpenSSH resolves it: its own block and every pattern that matches it. */
+  const resolve = (alias: string, block: Block): { host: SshConfigHost; named: boolean } => {
+    const host: SshConfigHost = { alias, hostname: '', port: 22 }
     const taken = new Set<string>()
+    const keys: string[] = []
     for (const from of blocks) {
       if (from !== block && !applies(from, alias)) continue
       for (const [keyword, value] of from.settings) {
+        // Every IdentityFile counts, as OpenSSH tries each in turn.
+        if (keyword === 'identityfile') {
+          keys.push(expandHome(unquote(value)))
+          continue
+        }
         if (taken.has(keyword)) continue
         switch (keyword) {
           case 'hostname':
@@ -128,9 +127,6 @@ export function parseSshConfig(text: string): SshConfigHost[] {
             host.port = port
             break
           }
-          case 'identityfile':
-            host.identityFile = expandHome(unquote(value))
-            break
           case 'proxyjump':
             host.proxyJump = value
             break
@@ -140,8 +136,40 @@ export function parseSshConfig(text: string): SshConfigHost[] {
         taken.add(keyword)
       }
     }
+    /*
+     * A host keeps one key, and the first OpenSSH would get anywhere with is
+     * the first that exists: it passes over the ones that do not, and a
+     * `Host *` listing id_rsa then id_ed25519 for a machine with only the
+     * second gave the import a key that was not there.
+     */
+    const key = keys.find((path) => existsSync(path)) ?? keys[0]
+    if (key) host.identityFile = key
+    const named = host.hostname !== ''
     // A Host block without an explicit HostName resolves to the alias itself.
-    hosts.push({ ...host, hostname: host.hostname || host.alias })
+    return { host: { ...host, hostname: host.hostname || host.alias }, named }
+  }
+
+  const hosts: SshConfigHost[] = []
+  const add = (host: SshConfigHost): void => {
+    if (!hosts.some((h) => h.alias === host.alias)) hosts.push(host)
+  }
+  for (const block of blocks.slice(1)) {
+    const [alias, ...others] = block.patterns?.filter((p) => !isPattern(p)) ?? []
+    if (!alias) continue
+    const first = resolve(alias, block)
+    /*
+     * Several names on one Host line are one machine only when it says which:
+     * with a HostName they are its other names, and a ProxyJump naming any of
+     * them finds it. Without one, each name is the machine of that name —
+     * `Host prod staging` is two servers sharing settings, and the second was
+     * missing from the import.
+     */
+    if (first.named || others.length === 0) {
+      add(others.length > 0 ? { ...first.host, otherAliases: others } : first.host)
+      continue
+    }
+    add(first.host)
+    for (const other of others) add(resolve(other, block).host)
   }
   return hosts
 }

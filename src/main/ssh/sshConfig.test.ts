@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { homedir } from 'os'
+import { mkdtempSync, rmSync, writeFileSync } from 'fs'
+import { homedir, tmpdir } from 'os'
 import { join } from 'path'
 import { parseSshConfig } from './sshConfig'
 
@@ -173,10 +174,36 @@ describe('a block of patterns', () => {
 
 /* Every plain name on a Host line names the host, as ssh reads it, not the first alone. */
 describe('a Host line of several names', () => {
+  /* Without a HostName, `Host prod staging` is two servers sharing settings. */
+  it('makes each name its own host when no HostName says they are one', () => {
+    const hosts = parseSshConfig('Host prod.example.com staging.example.com\n  User deploy\n')
+    expect(hosts).toEqual([
+      { alias: 'prod.example.com', hostname: 'prod.example.com', port: 22, user: 'deploy' },
+      { alias: 'staging.example.com', hostname: 'staging.example.com', port: 22, user: 'deploy' }
+    ])
+  })
+
   it('keeps the other names of the host', () => {
     const hosts = parseSshConfig('Host jump bastion\n  HostName bastion.example\n')
     expect(hosts).toEqual([
       { alias: 'jump', otherAliases: ['bastion'], hostname: 'bastion.example', port: 22 }
     ])
+  })
+})
+
+/* OpenSSH tries every IdentityFile and passes over the ones that are not there. */
+describe('several IdentityFile lines', () => {
+  it('give the host the first key that exists', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'td-sshkeys-'))
+    try {
+      const present = join(dir, 'id_ed25519')
+      writeFileSync(present, 'key')
+      const hosts = parseSshConfig(
+        `Host web\n  IdentityFile ${join(dir, 'id_rsa')}\n  IdentityFile ${present}\n`
+      )
+      expect(hosts[0].identityFile).toBe(present)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
