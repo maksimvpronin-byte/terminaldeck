@@ -232,8 +232,11 @@ export class ScpShell {
     limit: number
   ): Promise<{ root: string; entries: SftpEntry[]; truncated: boolean }> {
     const root = await this.realpath(path)
+    // A UTF-8 locale for find alone: under the C one every command here runs
+    // in, -iname folds Latin letters only, and `отчёт` did not find Отчёт.txt.
+    // Where the server has no C.UTF-8 it falls back to C, as it was.
     const output = await this.capture(
-      `find ${shellQuote(root)} -mindepth 1 -iname ${shellQuote(glob)} -print0 2>/dev/null` +
+      `LC_ALL=C.UTF-8 find ${shellQuote(root)} -mindepth 1 -iname ${shellQuote(glob)} -print0 2>/dev/null` +
         ` | head -z -n ${limit + 1} | xargs -0 -r ${STAT} 2>/dev/null; exit 0`,
       { ms: 60_000, message: 'The search took longer than a minute; search a smaller folder' }
     )

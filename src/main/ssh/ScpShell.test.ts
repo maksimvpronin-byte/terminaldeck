@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { Client, Server, utils } from 'ssh2'
 import { spawn, execFileSync } from 'child_process'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
@@ -10,6 +10,19 @@ import { ScpShell, parseShellStats, shellQuote } from './ScpShell'
 
 const container = process.env.TD_SCP_CONTAINER
 const canRun = process.platform !== 'win32'
+
+/* The search runs find under a UTF-8 locale; see ScpShell.find. */
+describe('searching through the shell', () => {
+  it('folds case beyond Latin letters', async () => {
+    const shell = new ScpShell({} as Client, 'env')
+    const capture = vi
+      .spyOn(shell as unknown as { capture: (command: string) => Promise<Buffer> }, 'capture')
+      .mockResolvedValueOnce(Buffer.from('/srv\0'))
+      .mockResolvedValueOnce(Buffer.alloc(0))
+    await shell.find('/srv', '*отчёт*', 10)
+    expect(capture.mock.calls[1][0]).toMatch(/^LC_ALL=C\.UTF-8 find /)
+  })
+})
 
 describe('shell metadata', () => {
   it('keeps spaces, quotes and newlines in file names and special mode bits', () => {
@@ -196,6 +209,12 @@ describe.skipIf(!canRun)('SCP over SSH', () => {
       expect(found.entries.map((e) => e.path).sort()).toEqual([
         `${dir}/a/b/Deep.LOG`,
         `${dir}/top '$(x).log`
+      ])
+
+      // Case folded beyond Latin: under the C locale `отчёт` missed Отчёт.txt.
+      await shell.upload(source, `${dir}/Отчёт.txt`)
+      expect((await shell.find(dir, '*отчёт*', 10)).entries.map((e) => e.name)).toEqual([
+        'Отчёт.txt'
       ])
 
       const cut = await shell.find(dir, '*', 2)
