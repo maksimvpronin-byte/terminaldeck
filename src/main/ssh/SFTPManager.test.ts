@@ -63,7 +63,7 @@ vi.mock('fs/promises', async (importOriginal) => {
 })
 
 userData = mkdtempSync(join(tmpdir(), 'terminaldeck-sftp-'))
-const { sftpManager } = await import('./SFTPManager')
+const { sftpManager, modeForNewFile } = await import('./SFTPManager')
 const { sshManager } = await import('./SSHManager')
 const { ScpShell } = await import('./ScpShell')
 
@@ -1027,6 +1027,74 @@ describe('replacing a remote file', () => {
     expect(Object.values(modeAtWrite)).toEqual([0o600])
     expect(entries['/srv/site.css'].mode).toBe(0o664)
   })
+
+  /*
+   * A new file was given the server's mode for one whatever its source's, so
+   * a 0600 .pgpass or key arrived readable by everyone there — where scp and
+   * sftp put both keep the source's mode for a file they create.
+   */
+  it.skipIf(process.platform === 'win32')(
+    'gives a new file its source’s mode, narrowed as the server narrows one',
+    async () => {
+      mkdirSync(localDir, { recursive: true })
+      const secret = join(localDir, 'pgpass')
+      writeFileSync(secret, 'db:5432:*:app:pw', 'utf8')
+      chmodSync(secret, 0o600)
+      const script = join(localDir, 'deploy.sh')
+      writeFileSync(script, 'echo hi', 'utf8')
+      chmodSync(script, 0o775)
+      const entries: Record<string, Entry> = { '/srv': { dir: true } }
+      attach('conn', stubSession([], entries, { newFileMode: 0o644 }))
+
+      await sftpManager.runPlan(
+        'conn',
+        plan('upload', [item(secret, '/srv/.pgpass'), item(script, '/srv/deploy.sh')])
+      )
+
+      expect(entries['/srv/.pgpass'].mode).toBe(0o600)
+      expect(entries['/srv/deploy.sh'].mode).toBe(0o755)
+    }
+  )
+
+  it.each([
+    [0o100600, 0o644, 0o600],
+    [0o100755, 0o644, 0o755],
+    [0o100664, 0o644, 0o644],
+    [0o104755, 0o644, 0o755],
+    [0o100755, 0o600, 0o700],
+    [undefined, 0o664, 0o664],
+    [0o100640, undefined, 0o640]
+  ])('gives a source of mode %o, where a new file gets %o, the mode %o', (source, fresh, want) => {
+    expect(modeForNewFile(source, fresh)).toBe(want)
+  })
+
+  it('relays a protected file to a new name on another host as protected', async () => {
+    const entries: Record<string, Entry> = { '/dst': { dir: true } }
+    attach('src', stubSession([], { '/src/id_ed25519': { size: 8, mode: 0o600 } }))
+    attach('dst', stubSession([], entries, { newFileMode: 0o644 }))
+
+    await sftpManager.runPlan(
+      'src',
+      plan('relay', [item('/src/id_ed25519', '/dst/id_ed25519')]),
+      {},
+      undefined,
+      'dst'
+    )
+
+    expect(entries['/dst/id_ed25519'].mode).toBe(0o600)
+  })
+
+  it.skipIf(process.platform === 'win32')(
+    'downloads a protected file to a new name as protected',
+    async () => {
+      const dest = join(localDir, `fetched-key-${Date.now()}`)
+      attach('conn', stubSession([], { '/srv/key': { size: 7, mode: 0o600 } }))
+
+      await sftpManager.runPlan('conn', plan('download', [item('/srv/key', dest)]))
+
+      expect(statSync(dest).mode & 0o777).toBe(0o600)
+    }
+  )
 
   /** A name somebody else put down first is theirs: not written through, not removed. */
   it('refuses a partial name that is already taken and leaves it alone', async () => {

@@ -1,15 +1,36 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { Client, Server, utils } from 'ssh2'
 import { spawn, execFileSync } from 'child_process'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { pipeline } from 'stream/promises'
-import { Readable } from 'stream'
+import { Readable, Writable } from 'stream'
 import { ScpShell, parseShellStats, shellQuote } from './ScpShell'
 
 const container = process.env.TD_SCP_CONTAINER
 const canRun = process.platform !== 'win32'
+
+/* A new file takes its source's mode; it was 0644 whatever the source. */
+describe('uploading a new file through the shell', () => {
+  it.skipIf(process.platform === 'win32')('gives it the source’s mode', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'td-scp-mode-'))
+    const secret = join(dir, 'pgpass')
+    writeFileSync(secret, 'secret')
+    chmodSync(secret, 0o600)
+    const shell = new ScpShell({} as Client, 'env')
+    vi.spyOn(shell, 'statPath').mockResolvedValue(null)
+    vi.spyOn(shell, 'replace').mockImplementation(async (path, write) => write(path))
+    const modes: string[] = []
+    vi.spyOn(shell, 'createWriteStream').mockImplementation((_path, _size, mode) => {
+      modes.push(mode ?? '')
+      return new Writable({ write: (_chunk, _encoding, done) => done() })
+    })
+    await shell.upload(secret, '/srv/.pgpass')
+    expect(modes).toEqual(['0600'])
+    rmSync(dir, { recursive: true, force: true })
+  })
+})
 
 /* The search runs find under a UTF-8 locale; see ScpShell.find. */
 describe('searching through the shell', () => {

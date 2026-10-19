@@ -1375,6 +1375,8 @@ export const ru: Record<string, string> = {
     'Через ссылку внутри выбранной папки ничего не пишется, даже при «Заменить»',
   'A file changed while the transfer ran is kept as it is and reported, not replaced':
     'Файл, изменившийся во время передачи, остаётся как есть, и об этом сообщается',
+  'A new file takes its source’s permissions, as scp does: a 0600 key stays private':
+    'Новый файл получает права исходного, как у scp: ключ с правами 0600 остаётся закрытым',
   'Downloading a link to a folder downloads the folder':
     'Скачивание ссылки на папку скачивает саму папку',
   'A path typed there may start with ~, or ~user where the server allows it':

@@ -527,6 +527,9 @@ const CHAPTERS: Chapter[] = [
               {
                 what: 'A file changed while the transfer ran is kept as it is and reported, not replaced'
               },
+              {
+                what: 'A new file takes its source’s permissions, as scp does: a 0600 key stays private'
+              },
               { what: 'Downloading a link to a folder downloads the folder' },
               {
                 what: 'Inside a folder, a link to a file goes as the file, both ways; a link to a folder is left out'

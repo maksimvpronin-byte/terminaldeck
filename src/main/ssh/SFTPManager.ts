@@ -129,15 +129,50 @@ const PARTIAL_MODE = 0o600
  * a mode is a read-only flag and carrying that one onto the partial would only
  * stop the rename.
  */
-function giveModeOf(dest: string, fd: number): void {
+function giveModeOf(dest: string, fd: number, sourceMode?: number): void {
   if (process.platform === 'win32') return
   let mode: number
   try {
     mode = statSync(dest).mode & 0o7777
   } catch {
-    mode = 0o666 & ~process.umask()
+    mode = modeForNewFile(sourceMode, 0o666 & ~process.umask())!
   }
   fchmodSync(fd, mode)
+}
+
+/**
+ * The mode a file new at its destination is given: its source's, narrowed the
+ * way that side narrows a new file of its own — `fresh` is what it gives one,
+ * 0666 less its umask, and the execute bits go where reading does. Special
+ * bits are not carried, as scp and sftp do not carry them.
+ *
+ * It used to be `fresh` alone, in every direction. A 0600 `.pgpass` or key
+ * arrived as 0644, readable by everyone on the other side, where `scp` and
+ * `sftp put` both keep the source's mode for a file they create.
+ */
+export function modeForNewFile(
+  source: number | undefined,
+  fresh: number | undefined
+): number | undefined {
+  if (source === undefined) return fresh
+  const permissions = source & 0o777
+  if (fresh === undefined) return permissions
+  return permissions & (fresh | ((fresh & 0o444) >> 2))
+}
+
+/**
+ * A local file's mode, to be carried to a file new on the far side. Not on
+ * Windows, which has no modes to carry: the server's own for a new file
+ * stands there, as it always has.
+ */
+export async function localModeOf(path: string): Promise<number | undefined> {
+  if (process.platform === 'win32') return undefined
+  return (await stat(path).catch(() => undefined))?.mode
+}
+
+/** A mode as SCP and the shell write it: four octal digits. */
+function octalMode(mode: number): string {
+  return (mode & 0o7777).toString(8).padStart(4, '0')
 }
 
 /**
@@ -738,7 +773,7 @@ class SFTPManager {
             (err) => (err ? reject(err) : resolve())
           )
         })
-      giveModeOf(localPath, fd)
+      giveModeOf(localPath, fd, await this.modeOf(connectionId, remotePath))
       // What is moved is the name, so it has to be ours still. Closed first:
       // Windows will not always rename a file somebody holds open.
       ours = namesHeldFile(fd, partial)
@@ -787,8 +822,26 @@ class SFTPManager {
       remotePath,
       (_target, handle) => putThroughHandle(sftp, handle, localPath, onProgress),
       beforeReplace,
-      stillInside
+      stillInside,
+      await localModeOf(localPath)
     )
+  }
+
+  /** A remote file's mode, the link followed; undefined where it cannot be read. */
+  private async modeOf(connectionId: string, remotePath: string): Promise<number | undefined> {
+    try {
+      const shell = this.getShell(connectionId)
+      if (shell) {
+        const found = await shell.statPath(remotePath, true)
+        return found ? parseInt(found.permissions, 8) : undefined
+      }
+      const sftp = await this.getSftp(connectionId)
+      return await new Promise<number | undefined>((resolve) =>
+        sftp.stat(remotePath, (err, stats) => resolve(err ? undefined : stats.mode))
+      )
+    } catch {
+      return undefined
+    }
   }
 
   /**
@@ -832,7 +885,9 @@ class SFTPManager {
      * had the copy made beyond it; so it is asked once the copy exists, and
      * again before it is moved into place.
      */
-    stillInside?: () => Promise<void>
+    stillInside?: () => Promise<void>,
+    /** The source's mode, which a file new here is given; see modeForNewFile. */
+    sourceMode?: number
   ): Promise<void> {
     let target = remotePath
     let existing = await lstatRaw(sftp, remotePath)
@@ -901,8 +956,8 @@ class SFTPManager {
       }
       await write(partial, opened.handle)
       if (!existing) {
-        // What a new file here has always been given, not the copy's 0600.
-        const newFileMode = opened.mode
+        // The source's mode as this server narrows a new file, not the copy's 0600.
+        const newFileMode = modeForNewFile(sourceMode, opened.mode)
         if (newFileMode !== undefined) {
           await sftpCall((cb) => sftp.fchmod(opened.handle, newFileMode, cb))
         }
@@ -1028,9 +1083,11 @@ class SFTPManager {
             srcSftp.stat(srcPath, (err, info) => (err ? reject(err) : resolve(info.size)))
           )
         : (sourceInfo?.size ?? 0)
+    const sourceMode = await this.modeOf(srcConnectionId, srcPath)
     const destinationMode =
       dstSftp instanceof ScpShell
-        ? ((await dstSftp.statPath(dstPath, true))?.permissions ?? '0644')
+        ? ((await dstSftp.statPath(dstPath, true))?.permissions ??
+          (sourceMode !== undefined ? octalMode(sourceMode & 0o777) : '0644'))
         : undefined
 
     /*
@@ -1092,7 +1149,8 @@ class SFTPManager {
       })
 
     if (dstSftp instanceof ScpShell) await dstSftp.replace(dstPath, copyInto)
-    else await this.writeRemoteFile(dstSftp, dstPath, copyInto, beforeReplace, stillInside)
+    else
+      await this.writeRemoteFile(dstSftp, dstPath, copyInto, beforeReplace, stillInside, sourceMode)
   }
 
   /**

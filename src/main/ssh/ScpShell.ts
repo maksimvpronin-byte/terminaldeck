@@ -401,7 +401,12 @@ export class ScpShell {
       if (!source.isFile()) throw new Error('SCP uploads require a regular file')
       const existing = await this.statPath(path, true)
       await this.replace(path, async (target) => {
-        const write = this.createWriteStream(target, source.size, existing?.permissions ?? '0644')
+        // A new file takes the source's mode, as `scp` gives it, less the
+        // server's umask; it was 0644 whatever the source, and a 0600
+        // .pgpass came out readable by everyone there.
+        const fresh =
+          process.platform === 'win32' ? '0644' : (source.mode & 0o777).toString(8).padStart(4, '0')
+        const write = this.createWriteStream(target, source.size, existing?.permissions ?? fresh)
         let count = 0
         const read = handle.createReadStream({ start: 0, autoClose: false })
         read.on('data', (chunk) => {
