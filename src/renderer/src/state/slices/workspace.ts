@@ -207,7 +207,20 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
     })
   },
 
-  setActiveWorkspace: (workspaceId) => set({ activeWorkspaceId: workspaceId }),
+  // The tab it shows is looked at, as when it is chosen itself: its mark of
+  // something new stayed lit after the workspace was opened on it.
+  setActiveWorkspace: (workspaceId) =>
+    set((s) => ({
+      activeWorkspaceId: workspaceId,
+      workspaces: s.workspaces.map((w) =>
+        w.id === workspaceId && w.tabs.some((t) => t.id === w.activeTabId && t.hasActivity)
+          ? {
+              ...w,
+              tabs: w.tabs.map((t) => (t.id === w.activeTabId ? { ...t, hasActivity: false } : t))
+            }
+          : w
+      )
+    })),
 
   setWorkspaceCollection: (workspaceId, collectionId) =>
     // One workspace per collection, so a host knows where to go.
@@ -608,7 +621,13 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
 
       // The pane moves to a different tree, so React remounts it and the old
       // connection is torn down; the new one starts fresh.
-      const moved = makeTab(leaf.title, leaf.target, leaf.color, leaf.viaCollectionId)
+      const made = makeTab(leaf.title, leaf.target, leaf.color, leaf.viaCollectionId)
+      // A pane left out of broadcast stays out: made afresh it was opted in
+      // again, and typed into from every other pane.
+      const moved =
+        made.root.type === 'leaf'
+          ? { ...made, root: { ...made.root, broadcastEnabled: leaf.broadcastEnabled } }
+          : made
       const leaves = collectLeaves(remaining)
       return {
         workspaces: s.workspaces.map((w) =>

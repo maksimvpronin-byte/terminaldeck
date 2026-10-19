@@ -230,6 +230,38 @@ it('preserves collection settings when a pane is detached', () => {
   expect(moved.color).toBe('#abcdef')
 })
 
+/* Moved to a tab of its own, a pane left out of broadcast was opted in again. */
+it('keeps a detached pane out of broadcast if it was', () => {
+  useStore.setState({ workspaces: [], activeWorkspaceId: null })
+  const paneId = useStore.getState().openTab('host', { kind: 'session', sessionId: 'host' })
+  const tabId = useStore.getState().workspaces[0].tabs[0].id
+  useStore.getState().splitPane(tabId, paneId, 'row')
+  useStore.getState().togglePaneBroadcast(tabId, paneId)
+  useStore.getState().detachPane(tabId, paneId)
+  const moved = collectLeaves(useStore.getState().workspaces[0].tabs[1].root)[0]
+  expect(moved.broadcastEnabled).toBe(false)
+})
+
+/* Opened from its own header, a workspace's shown tab kept its mark of something new. */
+it('takes a workspace’s shown tab as looked at when the workspace is opened', () => {
+  useStore.setState({ workspaces: [], activeWorkspaceId: null })
+  useStore.getState().openTab('a', { kind: 'session', sessionId: 'a' })
+  const first = useStore.getState().workspaces[0]
+  useStore.setState((s) => ({
+    workspaces: [
+      ...s.workspaces,
+      {
+        ...first,
+        id: 'other',
+        tabs: first.tabs.map((t) => ({ ...t, id: 'bt', hasActivity: true })),
+        activeTabId: 'bt'
+      }
+    ]
+  }))
+  useStore.getState().setActiveWorkspace('other')
+  expect(useStore.getState().workspaces[1].tabs[0].hasActivity).toBe(false)
+})
+
 it('does not lose a tab moved to a workspace that no longer exists', () => {
   useStore.setState({ workspaces: [], activeWorkspaceId: null })
   useStore.getState().openTab('host', { kind: 'session', sessionId: 'host' })
