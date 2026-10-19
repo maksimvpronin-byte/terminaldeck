@@ -449,6 +449,37 @@ describe('openHost: an open host is brought forward rather than opened again', (
     expect(tabCount()).toBe(1)
   })
 
+  /*
+   * A desktop opened as the host's default stays that account's session when
+   * the default changes: Connect as… the new default brought it forward.
+   */
+  it('keeps a live desktop as the account it signed in as when the default changes', () => {
+    seed()
+    const account = (id: string) => ({
+      id,
+      name: id,
+      username: id,
+      authMethod: 'password' as const,
+      createdAt: 0,
+      updatedAt: 0
+    })
+    const defaultTo = (id: string) =>
+      useStore.setState((st) => ({
+        sessions: st.sessions.map((h) => (h.id === 'dc' ? { ...h, credentialId: id } : h))
+      }))
+    useStore.setState({ credentials: [account('admin'), account('user2')] })
+    defaultTo('admin')
+    const first = open('dc')
+    const tab = useStore.getState().workspaces[0].tabs.find((t) => t.activePaneId === first)!
+    useStore.getState().setPaneDesktop(tab.id, first, 'desktop-1')
+
+    defaultTo('user2')
+    expect(open('dc', { credentialId: 'admin' })).toBe(first)
+    const second = open('dc', { credentialId: 'user2' })
+    expect(second).not.toBe(first)
+    expect(open('dc')).toBe(second)
+  })
+
   /* Two panes of one desktop in a layout saw only what was open already, not each other. */
   it('opens one desktop once from a layout that holds it twice', () => {
     seed()

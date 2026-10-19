@@ -520,7 +520,14 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
     set((s) => ({
       workspaces: mapTab(s.workspaces, tabId, (t) => ({
         ...t,
-        root: mapPane(t.root, paneId, (leaf) => ({ ...leaf, desktopId }))
+        root: mapPane(t.root, paneId, (leaf) => ({
+          ...leaf,
+          desktopId,
+          connectedAs:
+            desktopId === undefined || leaf.target.kind !== 'session' || leaf.target.credentialId
+              ? undefined
+              : (defaultAccountOf(s, leaf.target.sessionId) ?? null)
+        }))
       }))
     }))
   },

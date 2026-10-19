@@ -33,6 +33,13 @@ export type PaneNode =
        * in that list would be typed into.
        */
       desktopId?: string
+      /**
+       * The account a live desktop signed in as when it was opened with none
+       * named — the host's default then, `null` for the host's own login. The
+       * default can change while it is open, and the pane is still that
+       * account's Windows session: see `paneToReuse`. Gone with `desktopId`.
+       */
+      connectedAs?: string | null
       /** Came back from a saved layout: show it idle instead of dialling out on launch. */
       restored?: boolean
       sftpOpen: boolean
@@ -173,7 +180,14 @@ export function copyTree(node: PaneNode, ids: Map<string, string>): PaneNode {
       children: [copyTree(node.children[0], ids), copyTree(node.children[1], ids)]
     }
   }
-  return { ...node, id, connectionId: undefined, desktopId: undefined, restored: undefined }
+  return {
+    ...node,
+    id,
+    connectionId: undefined,
+    desktopId: undefined,
+    connectedAs: undefined,
+    restored: undefined
+  }
 }
 
 /** Connection ids of every connected pane in a tab. */

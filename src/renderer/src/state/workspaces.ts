@@ -137,13 +137,19 @@ export function paneToReuse(
     consoleSession?: boolean
   }
 ): { tabId: string; paneId: string } | undefined {
-  const named = (id: string | undefined): string | undefined =>
-    id === account?.defaultCredentialId ? undefined : id
+  // The account each side really signs in as. A live pane opened with none
+  // named is the default it signed in with, whatever the default is now.
+  const signsInAs = (leaf: ReturnType<typeof collectLeaves>[number]): string | undefined => {
+    if (leaf.target.kind !== 'session') return undefined
+    if (leaf.target.credentialId) return leaf.target.credentialId
+    if (leaf.connectedAs !== undefined) return leaf.connectedAs ?? undefined
+    return account?.defaultCredentialId
+  }
   const fits = (leaf: ReturnType<typeof collectLeaves>[number]): boolean =>
     leaf.target.kind === 'session' &&
     leaf.target.sessionId === sessionId &&
     (!account ||
-      (named(leaf.target.credentialId) === named(account.credentialId) &&
+      (signsInAs(leaf) === (account.credentialId ?? account.defaultCredentialId) &&
         (leaf.target.admin === true || account.consoleSession === true) ===
           (account.admin === true || account.consoleSession === true)))
   const current = activeTab(state)
