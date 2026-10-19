@@ -1368,6 +1368,10 @@ class SSHManager {
     if (enabled && !conn.followCwd) {
       // Asked for by hand: worth trying again even where earlier attempts failed.
       conn.setupAttempts = 0
+      // And what was remembered is forgotten: the panel may have gone
+      // elsewhere while this was off, and the shell's next report — the same
+      // folder, often — was dropped as no news, leaving it there until a cd.
+      conn.lastCwd = undefined
       this.sendSetupQuietly(conn)
     }
     conn.followCwd = enabled

@@ -418,6 +418,48 @@ describe('following the shell into a folder with a non-ASCII name', () => {
   })
 })
 
+/*
+ * Turned off and on again, the panel waited for the next cd: the folder the
+ * shell answered with was the one remembered from before, and dropped as no
+ * news, though the panel had gone elsewhere meanwhile.
+ */
+describe('following turned off and on again', () => {
+  it('hands the panel the folder the shell reports next, even the same one', async () => {
+    const { EventEmitter } = await import('events')
+    const sent: Sent[] = []
+    const win = stubWindow(sent)
+    const stream = Object.assign(new EventEmitter(), {
+      stderr: new EventEmitter(),
+      write: (): boolean => true,
+      close: (): void => undefined
+    })
+    const target = Object.assign(new EventEmitter(), {
+      shell: (_opts: unknown, cb: (err: undefined, s: unknown) => void): void =>
+        cb(undefined, stream)
+    })
+    await (sshManager as unknown as { openShell: (...args: unknown[]) => Promise<void> }).openShell(
+      win,
+      'c-again',
+      target,
+      [target],
+      80,
+      24
+    )
+    sshManager.setFollowCwd('c-again', true)
+    sshManager.markReady(win as never, 'c-again')
+    const report = (): boolean => stream.emit('data', Buffer.from('\u001b]7;file://h/srv\u001b\\'))
+
+    report()
+    sshManager.setFollowCwd('c-again', false)
+    sshManager.setFollowCwd('c-again', true)
+    report()
+
+    const cwd = sent.filter((s) => s.channel === 'ssh:cwd:c-again').map((s) => s.payload)
+    expect(cwd).toEqual(['/srv', '/srv'])
+    sshManager.disconnect('c-again')
+  })
+})
+
 /**
  * A session ends two ways and only one of them went through the disconnect
  * handler. A shell that ended on its own — `exit`, or a dropped link — left
