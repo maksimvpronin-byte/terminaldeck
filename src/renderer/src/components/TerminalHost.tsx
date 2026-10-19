@@ -12,6 +12,7 @@ import ContextMenu, { type MenuItem } from './ContextMenu'
 import { IS_MAC } from '../state/keys'
 import { translate, useT } from '../i18n'
 import { diag, diagKey } from '../diag'
+import { wheelArrows, wheelGoesToPager, wheelRows } from '../../../shared/pagerWheel'
 
 interface Props {
   target: PaneTarget
@@ -259,6 +260,38 @@ export default function TerminalHost({
         return false
       }
       return true
+    })
+
+    /*
+     * The wheel in `less -X`, which is how journalctl runs it: see
+     * pagerWheel.ts. Everywhere else the wheel is left to xterm.
+     */
+    let wheelCarry = 0
+    term.attachCustomWheelEventHandler((e) => {
+      const buffer = term.buffer.active
+      const row = buffer.getLine(buffer.baseY + buffer.cursorY)
+      const toPager = wheelGoesToPager({
+        buffer: buffer.type,
+        scrolledBack: buffer.viewportY < buffer.baseY,
+        cursorOnLastRow: buffer.cursorY === term.rows - 1,
+        cursorLine: row?.translateToString(true) ?? '',
+        cursorLineStartsInverse: !!row?.getCell(0)?.isInverse()
+      })
+      if (!toPager) {
+        wheelCarry = 0
+        return true
+      }
+      e.preventDefault()
+      const rowHeight = (term.element?.clientHeight ?? 0) / term.rows
+      const turn = wheelRows(e.deltaY, e.deltaMode, rowHeight, wheelCarry)
+      wheelCarry = turn.carry
+      // To this pane's session only: scrolling one pager is not something to
+      // broadcast to every pane typing along with it.
+      const own = connIdRef.current
+      if (own && turn.rows !== 0) {
+        window.td.ssh.write(own, wheelArrows(turn.rows, term.modes.applicationCursorKeysMode))
+      }
+      return false
     })
 
     /*
