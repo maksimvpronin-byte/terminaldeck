@@ -211,6 +211,41 @@ describe('the two ends of one tunnelled connection', () => {
  * A server that takes the request to listen and never answers left the
  * tunnel opening for ever, and the pane that started it waiting with it.
  */
+/*
+ * A link that drops leaves ssh2 refusing to say anything more: unforwardIn
+ * throws "Not connected". Thrown out of the clean-up, it left the forwards
+ * after it running — a local port still bound when the reconnect wanted it.
+ */
+describe('tunnels of a connection that dropped', () => {
+  it('are all stopped, the remote one too, though the server can no longer be told', async () => {
+    vi.mocked(net.connect).mockReset()
+    const unforward = (client as unknown as { unforwardIn: unknown }).unforwardIn
+    ;(client as unknown as { unforwardIn: () => void }).unforwardIn = () => {
+      throw new Error('Not connected')
+    }
+    try {
+      await portForwardManager.start('dropped', {
+        id: 'remote-first',
+        type: 'remote',
+        srcHost: '127.0.0.1',
+        srcPort: 9300,
+        dstHost: 'app',
+        dstPort: 80
+      })
+      const local = portForwardManager.start('dropped', { ...rule, id: 'local-after' })
+      finishListen()
+      await local
+      closed.length = 0
+
+      expect(() => portForwardManager.stopAllForConnection('dropped')).not.toThrow()
+      expect(closed).toContain('server')
+      expect(portForwardManager.listActive('dropped')).toEqual([])
+    } finally {
+      ;(client as unknown as { unforwardIn: unknown }).unforwardIn = unforward
+    }
+  })
+})
+
 describe('a remote forward the server never answers', () => {
   it('gives up after a while, and lets the port go if the answer comes late', async () => {
     vi.useFakeTimers()

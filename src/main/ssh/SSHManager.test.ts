@@ -479,6 +479,21 @@ describe('when a connection ends on its own', () => {
     expect(told).toEqual(['c-exit'])
     expect(innards().connections.has('c-exit')).toBe(false)
   })
+
+  it('goes on to the rest, and ends the connection, when one of them fails', () => {
+    const told: string[] = []
+    sshManager.onClosed(() => {
+      throw new Error('Not connected')
+    })
+    sshManager.onClosed((id) => told.push(id))
+    const { conn } = stubConnection('c-throws')
+    attach('c-throws', conn)
+
+    expect(() => innards().teardown('c-throws')).not.toThrow()
+
+    expect(told).toEqual(['c-throws'])
+    expect(innards().connections.has('c-throws')).toBe(false)
+  })
 })
 
 /**

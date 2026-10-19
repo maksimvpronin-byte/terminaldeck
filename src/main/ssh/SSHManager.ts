@@ -1505,7 +1505,15 @@ class SSHManager {
      * on its own — `exit`, or a dropped link — left every one of them behind,
      * and a forwarded port left listening is one nothing can bind again.
      */
-    for (const watcher of this.closedWatchers) watcher(connectionId)
+    // Each on its own: one that throws — a tunnel the dropped link can no
+    // longer be told to close — stopped the rest, and this teardown with them.
+    for (const watcher of this.closedWatchers) {
+      try {
+        watcher(connectionId)
+      } catch (err) {
+        diag('ssh', `${short(connectionId)} clean-up after close failed: ${(err as Error).message}`)
+      }
+    }
     if (conn.flushTimer) clearTimeout(conn.flushTimer)
     if (conn.setupWait) clearTimeout(conn.setupWait.timer)
     if (conn.setupGateTimer) clearTimeout(conn.setupGateTimer)

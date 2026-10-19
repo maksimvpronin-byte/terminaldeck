@@ -79,6 +79,22 @@ export function pipeStreams(a: Duplex, b: Duplex): void {
   b.on('error', tearDown)
 }
 
+/**
+ * Asks the server to stop listening, if it can still be asked.
+ *
+ * A link that has dropped leaves ssh2 throwing "Not connected", and thrown out
+ * of the clean-up it stopped the forwards after this one: a local port stayed
+ * bound, and the reconnect's own tunnel found it taken. The server lets go of
+ * the port with the connection anyway.
+ */
+function unforward(client: Client, host: string, port: number): void {
+  try {
+    client.unforwardIn(host, port, () => undefined)
+  } catch {
+    // Not connected any more: nothing to tell.
+  }
+}
+
 /** A channel that opened for a socket already gone: nothing is left to carry. */
 function discard(stream: Duplex): void {
   stream.destroy()
@@ -324,7 +340,7 @@ class PortForwardManager {
       client.forwardIn(rule.srcHost, rule.srcPort, (err, bound) => {
         clearTimeout(timer)
         if (gaveUp) {
-          if (!err) client.unforwardIn(rule.srcHost, bound || rule.srcPort, () => undefined)
+          if (!err) unforward(client, rule.srcHost, bound || rule.srcPort)
           return
         }
         if (err) reject(err)
@@ -334,7 +350,7 @@ class PortForwardManager {
     const route: RemoteRoute = { entry, bindHost: rule.srcHost, port }
     this.addRoute(client, route)
     entry.cleanupRemote = () => {
-      client.unforwardIn(rule.srcHost, port, () => undefined)
+      unforward(client, rule.srcHost, port)
       this.removeRoute(client, route)
     }
     // Stopped while the server was still agreeing: undo it now it has.
