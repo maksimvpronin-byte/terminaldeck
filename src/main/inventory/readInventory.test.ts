@@ -513,3 +513,89 @@ describe('a group written down in more than one place', () => {
     expect(result.groups.find((g) => g.name === 'web')?.port).toBe(2222)
   })
 })
+
+/*
+ * Ansible reads group_vars/<name> and host_vars/<name> as a file with no
+ * extension as well as a .yml, .yaml or .json one, and takes the first of
+ * those that exists. One with no extension was not read at all: a host's
+ * address, login and port were simply missing, with no error.
+ */
+describe('vars files as Ansible finds them', () => {
+  function read(files: Record<string, string>): ReturnType<typeof readInventory> {
+    const dir = mkdtempSync(join(tmpdir(), 'td-varsfile-'))
+    try {
+      for (const [name, text] of Object.entries(files)) {
+        mkdirSync(dirname(join(dir, name)), { recursive: true })
+        writeFileSync(join(dir, name), text)
+      }
+      return readInventory({
+        dir,
+        paths: ['hosts.yml'],
+        sourceId: 'repo',
+        prefix: 'git',
+        rootId: 'root'
+      })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  }
+
+  it('reads one with no extension', () => {
+    const result = read({
+      'hosts.yml': 'all:\n  hosts:\n    web:\n',
+      'host_vars/web': 'ansible_host: 10.0.0.5\nansible_user: deploy\nansible_port: 2222\n'
+    })
+    expect(result.hosts[0]).toMatchObject({ host: '10.0.0.5', username: 'deploy', port: 2222 })
+  })
+
+  it('reads one written as JSON', () => {
+    const result = read({
+      'hosts.yml': 'all:\n  hosts:\n    web:\n',
+      'host_vars/web.json': '{"ansible_user": "jsonuser"}'
+    })
+    expect(result.hosts[0].username).toBe('jsonuser')
+  })
+
+  it('takes the first that exists, as Ansible does: a folder by that name and all in it', () => {
+    const result = read({
+      'hosts.yml': 'all:\n  hosts:\n    web:\n',
+      'host_vars/web/10-login.yml': 'ansible_user: fromdir\n',
+      'host_vars/web/20-port': 'ansible_port: 2200\n',
+      'host_vars/web.yml': 'ansible_user: fromfile\n'
+    })
+    expect(result.hosts[0]).toMatchObject({ username: 'fromdir', port: 2200 })
+  })
+})
+
+/*
+ * `web[01:03].example.com` is three hosts to Ansible and was one here, named
+ * as written and reachable nowhere.
+ */
+describe('a host range', () => {
+  it('becomes the hosts it stands for', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'td-range-'))
+    try {
+      writeFileSync(
+        join(dir, 'hosts.yml'),
+        'all:\n  hosts:\n    "web[01:03].example.com":\n      ansible_user: ops\n    "db-[a:b]":\n'
+      )
+      const result = readInventory({
+        dir,
+        paths: ['hosts.yml'],
+        sourceId: 'repo',
+        prefix: 'git',
+        rootId: 'root'
+      })
+      expect(result.hosts.map((h) => h.host).sort()).toEqual([
+        'db-a',
+        'db-b',
+        'web01.example.com',
+        'web02.example.com',
+        'web03.example.com'
+      ])
+      expect(result.hosts.find((h) => h.host === 'web02.example.com')?.username).toBe('ops')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})

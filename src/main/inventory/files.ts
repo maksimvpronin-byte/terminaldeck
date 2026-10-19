@@ -17,8 +17,17 @@ export function isYaml(file: string): boolean {
   return ['.yml', '.yaml'].includes(extname(file).toLowerCase())
 }
 
+/** What Ansible takes for a vars file: these, or no extension at all. */
+const VARS_EXTENSIONS = ['.yml', '.yaml', '.json']
+
 /**
- * Reads `<dir>/<name>.yml` or every *.yml under `<dir>/<name>/`, as Ansible does.
+ * Reads a group's or a host's vars where Ansible looks for them: `<name>`,
+ * `<name>.yml`, `<name>.yaml` or `<name>.json`, the first of those that is
+ * there — and, a folder, every vars file in it and below, by name.
+ *
+ * Only the two YAML spellings and a folder were looked for, all at once, and
+ * a file with no extension — what Ansible's own examples write — was not
+ * read: a host's address, login and port were missing with nothing said.
  *
  * `repoDir` is the checkout every read must stay inside. The name is checked
  * before it is joined, and every file after it is found — by where it really
@@ -34,17 +43,30 @@ export function readVarsFor(
   const inside = (path: string): boolean => reallyInsideCheckout(repoDir, path)
 
   const candidates: string[] = []
-  const flat = join(baseDir, kind, `${name}.yml`)
-  const flatYaml = join(baseDir, kind, `${name}.yaml`)
-  const nested = join(baseDir, kind, name)
-
-  if (existsSync(flat) && inside(flat)) candidates.push(flat)
-  if (existsSync(flatYaml) && inside(flatYaml)) candidates.push(flatYaml)
-  if (existsSync(nested) && inside(nested) && statSync(nested).isDirectory()) {
-    for (const f of readdirSync(nested).sort()) {
-      const full = join(nested, f)
-      if (isYaml(f) && inside(full) && statSync(full).isFile()) candidates.push(full)
+  const base = join(baseDir, kind, name)
+  // A folder's vars files, by name, folders within it too; hidden and backup
+  // files are passed over, as Ansible passes them over.
+  const folder = (dir: string, depth: number): void => {
+    for (const f of readdirSync(dir).sort()) {
+      if (f.startsWith('.') || f.endsWith('~')) continue
+      const full = join(dir, f)
+      if (!inside(full)) continue
+      const info = statSync(full)
+      if (info.isDirectory()) {
+        if (depth < 8) folder(full, depth + 1)
+      } else if (
+        info.isFile() &&
+        (extname(f) === '' || VARS_EXTENSIONS.includes(extname(f).toLowerCase()))
+      ) {
+        candidates.push(full)
+      }
     }
+  }
+  for (const path of [base, ...VARS_EXTENSIONS.map((ext) => `${base}${ext}`)]) {
+    if (!existsSync(path) || !inside(path)) continue
+    if (statSync(path).isDirectory()) folder(path, 0)
+    else candidates.push(path)
+    break
   }
 
   let vars: AnsibleVars = {}

@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import { parse } from 'yaml'
-import { parseAnsibleInventory, protocolFromVars, varsToAuth, groupId, hostId } from './ansible'
+import {
+  parseAnsibleInventory,
+  protocolFromVars,
+  varsToAuth,
+  groupId,
+  hostId,
+  expandHostRange
+} from './ansible'
 import { resolveAuth } from '../../shared/authResolution'
 import { resolveRdp } from '../../shared/rdpResolution'
 import { appearanceSource, inheritedAppearance } from '../../shared/appearance'
@@ -1095,5 +1102,22 @@ all:
       hosts: { h: { ansible_port: 22 } }
 `
     expect(connects(doc, 'h').port).toBe(22)
+  })
+})
+
+describe('expandHostRange', () => {
+  it.each([
+    ['web[01:03]', ['web01', 'web02', 'web03']],
+    ['web[1:3].x', ['web1.x', 'web2.x', 'web3.x']],
+    ['n[0:6:3]', ['n0', 'n3', 'n6']],
+    ['db-[a:c]', ['db-a', 'db-b', 'db-c']],
+    ['r[1:2]-[a:b]', ['r1-a', 'r1-b', 'r2-a', 'r2-b']],
+    ['[:2]x', ['0x', '1x', '2x']],
+    ['plain', ['plain']],
+    ['web[01:3]', ['web[01:3]']],
+    ['web[3:1]', ['web[3:1]']],
+    ['ipv6[::1]', ['ipv6[::1]']]
+  ])('reads %s as %j', (pattern, hosts) => {
+    expect(expandHostRange(pattern)).toEqual(hosts)
   })
 })

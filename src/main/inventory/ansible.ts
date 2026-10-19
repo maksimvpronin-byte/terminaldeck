@@ -263,11 +263,13 @@ export function parseAnsibleInventories(
     const walk = (name: string, raw: RawGroup | null): void => {
       statedOf.set(name, { ...statedOf.get(name), ...(raw?.vars ?? {}) })
 
-      for (const [hostName, inlineVars] of Object.entries(raw?.hosts ?? {})) {
-        const key = hostId(sourceId, hostName, prefix)
-        const entry: Seen = seen.get(key) ?? { name: hostName, claims: [] }
-        entry.claims.push({ group: name, vars: inlineVars ?? {} })
-        seen.set(key, entry)
+      for (const [pattern, inlineVars] of Object.entries(raw?.hosts ?? {})) {
+        for (const hostName of expandHostRange(pattern)) {
+          const key = hostId(sourceId, hostName, prefix)
+          const entry: Seen = seen.get(key) ?? { name: hostName, claims: [] }
+          entry.claims.push({ group: name, vars: inlineVars ?? {} })
+          seen.set(key, entry)
+        }
       }
 
       for (const [childName, child] of Object.entries(raw?.children ?? {})) {
@@ -503,4 +505,59 @@ export function parseAnsibleInventories(
   }
 
   return { groups, hosts, memberships }
+}
+
+const LETTERS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+
+/** The most hosts one name may stand for; a typo in a range is not a fleet. */
+const MAX_RANGE = 10_000
+
+/**
+ * The hosts a name stands for: `web[01:03]` is web01, web02 and web03 to
+ * Ansible, `db-[a:c]` three more, and `[1:9:2]` steps by two. One range at a
+ * time, the rest of the name expanded after it, as Ansible's
+ * expand_hostname_range does; zero-padded bounds keep their width.
+ *
+ * Every name used to be taken as written, and a range became one host called
+ * `web[01:03].example.com` that nothing could reach. A name whose brackets
+ * are not a range Ansible would accept is left as it is.
+ */
+export function expandHostRange(name: string): string[] {
+  const open = name.indexOf('[')
+  const close = name.indexOf(']', open + 1)
+  if (open < 0 || close < 0) return [name]
+  const bounds = name.slice(open + 1, close).split(':')
+  if (bounds.length !== 2 && bounds.length !== 3) return [name]
+  const [first, end, by] = bounds
+  const begin = first || '0'
+  const step = by === undefined ? 1 : Number(by)
+  if (!end || !Number.isInteger(step) || step < 1) return [name]
+  const head = name.slice(0, open)
+  const tail = name.slice(close + 1)
+
+  let values: string[]
+  const a = LETTERS.indexOf(begin)
+  const b = LETTERS.indexOf(end)
+  if (begin.length === 1 && end.length === 1 && a >= 0 && b >= 0) {
+    if (a > b) return [name]
+    values = []
+    for (let i = a; i <= b; i += step) values.push(LETTERS[i])
+  } else {
+    if (!/^\d+$/.test(begin) || !/^\d+$/.test(end)) return [name]
+    const padded = begin.length > 1 && begin.startsWith('0')
+    if (padded && begin.length !== end.length) return [name]
+    const from = Number(begin)
+    const to = Number(end)
+    if (from > to || (to - from) / step >= MAX_RANGE) return [name]
+    values = []
+    for (let i = from; i <= to; i += step) {
+      values.push(padded ? String(i).padStart(begin.length, '0') : String(i))
+    }
+  }
+  const out: string[] = []
+  for (const value of values) {
+    out.push(...expandHostRange(`${head}${value}${tail}`))
+    if (out.length > MAX_RANGE) return [name]
+  }
+  return out
 }

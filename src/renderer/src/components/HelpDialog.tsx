@@ -872,6 +872,10 @@ const CHAPTERS: Chapter[] = [
                 what: 'group_vars and host_vars win over the vars written in the inventory itself'
               },
               {
+                what: 'A vars file may have no extension, or be .yml, .yaml or .json, as Ansible takes it'
+              },
+              { what: 'A host range such as web[01:03].example.com becomes the hosts it names' },
+              {
                 what: 'ansible_ssh_user and the other ansible_ssh_* spellings win over the plain ones'
               },
               {

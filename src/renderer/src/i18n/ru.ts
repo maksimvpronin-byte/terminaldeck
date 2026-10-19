@@ -1388,6 +1388,10 @@ export const ru: Record<string, string> = {
     'Через ссылку внутри выбранной папки ничего не пишется, даже при «Заменить»',
   'A file changed while the transfer ran is kept as it is and reported, not replaced':
     'Файл, изменившийся во время передачи, остаётся как есть, и об этом сообщается',
+  'A vars file may have no extension, or be .yml, .yaml or .json, as Ansible takes it':
+    'Файл переменных может быть без расширения, .yml, .yaml или .json — как у Ansible',
+  'A host range such as web[01:03].example.com becomes the hosts it names':
+    'Диапазон вроде web[01:03].example.com превращается в хосты, которые он называет',
   'A gateway’s use policy is shown, and connecting goes on once you accept it':
     'Политика использования шлюза показывается, и подключение продолжается, когда вы её примете',
   'A new file takes its source’s permissions, as scp does: a 0600 key stays private':
