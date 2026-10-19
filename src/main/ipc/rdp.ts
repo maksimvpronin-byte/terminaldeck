@@ -89,7 +89,13 @@ function desktopGateway(
   // account was chosen for this session, that account is what the host's login
   // now is, so the gateway is offered it too rather than a login the session
   // itself is not using.
-  const secretRef = rdp.gatewayUsername ? rdp.gatewaySecretRef : auth.secretRef
+  /*
+   * A login or a password of its own makes it the gateway's own sign-in. A
+   * password alone — the dialog offers that, the login box saying "the host's
+   * own login" — goes with the host's login: it used to be dropped, and the
+   * gateway was offered the desktop's password instead.
+   */
+  const own = Boolean(rdp.gatewayUsername || rdp.gatewaySecretRef)
   const login = splitLogin(rdp.gatewayUsername || auth.username || '')
 
   return {
@@ -97,9 +103,10 @@ function desktopGateway(
     port: rdp.gatewayPort,
     // Left unstated when it is the host's own login, so the client sets the
     // "same credentials" flag rather than sending the pair twice.
-    username: rdp.gatewayUsername ? login.username : undefined,
-    domain: rdp.gatewayUsername ? login.domain : undefined,
-    password: rdp.gatewayUsername && secretRef ? (vault.getSecret(secretRef) ?? '') : undefined,
+    username: own ? login.username : undefined,
+    domain: own ? login.domain : undefined,
+    password:
+      own && rdp.gatewaySecretRef ? (vault.getSecret(rdp.gatewaySecretRef) ?? '') : undefined,
     bypassLocal: rdp.gatewayBypassLocal
   }
 }
