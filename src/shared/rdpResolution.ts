@@ -93,12 +93,20 @@ export function resolveRdp(
    * were mixed.
    */
   const gatewayLevel = chain.find((level) => isSet(level.gatewayHost))
+  /*
+   * Whether private addresses skip it is a choice a host below the gateway
+   * may make for itself — its dialog offers the switch — and it was read
+   * from the gateway's level alone: turned off on the host, it stayed on.
+   * The nearest level that says, down to the gateway's own.
+   */
+  const throughGateway = gatewayLevel ? chain.slice(0, chain.indexOf(gatewayLevel) + 1) : []
   return {
     gatewayHost: gatewayLevel?.gatewayHost,
     gatewayPort: gatewayLevel?.gatewayPort ?? RDP_FALLBACK.gatewayPort,
     gatewayUsername: gatewayLevel?.gatewayUsername,
     gatewaySecretRef: gatewayLevel?.gatewaySecretRef,
-    gatewayBypassLocal: gatewayLevel?.gatewayBypassLocal ?? RDP_FALLBACK.gatewayBypassLocal,
+    gatewayBypassLocal:
+      firstDefined(throughGateway, 'gatewayBypassLocal') ?? RDP_FALLBACK.gatewayBypassLocal,
     resolution: pick(chain, 'resolution') ?? RDP_FALLBACK.resolution,
     desktopWidth: pick(chain, 'desktopWidth') ?? RDP_FALLBACK.desktopWidth,
     desktopHeight: pick(chain, 'desktopHeight') ?? RDP_FALLBACK.desktopHeight,

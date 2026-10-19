@@ -175,3 +175,18 @@ describe('sharing this computer’s disks', () => {
     expect(resolveRdp({ drives: false }, 'g', [group]).drives).toBe(false)
   })
 })
+
+/* A host turned the switch off under a group's gateway, and it stayed on. */
+it('lets a host decide for itself whether private addresses skip its group’s gateway', () => {
+  const groups = [
+    {
+      id: 'g',
+      name: 'G',
+      parentId: null,
+      gatewayHost: 'gw.example',
+      gatewayBypassLocal: true
+    }
+  ] as SessionGroup[]
+  expect(resolveRdp({ gatewayBypassLocal: false }, 'g', groups).gatewayBypassLocal).toBe(false)
+  expect(resolveRdp({}, 'g', groups).gatewayBypassLocal).toBe(true)
+})
