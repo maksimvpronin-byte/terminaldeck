@@ -79,6 +79,20 @@ describe('importing hosts from ~/.ssh/config', () => {
     })
   })
 
+  /* A saved bastion with no login is reached as this machine's user, as ssh reaches it. */
+  it('takes a jump host with no login as this machine’s user', () => {
+    const plan = planSshImport(
+      [host('db', 'max@bastion')],
+      [savedHost('saved-bastion', 'bastion')],
+      [],
+      makeId,
+      1,
+      [],
+      'max'
+    )
+    expect(plan.ok && plan.profiles[0].jumpHostId).toBe('saved-bastion')
+  })
+
   it('checks a jump host imported alongside the same way', () => {
     const bastion = { ...host('bastion'), user: 'root' }
     const plan = planSshImport([bastion, host('db', 'admin@bastion')], [], [], makeId, 1)

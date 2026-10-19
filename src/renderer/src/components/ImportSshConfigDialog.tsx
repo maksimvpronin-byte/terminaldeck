@@ -55,7 +55,15 @@ export default function ImportSshConfigDialog({ onClose }: { onClose: () => void
       // is written at once: a failure halfway used to leave the first hosts
       // saved — one of them pointing at a jump host that never was — and trying
       // again added them a second time under new ids.
-      const plan = planSshImport(chosen, sessions, groups, nanoid, Date.now(), credentials)
+      const plan = planSshImport(
+        chosen,
+        sessions,
+        groups,
+        nanoid,
+        Date.now(),
+        credentials,
+        window.td.localUsername
+      )
       if (!plan.ok) {
         setProblems(plan.problems)
         return

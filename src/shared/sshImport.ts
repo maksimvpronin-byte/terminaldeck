@@ -61,7 +61,9 @@ export function planSshImport(
   groups: SessionGroup[],
   makeId: () => string,
   now: number,
-  credentials: Credential[] = []
+  credentials: Credential[] = [],
+  /** Who a jump host with no login is reached as: this machine's user, as ssh does. */
+  localUser = ''
 ): SshImportPlan {
   const created = new Map<string, SessionProfile>()
   for (const h of chosen) {
@@ -111,7 +113,8 @@ export function planSshImport(
        * through `root@bastion:22` without a word; ssh uses what the entry
        * says. Told instead, so the jump host or the config can be put right.
        */
-      const has = resolveAuth(hop, hop.groupId, groups, { credentials })
+      const resolved = resolveAuth(hop, hop.groupId, groups, { credentials })
+      const has = { ...resolved, username: resolved.username || localUser }
       if (
         (wanted.user !== undefined && wanted.user !== has.username) ||
         (wanted.port !== undefined && wanted.port !== has.port)
