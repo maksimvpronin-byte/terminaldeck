@@ -177,7 +177,8 @@ the hosts it brings in stand in the tree beside the ones you saved by hand.
   name and the login are remembered and the password is asked for each time. Works for desktops as
   well as shells, and passwords live in the vault exactly as a host's do
 - Import hosts from `~/.ssh/config`, including `ProxyJump` links, with what `Host *` and other
-  pattern blocks give them, as `ssh -G` reads it
+  pattern blocks give them, as `ssh -G` reads it. A login or port a `ProxyJump` entry names has to
+  be the jump host's own; a saved one that logs in otherwise is reported, and nothing imported
 
 ### Terminals
 

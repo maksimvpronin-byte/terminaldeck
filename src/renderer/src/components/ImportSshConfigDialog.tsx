@@ -10,6 +10,7 @@ export default function ImportSshConfigDialog({ onClose }: { onClose: () => void
   const t = useT()
   const sessions = useStore((s) => s.sessions)
   const groups = useStore((s) => s.groups)
+  const credentials = useStore((s) => s.credentials)
   const upsertSessions = useStore((s) => s.upsertSessions)
 
   const [hosts, setHosts] = useState<SshConfigHost[] | null>(null)
@@ -54,7 +55,7 @@ export default function ImportSshConfigDialog({ onClose }: { onClose: () => void
       // is written at once: a failure halfway used to leave the first hosts
       // saved — one of them pointing at a jump host that never was — and trying
       // again added them a second time under new ids.
-      const plan = planSshImport(chosen, sessions, groups, nanoid, Date.now())
+      const plan = planSshImport(chosen, sessions, groups, nanoid, Date.now(), credentials)
       if (!plan.ok) {
         setProblems(plan.problems)
         return
@@ -110,7 +111,7 @@ export default function ImportSshConfigDialog({ onClose }: { onClose: () => void
           <div className="error-text">
             <p>
               {t(
-                'Nothing was imported. These hosts go through jump hosts that are not here — tick them too, or untick these:'
+                'Nothing was imported. These hosts cannot go through their jump hosts as ~/.ssh/config says — put that right, or untick them:'
               )}
             </p>
             <ul>
@@ -121,10 +122,17 @@ export default function ImportSshConfigDialog({ onClose }: { onClose: () => void
                         alias: p.alias,
                         hop: p.hop
                       })
-                    : t('{alias}: {hop} is not reached through the jump host before it', {
-                        alias: p.alias,
-                        hop: p.hop
-                      })}
+                    : p.reason === 'differs'
+                      ? t('{alias}: goes through {wanted}, but the jump host {hop} is {found}', {
+                          alias: p.alias,
+                          hop: p.hop,
+                          wanted: p.wanted ?? '',
+                          found: p.found ?? ''
+                        })
+                      : t('{alias}: {hop} is not reached through the jump host before it', {
+                          alias: p.alias,
+                          hop: p.hop
+                        })}
                 </li>
               ))}
             </ul>

@@ -69,6 +69,9 @@ const CHAPTERS: Chapter[] = [
               {
                 what: 'Host * and other pattern blocks give the hosts they match their login, port and jump host'
               },
+              {
+                what: 'A login or port in ProxyJump must be the jump host’s own, or nothing is imported'
+              },
               { what: 'The mark in front of a name says what it opens: a terminal or a desktop' },
               { what: 'It turns green while that machine is open, desktops and terminals alike' },
               { what: 'A host given a colour wears it as its own background and a coloured edge' },

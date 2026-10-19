@@ -1096,8 +1096,10 @@ export const ru: Record<string, string> = {
   'unchanged lines: {count}': 'неизменённых строк: {count}',
   '{count} more rows not drawn': 'ещё строк не отрисовано: {count}',
   'The two files are identical.': 'Файлы одинаковы.',
-  'Nothing was imported. These hosts go through jump hosts that are not here — tick them too, or untick these:':
-    'Ничего не импортировано. Эти хосты подключаются через jump-хосты, которых здесь нет — отметьте и их или снимите отметку с этих:',
+  'Nothing was imported. These hosts cannot go through their jump hosts as ~/.ssh/config says — put that right, or untick them:':
+    'Ничего не импортировано. Эти хосты не могут подключиться через свои jump-хосты так, как сказано в ~/.ssh/config, — исправьте это или снимите с них отметку:',
+  '{alias}: goes through {wanted}, but the jump host {hop} is {found}':
+    '{alias}: подключается через {wanted}, а jump-хост {hop} — это {found}',
   '{alias}: its jump host {hop} is neither selected nor saved':
     '{alias}: jump-хост {hop} не выбран и не сохранён',
   '{alias}: {hop} is not reached through the jump host before it':
@@ -1395,6 +1397,8 @@ export const ru: Record<string, string> = {
     'Как и у неотмеченной группы — диалог называет и такие группы',
   'Host * and other pattern blocks give the hosts they match their login, port and jump host':
     'Блоки-шаблоны вроде Host * отдают подходящим хостам логин, порт и бастион',
+  'A login or port in ProxyJump must be the jump host’s own, or nothing is imported':
+    'Логин или порт в ProxyJump должны совпадать с теми, что у самого бастиона, иначе ничего не импортируется',
   'A collection, a saved layout or a split brings such a desktop forward instead':
     'Коллекция, сохранённая раскладка или разделение панели выводят такой рабочий стол вперёд',
   'What has left the repository leaves the folder, and the dialog says what goes':

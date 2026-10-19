@@ -33,13 +33,66 @@ describe('importing hosts from ~/.ssh/config', () => {
     expect(db.jumpHostId).toBe(bastion.id)
   })
 
-  it('links a jump host that is already saved, whatever user and port the entry names', () => {
+  it('links a jump host that is already saved with the login and port the entry names', () => {
     const plan = planSshImport(
       [host('db', 'admin@bastion:2222')],
-      [savedHost('saved-bastion', 'bastion')],
+      [{ ...savedHost('saved-bastion', 'bastion'), username: 'admin', port: 2222 }],
       [],
       makeId,
       1
+    )
+    expect(plan.ok && plan.profiles[0].jumpHostId).toBe('saved-bastion')
+  })
+
+  it('links a saved jump host as it is when the entry names no login or port', () => {
+    const plan = planSshImport(
+      [host('db', 'bastion')],
+      [{ ...savedHost('saved-bastion', 'bastion'), username: 'root' }],
+      [],
+      makeId,
+      1
+    )
+    expect(plan.ok && plan.profiles[0].jumpHostId).toBe('saved-bastion')
+  })
+
+  /*
+   * The saved one was linked whatever it had: admin@bastion:2222 in the
+   * config went through root@bastion:22, with nothing said.
+   */
+  it.each([
+    ['admin@bastion', 'admin@bastion:22'],
+    ['bastion:2222', 'root@bastion:2222'],
+    ['ssh://admin@bastion:2222', 'admin@bastion:2222']
+  ])('imports nothing when %s is not how the saved jump host logs in', (spec, wanted) => {
+    const plan = planSshImport(
+      [host('db', spec)],
+      [{ ...savedHost('saved-bastion', 'bastion'), username: 'root' }],
+      [],
+      makeId,
+      1
+    )
+    expect(plan).toEqual({
+      ok: false,
+      problems: [
+        { alias: 'db', hop: 'bastion', reason: 'differs', wanted, found: 'root@bastion:22' }
+      ]
+    })
+  })
+
+  it('checks a jump host imported alongside the same way', () => {
+    const bastion = { ...host('bastion'), user: 'root' }
+    const plan = planSshImport([bastion, host('db', 'admin@bastion')], [], [], makeId, 1)
+    expect(plan.ok).toBe(false)
+  })
+
+  it('reads the login of a saved jump host from its account', () => {
+    const plan = planSshImport(
+      [host('db', 'admin@bastion')],
+      [{ ...savedHost('saved-bastion', 'bastion'), credentialId: 'acc' }],
+      [],
+      makeId,
+      1,
+      [{ id: 'acc', name: 'Admin', username: 'admin' } as never]
     )
     expect(plan.ok && plan.profiles[0].jumpHostId).toBe('saved-bastion')
   })
@@ -82,7 +135,7 @@ describe('importing hosts from ~/.ssh/config', () => {
   it('reads a bracketed IPv6 hop', () => {
     const plan = planSshImport(
       [host('db', 'root@[fd00::1]:22')],
-      [savedHost('v6', 'fd00::1')],
+      [{ ...savedHost('v6', 'fd00::1'), username: 'root' }],
       [],
       makeId,
       1

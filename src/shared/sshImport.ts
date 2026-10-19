@@ -1,5 +1,5 @@
 import { resolveAuth } from './authResolution'
-import type { SessionGroup, SessionProfile, SshConfigHost } from './types'
+import type { Credential, SessionGroup, SessionProfile, SshConfigHost } from './types'
 
 export type SshImportPlan =
   { ok: true; profiles: SessionProfile[] } | { ok: false; problems: SshImportProblem[] }
@@ -9,19 +9,37 @@ export interface SshImportProblem {
   alias: string
   /** The jump host that could not be found, or the one that goes the wrong way. */
   hop: string
-  reason: 'missing' | 'route'
+  reason: 'missing' | 'route' | 'differs'
+  /** For `differs`: the login the entry asks for, and the one the jump host has. */
+  wanted?: string
+  found?: string
 }
 
-/** The host a `ProxyJump` entry names: `[user@]host[:port]`, or the same as an ssh:// URI. */
-function hopAlias(spec: string): string {
-  const bare = spec
-    .trim()
-    .replace(/^ssh:\/\//i, '')
-    .replace(/^.*@/, '')
+/** What a `ProxyJump` entry names: `[user@]host[:port]`, or the same as an ssh:// URI. */
+interface HopSpec {
+  alias: string
+  user?: string
+  port?: number
+}
+
+function hopSpec(spec: string): HopSpec {
+  const uri = spec.trim().replace(/^ssh:\/\//i, '')
+  const at = uri.lastIndexOf('@')
+  const user = at >= 0 ? uri.slice(0, at) : undefined
+  const bare = at >= 0 ? uri.slice(at + 1) : uri
   // An IPv6 address comes bracketed when it has a port after it.
-  const bracketed = bare.match(/^\[([^\]]+)\]/)
-  if (bracketed) return bracketed[1]
-  return bare.replace(/:\d+$/, '')
+  const bracketed = bare.match(/^\[([^\]]+)\](?::(\d+))?$/)
+  if (bracketed) {
+    return { alias: bracketed[1], user, port: bracketed[2] ? Number(bracketed[2]) : undefined }
+  }
+  const ported = bare.match(/^(.*):(\d+)$/)
+  if (ported) return { alias: ported[1], user, port: Number(ported[2]) }
+  return { alias: bare, user }
+}
+
+/** `user@host:port`, the way a ProxyJump entry would name it. */
+function loginOf(user: string | undefined, host: string, port: number): string {
+  return `${user ? `${user}@` : ''}${host}:${port}`
 }
 
 /**
@@ -42,7 +60,8 @@ export function planSshImport(
   saved: SessionProfile[],
   groups: SessionGroup[],
   makeId: () => string,
-  now: number
+  now: number,
+  credentials: Credential[] = []
 ): SshImportPlan {
   const created = new Map<string, SessionProfile>()
   for (const h of chosen) {
@@ -80,10 +99,30 @@ export function planSshImport(
     if (!h.proxyJump || h.proxyJump.trim().toLowerCase() === 'none') continue
     const hops: SessionProfile[] = []
     for (const spec of h.proxyJump.split(',')) {
-      const alias = hopAlias(spec)
-      const hop = find(alias)
+      const wanted = hopSpec(spec)
+      const hop = find(wanted.alias)
       if (!hop) {
-        problems.push({ alias: h.alias, hop: alias, reason: 'missing' })
+        problems.push({ alias: h.alias, hop: wanted.alias, reason: 'missing' })
+        break
+      }
+      /*
+       * A login or port the entry names has to be the jump host's own. The
+       * saved one was linked whatever it had, and `admin@bastion:2222` went
+       * through `root@bastion:22` without a word; ssh uses what the entry
+       * says. Told instead, so the jump host or the config can be put right.
+       */
+      const has = resolveAuth(hop, hop.groupId, groups, { credentials })
+      if (
+        (wanted.user !== undefined && wanted.user !== has.username) ||
+        (wanted.port !== undefined && wanted.port !== has.port)
+      ) {
+        problems.push({
+          alias: h.alias,
+          hop: hop.name,
+          reason: 'differs',
+          wanted: loginOf(wanted.user ?? has.username, wanted.alias, wanted.port ?? has.port),
+          found: loginOf(has.username, wanted.alias, has.port)
+        })
         break
       }
       hops.push(hop)
