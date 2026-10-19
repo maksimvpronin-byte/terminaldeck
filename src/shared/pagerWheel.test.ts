@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { type PagerScreen, wheelArrows, wheelGoesToPager, wheelRows } from './pagerWheel'
+import { type PagerScreen, wheelArrows, wheelRows, wheelTarget } from './pagerWheel'
 
 // `sudo journalctl`: less -X on the normal screen, its prompt on the last row.
 const journal: PagerScreen = {
@@ -10,41 +10,66 @@ const journal: PagerScreen = {
   cursorLineStartsInverse: true
 }
 
-describe('wheelGoesToPager', () => {
+describe('wheelTarget', () => {
+  const up = -100
+  const down = 100
+
   it('scrolls journalctl rather than the history above it', () => {
-    expect(wheelGoesToPager(journal)).toBe(true)
+    expect(wheelTarget(journal, down)).toBe('pager')
+    expect(wheelTarget(journal, up)).toBe('pager')
   })
 
   it('knows less by its short prompt, which is not in reverse video', () => {
-    expect(wheelGoesToPager({ ...journal, cursorLine: ':', cursorLineStartsInverse: false })).toBe(
-      true
+    expect(wheelTarget({ ...journal, cursorLine: ':', cursorLineStartsInverse: false }, down)).toBe(
+      'pager'
     )
   })
 
   it('leaves a shell prompt to scroll the history', () => {
-    expect(
-      wheelGoesToPager({
-        ...journal,
-        cursorLine: 'pronin.mv_adm@awx ~ $',
-        cursorLineStartsInverse: false
-      })
-    ).toBe(false)
-  })
-
-  it('leaves the alternate screen to xterm', () => {
-    expect(wheelGoesToPager({ ...journal, buffer: 'alternate' })).toBe(false)
+    const shell = {
+      ...journal,
+      cursorLine: 'pronin.mv_adm@awx ~ $',
+      cursorLineStartsInverse: false
+    }
+    expect(wheelTarget(shell, up)).toBe('terminal')
   })
 
   it('keeps scrolling the history once the view is up in it', () => {
-    expect(wheelGoesToPager({ ...journal, scrolledBack: true })).toBe(false)
+    expect(wheelTarget({ ...journal, scrolledBack: true }, down)).toBe('terminal')
   })
 
   it('wants the prompt on the bottom row', () => {
-    expect(wheelGoesToPager({ ...journal, cursorOnLastRow: false })).toBe(false)
+    expect(wheelTarget({ ...journal, cursorOnLastRow: false }, down)).toBe('terminal')
   })
 
   it('does not take an empty reverse-video row for a prompt', () => {
-    expect(wheelGoesToPager({ ...journal, cursorLine: '   ' })).toBe(false)
+    expect(wheelTarget({ ...journal, cursorLine: '   ' }, down)).toBe('terminal')
+  })
+
+  it('scrolls less and man on the alternate screen as before', () => {
+    expect(wheelTarget({ ...journal, buffer: 'alternate' }, up)).toBe('pager')
+  })
+
+  // vi, with the cursor somewhere in the text.
+  const vi: PagerScreen = {
+    buffer: 'alternate',
+    scrolledBack: false,
+    cursorOnLastRow: false,
+    cursorLine: 'ExecStart=/usr/sbin/zabbix_agent2',
+    cursorLineStartsInverse: false
+  }
+
+  it('opens the history behind vi on the way up', () => {
+    expect(wheelTarget(vi, up)).toBe('history')
+  })
+
+  it('sends vi nothing on the way down, where it already is at the bottom', () => {
+    expect(wheelTarget(vi, down)).toBe('nothing')
+  })
+
+  it('opens the history behind vi with its status line under the cursor', () => {
+    const status = { ...vi, cursorOnLastRow: true, cursorLine: '-- INSERT --' }
+    expect(wheelTarget(status, up)).toBe('history')
   })
 })
 

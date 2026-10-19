@@ -1,5 +1,6 @@
 /**
- * The mouse wheel in a pager that does not take the alternate screen.
+ * The mouse wheel in a pager that does not take the alternate screen, and in
+ * the full-screen programs that do.
  *
  * xterm turns the wheel into arrow keys only on the alternate screen, which is
  * where vim, tmux and an ordinary `less` draw. journalctl starts `less` with
@@ -26,16 +27,37 @@ export interface PagerScreen {
   cursorLineStartsInverse: boolean
 }
 
-/** Whether the wheel should go to the program as arrow keys. */
-export function wheelGoesToPager(screen: PagerScreen): boolean {
-  // The alternate screen is xterm's to handle, and already is.
-  if (screen.buffer !== 'normal') return false
-  // Someone reading the history keeps scrolling it.
-  if (screen.scrolledBack) return false
+/** A pager's prompt is on the bottom row, with the cursor after it. */
+export function showsPagerPrompt(screen: PagerScreen): boolean {
   if (!screen.cursorOnLastRow) return false
   const line = screen.cursorLine.trim()
   if (line === '') return false
   return line === ':' || screen.cursorLineStartsInverse
+}
+
+/**
+ * Where a wheel turn goes.
+ *
+ * - `terminal`: xterm scrolls its own history, as it always has.
+ * - `pager`: arrow keys, to the pager — `less -X` on the normal screen, and
+ *   `less` or `man` on the alternate one.
+ * - `history`: up in any other full-screen program — vi, nano, top — opens
+ *   the history that program is drawn over; see historyView.ts.
+ * - `nothing`: down in one of those, which is already at the bottom.
+ *
+ * A program that asked for the mouse never gets here: xterm sends it the
+ * wheel itself.
+ */
+export type WheelTarget = 'terminal' | 'pager' | 'history' | 'nothing'
+
+export function wheelTarget(screen: PagerScreen, deltaY: number): WheelTarget {
+  if (screen.buffer === 'normal') {
+    // Someone reading the history keeps scrolling it.
+    if (screen.scrolledBack) return 'terminal'
+    return showsPagerPrompt(screen) ? 'pager' : 'terminal'
+  }
+  if (showsPagerPrompt(screen)) return 'pager'
+  return deltaY < 0 ? 'history' : 'nothing'
 }
 
 /** The arrow keys a wheel turn of `lines` sends, down for a positive count. */

@@ -12,7 +12,8 @@ import ContextMenu, { type MenuItem } from './ContextMenu'
 import { IS_MAC } from '../state/keys'
 import { translate, useT } from '../i18n'
 import { diag, diagKey } from '../diag'
-import { wheelArrows, wheelGoesToPager, wheelRows } from '../../../shared/pagerWheel'
+import { wheelArrows, wheelRows, wheelTarget } from '../../../shared/pagerWheel'
+import { openHistoryView, type HistoryView } from './historyView'
 
 interface Props {
   target: PaneTarget
@@ -87,6 +88,8 @@ export default function TerminalHost({
   const termRef = useRef<Terminal | null>(null)
   const fitRef = useRef<FitAddon | null>(null)
   const searchRef = useRef<SearchAddon | null>(null)
+  // The history laid over a full-screen program, while it is open.
+  const historyRef = useRef<HistoryView | null>(null)
   // Takes back the window listener a press left waiting for its release.
   const releaseRef = useRef<(() => void) | null>(null)
   const connIdRef = useRef<string | undefined>(connectionId)
@@ -263,28 +266,51 @@ export default function TerminalHost({
     })
 
     /*
-     * The wheel in `less -X`, which is how journalctl runs it: see
-     * pagerWheel.ts. Everywhere else the wheel is left to xterm.
+     * The wheel in a pager, and in a full-screen program with the history
+     * behind it: see pagerWheel.ts. Everywhere else it is left to xterm.
      */
     let wheelCarry = 0
     term.attachCustomWheelEventHandler((e) => {
       const buffer = term.buffer.active
       const row = buffer.getLine(buffer.baseY + buffer.cursorY)
-      const toPager = wheelGoesToPager({
-        buffer: buffer.type,
-        scrolledBack: buffer.viewportY < buffer.baseY,
-        cursorOnLastRow: buffer.cursorY === term.rows - 1,
-        cursorLine: row?.translateToString(true) ?? '',
-        cursorLineStartsInverse: !!row?.getCell(0)?.isInverse()
-      })
-      if (!toPager) {
+      const target = wheelTarget(
+        {
+          buffer: buffer.type,
+          scrolledBack: buffer.viewportY < buffer.baseY,
+          cursorOnLastRow: buffer.cursorY === term.rows - 1,
+          cursorLine: row?.translateToString(true) ?? '',
+          cursorLineStartsInverse: !!row?.getCell(0)?.isInverse()
+        },
+        e.deltaY
+      )
+      if (target === 'terminal') {
         wheelCarry = 0
         return true
       }
       e.preventDefault()
+      if (target === 'nothing') return false
       const rowHeight = (term.element?.clientHeight ?? 0) / term.rows
       const turn = wheelRows(e.deltaY, e.deltaMode, rowHeight, wheelCarry)
       wheelCarry = turn.carry
+      if (target === 'history') {
+        if (!historyRef.current && hostRef.current) {
+          historyRef.current = openHistoryView(term, hostRef.current, {
+            scrolled: Math.min(turn.rows, -1),
+            hint: translate(
+              useStore.getState().settings.language,
+              'History before this program. Scroll down past the end, or press any key, to go back'
+            ),
+            onCopy: (text) => {
+              clipDiag(`copy from history: ${text.length} chars`)
+              window.td.clipboard.write(text)
+            },
+            onClose: () => {
+              historyRef.current = null
+            }
+          })
+        }
+        return false
+      }
       // To this pane's session only: scrolling one pager is not something to
       // broadcast to every pane typing along with it.
       const own = connIdRef.current
@@ -330,6 +356,8 @@ export default function TerminalHost({
         if (!hostRef.current?.clientWidth || !hostRef.current.clientHeight) return
         fit.fit()
         if (term.cols === lastCols && term.rows === lastRows) return
+        // Laid out for the old size, and the program is about to redraw.
+        historyRef.current?.close()
         lastCols = term.cols
         lastRows = term.rows
         if (connIdRef.current) window.td.ssh.resize(connIdRef.current, term.cols, term.rows)
@@ -349,6 +377,7 @@ export default function TerminalHost({
       releaseRef.current?.()
       resizeObserver.disconnect()
       cancelAnimationFrame(resizeFrame)
+      historyRef.current?.close()
       term.dispose()
       /*
        * A connect still working is given up on, not merely ignored when it

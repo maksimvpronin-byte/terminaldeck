@@ -1263,6 +1263,41 @@ label {
      fitted was laid out and the last one sat on the bottom edge, cut short. */
   box-sizing: content-box;
 }
+/* What was in the terminal before a full-screen program, laid over it; see
+   historyView.ts. Placed and sized over the terminal from script, and padded
+   as the terminal is, so its rows land where the terminal's do. */
+.terminal-history {
+  position: absolute;
+  box-sizing: border-box;
+  padding: 4px 4px 8px;
+  /* Above xterm's own layers, as the reconnect cover is. */
+  z-index: 4;
+}
+.terminal-history-hint {
+  position: absolute;
+  top: 6px;
+  right: 14px;
+  z-index: 5;
+  max-width: 60%;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 11px;
+  pointer-events: none;
+  /* Long enough to read once, then out of the way of the line under it. */
+  animation: terminal-history-hint 4s ease-in forwards;
+}
+@keyframes terminal-history-hint {
+  0%,
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
 .terminal-search {
   display: flex;
   gap: 4px;

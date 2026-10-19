@@ -130,6 +130,8 @@ export const ru: Record<string, string> = {
     'Точка на фоновой вкладке означает, что там появился новый вывод',
   'Search the scrollback; ⏎ and ⇧⏎ step through matches':
     'Поиск по истории; ⏎ и ⇧⏎ переходят по совпадениям',
+  'History before this program. Scroll down past the end, or press any key, to go back':
+    'История до этой программы. Чтобы вернуться, прокрутите вниз до конца или нажмите любую клавишу',
   'Font size up, down, and back to default': 'Размер шрифта больше, меньше и обратно к исходному',
   'Zoom moves the global size, or the host’s own if it has one set':
     'Масштаб меняет общий размер — или размер хоста, если у него задан свой',
