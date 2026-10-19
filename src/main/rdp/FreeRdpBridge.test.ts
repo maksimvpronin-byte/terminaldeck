@@ -19,7 +19,8 @@ vi.mock('electron', () => ({
     read: () => '',
     readBuffer: () => Buffer.alloc(0)
   },
-  BrowserWindow: { getAllWindows: () => [] }
+  BrowserWindow: { getAllWindows: () => [] },
+  dialog: { showMessageBox: vi.fn(async () => ({ response: 1 })) }
 }))
 
 vi.mock('./clipboardFiles', () => ({
@@ -549,5 +550,34 @@ describe('a desktop out of sight that copies', () => {
       innards().sessions.delete('d-active')
       innards().sessions.delete('d-background')
     }
+  })
+})
+
+/*
+ * An RD Gateway's use policy waited for Y or N at a terminal the client does
+ * not have, and the connection stood still for ever. It is asked here.
+ */
+const { dialog } = await import('electron')
+const { isWindowCommand } = await import('../ipc/rdp')
+
+describe('a message from an RD Gateway', () => {
+  it.each([
+    [true, 1, true],
+    [true, 0, false],
+    [false, 0, true]
+  ])('answers the client (consent=%s, button=%s) with %s', async (consent, button, trust) => {
+    const { session, written } = stubSession()
+    session.window = { isDestroyed: () => false, webContents: { send: () => undefined } }
+    innards().sessions.set('gw', session)
+    vi.mocked(dialog.showMessageBox).mockResolvedValueOnce({ response: button } as never)
+    const event = JSON.stringify({ e: 'gateway-message', consent, text: 'Use policy' })
+    innards().receive('gw', session, RECORD.event, Buffer.from(event))
+    await new Promise((resolve) => setImmediate(resolve))
+    expect(Buffer.concat(written).toString()).toContain(`a\tgateway\ntrust\t${trust ? 1 : 0}`)
+    innards().sessions.delete('gw')
+  })
+
+  it('is never something the window may answer itself', () => {
+    expect(isWindowCommand({ a: 'gateway', trust: true })).toBe(false)
   })
 })

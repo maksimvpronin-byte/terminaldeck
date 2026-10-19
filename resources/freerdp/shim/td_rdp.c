@@ -1612,6 +1612,51 @@ static int td_verify_x509(freerdp* instance, const BYTE* data, size_t length, co
 }
 
 /*
+ * A message an RD Gateway puts in front of the connection — its use policy,
+ * often one that has to be accepted.
+ *
+ * FreeRDP's default prints it and waits for Y or N on standard input, which
+ * here is the pipe the driving process speaks on: the connection stood still
+ * for ever, waiting for an answer nobody could give, and the commands that
+ * did arrive were read as that answer. It is put to the application instead,
+ * which shows it and answers as it answers a certificate.
+ */
+static BOOL td_gateway_message(freerdp* instance, UINT32 type, BOOL isDisplayMandatory,
+                               BOOL isConsentMandatory, size_t length, const WCHAR* message)
+{
+	tdContext* td = (tdContext*)instance->context;
+	size_t utf8_len = 0;
+	char* text;
+	char* escaped;
+
+	WINPR_UNUSED(type);
+	if (!isDisplayMandatory && !isConsentMandatory)
+		return TRUE;
+	/* In bytes, as both gateway protocols count it. */
+	text = ConvertWCharNToUtf8Alloc(message, length / sizeof(WCHAR), &utf8_len);
+	if (!text)
+		return FALSE;
+	escaped = malloc(utf8_len * 6u + 1u);
+	if (!escaped)
+	{
+		free(text);
+		return FALSE;
+	}
+	(void)td_json_escape(escaped, utf8_len * 6u + 1u, text);
+	free(text);
+
+	(void)ResetEvent(td->answered);
+	td->trusted = 0;
+	td_event("{\"e\":\"gateway-message\",\"consent\":%s,\"text\":\"%s\"}",
+	         isConsentMandatory ? "true" : "false", escaped);
+	free(escaped);
+
+	if (WaitForSingleObject(td->answered, 180000) != WAIT_OBJECT_0)
+		return FALSE;
+	return td->trusted ? TRUE : FALSE;
+}
+
+/*
  * The host's logon message, passed on rather than judged here.
  *
  * A Logon Error Info PDU is named for its worst case and is usually not one:
@@ -1837,7 +1882,7 @@ static DWORD WINAPI reader_thread(LPVOID arg)
 			break;
 
 		const char* action = td_cmd_str(cmd, "a", "");
-		if (strcmp(action, "cert") == 0)
+		if (strcmp(action, "cert") == 0 || strcmp(action, "gateway") == 0)
 		{
 			td->trusted = td_cmd_bool(cmd, "trust", 0);
 			(void)SetEvent(td->answered);
@@ -2120,8 +2165,19 @@ static BOOL client_new(freerdp* instance, rdpContext* context)
 	 * for the application's own trust store to recognise a certificate it has
 	 * already been told about. */
 	instance->VerifyX509Certificate = td_verify_x509;
-	/* Deliberately no Authenticate callback: everything needed was given at
-	 * start, and a prompt from a process with no terminal would hang. */
+	/* Everything FreeRDP's defaults would ask at a terminal — on standard
+	 * input, which is the command pipe. Leaving them out, as this once did on
+	 * purpose, did not leave them unset: the client's common code installs its
+	 * console ones before this runs. */
+	instance->PresentGatewayMessage = td_gateway_message;
+	/* And these none at all, which FreeRDP takes as nothing more to give: a
+	 * desktop goes on to its own logon screen, and a gateway or a smartcard
+	 * that wants more ends the connection saying so — where the console ones
+	 * read standard input, and a gateway with a login of its own and no saved
+	 * password hung on it. */
+	instance->AuthenticateEx = NULL;
+	instance->ChooseSmartcard = NULL;
+	instance->GetAccessToken = NULL;
 
 	InitializeCriticalSection(&td->lock);
 	InitializeCriticalSection(&td->paint);

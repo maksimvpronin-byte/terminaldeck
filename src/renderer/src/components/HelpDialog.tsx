@@ -616,6 +616,9 @@ const CHAPTERS: Chapter[] = [
               { what: 'Set the gateway on the group and every RDP host in it goes through it' },
               { what: 'A gateway can leave private addresses alone and reach them directly' },
               {
+                what: 'A gateway’s use policy is shown, and connecting goes on once you accept it'
+              },
+              {
                 what: 'A certificate the machine cannot verify is asked about once, then remembered'
               },
               {

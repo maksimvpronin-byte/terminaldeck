@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from 'child_process'
 import { dirname, join } from 'path'
 import { X509Certificate } from 'crypto'
-import { app, clipboard, type BrowserWindow } from 'electron'
+import { app, clipboard, dialog, type BrowserWindow } from 'electron'
 import { IPC } from '../../shared/ipc-channels'
 import { askAboutCertificate } from './certificateVerifier'
 import { isUnlocked, requireUnlocked } from '../vault/locked'
@@ -841,6 +841,10 @@ class FreeRdpBridge {
       void this.decideCertificate(id, session, event)
       return
     }
+    if (event.e === 'gateway-message') {
+      void this.presentGatewayMessage(id, session, event)
+      return
+    }
     if (event.e === 'failed') {
       const detail = failureText(
         String(event.detail ?? ''),
@@ -905,6 +909,43 @@ class FreeRdpBridge {
       trusted = false
     }
     this.write(id, { a: 'cert', trust: trusted })
+  }
+
+  /**
+   * What an RD Gateway puts in front of the connection: a notice, or a use
+   * policy to be accepted before it lets anybody through.
+   *
+   * The client waited for Y or N at a terminal it does not have, and the
+   * connection stood still for ever; it now asks here. Declined, or left
+   * unanswered, the gateway is told no and the connection ends.
+   */
+  private async presentGatewayMessage(
+    id: string,
+    session: Session,
+    event: Record<string, unknown>
+  ): Promise<void> {
+    const consent = event.consent === true
+    let accepted = false
+    try {
+      if (!session.window.isDestroyed()) {
+        const { response } = await dialog.showMessageBox(session.window, {
+          type: consent ? 'question' : 'info',
+          title: 'RD Gateway',
+          message: consent
+            ? 'The gateway asks you to accept its policy before connecting.'
+            : 'A message from the gateway',
+          detail: String(event.text ?? ''),
+          buttons: consent ? ['Decline', 'Accept and connect'] : ['Continue'],
+          defaultId: 0,
+          cancelId: 0,
+          noLink: true
+        })
+        accepted = consent ? response === 1 : true
+      }
+    } catch {
+      accepted = false
+    }
+    this.write(id, { a: 'gateway', trust: accepted })
   }
 
   private say(session: Session, id: string, payload: Record<string, unknown>): void {
