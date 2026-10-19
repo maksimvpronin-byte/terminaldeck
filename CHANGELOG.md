@@ -6,6 +6,63 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.29.2
+
+Two more passes of review after 0.29.1: ten rounds over the whole
+application, then a module-by-module read, each module by hand and then by
+Codex. Each fix was reproduced as a failing test first.
+
+### Security
+
+- **A new file takes its source's permissions, in every direction.** An
+  upload over SFTP or SCP/Shell, a copy between hosts and a download each
+  gave a file new at its destination the mode that side gives any new file:
+  a 0600 key or `.pgpass` arrived as 0644, readable by everyone there. It now
+  takes its source's, narrowed as that side narrows a new file, as `scp` and
+  `sftp` do; a file that is replaced keeps its own.
+- **A locked vault takes a full-screen desktop out of full screen**, so the
+  lock screen covers it; the picture stayed on screen above it.
+- **An SSH key passphrase is kept out of a desktop's sign-in** however the
+  groups above it mix keys and RDP logins.
+- **The diagnostics journal names only modifier keys** held as a desktop
+  loses focus.
+
+### Changed
+
+- **Importing `~/.ssh/config` links a saved jump host only as its
+  `ProxyJump` names it.** `admin@bastion:2222` over a bastion saved as
+  `root@bastion:22` used to go through the saved one, unannounced; the dialog
+  now names the difference and imports nothing. A jump host is found by any
+  name its `Host` line gives it.
+- **A key locked with a passphrase that is not saved asks for it** on
+  connecting, as `ssh` does; it failed with "no passphrase given".
+- **A link to a file inside a folder being uploaded goes as the file**, as a
+  download takes one; it went missing without a word.
+- **`~`, `~/…` and, where the server offers it, `~user` work in the SFTP path
+  bar.**
+
+### Fixed
+
+- A desktop is never opened twice for one account: not from a layout or a
+  request that names it twice, not when the host is set to console mode, and
+  not after the host's default account changes while it is open — the pane
+  keeps the account it signed in with. Connect as… the default account
+  brings the open one forward.
+- A swipe or Shift+wheel across a desktop scrolled it the other way.
+- An RD Gateway password saved with its login left blank was dropped, and
+  the gateway offered the desktop's password.
+- Text or files copied in one desktop did not reach another open beside it.
+- A tunnel lost the answer to a program that ends its side of the
+  connection before reading; and after a dropped link, the tunnels after a
+  remote one were left running and their ports taken.
+- Searching through SCP/Shell missed a Cyrillic name in another case.
+- Turning following the terminal off and on again left the file panel where
+  it was until the next `cd`.
+- The monitor counted the time a host spends running virtual machines twice.
+- A deletion stops at a link put in place of a folder while it is emptied.
+- An import keeps each step's undo before writing, forgets what a folder it
+  unties from git mirrored, and reads the saved layouts again.
+
 ## 0.29.1
 
 A review of the whole application after 0.29.0. Nothing here was reported
