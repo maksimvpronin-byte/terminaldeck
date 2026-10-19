@@ -23,6 +23,17 @@ describe('the desktop panes of a workspace', () => {
   }
   const protocol = (id: string): 'ssh' | 'rdp' => (id.startsWith('win') ? 'rdp' : 'ssh')
 
+  it('counts a desktop typed into Quick connect', () => {
+    const quickDesktop = makeLeaf('qd', { kind: 'quick', params: { protocol: 'rdp' } as never })
+    const only: Workspace = {
+      ...workspace,
+      tabs: [{ id: 'q', title: 'q', root: quickDesktop, activePaneId: quickDesktop.id }]
+    }
+    expect(desktopPanesOf(only, protocol)).toEqual([
+      { tabId: 'q', paneId: quickDesktop.id, desktopId: undefined }
+    ])
+  })
+
   it('finds desktops in splits and on their own, leaving terminals out', () => {
     expect(desktopPanesOf(workspace, protocol)).toEqual([
       { tabId: 't1', paneId: windows.id, desktopId: 'rdp-1' },

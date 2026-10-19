@@ -23,8 +23,11 @@ export function desktopPanesOf(
 ): DesktopPane[] {
   return workspace.tabs.flatMap((tab) =>
     collectLeaves(tab.root)
-      .filter(
-        (leaf) => leaf.target.kind === 'session' && protocolFor(leaf.target.sessionId) === 'rdp'
+      // A desktop typed into Quick connect is one too, and was left signed in.
+      .filter((leaf) =>
+        leaf.target.kind === 'session'
+          ? protocolFor(leaf.target.sessionId) === 'rdp'
+          : leaf.target.params.protocol === 'rdp'
       )
       .map((leaf) => ({ tabId: tab.id, paneId: leaf.id, desktopId: leaf.desktopId }))
   )
