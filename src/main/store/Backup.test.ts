@@ -28,6 +28,15 @@ let userData = ''
 let saveTo: string | undefined
 let openFrom: string | undefined
 
+/*
+ * Every test here writes a backup to disk and reads it back, and on GitHub's
+ * Windows runners that is slow and uneven: the whole file takes half a
+ * minute there, and on a loaded day a single test went from 0.3 to 6.8
+ * seconds and failed the release build on the default five. Nothing here can
+ * hang, so the limit is only ever the runner's speed.
+ */
+vi.setConfig({ testTimeout: 30_000 })
+
 vi.mock('electron', () => ({
   app: { getPath: (): string => userData },
   dialog: {
