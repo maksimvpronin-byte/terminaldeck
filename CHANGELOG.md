@@ -6,6 +6,18 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.29.3
+
+### Fixed
+
+- **The mouse wheel scrolls `journalctl`.** journalctl runs `less` with
+  `-X`, which keeps it on the terminal's ordinary screen, and there the wheel
+  scrolled the terminal's history — up over the prompt and the command —
+  while the pager stayed where it was. A pager's prompt on the bottom row now
+  takes the wheel as arrow keys, sent to that pane alone and not to the panes
+  broadcast is typing into. Scrolled up into the history, the wheel goes on
+  scrolling it.
+
 ## 0.29.2
 
 Two more passes of review after 0.29.1: ten rounds over the whole
