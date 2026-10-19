@@ -96,13 +96,23 @@ describe('wheelTurns', () => {
   })
 
   it('keeps an explicit horizontal gesture', () => {
-    expect(wheelTurns(-100, 0, 0)).toEqual([{ units: 120, horizontal: true }])
+    expect(wheelTurns(-100, 0, 0)).toEqual([{ units: -120, horizontal: true }])
+  })
+
+  /*
+   * Right is positive on both sides — WM_MOUSEHWHEEL, and FreeRDP's X11
+   * client sends button 7, scroll right, as +0x78. Flipped like the vertical
+   * axis, a swipe right scrolled the far end left.
+   */
+  it('scrolls the far end the way the gesture went across', () => {
+    expect(wheelTurns(100, 0, 0)).toEqual([{ units: 120, horizontal: true }])
+    expect(wheelFlags(120, true)! & PTR.wheelNegative).toBe(0)
   })
 
   it('keeps a deliberate diagonal gesture', () => {
     expect(wheelTurns(80, -100, 0)).toEqual([
       { units: 120, horizontal: false },
-      { units: -96, horizontal: true }
+      { units: 96, horizontal: true }
     ])
   })
 

@@ -99,7 +99,13 @@ export interface WheelTurn {
  */
 export function wheelTurns(deltaX: number, deltaY: number, deltaMode: number): WheelTurn[] {
   const vertical = wheelUnits(deltaY, deltaMode)
-  const horizontal = wheelUnits(deltaX, deltaMode)
+  /*
+   * Not flipped, across: the browser and the protocol agree there, right is
+   * positive in both — Windows' WM_MOUSEHWHEEL, and FreeRDP's own clients
+   * send scrolling right as a positive turn. Flipped like the vertical one, a
+   * swipe or Shift+wheel to the right scrolled the far end to the left.
+   */
+  const horizontal = -wheelUnits(deltaX, deltaMode)
 
   if (vertical === 0 && horizontal === 0) return []
   if (vertical === 0) return [{ units: horizontal, horizontal: true }]
