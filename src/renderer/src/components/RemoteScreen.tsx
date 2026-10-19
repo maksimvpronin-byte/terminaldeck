@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useT, type Translate } from '../i18n'
 import { desktopSizeFor, type DesktopSize } from '../../../shared/desktopSize'
 import { buttonEvent, PTR, wheelFlags, wheelTurns } from '../../../shared/rdpInput'
-import { rdpKeyFor, substituteCommand, textKey, unicodeKey } from '../../../shared/rdpScancodes'
+import { rdpKeyFor, substituteCommand, textKey, unicodeUnits } from '../../../shared/rdpScancodes'
 import { modifierFixes } from '../../../shared/modifierSync'
 import { isLockKey, lockFlags } from '../../../shared/lockSync'
 import { IS_MAC } from '../state/keys'
@@ -448,10 +448,11 @@ export default function RemoteScreen({
     const text = field.value
     field.value = ''
     for (const character of text) {
-      const unit = unicodeKey(character)
-      if (unit === undefined) continue
-      tell({ a: 'unicode', code: unit, down: true })
-      tell({ a: 'unicode', code: unit, down: false })
+      // Two units for an emoji and the like: see unicodeUnits.
+      for (const unit of unicodeUnits(character) ?? []) {
+        tell({ a: 'unicode', code: unit, down: true })
+        tell({ a: 'unicode', code: unit, down: false })
+      }
     }
   }
 
@@ -1169,8 +1170,7 @@ export default function RemoteScreen({
        * composed, or typed through an input method. There is no scancode for
        * it, and RDP has a second path for exactly this case.
        */
-      const unit = unicodeKey(event.key)
-      if (unit !== undefined) {
+      for (const unit of unicodeUnits(event.key) ?? []) {
         tell({ a: 'unicode', code: unit, down: true })
         tell({ a: 'unicode', code: unit, down: false })
       }

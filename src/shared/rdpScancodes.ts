@@ -212,6 +212,24 @@ export function unicodeKey(key: string): number | undefined {
 }
 
 /**
+ * The UTF-16 units a character goes as, one Unicode event each, or nothing.
+ *
+ * The protocol's field is one unit, and a character beyond the Basic
+ * Multilingual Plane — an emoji from the system's character viewer — is two,
+ * a surrogate pair Windows puts back together. Taken one unit at a time, it
+ * was refused as more than one character and went nowhere.
+ */
+export function unicodeUnits(character: string): number[] | undefined {
+  const point = character.codePointAt(0)
+  if (point === undefined || String.fromCodePoint(point) !== character) return undefined
+  if (point <= 0xffff) {
+    const unit = unicodeKey(character)
+    return unit === undefined ? undefined : [unit]
+  }
+  return [character.charCodeAt(0), character.charCodeAt(1)]
+}
+
+/**
  * A keystroke to send as the character it typed rather than as the key, or
  * nothing when it has to go as the key.
  *

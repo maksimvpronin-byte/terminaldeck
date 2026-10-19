@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { rdpKeyFor, substituteCommand, textKey, unicodeKey } from './rdpScancodes'
+import { rdpKeyFor, substituteCommand, textKey, unicodeKey, unicodeUnits } from './rdpScancodes'
 
 describe('rdpKeyFor', () => {
   it('names physical keys, not the letters printed on them', () => {
@@ -140,5 +140,17 @@ describe('textKey', () => {
 
   it('does nothing when the host asked for keys', () => {
     expect(textKey(press('в', 'KeyD'), false)).toBeUndefined()
+  })
+})
+
+/* An emoji from the character viewer is two UTF-16 units, and went nowhere. */
+describe('unicodeUnits', () => {
+  it('sends a character beyond the BMP as its surrogate pair', () => {
+    expect(unicodeUnits('😀')).toEqual([0xd83d, 0xde00])
+  })
+  it('sends one unit for an ordinary character, and none for a control', () => {
+    expect(unicodeUnits('ж')).toEqual(['ж'.charCodeAt(0)])
+    expect(unicodeUnits('\u0007')).toBeUndefined()
+    expect(unicodeUnits('ab')).toBeUndefined()
   })
 })
