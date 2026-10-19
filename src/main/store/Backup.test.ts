@@ -384,6 +384,39 @@ describe('backup import', () => {
     }
   })
 
+  /*
+   * Exported without credentials and taken to another machine, every host and
+   * account kept a reference to a password that machine never had, and said
+   * one was saved.
+   */
+  it('brings no reference to a password the file and this vault both lack', async () => {
+    populate()
+    saveTo = FILE
+    await exportToFile(win, false)
+
+    await startAgainWithAnEmptyVault()
+    openFrom = FILE
+    await importFromFile(win)
+
+    expect(sessionStore.getAll().sessions[0].secretRef).toBeUndefined()
+    expect(sessionStore.getAll().groups[0].secretRef).toBeUndefined()
+    expect(credentialStore.list()[0].secretRef).toBeUndefined()
+    expect(inventoryStore.sources()[0].secretRef).toBeUndefined()
+    expect(inventoryStore.overrides()[0].secretRef).toBeUndefined()
+  })
+
+  it('keeps every reference when the backup comes back where it was made', async () => {
+    populate()
+    saveTo = FILE
+    await exportToFile(win, false)
+    const before = clone(snapshot())
+
+    openFrom = FILE
+    await importFromFile(win)
+
+    expect(snapshot()).toEqual(before)
+  })
+
   it('survives the round trip through a locked and reopened vault', async () => {
     populate()
     saveTo = FILE

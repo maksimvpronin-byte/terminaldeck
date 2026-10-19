@@ -576,15 +576,32 @@ export async function importFromFile(
   const checked = checkRelations(parsed)
   // A token in a repository address, in a backup older than the rule against
   // one, is not brought back in; see repoSecret.
-  const groups = checked.groups.map(groupWithoutRepoSecret)
-  const sessions = checked.sessions
+  /*
+   * A reference to a password neither the file nor this vault holds points at
+   * nothing. Brought in as it was — an export made without credentials keeps
+   * the references — a host or an account said a password was saved where
+   * none was, and "blank keeps the one saved" kept nothing. Restored where
+   * they came from, the vault still has them, and they stay.
+   */
+  const held = (ref: string): boolean =>
+    (secrets !== undefined && Object.hasOwn(secrets, ref)) || vaultHolds(ref)
+  const resolvable = <T extends object>(item: T): T => {
+    const refs = item as Record<string, unknown>
+    const dangling = SECRET_REF_FIELDS.filter(
+      (field) => typeof refs[field] === 'string' && !held(refs[field] as string)
+    )
+    if (dangling.length === 0) return item
+    return { ...item, ...Object.fromEntries(dangling.map((field) => [field, undefined])) }
+  }
+  const groups = checked.groups.map(groupWithoutRepoSecret).map(resolvable)
+  const sessions = checked.sessions.map(resolvable)
   const snippets = parsed.snippets ?? []
   const collections = parsed.collections ?? []
   const multiWindows = parsed.multiWindows ?? []
-  const sources = (parsed.inventorySources ?? []).map(sourceWithoutRepoSecret)
-  const inventoryOverrides = parsed.inventoryOverrides ?? []
-  const gitFolderOverrides = parsed.gitFolderOverrides ?? []
-  const credentials = parsed.credentials ?? []
+  const sources = (parsed.inventorySources ?? []).map(sourceWithoutRepoSecret).map(resolvable)
+  const inventoryOverrides = (parsed.inventoryOverrides ?? []).map(resolvable)
+  const gitFolderOverrides = (parsed.gitFolderOverrides ?? []).map(resolvable)
+  const credentials = (parsed.credentials ?? []).map(resolvable)
 
   /*
    * All of it or none of it.
@@ -727,6 +744,18 @@ export async function importFromFile(
     gitFolderOverrides: gitFolderOverrides.length,
     credentials: credentials.length,
     secrets: secrets ? Object.keys(secrets).length : 0
+  }
+}
+
+/** Every field an item keeps a vault reference in; see ipc/secrets. */
+const SECRET_REF_FIELDS = ['secretRef', 'gatewaySecretRef', 'rdpSecretRef'] as const
+
+/** Whether this vault holds a reference — unknown, and so kept, while it is locked. */
+function vaultHolds(ref: string): boolean {
+  try {
+    return vault.getSecret(ref) !== undefined
+  } catch {
+    return true
   }
 }
 
