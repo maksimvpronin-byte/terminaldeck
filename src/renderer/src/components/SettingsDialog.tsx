@@ -3,13 +3,21 @@ import { useStore } from '../state/store'
 import {
   FONT_CHOICES,
   THEME_GROUPS,
+  TREE_FOLDER_TEXT_DEFAULT,
+  TREE_HOST_TEXT_DEFAULT,
   TREE_ROW_DEFAULT,
   TREE_ROW_MAX,
   TREE_ROW_MIN,
+  TREE_TEXT_MAX,
+  TREE_TEXT_MIN,
+  TREE_UI_FONTS,
   terminalDefaults,
   themeOf,
   treeDefaults,
-  treeRowHeightOf,
+  treeFontOf,
+  treeRowFloorOf,
+  treeRowOf,
+  treeTextSizeOf,
   treeTintOf,
   type TreeTint
 } from '../state/settings'
@@ -19,6 +27,8 @@ import BackupSettings from './BackupSettings'
 import AboutSettings from './AboutSettings'
 import { SettingRow, SettingsGroup, SwitchRow } from './SettingsGroup'
 import { TerminalIcon } from './icons'
+import { Chevron, FolderIcon, TreeChildren } from './TreeToggle'
+import { groupIndent, hostIndent } from './treeIndent'
 import PageIcon from './PageIcon'
 import ModalBackdrop from './ModalBackdrop'
 import { keyHint } from '../state/keys'
@@ -28,8 +38,9 @@ export type SettingsTab =
   'general' | 'tree' | 'terminal' | 'files' | 'accounts' | 'security' | 'backup' | 'about'
 
 /**
- * Three made-up hosts drawn with the tree's own classes, so every setting on
- * the page shows on them as it will in the tree — fill, edge, bold, height.
+ * A made-up group of three hosts drawn with the tree's own classes, so every
+ * setting on the page shows on them as it will in the tree — fill, edge, bold,
+ * height, and the fonts of both kinds of name.
  */
 function TreePreview(): JSX.Element {
   const rows = [
@@ -39,21 +50,92 @@ function TreePreview(): JSX.Element {
   ]
   return (
     <div className="sidebar-tree tree-preview" aria-hidden="true">
-      {rows.map((row) => (
-        <div
-          key={row.name}
-          className={`tree-item${row.colour ? ' tinted' : ''}`}
-          style={(row.colour ? { '--host-colour': row.colour } : {}) as CSSProperties}
-        >
-          <span className="name">
-            <span className={`session-kind${row.open ? ' live' : ''}`}>
-              <TerminalIcon />
+      <div className="tree-item" style={{ paddingLeft: groupIndent(0) }}>
+        <span className="tree-group-title name open">
+          <Chevron open /> <FolderIcon open /> dc-1
+        </span>
+        <span className="child-count">{rows.length}</span>
+      </div>
+      <TreeChildren indent={groupIndent(0)}>
+        {rows.map((row) => (
+          <div
+            key={row.name}
+            className={`tree-item${row.colour ? ' tinted' : ''}`}
+            style={
+              {
+                paddingLeft: hostIndent(0),
+                ...(row.colour ? { '--host-colour': row.colour } : {})
+              } as CSSProperties
+            }
+          >
+            <span className="name">
+              <span className={`session-kind${row.open ? ' live' : ''}`}>
+                <TerminalIcon />
+              </span>
+              {row.name}
             </span>
-            {row.name}
-          </span>
-        </div>
-      ))}
+          </div>
+        ))}
+      </TreeChildren>
     </div>
+  )
+}
+
+/** A font and a size for one kind of name in the tree, side by side on one row. */
+function TreeTextControls({
+  id,
+  font,
+  size,
+  onChange
+}: {
+  id: string
+  font: string
+  size: number
+  onChange: (font: string, size: number) => void
+}): JSX.Element {
+  const t = useT()
+  return (
+    <>
+      <select
+        id={id}
+        className="tree-font"
+        value={font}
+        onChange={(e) => onChange(e.target.value, size)}
+      >
+        <option value="">{t('Interface font')}</option>
+        <optgroup label={t('Proportional')}>
+          {TREE_UI_FONTS.map((f) => (
+            <option key={f} value={f}>
+              {f.split(',')[0]}
+            </option>
+          ))}
+        </optgroup>
+        <optgroup label={t('Monospaced')}>
+          {FONT_CHOICES.map((f) => (
+            <option key={f} value={f}>
+              {f.split(',')[0]}
+            </option>
+          ))}
+        </optgroup>
+      </select>
+      <div className="stepper">
+        <button
+          title={t('Smaller')}
+          disabled={size <= TREE_TEXT_MIN}
+          onClick={() => onChange(font, size - 1)}
+        >
+          −
+        </button>
+        <span className="stepper-value">{size}</span>
+        <button
+          title={t('Larger')}
+          disabled={size >= TREE_TEXT_MAX}
+          onClick={() => onChange(font, size + 1)}
+        >
+          +
+        </button>
+      </div>
+    </>
   )
 }
 
@@ -258,25 +340,66 @@ export default function SettingsDialog({
                     onChange={(on) => updateSettings({ treeBoldOpen: on })}
                   />
                   <SettingRow
+                    controlId={`${id}-host-font`}
+                    label={t('Host names')}
+                    hint={t('The font and its size. {px} is the usual size.', {
+                      px: TREE_HOST_TEXT_DEFAULT
+                    })}
+                  >
+                    <TreeTextControls
+                      id={`${id}-host-font`}
+                      font={treeFontOf(settings.treeHostFont)}
+                      size={treeTextSizeOf(settings.treeHostFontSize, TREE_HOST_TEXT_DEFAULT)}
+                      onChange={(font, size) =>
+                        updateSettings({ treeHostFont: font, treeHostFontSize: size })
+                      }
+                    />
+                  </SettingRow>
+                  <SettingRow
+                    controlId={`${id}-folder-font`}
+                    label={t('Group names')}
+                    hint={t(
+                      'The font and its size, for groups and collections alike. {px} is the usual size.',
+                      { px: TREE_FOLDER_TEXT_DEFAULT }
+                    )}
+                  >
+                    <TreeTextControls
+                      id={`${id}-folder-font`}
+                      font={treeFontOf(settings.treeFolderFont)}
+                      size={treeTextSizeOf(settings.treeFolderFontSize, TREE_FOLDER_TEXT_DEFAULT)}
+                      onChange={(font, size) =>
+                        updateSettings({ treeFolderFont: font, treeFolderFontSize: size })
+                      }
+                    />
+                  </SettingRow>
+                  <SettingRow
                     controlId={`${id}-row`}
                     label={t('Row height')}
+                    note={
+                      treeRowFloorOf(settings) > TREE_ROW_MIN
+                        ? t('No lower than {px} px with names this large.', {
+                            px: treeRowFloorOf(settings)
+                          })
+                        : undefined
+                    }
                     hint={t(
                       'How close together hosts and groups sit in the left panel. {px} px is the usual height; lower packs a long list onto one screen.',
                       { px: TREE_ROW_DEFAULT }
                     )}
                   >
+                    {/* It shows the height the rows are drawn at, which larger
+                        names can hold above the one chosen; the one chosen
+                        comes back when they are made smaller again. */}
                     <input
                       id={`${id}-row`}
                       type="range"
-                      min={TREE_ROW_MIN}
+                      min={treeRowFloorOf(settings)}
                       max={TREE_ROW_MAX}
                       step={1}
-                      value={treeRowHeightOf(settings)}
+                      value={treeRowOf(settings)}
                       onChange={(e) => updateSettings({ treeRowHeight: Number(e.target.value) })}
                     />
-                    <span className="setting-value range-value">
-                      {treeRowHeightOf(settings)} px
-                    </span>
+                    <span className="setting-value range-value">{treeRowOf(settings)} px</span>
                   </SettingRow>
                 </SettingsGroup>
               </>

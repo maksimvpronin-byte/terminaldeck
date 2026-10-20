@@ -459,6 +459,22 @@ label {
   padding-top: 0;
   padding-bottom: 0;
 }
+/* The font and size of a host's name and of a group's are settings too
+   (Settings → Tree and tabs). A font left at the interface's own is never set,
+   and an unset variable leaves the font inherited, as it always was. */
+.sidebar-tree .tree-item .name {
+  font-family: var(--tree-host-font);
+  font-size: var(--tree-host-size, 13px);
+}
+.sidebar-tree .tree-item .tree-group-title {
+  font-family: var(--tree-folder-font);
+  font-size: var(--tree-folder-size, 12px);
+}
+/* A host's icon grows with its name: 1em is its 13px at the usual size. */
+.sidebar-tree .tree-item .session-kind > svg {
+  width: 1em;
+  height: 1em;
+}
 .sidebar-tree .tree-item.selected:not(.tinted) {
   box-shadow: inset 2px 0 0 var(--accent);
 }
@@ -2427,6 +2443,10 @@ textarea:focus {
 }
 .setting-control > select {
   width: 220px;
+}
+/* Narrower, to leave room for the size beside it. */
+.setting-control > select.tree-font {
+  width: 170px;
 }
 .setting-control > input[type='number'] {
   width: 110px;

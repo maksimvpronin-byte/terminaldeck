@@ -1535,6 +1535,17 @@ export const ru: Record<string, string> = {
   'Row height': 'Высота строки',
   'How close together hosts and groups sit in the left panel. {px} px is the usual height; lower packs a long list onto one screen.':
     'Насколько плотно стоят хосты и группы в левой панели. {px} px — обычная высота; меньше — длинный список помещается на один экран.',
+  'No lower than {px} px with names this large.': 'С такими крупными именами — не ниже {px} px.',
+  'Host names': 'Имена хостов',
+  'Group names': 'Имена групп',
+  'The font and its size. {px} is the usual size.': 'Шрифт и его размер. Обычный размер — {px}.',
+  'The font and its size, for groups and collections alike. {px} is the usual size.':
+    'Шрифт и его размер — для групп и наборов. Обычный размер — {px}.',
+  'Interface font': 'Шрифт интерфейса',
+  Proportional: 'Пропорциональные',
+  Monospaced: 'Моноширинные',
+  Smaller: 'Меньше',
+  Larger: 'Больше',
   'Colour of coloured rows': 'Заливка цветных строк',
   'Fading from the edge': 'Градиент от левого края',
   'Even and faint, across the row': 'Ровная и лёгкая, на всю строку',

@@ -97,6 +97,20 @@ export interface TerminalSettings extends ResolvedAppearance {
   treeEdge: boolean
   /** An open host's name in bold and brighter than the rest of the tree. */
   treeBoldOpen: boolean
+  /**
+   * The font of a host's name in the tree — one of `TREE_FONT_CHOICES`. Empty
+   * is the interface's own, which is what the tree always had.
+   */
+  treeHostFont: string
+  /** The size of a host's name in the tree, in pixels. */
+  treeHostFontSize: number
+  /**
+   * The font of a group's name in the tree, and of a collection's — the rows
+   * with a folder in front. Empty is the interface's own.
+   */
+  treeFolderFont: string
+  /** The size of a group's name in the tree, in pixels. */
+  treeFolderFontSize: number
 }
 
 export type TreeTint = 'fade' | 'flat'
@@ -116,6 +130,43 @@ export function treeRowHeightOf(settings: Pick<TerminalSettings, 'treeRowHeight'
   const value = Math.round(Number(settings.treeRowHeight))
   if (!Number.isFinite(value)) return TREE_ROW_DEFAULT
   return Math.min(TREE_ROW_MAX, Math.max(TREE_ROW_MIN, value))
+}
+
+/** The range a name in the tree may be set within, in pixels. */
+export const TREE_TEXT_MIN = 10
+export const TREE_TEXT_MAX = 20
+/** What a host's and a group's name always were: the interface's 13px, and 12px. */
+export const TREE_HOST_TEXT_DEFAULT = 13
+export const TREE_FOLDER_TEXT_DEFAULT = 12
+
+/** A stored text size brought back inside the range, or `fallback` when it is no number. */
+export function treeTextSizeOf(size: unknown, fallback: number): number {
+  const value = Math.round(Number(size))
+  if (!Number.isFinite(value)) return fallback
+  return Math.min(TREE_TEXT_MAX, Math.max(TREE_TEXT_MIN, value))
+}
+
+/**
+ * The least a row can be for the text in it. A row lower than its name is
+ * stretched by it anyway, and the branch lines, which are drawn from the row
+ * height, then miss the rows they lead to. At the usual 13px this is the
+ * lowest row there is, so it binds only once the text is made larger.
+ */
+export function treeRowFloorOf(
+  settings: Pick<TerminalSettings, 'treeHostFontSize' | 'treeFolderFontSize'>
+): number {
+  const text = Math.max(
+    treeTextSizeOf(settings.treeHostFontSize, TREE_HOST_TEXT_DEFAULT),
+    treeTextSizeOf(settings.treeFolderFontSize, TREE_FOLDER_TEXT_DEFAULT)
+  )
+  return Math.max(TREE_ROW_MIN, Math.ceil(text * 1.5))
+}
+
+/** The height the tree's rows are drawn at: the one chosen, or more if the text needs it. */
+export function treeRowOf(
+  settings: Pick<TerminalSettings, 'treeRowHeight' | 'treeHostFontSize' | 'treeFolderFontSize'>
+): number {
+  return Math.max(treeRowHeightOf(settings), treeRowFloorOf(settings))
 }
 
 /** Chrome colours, mapped onto the CSS custom properties in styles.css. */
@@ -592,7 +643,11 @@ export const DEFAULT_SETTINGS: TerminalSettings = {
   treeRowHeight: 32,
   treeTint: 'fade',
   treeEdge: true,
-  treeBoldOpen: true
+  treeBoldOpen: true,
+  treeHostFont: '',
+  treeHostFontSize: TREE_HOST_TEXT_DEFAULT,
+  treeFolderFont: '',
+  treeFolderFontSize: TREE_FOLDER_TEXT_DEFAULT
 }
 
 /**
@@ -627,7 +682,11 @@ export const TREE_KEYS = [
   'treeRowHeight',
   'treeTint',
   'treeEdge',
-  'treeBoldOpen'
+  'treeBoldOpen',
+  'treeHostFont',
+  'treeHostFontSize',
+  'treeFolderFont',
+  'treeFolderFontSize'
 ] as const satisfies ReadonlyArray<keyof TerminalSettings>
 
 /**
@@ -667,6 +726,25 @@ export const FONT_CHOICES = [
   'Courier New, monospace'
 ]
 
+/**
+ * The fonts a name in the tree can be set in, after the interface's own: a few
+ * plain ones every system has, then the terminal's monospaced ones, for whoever
+ * wants a host name to look the way they type it.
+ */
+export const TREE_UI_FONTS = [
+  'Arial, Helvetica, sans-serif',
+  'Verdana, Geneva, sans-serif',
+  'Tahoma, Verdana, sans-serif',
+  'Trebuchet MS, Helvetica, sans-serif',
+  'Georgia, Times New Roman, serif'
+]
+export const TREE_FONT_CHOICES = ['', ...TREE_UI_FONTS, ...FONT_CHOICES]
+
+/** A stored font, or the interface's own when it is not one offered. */
+export function treeFontOf(font: unknown): string {
+  return typeof font === 'string' && TREE_FONT_CHOICES.includes(font) ? font : ''
+}
+
 const KEY = 'terminaldeck.terminalSettings'
 
 /** Validate both persisted values and updates made during a running session. */
@@ -699,6 +777,10 @@ export function normaliseSettings(parsed: unknown): TerminalSettings {
   )
     result.lockAfterMinutes = DEFAULT_SETTINGS.lockAfterMinutes
   result.treeRowHeight = treeRowHeightOf(result)
+  result.treeHostFont = treeFontOf(result.treeHostFont)
+  result.treeFolderFont = treeFontOf(result.treeFolderFont)
+  result.treeHostFontSize = treeTextSizeOf(result.treeHostFontSize, TREE_HOST_TEXT_DEFAULT)
+  result.treeFolderFontSize = treeTextSizeOf(result.treeFolderFontSize, TREE_FOLDER_TEXT_DEFAULT)
   return result
 }
 
@@ -752,7 +834,23 @@ export function applyUiPalette(settings: TerminalSettings): void {
   root.setProperty('--danger', ui.danger)
   root.setProperty('--success', ui.success)
   // The host tree's row height, which the rows and the branch lines both read.
-  root.setProperty('--tree-row', `${treeRowHeightOf(settings)}px`)
+  root.setProperty('--tree-row', `${treeRowOf(settings)}px`)
+  // The fonts of its names. Left at the interface's own, the variable is not
+  // set at all, so styles.css falls through to the inherited font.
+  const font = (name: string, value: string): void => {
+    if (value) root.setProperty(name, value)
+    else root.removeProperty(name)
+  }
+  font('--tree-host-font', treeFontOf(settings.treeHostFont))
+  font('--tree-folder-font', treeFontOf(settings.treeFolderFont))
+  root.setProperty(
+    '--tree-host-size',
+    `${treeTextSizeOf(settings.treeHostFontSize, TREE_HOST_TEXT_DEFAULT)}px`
+  )
+  root.setProperty(
+    '--tree-folder-size',
+    `${treeTextSizeOf(settings.treeFolderFontSize, TREE_FOLDER_TEXT_DEFAULT)}px`
+  )
   // Read by styles.css to pick how a coloured row is painted.
   document.documentElement.dataset.treeTint = treeTintOf(settings)
   document.documentElement.dataset.treeEdge = settings.treeEdge ? 'on' : 'off'

@@ -5,14 +5,20 @@ import {
   FONT_CHOICES,
   OTHER_KEYS,
   TERMINAL_KEYS,
+  TREE_FONT_CHOICES,
   TREE_KEYS,
   THEMES,
   THEME_GROUPS,
+  normaliseSettings,
   terminalDefaults,
   treeDefaults,
   themeOf,
   themeByName,
+  treeFontOf,
+  treeRowFloorOf,
   treeRowHeightOf,
+  treeRowOf,
+  treeTextSizeOf,
   treeTintOf
 } from './settings'
 
@@ -73,6 +79,42 @@ describe('the host tree row height', () => {
     expect(treeRowHeightOf({ treeRowHeight: 400 })).toBe(40)
     expect(treeRowHeightOf({ treeRowHeight: Number.NaN })).toBe(32)
     expect(treeRowHeightOf({ treeRowHeight: 23.6 })).toBe(24)
+  })
+})
+
+describe('the names in the host tree', () => {
+  it('are in the interface font, at the sizes they always were, until changed', () => {
+    const settings = normaliseSettings({})
+    expect(settings.treeHostFont).toBe('')
+    expect(settings.treeFolderFont).toBe('')
+    expect(settings.treeHostFontSize).toBe(13)
+    expect(settings.treeFolderFontSize).toBe(12)
+  })
+
+  it('keep a font that is offered and drop one that is not', () => {
+    const font = TREE_FONT_CHOICES.find((f) => f.startsWith('Verdana'))!
+    expect(normaliseSettings({ treeHostFont: font }).treeHostFont).toBe(font)
+    // Straight into a style property: nothing but the list gets that far.
+    expect(normaliseSettings({ treeHostFont: 'x; color: red' }).treeHostFont).toBe('')
+    expect(treeFontOf(42)).toBe('')
+  })
+
+  it('are sized inside the range, whatever was stored', () => {
+    expect(treeTextSizeOf(4, 13)).toBe(10)
+    expect(treeTextSizeOf(400, 13)).toBe(20)
+    expect(treeTextSizeOf(Number.NaN, 12)).toBe(12)
+    expect(normaliseSettings({ treeFolderFontSize: 15.4 }).treeFolderFontSize).toBe(15)
+  })
+
+  it('hold the rows up only once they are made larger', () => {
+    // At the usual sizes every row height there is can still be chosen.
+    expect(treeRowFloorOf(DEFAULT_SETTINGS)).toBe(20)
+    expect(treeRowOf({ ...DEFAULT_SETTINGS, treeRowHeight: 20 })).toBe(20)
+    const large = { ...DEFAULT_SETTINGS, treeRowHeight: 20, treeFolderFontSize: 18 }
+    expect(treeRowFloorOf(large)).toBe(27)
+    expect(treeRowOf(large)).toBe(27)
+    // A row already taller than the floor stays as chosen.
+    expect(treeRowOf({ ...large, treeRowHeight: 36 })).toBe(36)
   })
 })
 
