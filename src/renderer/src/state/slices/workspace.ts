@@ -11,6 +11,7 @@ import {
   setAllBroadcast,
   collectLeaves,
   collectBroadcastTargets,
+  gridOf,
   type PaneTarget
 } from '../paneTree'
 import {
@@ -392,34 +393,20 @@ export const createWorkspaceSlice: StateCreator<AppState, [], [], WorkspaceSlice
       return
     }
 
-    const [first, ...rest] = items
     // One tab holds them all, so it goes where they all belong, if they agree.
     if (!items.some((i) => i.viaCollectionId))
       homeWorkspace(
         get,
         items.map((i) => sessionOf(i.target))
       )
-    get().openTab(first.title, first.target, first.color, first.viaCollectionId)
-    const tabId = activeTab(get())?.id
-    if (!tabId) return
-    rest.forEach((item, index) => {
-      const tab = allTabs(get()).find((t) => t.id === tabId)
-      if (!tab) return
-      // Alternate the direction so the panes stay roughly square rather than
-      // ending up as a row of slivers.
-      get().splitPaneWith(
-        tabId,
-        tab.activePaneId,
-        index % 2 === 0 ? 'row' : 'col',
-        'after',
-        item.title,
-        item.target,
-        item.color,
-        // Every pane of a collection opened as a grid wears its look, not the
-        // first alone.
-        item.viaCollectionId
-      )
-    })
+    // Laid out whole. Each split off the one before, four came out as a
+    // spiral — a half, a quarter and two eighths — where they fit two by two.
+    const [first, ...rest] = items.map((item) =>
+      // Every pane of a collection opened as a grid wears its look, not the
+      // first alone.
+      makeLeaf(item.title, item.target, item.color, item.viaCollectionId)
+    )
+    get().openPanes(first.title, gridOf([first, ...rest]))
   },
 
   closeTab: (tabId) => {

@@ -10,6 +10,7 @@ import {
   collectLeaves,
   collectConnectionIds,
   collectBroadcastTargets,
+  gridOf,
   type PaneNode,
   type LeafNode
 } from './paneTree'
@@ -143,5 +144,83 @@ describe('findPane and setSizes', () => {
     >
     const resized = setSizes(root, root.id, [70, 30]) as Extract<PaneNode, { type: 'split' }>
     expect(resized.sizes).toEqual([70, 30])
+  })
+})
+
+describe('gridOf', () => {
+  /** Each pane's title with its place and size, as fractions of the tab. */
+  function cells(
+    node: PaneNode,
+    x = 0,
+    y = 0,
+    w = 1,
+    h = 1
+  ): { title: string; x: number; y: number; w: number; h: number }[] {
+    if (node.type === 'leaf') return [{ title: node.title, x, y, w, h }]
+    const [a, b] = node.sizes.map((size) => size / 100)
+    return node.dir === 'row'
+      ? [
+          ...cells(node.children[0], x, y, w * a, h),
+          ...cells(node.children[1], x + w * a, y, w * b, h)
+        ]
+      : [
+          ...cells(node.children[0], x, y, w, h * a),
+          ...cells(node.children[1], x, y + h * a, w, h * b)
+        ]
+  }
+  /** The titles row by row, top to bottom. */
+  function rows(node: PaneNode): string[][] {
+    const byRow = new Map<number, string[]>()
+    for (const cell of cells(node)) {
+      const top = Math.round(cell.y * 1000)
+      byRow.set(top, [...(byRow.get(top) ?? []), cell.title])
+    }
+    return [...byRow.entries()].sort(([a], [b]) => a - b).map(([, titles]) => titles)
+  }
+  const panes = (n: number): [LeafNode, ...LeafNode[]] =>
+    Array.from({ length: n }, (_, i) => leaf(String(i + 1))) as [LeafNode, ...LeafNode[]]
+
+  it('lays four panes out two by two, not as a spiral', () => {
+    const grid = gridOf(panes(4))
+    expect(rows(grid)).toEqual([
+      ['1', '2'],
+      ['3', '4']
+    ])
+    for (const cell of cells(grid)) {
+      expect(cell.w).toBeCloseTo(0.5)
+      expect(cell.h).toBeCloseTo(0.5)
+    }
+  })
+
+  it('fills rows left to right, top to bottom, the spare panes going to the top', () => {
+    expect(rows(gridOf(panes(1)))).toEqual([['1']])
+    expect(rows(gridOf(panes(2)))).toEqual([['1', '2']])
+    expect(rows(gridOf(panes(3)))).toEqual([['1', '2'], ['3']])
+    expect(rows(gridOf(panes(5)))).toEqual([
+      ['1', '2', '3'],
+      ['4', '5']
+    ])
+    expect(rows(gridOf(panes(6)))).toEqual([
+      ['1', '2', '3'],
+      ['4', '5', '6']
+    ])
+    expect(rows(gridOf(panes(7)))).toEqual([
+      ['1', '2', '3'],
+      ['4', '5'],
+      ['6', '7']
+    ])
+    expect(rows(gridOf(panes(9)))).toEqual([
+      ['1', '2', '3'],
+      ['4', '5', '6'],
+      ['7', '8', '9']
+    ])
+  })
+
+  it('gives every row an equal height and every pane in a row an equal width', () => {
+    const grid = gridOf(panes(7))
+    for (const cell of cells(grid)) {
+      expect(cell.h).toBeCloseTo(1 / 3)
+      expect(cell.w).toBeCloseTo(cell.title <= '3' ? 1 / 3 : 1 / 2)
+    }
   })
 })

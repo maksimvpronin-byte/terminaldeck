@@ -166,6 +166,24 @@ describe('a collection opened as a grid', () => {
     expect(collectLeaves(tab.root).map((l) => l.viaCollectionId)).toEqual(['col1', 'col1', 'col1'])
   })
 
+  /* Each split off the one before, four hosts came out as a spiral. */
+  it('lays four hosts out two by two, in the order they were picked', () => {
+    useStore.setState({ workspaces: [], activeWorkspaceId: null })
+    useStore.getState().openMany(
+      ['a', 'b', 'c', 'd'].map((id) => ({
+        title: id,
+        target: { kind: 'session' as const, sessionId: id }
+      })),
+      'grid'
+    )
+    const [tab] = useStore.getState().workspaces[0].tabs
+    const shape = (node: typeof tab.root): unknown =>
+      node.type === 'leaf' ? node.title : { [node.dir]: node.children.map(shape) }
+    expect(shape(tab.root)).toEqual({ col: [{ row: ['a', 'b'] }, { row: ['c', 'd'] }] })
+    expect(tab.title).toBe('a')
+    expect(tab.activePaneId).toBe(collectLeaves(tab.root)[0].id)
+  })
+
   it('keeps the look when a pane of it is split again', () => {
     useStore.setState({ workspaces: [], activeWorkspaceId: null })
     const paneId = useStore

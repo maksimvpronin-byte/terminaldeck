@@ -161,6 +161,39 @@ export function splitLeaf(
 }
 
 /**
+ * Panes laid out as a grid, left to right and top to bottom: as many columns
+ * as rows, or one more, so four make two by two. Rows that cannot all be full
+ * share the panes out evenly, the spare ones going to the top rows — seven
+ * are three over two over two.
+ */
+export function gridOf(panes: [PaneNode, ...PaneNode[]]): PaneNode {
+  const columns = Math.ceil(Math.sqrt(panes.length))
+  const rows = Math.ceil(panes.length / columns)
+  const lines: PaneNode[] = []
+  let at = 0
+  for (let row = 0; row < rows; row++) {
+    const count = Math.floor(panes.length / rows) + (row < panes.length % rows ? 1 : 0)
+    lines.push(lineOf(panes.slice(at, at + count), 'row'))
+    at += count
+  }
+  return lineOf(lines, 'col')
+}
+
+/** Panes side by side (`row`) or one above another (`col`), each an equal share. */
+function lineOf(panes: PaneNode[], dir: 'row' | 'col'): PaneNode {
+  if (panes.length === 1) return panes[0]
+  const half = Math.ceil(panes.length / 2)
+  const share = (half / panes.length) * 100
+  return {
+    type: 'split',
+    id: nanoid(),
+    dir,
+    children: [lineOf(panes.slice(0, half), dir), lineOf(panes.slice(half), dir)],
+    sizes: [share, 100 - share]
+  }
+}
+
+/**
  * A tree of panes as it will be when opened somewhere else: the same layout,
  * hosts and settings, under new ids and with no live session attached. Every
  * old id is written into `ids` against its new one.
