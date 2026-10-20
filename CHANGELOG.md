@@ -6,6 +6,17 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.30.1
+
+### Fixed
+
+- **Hosts opened tiled fill a grid.** Each host was split off the pane
+  opened before it, so four came out as a spiral — a half, a quarter and
+  two eighths. They are now laid out as a grid, in the order they were
+  picked: four two by two, six three by two, nine three by three. The
+  panes of a row that cannot be full share its width evenly, and the first
+  host, top left, is the one in front.
+
 ## 0.30.0
 
 0.29.3 was built and never published; what it held is here, under Fixed.
