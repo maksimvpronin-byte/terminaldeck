@@ -6,7 +6,19 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
-## 0.30.1
+## 0.31.0
+
+0.30.1 was built and never published; what it held is here, under Fixed.
+
+### Added
+
+- **Fonts and sizes for the host tree.** Settings → Tree and tabs sets the
+  font and the size of host names and, separately, of group names — the
+  rows of collections too. There is the interface's own font, five plain
+  ones every system has and the terminal's monospaced ones, at 10 to 20 px;
+  until changed, the tree looks as it always did. A host's icon grows with
+  its name, and the rows never get lower than their text, so the branch
+  lines still meet them.
 
 ### Fixed
 
