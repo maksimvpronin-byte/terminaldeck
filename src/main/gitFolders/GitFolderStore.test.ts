@@ -16,6 +16,14 @@ import { gitGroupId, gitHostId } from '../../shared/gitFolders'
  * the stores live under a temporary directory that goes at the end.
  */
 
+/*
+ * Every one of those is a git process, and starting processes is what GitHub's
+ * Windows runners are slowest at: the file takes seventeen seconds there, and a
+ * preview that runs in a fraction of one locally went past the default five and
+ * failed the 0.31.0 release build. Nothing here waits on anything but git.
+ */
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 })
+
 let userData = ''
 vi.mock('electron', () => ({ app: { getPath: (): string => userData } }))
 
