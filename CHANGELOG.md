@@ -6,6 +6,22 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.32.0
+
+### Added
+
+- **Open a host from the command line.** `TerminalDeck.exe -s web-01` opens a
+  saved, inventory or git-folder host as a double-click in the tree would.
+  A copy already running comes forward and opens it; a closed one starts,
+  asks for the master password, and opens it then. The host is found by its
+  name, FQDN or IP — a short name and its FQDN are taken for one machine, and
+  DNS is asked when neither fits. Several that fit are offered to choose
+  from; one it does not know is said to be unknown. `-s` can be given more
+  than once.
+- **TerminalDeck is on PATH on Windows.** The installer, and every update
+  from this one on, puts its folder on your user PATH, so the line above
+  works from any console opened afterwards. Uninstalling takes it off again.
+
 ## 0.31.2
 
 ### Added
