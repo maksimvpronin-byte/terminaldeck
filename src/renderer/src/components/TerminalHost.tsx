@@ -45,6 +45,9 @@ interface Props {
   wakeReconnect?: boolean
 }
 
+/** How long output must have been quiet before the scrollbar is checked. */
+const SCROLLBAR_SETTLE_MS = 150
+
 /**
  * Draws through the GPU instead of the DOM.
  *
@@ -285,8 +288,14 @@ export default function TerminalHost({
 
     /*
      * The bar is also put back at the end whenever the screen is there and the
-     * bar is not, however it came to be: after a render, and before a wheel
-     * turn is left to xterm, which scrolls from wherever the bar is.
+     * bar is not, however it came to be: once output has settled, and before a
+     * wheel turn is left to xterm, which scrolls from wherever the bar is.
+     *
+     * Not after each render, as 0.31.1 did. `cat` in a tab in plain sight
+     * still left the bar halfway on some machines, which no render was left to
+     * notice: xterm lengthens the bar a frame after the screen is drawn, so the
+     * last check ran against the old length, found the bar at its end, and the
+     * bar was then left behind once the new length came in.
      */
     const viewport = hostRef.current.querySelector<HTMLElement>('.xterm-viewport')
     function catchUpScrollbar(): void {
@@ -300,10 +309,21 @@ export default function TerminalHost({
         clientHeight: viewport.clientHeight,
         rowHeight: (term.element?.clientHeight ?? 0) / term.rows
       })
+      if (!behind) return
+      diag(
+        'terminal',
+        `${connIdRef.current?.slice(0, 8) ?? 'no session'} scrollbar caught up from ` +
+          `${Math.round(viewport.scrollTop)} of ${viewport.scrollHeight - viewport.clientHeight}`
+      )
       // As far as it goes: the browser stops it at the end.
-      if (behind) viewport.scrollTop = viewport.scrollHeight
+      viewport.scrollTop = viewport.scrollHeight
     }
-    term.onRender(catchUpScrollbar)
+    // Long enough for xterm to have measured the bar for the last of it.
+    let settleTimer: ReturnType<typeof setTimeout> | undefined
+    term.onWriteParsed(() => {
+      clearTimeout(settleTimer)
+      settleTimer = setTimeout(catchUpScrollbar, SCROLLBAR_SETTLE_MS)
+    })
 
     /*
      * The wheel in a pager, and in a full-screen program with the history
@@ -427,6 +447,7 @@ export default function TerminalHost({
       releaseRef.current?.()
       resizeObserver.disconnect()
       cancelAnimationFrame(resizeFrame)
+      clearTimeout(settleTimer)
       historyRef.current?.close()
       term.dispose()
       /*
