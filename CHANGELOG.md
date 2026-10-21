@@ -6,6 +6,19 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.31.1
+
+### Fixed
+
+- **The wheel scrolls from where the screen is after output.** Output that
+  reached a tab while it was out of sight moved the screen but not the
+  scrollbar. After `cat` the screen showed the end of the file while the bar
+  sat where the prompt had been, so the first turn of the wheel threw the
+  view back up to the command; after a short output the bar could shrink to
+  nothing and the wheel scrolled nothing at all. A tab brought forward now
+  measures its scrollbar again, and a bar left short of the end is put back
+  there before the wheel moves it.
+
 ## 0.31.0
 
 0.30.1 was built and never published; what it held is here, under Fixed.
