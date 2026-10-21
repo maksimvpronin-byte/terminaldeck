@@ -6,6 +6,25 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.31.2
+
+### Added
+
+- **A selection can last only as long as the clipboard holds it.** A new
+  switch under copying on selection, in Settings → Terminal, does what
+  MobaXterm does: once something else is copied — in another tab, another
+  program or a remote desktop — the selection is taken away, so what is
+  highlighted is always what a paste brings in. Copying the same text again
+  leaves it. Off by default, so nothing changes until it is turned on.
+
+### Fixed
+
+- **The scrollbar keeps up with `cat` in the tab in front, too.** 0.31.1
+  fixed a tab that received output while out of sight; on some machines the
+  bar still stopped halfway after `cat` in the tab being looked at, and only
+  a turn of the wheel brought it down. It now goes to the end by itself once
+  the output has stopped.
+
 ## 0.31.1
 
 ### Fixed
