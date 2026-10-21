@@ -2,6 +2,7 @@ import { registerDiagnostics } from '../diagnostics'
 import { registerFullscreenWindow } from '../fullscreenWindow'
 import { registerKeyboardCapture } from '../keyboardCapture'
 import { registerInputLanguage } from '../inputLanguage'
+import { registerLaunchHandlers } from '../launchRequests'
 import { registerAppHandlers } from './app'
 import { registerGitFolderHandlers } from './gitFolders'
 import { registerInventoryHandlers } from './inventory'
@@ -32,6 +33,7 @@ export function registerIpcHandlers(): void {
   registerSftpHandlers()
   registerRdpHandlers()
   registerAppHandlers()
+  registerLaunchHandlers()
   registerKeyboardCapture()
   registerInputLanguage()
   registerFullscreenWindow()

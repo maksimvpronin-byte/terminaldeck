@@ -14,6 +14,8 @@ export interface PaletteEntry {
   /** "Prod / Databases" or "Repo / all / db", so duplicates are tellable apart. */
   path: string
   address: string
+  /** The address alone, without the login: what a command line names it by. */
+  host: string
   color?: string
   target: PaneTarget
 }
@@ -42,6 +44,7 @@ function entry(
     title: host.name,
     path: groupPath(host.groupId, groups),
     address: auth.username ? `${auth.username}@${host.host}` : host.host,
+    host: host.host,
     color: colourOf(host, host.groupId, groups),
     target: { kind: 'session', sessionId: host.id }
   }

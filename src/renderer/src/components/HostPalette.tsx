@@ -5,9 +5,20 @@ import type { OpenMode } from '../state/store'
 import { paletteEntries } from '../state/palette'
 import type { PaletteEntry as Entry } from '../state/palette'
 import ModalBackdrop from './ModalBackdrop'
+import type { LaunchRequest } from '../hooks/useLaunchRequests'
 import { useT } from '../i18n'
 
-export default function HostPalette({ onClose }: { onClose: () => void }): JSX.Element {
+export default function HostPalette({
+  onClose,
+  request
+}: {
+  onClose: () => void
+  /**
+   * A host from the command line that fitted several, or none: those are what
+   * it shows until the query is changed. See useLaunchRequests.
+   */
+  request?: LaunchRequest
+}): JSX.Element {
   const t = useT()
   const sessions = useStore((s) => s.sessions)
   const groups = useStore((s) => s.groups)
@@ -19,7 +30,7 @@ export default function HostPalette({ onClose }: { onClose: () => void }): JSX.E
   const openMany = useStore((s) => s.openMany)
 
   const credentials = useStore((s) => s.credentials)
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(request?.query ?? '')
   const [cursor, setCursor] = useState(0)
   const [picked, setPicked] = useState<Set<string>>(new Set())
   const listRef = useRef<HTMLDivElement | null>(null)
@@ -38,11 +49,16 @@ export default function HostPalette({ onClose }: { onClose: () => void }): JSX.E
     [sessions, groups, trees, overrides, gitTrees, gitOverrides, credentials]
   )
 
+  // The command line's own answer stands while its words are in the box: it
+  // matched by short name and through DNS, which the box's search does not.
+  const asked = request !== undefined && query === request.query
+
   const matches = useMemo(() => {
+    if (asked && request) return entries.filter((e) => request.ids.includes(e.id))
     const needle = query.trim().toLowerCase()
     if (!needle) return entries
     return entries.filter((e) => `${e.title} ${e.address} ${e.path}`.toLowerCase().includes(needle))
-  }, [entries, query])
+  }, [entries, query, asked, request])
 
   useEffect(() => {
     setCursor(0)
@@ -118,19 +134,26 @@ export default function HostPalette({ onClose }: { onClose: () => void }): JSX.E
         />
 
         <div className="palette-target">
-          {picked.size > 0
-            ? t('Selected: {count} — ⏎ tabs, ⇧⏎ tiled in one, ⌥⏎ a new workspace', {
-                count: picked.size
-              })
-            : t('Tab marks a host for opening several at once')}
+          {asked && picked.size === 0 && matches.length > 1
+            ? t('Several hosts fit “{query}” — choose the one to open', { query })
+            : picked.size > 0
+              ? t('Selected: {count} — ⏎ tabs, ⇧⏎ tiled in one, ⌥⏎ a new workspace', {
+                  count: picked.size
+                })
+              : t('Tab marks a host for opening several at once')}
         </div>
 
         <div className="palette-list" ref={listRef}>
           {matches.length === 0 && (
             <div className="palette-empty">
-              {entries.length === 0
-                ? t('No hosts yet.')
-                : t('Nothing matches “{query}”.', { query })}
+              {asked
+                ? t(
+                    '“{query}” is not among the saved hosts or the inventories, by name, address or what DNS says it is.',
+                    { query }
+                  )
+                : entries.length === 0
+                  ? t('No hosts yet.')
+                  : t('Nothing matches “{query}”.', { query })}
             </div>
           )}
           {matches.map((e, i) => (

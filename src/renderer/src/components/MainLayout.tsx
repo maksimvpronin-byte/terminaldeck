@@ -8,12 +8,16 @@ import AuthPromptDialog from './AuthPromptDialog'
 import HelpDialog from './HelpDialog'
 import HostPalette from './HostPalette'
 import { useShortcuts, useIdleLock, useZoom } from '../hooks/useShortcuts'
+import { type LaunchRequest, useLaunchRequests } from '../hooks/useLaunchRequests'
 import { useStore } from '../state/store'
 
 export default function MainLayout(): JSX.Element {
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
   const [hostsOpen, setHostsOpen] = useState(false)
+  // Hosts from `-s` waiting for a choice, or to be told they are not known.
+  const [launchAsks, setLaunchAsks] = useState<LaunchRequest[]>([])
+  useLaunchRequests((request) => setLaunchAsks((asks) => [...asks, request]))
   const loadSnippets = useStore((s) => s.loadSnippets)
   // Loaded up front, not just when the Inventory tab is opened: the host
   // palette searches inventory hosts too.
@@ -67,6 +71,15 @@ export default function MainLayout(): JSX.Element {
       {paletteOpen && <SnippetPalette onClose={() => setPaletteOpen(false)} />}
       {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}
       {hostsOpen && <HostPalette onClose={() => setHostsOpen(false)} />}
+      {/* One at a time, each after the last is closed. Keyed so the next
+          starts with its own query rather than the last one's. */}
+      {!hostsOpen && launchAsks.length > 0 && (
+        <HostPalette
+          key={`${launchAsks.length}:${launchAsks[0].query}`}
+          request={launchAsks[0]}
+          onClose={() => setLaunchAsks((asks) => asks.slice(1))}
+        />
+      )}
       <AuthPromptDialog />
     </div>
   )

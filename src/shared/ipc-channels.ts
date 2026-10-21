@@ -237,6 +237,14 @@ export const IPC = {
   clipboardRead: 'clipboard:read',
   clipboardWrite: 'clipboard:write',
 
+  // Hosts asked for on the command line: `TerminalDeck.exe -s web-01`
+  /** Hands over, and forgets, the hosts asked for so far. */
+  launchTake: 'launch:take',
+  /** More have been asked for, by a second launch. */
+  launchRequested: 'launch:requested',
+  /** What DNS says a name or an address is, for a host not found by either. */
+  launchResolve: 'launch:resolve',
+
   // Session logs
   logsReveal: 'logs:reveal',
   /** A line for the diagnostics journal, from the window; see main/diagnostics.ts. */

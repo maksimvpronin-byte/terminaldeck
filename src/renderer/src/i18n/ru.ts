@@ -1579,6 +1579,22 @@ export const ru: Record<string, string> = {
   'Hosts and groups': 'Хосты и группы',
   'The tree': 'Дерево',
   'Opening a host': 'Открытие хоста',
+  'From the command line': 'Из командной строки',
+  'Opens a saved or inventory host from a console, by name, FQDN or IP':
+    'Открывает сохранённый или инвентарный хост из консоли — по имени, FQDN или IP',
+  'A running copy opens it; a closed one starts, asks for the master password, then opens it':
+    'Запущенная копия открывает его сразу; закрытая запускается, спрашивает мастер-пароль и потом открывает',
+  'A short name finds its FQDN and the other way round; DNS is asked when neither fits':
+    'Короткое имя находит FQDN и наоборот; если не подходит ни то ни другое, спрашивается DNS',
+  'Several that fit are offered to choose from; one it does not know is said to be unknown':
+    'Если подходит несколько — предлагается выбор; незнакомый хост — так и сказано, что не найден',
+  '-s more than once opens each of them': 'Несколько -s открывают каждый из хостов',
+  'The Windows installer puts the program on your PATH; a console opened before it does not see it':
+    'Установщик для Windows добавляет программу в PATH; консоль, открытая раньше, её не видит',
+  'Several hosts fit “{query}” — choose the one to open':
+    'Под «{query}» подходит несколько хостов — выберите, какой открыть',
+  '“{query}” is not among the saved hosts or the inventories, by name, address or what DNS says it is.':
+    '«{query}» нет среди сохранённых хостов и в инвентарях — ни по имени, ни по адресу, ни по тому, что говорит о нём DNS.',
   'Several at once': 'Несколько сразу',
   'Sorting by dragging': 'Порядок перетаскиванием',
   'What a group passes on': 'Что даёт группа',

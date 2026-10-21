@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { IPC } from '../shared/ipc-channels'
+import type { Resolved } from '../shared/hostMatch'
 import type {
   SessionProfile,
   SessionGroup,
@@ -546,6 +547,18 @@ const api = {
   },
   logs: {
     reveal: (): Promise<string> => ipcRenderer.invoke(IPC.logsReveal)
+  },
+  /** Hosts named on the command line, `-s web-01`: see main/launchRequests.ts. */
+  launch: {
+    /** The names asked for so far, which main then forgets. */
+    take: (): Promise<string[]> => ipcRenderer.invoke(IPC.launchTake),
+    /** A second launch asked for more. */
+    onRequested: (cb: () => void): (() => void) => {
+      const listener = (): void => cb()
+      ipcRenderer.on(IPC.launchRequested, listener)
+      return () => ipcRenderer.removeListener(IPC.launchRequested, listener)
+    },
+    resolve: (name: string): Promise<Resolved> => ipcRenderer.invoke(IPC.launchResolve, name)
   },
   /**
    * One line for the diagnostics journal. Say what happened, never what was

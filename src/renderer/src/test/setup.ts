@@ -55,6 +55,11 @@ if (typeof window !== 'undefined') {
       snippets: stub({ list: () => Promise.resolve([]) }),
       vault: stub({ status: () => Promise.resolve({ exists: false, unlocked: false }) }),
       clipboard: stub({ read: () => '', write: () => undefined }),
+      launch: stub({
+        take: () => Promise.resolve([]),
+        onRequested: () => () => undefined,
+        resolve: () => Promise.resolve({ addresses: [], names: [] })
+      }),
       ssh: stub(),
       sftp: stub(),
       monitor: stub(),

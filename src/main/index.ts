@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url'
 import { electronApp, is } from '@electron-toolkit/utils'
 import { installSenderCheck } from './ipc/guard'
 import { registerIpcHandlers } from './ipc/handlers'
+import { requestFromArgv } from './launchRequests'
 import { recoverInterruptedImport } from './store/Backup'
 import { desktopHoldsKeyboard, releaseKeyboard } from './keyboardCapture'
 import { diag } from './diagnostics'
@@ -341,7 +342,9 @@ const primaryInstance = app.requestSingleInstanceLock()
 if (!primaryInstance) {
   app.quit()
 } else {
-  app.on('second-instance', () => {
+  app.on('second-instance', (_event, argv) => {
+    // `TerminalDeck.exe -s web-01` with a copy already running: see launchRequests.ts.
+    requestFromArgv(argv)
     const win = BrowserWindow.getAllWindows()[0]
     if (!win) return
     if (win.isMinimized()) win.restore()
@@ -353,6 +356,8 @@ if (!primaryInstance) {
 app.whenReady().then(async () => {
   if (!primaryInstance) return
   electronApp.setAppUserModelId('com.terminaldeck.app')
+  // Held for the window, which takes it once the vault is open.
+  requestFromArgv(process.argv)
   /*
    * No optimizer.watchWindowShortcuts: in a build it swallowed Cmd/Ctrl+R
    * outright, before the page, so a shell's history search never reached the

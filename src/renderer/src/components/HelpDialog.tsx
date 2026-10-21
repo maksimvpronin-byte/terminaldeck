@@ -119,6 +119,28 @@ const CHAPTERS: Chapter[] = [
             ]
           },
           {
+            title: 'From the command line',
+            rows: [
+              {
+                keys: 'TerminalDeck.exe -s web-01',
+                what: 'Opens a saved or inventory host from a console, by name, FQDN or IP'
+              },
+              {
+                what: 'A running copy opens it; a closed one starts, asks for the master password, then opens it'
+              },
+              {
+                what: 'A short name finds its FQDN and the other way round; DNS is asked when neither fits'
+              },
+              {
+                what: 'Several that fit are offered to choose from; one it does not know is said to be unknown'
+              },
+              { what: '-s more than once opens each of them' },
+              {
+                what: 'The Windows installer puts the program on your PATH; a console opened before it does not see it'
+              }
+            ]
+          },
+          {
             title: 'Several at once',
             rows: [
               { keys: '⌘ click', what: 'Tick a host as well, to open several at once' },
