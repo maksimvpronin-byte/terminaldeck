@@ -530,6 +530,16 @@ export default function SettingsDialog({
                     checked={settings.copyOnSelect}
                     onChange={(on) => updateSettings({ copyOnSelect: on })}
                   />
+                  <SwitchRow
+                    label={t('Take the selection away when something else is copied')}
+                    note={t('As in MobaXterm. Works with copying on selection.')}
+                    hint={t(
+                      'A selection is then only ever what the clipboard holds. Copying in another tab, another program or a remote desktop clears it; copying the same text again leaves it.'
+                    )}
+                    disabled={!settings.copyOnSelect}
+                    checked={settings.clearSelectionOnClipboardChange}
+                    onChange={(on) => updateSettings({ clearSelectionOnClipboardChange: on })}
+                  />
                   <SettingRow controlId={`${id}-right`} label={t('Right-click in a terminal')}>
                     <select
                       id={`${id}-right`}

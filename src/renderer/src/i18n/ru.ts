@@ -140,6 +140,8 @@ export const ru: Record<string, string> = {
     'Выделение сразу копирует текст, правый клик вставляет',
   'Both of those are switchable in Settings if you prefer a menu':
     'Оба поведения переключаются в настройках, если вам привычнее меню',
+  'A setting there takes the selection away once something else is copied, as MobaXterm does':
+    'Там же можно включить, чтобы выделение снималось, как только скопировано что-то другое, — как в MobaXterm',
   'Ctrl+Alt+Del on the far side; this machine keeps the real one':
     'Ctrl+Alt+Del на той стороне; настоящее сочетание остаётся этой машине',
   'Full screen, which is the only way Alt+Tab reaches the far side':
@@ -372,6 +374,12 @@ export const ru: Record<string, string> = {
   Bar: 'Полоса',
   'Blinking cursor': 'Мигающий курсор',
   'Copy to clipboard as soon as text is selected': 'Копировать в буфер сразу при выделении текста',
+  'Take the selection away when something else is copied':
+    'Снимать выделение, когда скопировано что-то другое',
+  'As in MobaXterm. Works with copying on selection.':
+    'Как в MobaXterm. Работает вместе с копированием при выделении.',
+  'A selection is then only ever what the clipboard holds. Copying in another tab, another program or a remote desktop clears it; copying the same text again leaves it.':
+    'Тогда выделено всегда ровно то, что лежит в буфере. Копирование в другой вкладке, другой программе или на удалённом рабочем столе снимает выделение; если скопировать тот же самый текст, оно остаётся.',
   'Right-click in a terminal': 'Правый клик в терминале',
   'Paste clipboard': 'Вставить из буфера',
   'Open context menu': 'Открыть контекстное меню',

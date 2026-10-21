@@ -79,12 +79,15 @@ export function SwitchRow({
   note,
   hint,
   checked,
+  disabled,
   onChange
 }: {
   label: ReactNode
   note?: ReactNode
   hint?: ReactNode
   checked: boolean
+  /** For a setting that means nothing while another one is off. */
+  disabled?: boolean
   onChange: (checked: boolean) => void
 }): JSX.Element {
   const id = useId()
@@ -96,6 +99,7 @@ export function SwitchRow({
         role="switch"
         className="switch"
         checked={checked}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
       />
     </SettingRow>

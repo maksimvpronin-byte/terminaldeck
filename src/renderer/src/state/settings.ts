@@ -18,6 +18,12 @@ export interface TerminalSettings extends ResolvedAppearance {
   themeName: string
   /** Selecting text in a terminal puts it on the clipboard right away. */
   copyOnSelect: boolean
+  /**
+   * With `copyOnSelect`, a selection lasts only as long as the clipboard holds
+   * it, as in MobaXterm: something else copied, here or in another program,
+   * takes the selection away. Off by default — it is not how this app behaved.
+   */
+  clearSelectionOnClipboardChange: boolean
   /** Right-click either pastes immediately or opens the terminal menu. */
   rightClick: 'paste' | 'menu'
   /**
@@ -629,6 +635,7 @@ export const DEFAULT_SETTINGS: TerminalSettings = {
   cursorStyle: 'block',
   themeName: DEFAULT_THEME,
   copyOnSelect: true,
+  clearSelectionOnClipboardChange: false,
   rightClick: 'paste',
   externalEditor: '',
   // What it always was, now that it can be something else.
@@ -667,6 +674,7 @@ export const TERMINAL_KEYS = [
   'cursorStyle',
   'cursorBlink',
   'copyOnSelect',
+  'clearSelectionOnClipboardChange',
   'rightClick',
   'monitorForAll'
 ] as const satisfies ReadonlyArray<keyof TerminalSettings>

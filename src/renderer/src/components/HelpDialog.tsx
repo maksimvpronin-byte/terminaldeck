@@ -374,6 +374,9 @@ const CHAPTERS: Chapter[] = [
               },
               { what: 'Selecting text copies it straight away; right-click pastes' },
               { what: 'Both of those are switchable in Settings if you prefer a menu' },
+              {
+                what: 'A setting there takes the selection away once something else is copied, as MobaXterm does'
+              },
               { what: 'That menu copies, pastes, selects all, finds and clears the screen' }
             ]
           }

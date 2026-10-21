@@ -2517,6 +2517,11 @@ input.switch:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+/* Off and unavailable both read as off at a glance, so the switch fades too. */
+input.switch:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
 
 /* The host tree page's sample rows: the tree's own classes, so its settings
    show here exactly as they will there, without the tree's scrolling. */

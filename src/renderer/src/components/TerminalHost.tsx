@@ -14,6 +14,7 @@ import { translate, useT } from '../i18n'
 import { diag, diagKey } from '../diag'
 import { wheelArrows, wheelRows, wheelTarget } from '../../../shared/pagerWheel'
 import { scrollbarBehind } from '../../../shared/scrollbarLag'
+import { type SelectionOwner, selectionWatch } from '../selectionWatch'
 import { openHistoryView, type HistoryView } from './historyView'
 
 interface Props {
@@ -94,6 +95,10 @@ export default function TerminalHost({
   const searchRef = useRef<SearchAddon | null>(null)
   // The history laid over a full-screen program, while it is open.
   const historyRef = useRef<HistoryView | null>(null)
+  // This terminal, as the clipboard's selection watch knows it.
+  const selectionOwnerRef = useRef<SelectionOwner>({
+    clear: () => termRef.current?.clearSelection()
+  })
   // Takes back the window listener a press left waiting for its release.
   const releaseRef = useRef<(() => void) | null>(null)
   const connIdRef = useRef<string | undefined>(connectionId)
@@ -318,6 +323,12 @@ export default function TerminalHost({
       // As far as it goes: the browser stops it at the end.
       viewport.scrollTop = viewport.scrollHeight
     }
+    // A selection clicked away, or cleared with the screen, is no longer held.
+    const selectionOwner = selectionOwnerRef.current
+    term.onSelectionChange(() => {
+      if (!term.hasSelection()) selectionWatch().released(selectionOwner)
+    })
+
     // Long enough for xterm to have measured the bar for the last of it.
     let settleTimer: ReturnType<typeof setTimeout> | undefined
     term.onWriteParsed(() => {
@@ -355,6 +366,9 @@ export default function TerminalHost({
       wheelCarry = turn.carry
       if (target === 'history') {
         if (!historyRef.current && hostRef.current) {
+          const historyOwner: SelectionOwner = {
+            clear: () => historyRef.current?.clearSelection()
+          }
           historyRef.current = openHistoryView(term, hostRef.current, {
             scrolled: Math.min(turn.rows, -1),
             hint: translate(
@@ -364,8 +378,10 @@ export default function TerminalHost({
             onCopy: (text) => {
               clipDiag(`copy from history: ${text.length} chars`)
               window.td.clipboard.write(text)
+              selectionWatch().copied(historyOwner, text)
             },
             onClose: () => {
+              selectionWatch().released(historyOwner)
               historyRef.current = null
             }
           })
@@ -448,6 +464,7 @@ export default function TerminalHost({
       resizeObserver.disconnect()
       cancelAnimationFrame(resizeFrame)
       clearTimeout(settleTimer)
+      selectionWatch().released(selectionOwner)
       historyRef.current?.close()
       term.dispose()
       /*
@@ -529,6 +546,7 @@ export default function TerminalHost({
     if (!selection) return
     clipDiag(`copy by ${how}: ${selection.length} chars`)
     window.td.clipboard.write(selection)
+    selectionWatch().copied(selectionOwnerRef.current, selection)
   }
 
   /**

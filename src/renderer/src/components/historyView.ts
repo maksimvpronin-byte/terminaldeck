@@ -14,6 +14,8 @@ import { replayLines } from './screenReplay'
  */
 export interface HistoryView {
   close(): void
+  /** Takes the selection away, as something else copied does: see selectionWatch.ts. */
+  clearSelection(): void
 }
 
 export interface HistoryViewOptions {
@@ -108,5 +110,5 @@ export function openHistoryView(
     if (buffer.type === 'normal') close()
   })
 
-  return { close }
+  return { close, clearSelection: () => view.clearSelection() }
 }
