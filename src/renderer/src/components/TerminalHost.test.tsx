@@ -19,6 +19,7 @@ vi.mock('@xterm/xterm', () => ({
     loadAddon(): void {}
     attachCustomKeyEventHandler(): void {}
     attachCustomWheelEventHandler(): void {}
+    onRender(): void {}
     onData(): void {}
     write(): void {}
     writeln(): void {}

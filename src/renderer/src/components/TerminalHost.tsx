@@ -13,6 +13,7 @@ import { IS_MAC } from '../state/keys'
 import { translate, useT } from '../i18n'
 import { diag, diagKey } from '../diag'
 import { wheelArrows, wheelRows, wheelTarget } from '../../../shared/pagerWheel'
+import { scrollbarBehind } from '../../../shared/scrollbarLag'
 import { openHistoryView, type HistoryView } from './historyView'
 
 interface Props {
@@ -266,6 +267,45 @@ export default function TerminalHost({
     })
 
     /*
+     * xterm's scrollbar, made to agree with the screen again after output that
+     * came in while the tab was hidden: see scrollbarLag.ts.
+     *
+     * A line up and back down is how: xterm measures the bar afresh on every
+     * scroll, and has no public call that does only that. Both happen before
+     * the next frame, so nothing moves on screen. At the very top it is a line
+     * down and back up instead, the only way that does not stop at the edge.
+     */
+    function resyncScrollbar(): void {
+      const buffer = term.buffer.active
+      if (buffer.baseY === 0) return
+      const step = buffer.viewportY > 0 ? -1 : 1
+      term.scrollLines(step)
+      term.scrollLines(-step)
+    }
+
+    /*
+     * The bar is also put back at the end whenever the screen is there and the
+     * bar is not, however it came to be: after a render, and before a wheel
+     * turn is left to xterm, which scrolls from wherever the bar is.
+     */
+    const viewport = hostRef.current.querySelector<HTMLElement>('.xterm-viewport')
+    function catchUpScrollbar(): void {
+      // Hidden: there is no end to go to, and the browser would drop it anyway.
+      if (!viewport || viewport.clientHeight === 0) return
+      const buffer = term.buffer.active
+      const behind = scrollbarBehind({
+        atBottom: buffer.viewportY >= buffer.baseY,
+        scrollTop: viewport.scrollTop,
+        scrollHeight: viewport.scrollHeight,
+        clientHeight: viewport.clientHeight,
+        rowHeight: (term.element?.clientHeight ?? 0) / term.rows
+      })
+      // As far as it goes: the browser stops it at the end.
+      if (behind) viewport.scrollTop = viewport.scrollHeight
+    }
+    term.onRender(catchUpScrollbar)
+
+    /*
      * The wheel in a pager, and in a full-screen program with the history
      * behind it: see pagerWheel.ts. Everywhere else it is left to xterm.
      */
@@ -285,6 +325,7 @@ export default function TerminalHost({
       )
       if (target === 'terminal') {
         wheelCarry = 0
+        catchUpScrollbar()
         return true
       }
       e.preventDefault()
@@ -346,15 +387,24 @@ export default function TerminalHost({
     let resizeFrame = 0
     let lastCols = term.cols
     let lastRows = term.rows
+    // Whether the pane has been out of sight since it was last laid out.
+    let wasHidden = false
     const resizeObserver = new ResizeObserver((entries) => {
       const box = entries[0]?.contentRect
       // Skip while the pane is hidden (0x0) — fitting then yields bogus cols/rows.
-      if (!box || box.width === 0 || box.height === 0) return
+      if (!box || box.width === 0 || box.height === 0) {
+        wasHidden = true
+        return
+      }
       if (resizeFrame) return
       resizeFrame = requestAnimationFrame(() => {
         resizeFrame = 0
         if (!hostRef.current?.clientWidth || !hostRef.current.clientHeight) return
         fit.fit()
+        if (wasHidden) {
+          wasHidden = false
+          resyncScrollbar()
+        }
         if (term.cols === lastCols && term.rows === lastRows) return
         // Laid out for the old size, and the program is about to redraw.
         historyRef.current?.close()
