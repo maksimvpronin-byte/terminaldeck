@@ -4,7 +4,8 @@ import { fileURLToPath } from 'url'
 import { electronApp, is } from '@electron-toolkit/utils'
 import { installSenderCheck } from './ipc/guard'
 import { registerIpcHandlers } from './ipc/handlers'
-import { requestFromArgv } from './launchRequests'
+import { requestHosts } from './launchRequests'
+import { hostsFromArgv, hostsFromLaunchData, type LaunchData } from '../shared/launchArgs'
 import { recoverInterruptedImport } from './store/Backup'
 import { desktopHoldsKeyboard, releaseKeyboard } from './keyboardCapture'
 import { diag } from './diagnostics'
@@ -337,14 +338,21 @@ function createWindow(): void {
  * the vault could end up re-keyed by one copy while the other kept writing
  * secrets under the old key. A second launch now hands over to the first — its
  * window comes forward — and exits without having written anything.
+ *
+ * The hosts it was asked to open, `TerminalDeck.exe -s web-01`, go over with
+ * the lock, read from its own command line. Not from the argv the running copy
+ * is given: Chromium parses that line again and puts every switch ahead of the
+ * plain words, so `-s amnezia` arrived as `-s --allow-file-access-from-files …
+ * amnezia`, and no name followed the `-s`.
  */
-const primaryInstance = app.requestSingleInstanceLock()
+const launchHosts = hostsFromArgv(process.argv)
+const primaryInstance = app.requestSingleInstanceLock({ hosts: launchHosts } satisfies LaunchData)
 if (!primaryInstance) {
   app.quit()
 } else {
-  app.on('second-instance', (_event, argv) => {
-    // `TerminalDeck.exe -s web-01` with a copy already running: see launchRequests.ts.
-    requestFromArgv(argv)
+  app.on('second-instance', (_event, _argv, _cwd, data) => {
+    // A copy already running asked for hosts: see launchRequests.ts.
+    requestHosts(hostsFromLaunchData(data))
     const win = BrowserWindow.getAllWindows()[0]
     if (!win) return
     if (win.isMinimized()) win.restore()
@@ -357,7 +365,7 @@ app.whenReady().then(async () => {
   if (!primaryInstance) return
   electronApp.setAppUserModelId('com.terminaldeck.app')
   // Held for the window, which takes it once the vault is open.
-  requestFromArgv(process.argv)
+  requestHosts(launchHosts)
   /*
    * No optimizer.watchWindowShortcuts: in a build it swallowed Cmd/Ctrl+R
    * outright, before the page, so a shell's history search never reached the

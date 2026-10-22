@@ -2,7 +2,6 @@ import { BrowserWindow, ipcMain } from 'electron'
 import { promises as dns } from 'dns'
 import { IPC } from '../shared/ipc-channels'
 import { isIpAddress, type Resolved } from '../shared/hostMatch'
-import { hostsFromArgv } from '../shared/launchArgs'
 import { diag } from './diagnostics'
 
 /**
@@ -19,9 +18,8 @@ import { diag } from './diagnostics'
  */
 const pending: string[] = []
 
-/** Takes the hosts a command line names, and tells the window if it is there. */
-export function requestFromArgv(argv: readonly string[]): void {
-  const names = hostsFromArgv(argv)
+/** Takes the hosts a command line named, and tells the window if it is there. */
+export function requestHosts(names: readonly string[]): void {
   if (names.length === 0) return
   // Names only: they are hosts the user typed, not anything secret.
   diag('launch', `asked to open ${names.join(', ')}`)

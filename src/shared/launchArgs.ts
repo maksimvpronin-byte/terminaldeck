@@ -22,8 +22,34 @@ export function hostsFromArgv(argv: readonly string[]): string[] {
         i++
       }
     }
-    const name = value?.trim()
-    if (name && !name.startsWith('-')) out.push(name)
+    const name = hostName(value)
+    if (name) out.push(name)
   }
   return out
+}
+
+/** A name as `-s` takes it: trimmed, and never a switch. */
+function hostName(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const name = value.trim()
+  return name && !name.startsWith('-') ? name : undefined
+}
+
+/** What a second launch hands the copy already running, alongside its lock. */
+export interface LaunchData {
+  hosts: string[]
+}
+
+/**
+ * The hosts a second launch asked for, from what it handed over — see
+ * index.ts for why they travel this way and not in its argv.
+ *
+ * It comes from another process, so it is checked before it is believed: a
+ * list of names, each as `-s` would have taken it, and nothing else.
+ */
+export function hostsFromLaunchData(data: unknown): string[] {
+  if (typeof data !== 'object' || data === null) return []
+  const hosts = (data as Partial<Record<keyof LaunchData, unknown>>).hosts
+  if (!Array.isArray(hosts)) return []
+  return hosts.map(hostName).filter((name): name is string => name !== undefined)
 }
