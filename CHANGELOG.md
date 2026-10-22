@@ -6,6 +6,15 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.32.1
+
+### Fixed
+
+- **`-s` opens the host in a copy already running.** With TerminalDeck open,
+  `TerminalDeck.exe -s web-01` brought the window forward and opened nothing:
+  only a copy just started found the host. The name now reaches the running
+  copy too, and it opens the host as a closed one would.
+
 ## 0.32.0
 
 ### Added
