@@ -630,14 +630,9 @@ export default function SftpPanel({
     }
   }
 
-  async function upload(): Promise<void> {
-    const localPath = await window.td.dialogs.pickOpenPath()
-    if (localPath) await planAndUpload([localPath])
-  }
-
-  async function uploadFolder(): Promise<void> {
-    const localPath = await window.td.dialogs.pickDirectory()
-    if (localPath) await planAndUpload([localPath])
+  async function upload(kind: 'files' | 'folders'): Promise<void> {
+    const localPaths = await window.td.dialogs.pickUploadPaths(kind)
+    if (localPaths) await planAndUpload(localPaths)
   }
 
   /** Starts dragging rows out towards another host's panel. */
@@ -802,8 +797,8 @@ export default function SftpPanel({
         })
       }
     })
-    items.push({ label: t('Upload file…'), onSelect: upload })
-    items.push({ label: t('Upload folder…'), onSelect: uploadFolder })
+    items.push({ label: t('Upload files…'), onSelect: () => upload('files') })
+    items.push({ label: t('Upload folders…'), onSelect: () => upload('folders') })
     items.push({ label: t('Refresh'), onSelect: () => refresh() })
     return items
   }
@@ -1191,9 +1186,12 @@ export default function SftpPanel({
         onBusy={transfers.setTransferring}
       />
 
-      <div style={{ padding: 6, borderTop: '1px solid var(--border)' }}>
-        <button onClick={upload} style={{ width: '100%' }}>
-          {t('Upload file…')}
+      <div style={{ display: 'flex', gap: 6, padding: 6, borderTop: '1px solid var(--border)' }}>
+        <button onClick={() => upload('files')} style={{ flex: 1 }}>
+          {t('Upload files…')}
+        </button>
+        <button onClick={() => upload('folders')} style={{ flex: 1 }}>
+          {t('Upload folders…')}
         </button>
       </div>
 

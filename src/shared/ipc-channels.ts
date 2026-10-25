@@ -254,5 +254,6 @@ export const IPC = {
   dialogPickPrivateKey: 'dialog:pickPrivateKey',
   dialogPickSavePath: 'dialog:pickSavePath',
   dialogPickOpenPath: 'dialog:pickOpenPath',
-  dialogPickDirectory: 'dialog:pickDirectory'
+  dialogPickDirectory: 'dialog:pickDirectory',
+  dialogPickUploadPaths: 'dialog:pickUploadPaths'
 } as const

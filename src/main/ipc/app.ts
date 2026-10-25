@@ -5,6 +5,7 @@ import { existsSync, mkdirSync } from 'fs'
 import { IPC } from '../../shared/ipc-channels'
 import { focusedWin } from './win'
 import { diag } from '../diagnostics'
+import { lastUploadFolder, rememberUploadFolder } from '../uploadFolder'
 
 /** Whatever belongs to the application rather than to a connection: files and folders. */
 
@@ -90,5 +91,21 @@ export function registerAppHandlers(): void {
       title: 'Choose a destination folder'
     })
     return res.canceled ? undefined : res.filePaths[0]
+  })
+  /**
+   * Picks what to upload: several files, or several folders. Never both at
+   * once — on Windows and Linux one dialog cannot choose files and folders
+   * together, so the panel asks for one kind or the other.
+   */
+  ipcMain.handle(IPC.dialogPickUploadPaths, async (_e, kind: unknown) => {
+    const folders = kind === 'folders'
+    const res = await dialog.showOpenDialog(focusedWin(), {
+      properties: [folders ? 'openDirectory' : 'openFile', 'multiSelections'],
+      defaultPath: lastUploadFolder(),
+      title: folders ? 'Choose folders to upload' : 'Choose files to upload'
+    })
+    if (res.canceled || res.filePaths.length === 0) return undefined
+    rememberUploadFolder(res.filePaths)
+    return res.filePaths
   })
 }

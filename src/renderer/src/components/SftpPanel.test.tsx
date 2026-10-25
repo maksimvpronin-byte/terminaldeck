@@ -156,6 +156,32 @@ describe('going to a typed path', () => {
   })
 })
 
+/** Uploading took one file a dialog; several files, or several folders, each come as a plan. */
+describe('uploading from the button', () => {
+  it.each([
+    ['Upload files…', 'files'],
+    ['Upload folders…', 'folders']
+  ])('%s sends every path picked', async (label, kind) => {
+    window.td.dialogs.pickUploadPaths = vi.fn().mockResolvedValue(['C:\\a', 'C:\\b'])
+    const planUpload = vi.fn().mockResolvedValue({
+      direction: 'upload',
+      items: [],
+      conflicts: [],
+      totalBytes: 0
+    })
+    window.td.sftp.planUpload = planUpload
+    window.td.sftp.runPlan = vi.fn().mockResolvedValue({ written: 0, skipped: 0, changed: [] })
+    render(<SftpPanel connectionId="c1" />)
+    await row('.bashrc')
+
+    await userEvent.click(screen.getByRole('button', { name: label }))
+
+    await waitFor(() => expect(planUpload).toHaveBeenCalledTimes(2))
+    expect(window.td.dialogs.pickUploadPaths).toHaveBeenCalledWith(kind)
+    expect(planUpload.mock.calls.map((call) => call[1])).toEqual(['C:\\a', 'C:\\b'])
+  })
+})
+
 /**
  * A listing describes a link, not what it names, so a link to a folder came
  * in as a file: Download asked for a file name and planned the link as one

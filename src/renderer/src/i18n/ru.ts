@@ -884,8 +884,8 @@ export const ru: Record<string, string> = {
     'Следующее будет безвозвратно удалено с удалённого хоста — отменить это нельзя:',
   'New folder…': 'Новая папка…',
   'New folder name': 'Имя новой папки',
-  'Upload file…': 'Загрузить файл…',
-  'Upload folder…': 'Загрузить папку…',
+  'Upload files…': 'Загрузить файлы…',
+  'Upload folders…': 'Загрузить папки…',
   'Uploaded {name}': 'Отправлено: {name}',
   'Left alone, because something appeared there after the check: {paths}':
     'Не тронуто — после проверки там что-то появилось: {paths}',

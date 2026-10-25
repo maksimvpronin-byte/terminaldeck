@@ -577,7 +577,10 @@ const api = {
     pickSavePath: (defaultName: string): Promise<string | undefined> =>
       ipcRenderer.invoke(IPC.dialogPickSavePath, defaultName),
     pickOpenPath: (): Promise<string | undefined> => ipcRenderer.invoke(IPC.dialogPickOpenPath),
-    pickDirectory: (): Promise<string | undefined> => ipcRenderer.invoke(IPC.dialogPickDirectory)
+    pickDirectory: (): Promise<string | undefined> => ipcRenderer.invoke(IPC.dialogPickDirectory),
+    /** Opens in the folder the last upload came from, and remembers this one's. */
+    pickUploadPaths: (kind: 'files' | 'folders'): Promise<string[] | undefined> =>
+      ipcRenderer.invoke(IPC.dialogPickUploadPaths, kind)
   }
 }
 
