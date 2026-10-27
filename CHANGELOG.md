@@ -6,6 +6,16 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.33.1
+
+### Security
+
+- **No 7-Zip among the tools TerminalDeck is built with.** A scan reported 24
+  advisories against old 7-Zip executables that a Squirrel.Windows packager
+  brought into the build tools, though TerminalDeck is not packaged that way
+  and the app never carried them. That packager is no longer installed.
+  Nothing in the app itself changes.
+
 ## 0.33.0
 
 ### Added
