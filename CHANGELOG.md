@@ -6,6 +6,53 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.33.0
+
+### Added
+
+- **Several files or folders in one upload.** Upload files… and Upload
+  folders… in the file panel take everything picked at once, and the picker
+  opens in the folder the last upload came from.
+
+### Fixed
+
+- **A desktop behind an RD Gateway no longer hangs on its use policy.** A
+  gateway that asked for its policy to be accepted held the connection for
+  ever, waiting for an answer at a console nobody could see. The policy is
+  shown in a dialog now and the answer passed on.
+- **Ansible inventories are read as Ansible reads them.** A `group_vars` or
+  `host_vars` file with no extension is read, so a host's address, login and
+  port are no longer missing, and a range such as `web[01:03].example.com`
+  becomes the hosts it names instead of one host by that name.
+- **`Host prod staging` with no HostName imports two hosts**, as `ssh` sees
+  them; the second name was taken for another name of the first. Of several
+  IdentityFile lines the first that exists is taken.
+- **A jump host saved with no login is this machine's user on import**, so
+  `max@bastion` is no longer refused for a bastion that connects as max.
+- **A backup exported without credentials no longer claims saved passwords**
+  on another machine; references the file and the vault both lack are dropped.
+- **Files copied out of a desktop no longer fill the disk.** Each batch was
+  kept until the application quit; earlier ones now go once newer ones are on
+  the clipboard.
+- **An SSH host switched to RDP no longer sends its key's passphrase as the
+  Windows password.**
+- **A host can turn off "Reach private addresses directly, without the
+  gateway"** under a group that names the gateway; the group's setting won.
+- **An emoji typed into a desktop arrives.** It was refused and went nowhere.
+- **Sign out of Windows sessions includes desktops opened by Quick connect.**
+- **Connect as… an account with the host's own login reuses the open
+  desktop** instead of opening a second session that signs the first out.
+- **A pane moved to a tab of its own stays out of broadcast** if it was left
+  out, and opening a workspace from its header clears its tab's "new" mark.
+- **The portable Windows build offers the download page for an update**: the
+  installer it ran left the portable file at the old version.
+
+### Security
+
+- **Electron 43.8.3, Vite 7.3.7 and fast-uri 3.1.9.** A scan of the lock file
+  found two high and nine medium advisories in the versions before these;
+  each is fixed in the patch release now used.
+
 ## 0.32.1
 
 ### Fixed
