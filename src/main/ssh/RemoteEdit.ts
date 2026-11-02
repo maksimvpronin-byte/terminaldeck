@@ -1,7 +1,7 @@
-import { shell, type BrowserWindow } from 'electron'
+import type { BrowserWindow } from 'electron'
 import { dirname, join } from 'path'
 import { spawn } from 'child_process'
-import { mkdtempSync, existsSync, statSync, rmSync, watch, type FSWatcher } from 'fs'
+import { chmodSync, mkdtempSync, existsSync, statSync, rmSync, watch, type FSWatcher } from 'fs'
 import { tmpdir } from 'os'
 import { IPC } from '../../shared/ipc-channels'
 import { sftpManager } from './SFTPManager'
@@ -63,8 +63,8 @@ function parseCommand(input: string): { program: string; args: string[] } {
  * on Windows, and on macOS `open -t`, the text editor the user chose there,
  * which a `.command` file cannot talk its way past either.
  *
- * Linux keeps the desktop's own handler. The copy is written without the
- * execute bit, so a script found there is opened, not run.
+ * Linux requires an explicitly configured text editor: the desktop's file
+ * handler can execute scripts and launchers, even without an execute bit.
  */
 export function defaultEditor(
   platform: NodeJS.Platform
@@ -91,9 +91,7 @@ export async function openInEditor(
   const configured = editorCommand?.trim()
   const fallback = configured ? undefined : defaultEditor(platform)
   if (!configured && !fallback) {
-    const failure = await shell.openPath(localPath)
-    if (failure) throw new Error(failure)
-    return
+    throw new Error('Configure a text editor in Settings before editing remote files locally')
   }
 
   const { program, args } = fallback ?? parseCommand(configured!)
@@ -211,6 +209,7 @@ class RemoteEditManager {
     const localPath = localChild(dir, name)
 
     await sftpManager.download(connectionId, remotePath, localPath)
+    if (process.platform !== 'win32') chmodSync(localPath, 0o600)
     if (token.cancelled || win.isDestroyed()) {
       throw new Error('SSH connection closed while downloading the file for editing')
     }

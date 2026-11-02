@@ -43,6 +43,12 @@ const client = Object.assign(new EventEmitter(), {
   }
 }) as unknown as Client
 vi.mock('./SSHManager', () => ({ sshManager: { getClientChain: () => [client] } }))
+const vaultState = { unlocked: true }
+vi.mock('../vault/locked', () => ({
+  requireUnlocked: () => {
+    if (!vaultState.unlocked) throw new Error('Vault locked')
+  }
+}))
 
 const { portForwardManager, pipeStreams, handleSocks5 } = await import('./PortForwardManager')
 const net = (await import('net')).default
@@ -57,6 +63,18 @@ const rule = {
 }
 
 describe('a tunnel stopped while it opens', () => {
+  it.each(['local', 'remote', 'dynamic'] as const)(
+    'refuses a new %s tunnel while locked',
+    (type) => {
+      vaultState.unlocked = false
+      try {
+        expect(() => portForwardManager.start('locked', { ...rule, type })).toThrow('Vault locked')
+        expect(portForwardManager.listActive('locked')).toEqual([])
+      } finally {
+        vaultState.unlocked = true
+      }
+    }
+  )
   it('closes the listener that comes up afterwards and never lists it', async () => {
     const opening = portForwardManager.start('conn', rule)
     expect(portForwardManager.listActive('conn')).toEqual([])

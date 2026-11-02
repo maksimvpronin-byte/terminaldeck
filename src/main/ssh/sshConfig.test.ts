@@ -5,6 +5,12 @@ import { join } from 'path'
 import { parseSshConfig } from './sshConfig'
 
 describe('parseSshConfig', () => {
+  it.each(['Include conf.d/*', 'include=conf.d/prod', 'Host prod\n  Include "prod config"'])(
+    'refuses a partial import when settings depend on %s',
+    (text) => {
+      expect(() => parseSshConfig(text)).toThrow(/Include directives are not supported/)
+    }
+  )
   it('reads a plain host block', () => {
     const hosts = parseSshConfig(`
 Host web1

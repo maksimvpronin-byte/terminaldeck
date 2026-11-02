@@ -54,7 +54,7 @@ function buildApplicationMenu(): void {
          * accelerator fires before the terminal ever sees the key.
          */
         ...(is.dev ? [{ role: 'forceReload' as const }] : []),
-        { role: 'toggleDevTools' },
+        ...(is.dev ? [{ role: 'toggleDevTools' as const }] : []),
         { type: 'separator' },
         { role: 'togglefullscreen' }
       ]
@@ -133,6 +133,7 @@ function createWindow(): void {
        * required; the bridge it exposes is otherwise unchanged.
        */
       sandbox: true,
+      devTools: is.dev,
       contextIsolation: true,
       nodeIntegration: false
     }

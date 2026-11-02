@@ -75,7 +75,7 @@ function authFor(
  *
  * Resolved in the main process and passed directly to FreeRDP.
  */
-function desktopGateway(
+export function desktopGateway(
   profile: SessionProfile,
   groups: SessionGroup[],
   /** What the session itself signs in with, account and all. */
@@ -97,6 +97,9 @@ function desktopGateway(
    */
   const own = Boolean(rdp.gatewayUsername || rdp.gatewaySecretRef)
   const login = splitLogin(rdp.gatewayUsername || auth.username || '')
+  if (own && !login.username) {
+    throw new Error('The RD Gateway username must contain an account name')
+  }
 
   return {
     host: rdp.gatewayHost,

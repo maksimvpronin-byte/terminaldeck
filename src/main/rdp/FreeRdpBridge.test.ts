@@ -79,6 +79,33 @@ function stubSession(): {
 }
 
 describe('speaking to a desktop client', () => {
+  it.each(['', '   '])(
+    'rejects an empty explicit gateway account before starting a client: %j',
+    (username) => {
+      expect(() =>
+        freeRdpBridge.start(
+          {} as Parameters<typeof freeRdpBridge.start>[0],
+          { host: 'desktop', width: 800, height: 600 },
+          { username: 'desktop-user', password: 'desktop-password' },
+          { host: 'gateway', username, password: 'gateway-password' }
+        )
+      ).toThrow(/Gateway username/)
+    }
+  )
+  it('blocks input while locked and keeps frame acknowledgements working', () => {
+    const { session, written } = stubSession()
+    innards().sessions.set('locked-input', session)
+    vaultState.unlocked = false
+    for (const a of ['key', 'mouse', 'xmouse', 'text', 'unicode']) {
+      freeRdpBridge.send('locked-input', { a, code: 30, down: true })
+    }
+    expect(written).toHaveLength(0)
+    freeRdpBridge.send('locked-input', { a: 'ack' })
+    expect(written).toHaveLength(1)
+    vaultState.unlocked = true
+    freeRdpBridge.send('locked-input', { a: 'key', code: 30, down: true })
+    expect(written).toHaveLength(2)
+  })
   it('says nothing once its input has been closed', async () => {
     const { session, stdin } = stubSession()
     innards().sessions.set('d1', session)

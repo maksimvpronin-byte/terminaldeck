@@ -23,7 +23,7 @@ import { credentialStore } from '../store/CredentialStore'
 import { defaultCredential, authChain } from '../../shared/authResolution'
 import { vault } from '../vault/Vault'
 import { makeHostVerifier } from './hostVerifier'
-import { requireUnlocked } from '../vault/locked'
+import { isUnlocked, requireUnlocked } from '../vault/locked'
 import { requestAuth } from './authPrompt'
 import { keyNeedsPassphrase, readPrivateKey } from './ppk'
 import { AnsweringPageant } from './pageant'
@@ -1394,6 +1394,7 @@ class SSHManager {
   }
 
   write(connectionId: string, data: string): void {
+    if (!isUnlocked()) return
     const conn = this.connections.get(connectionId)
     // What arrived, as counts and control characters — see shared/diagnostics.ts.
     diag(

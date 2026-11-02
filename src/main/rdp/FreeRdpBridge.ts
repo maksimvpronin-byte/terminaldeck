@@ -190,6 +190,9 @@ class FreeRdpBridge {
     gateway?: DesktopGateway
   ): string {
     requireUnlocked()
+    if (gateway?.username !== undefined && !gateway.username.trim()) {
+      throw new Error('The RD Gateway username must contain an account name')
+    }
     const id = `desktop${this.nextId++}`
     const port = request.port ?? 3389
 
@@ -322,7 +325,7 @@ class FreeRdpBridge {
       gatewayPort: gateway?.port,
       // Stated rather than inferred: on most deployments the gateway takes the
       // same login and on exactly the others, guessing locks an account out.
-      gatewaySameCredentials: gateway ? !gateway.username : undefined,
+      gatewaySameCredentials: gateway ? gateway.username === undefined : undefined,
       gatewayUser: gateway?.username,
       gatewayDomain: gateway?.domain,
       gatewayPassword: gateway?.password,
@@ -334,6 +337,7 @@ class FreeRdpBridge {
 
   /** Anything the renderer wants said: input, a new size, an acknowledgement. */
   send(id: string, fields: Record<string, string | number | boolean | undefined>): void {
+    if (!isUnlocked() && !['ack', 'resize', 'visible'].includes(String(fields.a))) return
     const session = this.sessions.get(id)
     if (session && fields.a === 'visible') session.hidden = fields.value === false
     this.write(id, fields)

@@ -20,6 +20,13 @@ vi.mock('electron', () => ({
 }))
 
 userData = mkdtempSync(join(tmpdir(), 'terminaldeck-ssh-'))
+const vaultState = { unlocked: true }
+vi.mock('../vault/locked', () => ({
+  isUnlocked: () => vaultState.unlocked,
+  requireUnlocked: () => {
+    if (!vaultState.unlocked) throw new Error('Vault locked')
+  }
+}))
 const { sshManager, forwarding, methodWatcher } = await import('./SSHManager')
 
 interface Sent {
@@ -102,8 +109,20 @@ function dataSent(sent: Sent[], id: string): Buffer[] {
 }
 
 beforeEach(() => {
+  vaultState.unlocked = true
   vi.useFakeTimers()
   innards().connections.clear()
+})
+
+it('blocks terminal input while locked and resumes on unlock', () => {
+  const write = vi.fn()
+  attach('input', { stream: { write } })
+  vaultState.unlocked = false
+  sshManager.write('input', 'dangerous command\n')
+  expect(write).not.toHaveBeenCalled()
+  vaultState.unlocked = true
+  sshManager.write('input', 'echo hello\n')
+  expect(write).toHaveBeenCalledWith('echo hello\n')
 })
 
 afterEach(() => {

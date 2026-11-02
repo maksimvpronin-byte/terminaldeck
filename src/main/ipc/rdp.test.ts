@@ -1,4 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
+import type { SessionProfile } from '../../shared/types'
+import { AUTH_FALLBACK } from '../../shared/authResolution'
 
 vi.mock('electron', () => ({
   app: { getPath: (): string => '/tmp', isPackaged: false },
@@ -6,7 +8,51 @@ vi.mock('electron', () => ({
   ipcMain: { on: () => undefined, handle: () => undefined }
 }))
 
-const { isWindowCommand } = await import('./rdp')
+const { isWindowCommand, desktopGateway } = await import('./rdp')
+const { vault } = await import('../vault/Vault')
+
+describe('RD Gateway credentials', () => {
+  const profile = (rdp: object): SessionProfile => ({
+    id: 'desktop',
+    name: 'desktop',
+    host: 'host',
+    groupId: null,
+    tags: [],
+    logToFile: false,
+    portForwards: [],
+    createdAt: 0,
+    updatedAt: 0,
+    gatewayHost: 'gateway',
+    ...rdp
+  })
+  const auth = { ...AUTH_FALLBACK, username: 'CORP\\desktop' }
+
+  it.each(['   ', 'CORP\\'])('refuses an explicit gateway login with no account: %s', (name) => {
+    expect(() => desktopGateway(profile({ gatewayUsername: name }), [], auth)).toThrow(
+      /Gateway username/
+    )
+  })
+
+  it('uses the host login with the gateway password when only a password is configured', () => {
+    const read = vi.spyOn(vault, 'getSecret').mockReturnValueOnce('gateway-password')
+    try {
+      expect(desktopGateway(profile({ gatewaySecretRef: 'gw-ref' }), [], auth)).toMatchObject({
+        username: 'desktop',
+        domain: 'CORP',
+        password: 'gateway-password'
+      })
+    } finally {
+      read.mockRestore()
+    }
+  })
+
+  it('leaves credentials shared only when no gateway login or password is configured', () => {
+    expect(desktopGateway(profile({}), [], auth)).toMatchObject({
+      username: undefined,
+      password: undefined
+    })
+  })
+})
 
 /**
  * The window drives a desktop's input. The same pipe also carries what only

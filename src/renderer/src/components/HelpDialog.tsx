@@ -580,7 +580,7 @@ const CHAPTERS: Chapter[] = [
                 what: 'A copy that could not be sent is kept and listed when you quit, not deleted'
               },
               {
-                what: 'Pick that editor in Settings → Files; otherwise a plain text editor is used'
+                what: 'Pick that editor in Settings → Files; required on Linux, optional on Windows and macOS'
               },
               { what: 'Compare in a clash shows the diff before you decide to replace it' },
               { what: 'Right-click a remote file to compare it against any local one' },

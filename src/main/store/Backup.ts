@@ -24,7 +24,7 @@ import type {
   SavedPane
 } from '../../shared/types'
 import { groupWithoutRepoSecret, sourceWithoutRepoSecret } from '../../shared/repoSecret'
-import { forgetSecret, forgetSecretAt } from '../ipc/secrets'
+import { SECRET_FIELDS, forgetSecretsAt, refsHeldBy } from '../ipc/secrets'
 
 interface BackupFile {
   format: 'terminaldeck-backup'
@@ -624,7 +624,7 @@ export async function importFromFile(
   writeJson(journalPath(), {
     version: 1,
     startedAt: Date.now(),
-    vault: secrets && Object.keys(secrets).length > 0 ? vault.sealedSecrets() : undefined,
+    vault: vault.isUnlocked() ? vault.sealedSecrets() : undefined,
     sessions: sessionStore.snapshot(),
     snippets: snippetStore.snapshot(),
     collections: collectionStore.snapshot(),
@@ -708,6 +708,25 @@ export async function importFromFile(
       (previous) => credentialStore.restore(previous),
       () => credentialStore.saveMany(credentials)
     )
+    if (forgotten.length > 0 && vault.isUnlocked()) {
+      const saved = sessionStore.getAll()
+      const retainedRefs = refsHeldBy(
+        [
+          ...saved.sessions,
+          ...saved.groups,
+          ...credentialStore.list(),
+          ...inventoryStore.sources(),
+          ...inventoryStore.overrides(),
+          ...gitFolderStore.overrides()
+        ],
+        SECRET_FIELDS
+      )
+      step(
+        () => vault.snapshotSecrets(),
+        (previous) => vault.restoreSecrets(previous),
+        () => forgetSecretsAt(forgotten, [...SECRET_FIELDS], retainedRefs)
+      )
+    }
   } catch (err) {
     const unrestored: string[] = []
     for (const put of undo.reverse()) {
@@ -727,11 +746,6 @@ export async function importFromFile(
     )
   }
   rmSync(journalPath(), { force: true })
-  // Their passwords only once the import stands: a vault entry cannot be put back.
-  for (const override of forgotten) {
-    forgetSecret(override)
-    forgetSecretAt(override, 'gatewaySecretRef')
-  }
 
   return {
     groups: groups.length,

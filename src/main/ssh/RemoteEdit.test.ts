@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { existsSync, readFileSync, utimesSync, writeFileSync } from 'fs'
+import { chmodSync, existsSync, readFileSync, statSync, utimesSync, writeFileSync } from 'fs'
 import { basename, dirname } from 'path'
 import type { BrowserWindow } from 'electron'
 
@@ -90,6 +90,28 @@ function save(local: string, contents: string): void {
 }
 
 describe('remote editing', () => {
+  it.skipIf(process.platform === 'win32')(
+    'keeps edit copies private and non-executable',
+    async () => {
+      const { sftpManager } = await import('./SFTPManager')
+      vi.mocked(sftpManager.download).mockImplementationOnce(async (_id, _remote, local) => {
+        writeFileSync(local, 'script')
+        chmodSync(local, 0o755)
+      })
+      const local = await remoteEdit.open(win, 'permissions', '/srv/run.sh', 'editor')
+      expect(statSync(local).mode & 0o777).toBe(0o600)
+    }
+  )
+
+  it('requires a text editor on Linux instead of opening a remote launcher', async () => {
+    openPath.mockClear()
+    const count = spawned.length
+    await expect(openInEditor('/tmp/remote.desktop', undefined, 'linux')).rejects.toThrow(
+      /Configure a text editor/
+    )
+    expect(openPath).not.toHaveBeenCalled()
+    expect(spawned).toHaveLength(count)
+  })
   it('removes a copy at quit even when its connection closed first', async () => {
     const local = await remoteEdit.open(win, 'connection-1', '/etc/sshd_config', 'true')
     expect(existsSync(local)).toBe(true)

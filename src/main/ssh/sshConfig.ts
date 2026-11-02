@@ -89,6 +89,11 @@ export function parseSshConfig(text: string): SshConfigHost[] {
     if (!match) continue
     const keyword = match[1].toLowerCase()
     const value = match[2].trim()
+    if (keyword === 'include') {
+      throw new Error(
+        'SSH Include directives are not supported by the importer. Expand the included settings into ~/.ssh/config before importing.'
+      )
+    }
     if (keyword === 'host') {
       blocks.push({ patterns: value.split(/\s+/).map(unquote), settings: [] })
     } else if (keyword === 'match') {

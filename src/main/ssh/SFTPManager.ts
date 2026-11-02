@@ -449,7 +449,7 @@ class SFTPManager {
       const named = parseLongnameOwner(e.longname ?? '')
       return {
         name: e.filename,
-        path: remotePath.replace(/\/$/, '') + '/' + e.filename,
+        path: remoteChild(remotePath, e.filename),
         isDirectory: (e.attrs.mode & 0o170000) === 0o040000,
         isSymlink: (e.attrs.mode & 0o170000) === 0o120000,
         size: e.attrs.size ?? 0,
@@ -815,7 +815,7 @@ class SFTPManager {
     stillInside?: () => Promise<void>
   ): Promise<void> {
     const shell = this.getShell(connectionId)
-    if (shell) return shell.upload(localPath, remotePath, onProgress)
+    if (shell) return shell.upload(localPath, remotePath, onProgress, beforeReplace, stillInside)
     const sftp = await this.getSftp(connectionId)
     await this.writeRemoteFile(
       sftp,
@@ -1148,7 +1148,8 @@ class SFTPManager {
         })
       })
 
-    if (dstSftp instanceof ScpShell) await dstSftp.replace(dstPath, copyInto)
+    if (dstSftp instanceof ScpShell)
+      await dstSftp.replace(dstPath, copyInto, beforeReplace, stillInside)
     else
       await this.writeRemoteFile(dstSftp, dstPath, copyInto, beforeReplace, stillInside, sourceMode)
   }

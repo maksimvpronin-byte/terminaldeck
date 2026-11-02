@@ -1,6 +1,7 @@
 import type { BrowserWindow } from 'electron'
 import { sshManager } from './SSHManager'
 import { IPC } from '../../shared/ipc-channels'
+import { requireUnlocked } from '../vault/locked'
 import {
   diffSamples,
   parseProbe,
@@ -30,6 +31,7 @@ class RemoteMonitor {
   private watches = new Map<string, Watch>()
 
   start(win: BrowserWindow, connectionId: string): void {
+    requireUnlocked()
     if (this.watches.has(connectionId)) return
     const watch: Watch = {
       timer: setInterval(() => this.tick(win, connectionId), INTERVAL_MS),

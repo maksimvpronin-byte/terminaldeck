@@ -2,6 +2,7 @@ import net, { type Server, type Socket } from 'net'
 import type { Client } from 'ssh2'
 import type { Duplex } from 'stream'
 import { sshManager } from './SSHManager'
+import { requireUnlocked } from '../vault/locked'
 import {
   HANDSHAKE_LIMIT,
   HANDSHAKE_TIMEOUT,
@@ -243,6 +244,7 @@ class PortForwardManager {
    * listener that finishes opening after it was stopped is closed on arrival.
    */
   start(connectionId: string, rule: PortForwardRule): Promise<void> {
+    requireUnlocked()
     const key = `${connectionId}:${rule.id}`
     const inProgress = this.opening.get(key)
     if (inProgress) return inProgress

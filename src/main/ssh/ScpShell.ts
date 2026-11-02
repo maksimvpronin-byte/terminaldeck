@@ -393,28 +393,37 @@ export class ScpShell {
   async upload(
     local: string,
     path: string,
-    progress?: (n: number, total: number) => void
+    progress?: (n: number, total: number) => void,
+    beforeReplace?: () => Promise<void>,
+    stillInside?: () => Promise<void>
   ): Promise<void> {
     const handle = await open(local, 'r')
     try {
       const source = await handle.stat()
       if (!source.isFile()) throw new Error('SCP uploads require a regular file')
       const existing = await this.statPath(path, true)
-      await this.replace(path, async (target) => {
-        // A new file takes the source's mode, as `scp` gives it, less the
-        // server's umask; it was 0644 whatever the source, and a 0600
-        // .pgpass came out readable by everyone there.
-        const fresh =
-          process.platform === 'win32' ? '0644' : (source.mode & 0o777).toString(8).padStart(4, '0')
-        const write = this.createWriteStream(target, source.size, existing?.permissions ?? fresh)
-        let count = 0
-        const read = handle.createReadStream({ start: 0, autoClose: false })
-        read.on('data', (chunk) => {
-          count += chunk.length
-          progress?.(count, source.size)
-        })
-        await pipeline(read, write)
-      })
+      await this.replace(
+        path,
+        async (target) => {
+          // A new file takes the source's mode, as `scp` gives it, less the
+          // server's umask; it was 0644 whatever the source, and a 0600
+          // .pgpass came out readable by everyone there.
+          const fresh =
+            process.platform === 'win32'
+              ? '0644'
+              : (source.mode & 0o777).toString(8).padStart(4, '0')
+          const write = this.createWriteStream(target, source.size, existing?.permissions ?? fresh)
+          let count = 0
+          const read = handle.createReadStream({ start: 0, autoClose: false })
+          read.on('data', (chunk) => {
+            count += chunk.length
+            progress?.(count, source.size)
+          })
+          await pipeline(read, write)
+        },
+        beforeReplace,
+        stillInside
+      )
     } finally {
       await handle.close()
     }
@@ -430,10 +439,19 @@ export class ScpShell {
    * destination that did not exist is not replaced if something appeared there
    * meanwhile, and a symlink's target is replaced rather than the link.
    */
-  async replace(path: string, write: (target: string) => Promise<void>): Promise<void> {
+  async replace(
+    path: string,
+    write: (target: string) => Promise<void>,
+    beforeReplace?: () => Promise<void>,
+    stillInside?: () => Promise<void>
+  ): Promise<void> {
+    await stillInside?.()
+    // A transfer plan refuses links; direct editor saves may follow them.
+    await beforeReplace?.()
     let target = path
     let existing = await this.statPath(path)
     if (existing?.isSymlink) {
+      if (beforeReplace) throw new Error(`${path} became a link before the transfer`)
       const resolved = await this.capture(`readlink -f -z -- ${pathArg(path)}`)
       if (resolved.at(-1) !== 0) throw new Error(`${path} is a link that cannot be followed`)
       target = resolved.subarray(0, -1).toString('utf8')
@@ -450,7 +468,10 @@ export class ScpShell {
     const [p, d] = [pathArg(partial), pathArg(target)]
     let moved = false
     try {
+      await stillInside?.()
       await write(partial)
+      await beforeReplace?.()
+      await stillInside?.()
       if (!existing) {
         await this.capture(
           `mv -T -n -- ${p} ${d}; if test -e ${p}; then printf '%s\\n' 'Destination appeared during the transfer and was left alone' >&2; exit 1; fi`

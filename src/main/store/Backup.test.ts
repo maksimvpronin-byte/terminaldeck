@@ -455,60 +455,93 @@ describe('backup import', () => {
    * stayed in the palette, and deleting the group, no longer a git folder,
    * cleaned up nothing.
    */
-  it('forgets what a folder untied by the import mirrored', async () => {
-    const { gitFolderStore } = await import('../gitFolders/GitFolderStore')
-    const { gitHostId } = await import('../../shared/gitFolders')
-    const previous = gitFolderStore.snapshot()
-    try {
-      populate()
-      saveTo = FILE
-      await exportToFile(win, false)
-      const file = JSON.parse(readFileSync(FILE, 'utf8'))
-      file.groups.push({ id: 'mirror', name: 'Was from git', parentId: null })
-      writeFileSync(FILE, JSON.stringify(file), 'utf8')
+  it.each(['orphan', 'shared', 'failure'] as const)(
+    'cleans up an untied mirror: %s',
+    async (mode) => {
+      const shared = mode === 'shared'
+      const { gitFolderStore } = await import('../gitFolders/GitFolderStore')
+      const { gitHostId } = await import('../../shared/gitFolders')
+      const previous = gitFolderStore.snapshot()
+      try {
+        populate()
+        saveTo = FILE
+        await exportToFile(win, false)
+        const file = JSON.parse(readFileSync(FILE, 'utf8'))
+        file.groups.push({ id: 'mirror', name: 'Was from git', parentId: null })
+        writeFileSync(FILE, JSON.stringify(file), 'utf8')
 
-      sessionStore.saveGroup({
-        id: 'mirror',
-        name: 'From git',
-        parentId: null,
-        git: { repoUrl: 'https://git.example/inv.git', paths: [], includedGroups: [] }
-      })
-      const hostId = gitHostId('mirror', 'web1')
-      gitFolderStore.restore({
-        ...previous,
-        trees: [
-          {
-            groupId: 'mirror',
-            groups: [],
-            sessions: [
-              {
-                id: hostId,
-                name: 'web1',
-                host: 'web1',
-                groupId: null,
-                tags: [],
-                logToFile: false,
-                portForwards: [],
-                createdAt: 0,
-                updatedAt: 0
-              }
-            ],
-            memberships: {}
+        sessionStore.saveGroup({
+          id: 'mirror',
+          name: 'From git',
+          parentId: null,
+          git: { repoUrl: 'https://git.example/inv.git', paths: [], includedGroups: [] }
+        })
+        const hostId = gitHostId('mirror', 'web1')
+        const loginRef = shared ? 'secret-session' : 'orphan-login'
+        const gatewayRef = shared ? 'secret-credential' : 'orphan-gateway'
+        if (!shared) {
+          vault.setSecret(loginRef, 'orphan login')
+          vault.setSecret(gatewayRef, 'orphan gateway')
+        }
+        gitFolderStore.restore({
+          ...previous,
+          trees: [
+            {
+              groupId: 'mirror',
+              groups: [],
+              sessions: [
+                {
+                  id: hostId,
+                  name: 'web1',
+                  host: 'web1',
+                  groupId: null,
+                  tags: [],
+                  logToFile: false,
+                  portForwards: [],
+                  createdAt: 0,
+                  updatedAt: 0
+                }
+              ],
+              memberships: {}
+            }
+          ],
+          overrides: [
+            { nodeId: hostId, username: 'local', secretRef: loginRef, gatewaySecretRef: gatewayRef }
+          ]
+        })
+
+        openFrom = FILE
+        if (mode === 'failure') {
+          const change = vault.changeSecrets.bind(vault)
+          const fail = vi.spyOn(vault, 'changeSecrets').mockImplementationOnce((...args) => {
+            change(...args)
+            throw new Error('Secret cleanup failed after writing')
+          })
+          try {
+            await expect(importFromFile(win)).rejects.toThrow(/nothing was changed/)
+            expect(sessionStore.getAll().groups.find((g) => g.id === 'mirror')?.git).toBeDefined()
+            expect(gitFolderStore.overrides().find((o) => o.nodeId === hostId)?.secretRef).toBe(
+              loginRef
+            )
+            expect(vault.getSecret(loginRef)).toBe('orphan login')
+            expect(vault.getSecret(gatewayRef)).toBe('orphan gateway')
+          } finally {
+            fail.mockRestore()
           }
-        ],
-        overrides: [{ nodeId: hostId, username: 'local' }]
-      })
+          return
+        }
+        await importFromFile(win)
 
-      openFrom = FILE
-      await importFromFile(win)
-
-      expect(sessionStore.getAll().groups.find((g) => g.id === 'mirror')?.git).toBeUndefined()
-      expect(gitFolderStore.trees().some((t) => t.groupId === 'mirror')).toBe(false)
-      expect(gitFolderStore.overrides().some((o) => o.nodeId === hostId)).toBe(false)
-    } finally {
-      gitFolderStore.restore(previous)
+        expect(sessionStore.getAll().groups.find((g) => g.id === 'mirror')?.git).toBeUndefined()
+        expect(gitFolderStore.trees().some((t) => t.groupId === 'mirror')).toBe(false)
+        expect(gitFolderStore.overrides().some((o) => o.nodeId === hostId)).toBe(false)
+        expect(vault.getSecret(loginRef)).toBe(shared ? SECRETS['secret-session'] : undefined)
+        expect(vault.getSecret(gatewayRef)).toBe(shared ? SECRETS['secret-credential'] : undefined)
+      } finally {
+        gitFolderStore.restore(previous)
+      }
     }
-  })
+  )
 
   /*
    * The step that forgets an untied folder's mirror writes more than once,

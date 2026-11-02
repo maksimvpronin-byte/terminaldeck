@@ -578,7 +578,7 @@ export default function SettingsDialog({
                       {t(
                         'Used by “Edit locally” in the SFTP panel. Left empty, the file opens in Notepad on Windows and in your default text editor on macOS — never in whatever program would run it.'
                       )}{' '}
-                      <code>{'{file}'}</code>{' '}
+                      {t('On Linux, specify a text editor command.')} <code>{'{file}'}</code>{' '}
                       {t(
                         'is replaced by the path; without it the path is appended. Give the full path to the program — a windowed app does not inherit the PATH from your shell, so a bare code or subl may not be found.'
                       )}

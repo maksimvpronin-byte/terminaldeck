@@ -11,6 +11,67 @@ import { ScpShell, parseShellStats, shellQuote } from './ScpShell'
 const container = process.env.TD_SCP_CONTAINER
 const canRun = process.platform !== 'win32'
 
+describe('checking a shell replacement before committing it', () => {
+  function replacement() {
+    const shell = new ScpShell({} as Client, 'env')
+    vi.spyOn(shell, 'statPath').mockResolvedValue({
+      isDirectory: false,
+      isSymlink: false
+    } as Awaited<ReturnType<ScpShell['statPath']>>)
+    const capture = vi
+      .spyOn(shell as unknown as { capture: (command: string) => Promise<Buffer> }, 'capture')
+      .mockResolvedValue(Buffer.from('moved'))
+    return { shell, capture }
+  }
+
+  it.each(['destination', 'parent'] as const)(
+    'keeps the old file when the %s changes during transfer',
+    async (what) => {
+      const { shell, capture } = replacement()
+      let written = false
+      const check = async (): Promise<void> => {
+        if (written) throw new Error('changed during transfer')
+      }
+      await expect(
+        shell.replace(
+          '/srv/file',
+          async () => {
+            written = true
+          },
+          what === 'destination' ? check : undefined,
+          what === 'parent' ? check : undefined
+        )
+      ).rejects.toThrow('changed during transfer')
+      expect(written).toBe(true)
+      expect(capture.mock.calls.some(([cmd]) => cmd.includes('mv '))).toBe(false)
+      expect(capture.mock.calls.some(([cmd]) => cmd.startsWith('rm -f -- '))).toBe(true)
+    }
+  )
+
+  it('refuses a destination link in a planned transfer before writing through it', async () => {
+    const { shell, capture } = replacement()
+    vi.mocked(shell.statPath).mockResolvedValueOnce({
+      isDirectory: false,
+      isSymlink: true
+    } as Awaited<ReturnType<ScpShell['statPath']>>)
+    const write = vi.fn()
+    await expect(shell.replace('/srv/file', write, async () => undefined)).rejects.toThrow(/link/)
+    expect(write).not.toHaveBeenCalled()
+    expect(capture).not.toHaveBeenCalled()
+  })
+
+  it('still follows a link for a direct editor save', async () => {
+    const { shell, capture } = replacement()
+    vi.mocked(shell.statPath).mockResolvedValueOnce({
+      isDirectory: false,
+      isSymlink: true
+    } as Awaited<ReturnType<ScpShell['statPath']>>)
+    capture.mockResolvedValueOnce(Buffer.from('/srv/actual\0'))
+    await shell.replace('/srv/link', async () => undefined)
+    expect(capture.mock.calls.at(-1)?.[0]).toContain("'/srv/actual'")
+  })
+})
+
 /* A new file takes its source's mode; it was 0644 whatever the source. */
 describe('uploading a new file through the shell', () => {
   it.skipIf(process.platform === 'win32')('gives it the source’s mode', async () => {

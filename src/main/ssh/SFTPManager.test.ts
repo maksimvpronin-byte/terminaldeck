@@ -1277,11 +1277,19 @@ describe('folders with nothing in them', () => {
  * nothing, is left out.
  */
 describe('links in a folder being uploaded', () => {
-  it('sends a link to a file as the file, and leaves out the others', async () => {
+  it('sends a link to a file as the file, and leaves out the others', async (context) => {
     const lib = join(localDir, 'linked', 'lib')
     mkdirSync(join(lib, 'sub'), { recursive: true })
     writeFileSync(join(lib, 'libapp.so.1'), 'library', 'utf8')
-    symlinkSync('libapp.so.1', join(lib, 'libapp.so'))
+    try {
+      symlinkSync('libapp.so.1', join(lib, 'libapp.so'))
+    } catch (err) {
+      if (process.platform === 'win32' && (err as NodeJS.ErrnoException).code === 'EPERM') {
+        context.skip('Creating file symlinks requires Windows Developer Mode or elevation')
+        return
+      }
+      throw err
+    }
     symlinkSync('sub', join(lib, 'current'))
     symlinkSync('missing', join(lib, 'dangling'))
     const calls: Call[] = []
@@ -1341,6 +1349,16 @@ describe('a path that starts at home', () => {
 })
 
 describe('SCP/Shell routing', () => {
+  it('passes overwrite and containment checks to shell uploads', async () => {
+    vi.spyOn(sshManager, 'getFileAccess').mockReturnValue({ protocol: 'scp', shell: 'env' })
+    vi.spyOn(sshManager, 'getClientChain').mockReturnValue([{} as import('ssh2').Client])
+    const upload = vi.spyOn(ScpShell.prototype, 'upload').mockResolvedValue()
+    const before = async (): Promise<void> => undefined
+    const inside = async (): Promise<void> => undefined
+    await sftpManager.upload('shell-checks', '/local/file', '/file', undefined, before, inside)
+    expect(upload).toHaveBeenCalledWith('/local/file', '/file', undefined, before, inside)
+    sftpManager.releaseConnection('shell-checks')
+  })
   it.each(['source', 'destination'])(
     'relays between SFTP and SCP with the SCP endpoint as %s',
     async (side) => {
@@ -1367,14 +1385,21 @@ describe('SCP/Shell routing', () => {
       )
       // Replacing through a partial name is a shell script of its own; the
       // routing is what is under test here, so it writes straight through.
-      vi.spyOn(ScpShell.prototype, 'replace').mockImplementation((path, write) => write(path))
+      const replace = vi
+        .spyOn(ScpShell.prototype, 'replace')
+        .mockImplementation((path, write) => write(path))
       const write = vi
         .spyOn(ScpShell.prototype, 'createWriteStream')
         .mockImplementation((path) => stub.createWriteStream(path))
       attach(side === 'source' ? 'destination' : 'source', stub)
-      await sftpManager.relay('source', '/file', 'destination', '/copy')
+      const before = async (): Promise<void> => undefined
+      const inside = async (): Promise<void> => undefined
+      await sftpManager.relay('source', '/file', 'destination', '/copy', undefined, before, inside)
       expect(received['/copy']).toBe('the file')
-      if (side === 'destination') expect(write).toHaveBeenCalledWith('/copy', 8, '640')
+      if (side === 'destination') {
+        expect(write).toHaveBeenCalledWith('/copy', 8, '640')
+        expect(replace).toHaveBeenCalledWith('/copy', expect.any(Function), before, inside)
+      }
       sftpManager.releaseConnection('source')
       sftpManager.releaseConnection('destination')
     }
@@ -1587,6 +1612,34 @@ describe('deleting a folder swapped for a link partway', () => {
 })
 
 describe('downloading a folder', () => {
+  it.each(['.', '..', '../outside', 'sub/../../outside', '/outside', 'bad\0name'])(
+    'refuses unsafe listing name %j before it can be shown, searched or deleted',
+    async (name) => {
+      const calls: Call[] = []
+      attach(
+        'conn',
+        withListing(stubSession(calls, { '/srv/tree': { dir: true } }), {
+          '/srv/tree': [{ name, size: 1 }]
+        })
+      )
+      await expect(sftpManager.list('conn', '/srv/tree')).rejects.toThrow(/unsafe remote file name/)
+      await expect(sftpManager.delete('conn', '/srv/tree', true)).rejects.toThrow(
+        /unsafe remote file name/
+      )
+      expect(calls.filter((c) => c.op === 'unlink')).toEqual([])
+      expect((await sftpManager.find('conn', '/srv/tree', '*')).entries).toEqual([])
+    }
+  )
+
+  it('refuses backslash traversal from a Windows server listing', async () => {
+    attach(
+      'conn',
+      withListing(stubSession([]), {
+        '/C:/Users': [{ name: 'x\\..\\..\\outside', size: 1 }]
+      })
+    )
+    await expect(sftpManager.list('conn', '/C:/Users')).rejects.toThrow(/unsafe remote file name/)
+  })
   function withListing(
     session: SFTPWrapper,
     listing: Record<string, { name: string; size: number; mode?: number }[]>

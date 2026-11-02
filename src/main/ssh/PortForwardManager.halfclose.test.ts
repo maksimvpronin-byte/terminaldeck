@@ -43,6 +43,7 @@ const client = {
   ) => cb(undefined, answeringChannel())
 } as unknown as Client
 vi.mock('./SSHManager', () => ({ sshManager: { getClientChain: () => [client] } }))
+vi.mock('../vault/locked', () => ({ requireUnlocked: () => undefined }))
 
 const { portForwardManager } = await import('./PortForwardManager')
 

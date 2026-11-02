@@ -16,8 +16,8 @@ import { VaultLockedError, vault } from './Vault'
  * over SFTP, or a desktop being started. The vault being shut has to mean the
  * application is shut, and this is where that is said.
  *
- * Deliberately not applied to what is already running: an open terminal keeps
- * its connection, keeps receiving output and keeps its scrollback. Locking is
+ * An open terminal keeps its connection, receiving output and scrollback, but
+ * refuses interactive input until unlocked. Locking is
  * not disconnecting — that would drop work in progress every time somebody went
  * to lunch — it is refusing to start anything new and refusing to hand anything
  * out while nobody is there to say so.

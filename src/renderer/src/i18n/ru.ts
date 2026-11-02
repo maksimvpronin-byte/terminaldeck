@@ -288,8 +288,9 @@ export const ru: Record<string, string> = {
     'Правый клик — скачать, переименовать, удалить или создать папку',
   '"Edit locally" opens a file in your editor and uploads it on every save':
     '«Править локально» открывает файл в вашем редакторе и загружает при каждом сохранении',
-  'Pick that editor in Settings → Files; otherwise a plain text editor is used':
-    'Редактор выбирается в «Настройки → Файлы», иначе берётся простой текстовый',
+  'Pick that editor in Settings → Files; required on Linux, optional on Windows and macOS':
+    'Редактор выбирается в «Настройки → Файлы»: обязательно в Linux, по желанию в Windows и macOS',
+  'On Linux, specify a text editor command.': 'В Linux укажите команду текстового редактора.',
   'Drag files or folders in from Finder to upload them':
     'Перетащите файлы или папки из Finder, чтобы загрузить их',
   'Anything that would overwrite is listed first, both ways, and asked about':
