@@ -6,6 +6,35 @@ publishes a release — see [Releasing](README.md#releasing). Bumping one withou
 the other produces a version nobody can install, which is how 0.1.10 through
 0.3.2 came to be written and never released: no tag, so no build ever ran.
 
+## 0.33.2
+
+### Security
+
+- **Locking TerminalDeck blocks input to existing SSH and RDP sessions**, as
+  well as starting tunnels and monitoring. Connections and terminal output
+  remain alive. Developer Tools are disabled in production builds.
+- **SFTP listings refuse unsafe file names** before they can be displayed,
+  searched or used for deletion, including path traversal and Windows separators
+  returned by a Windows server.
+- **SCP/Shell uploads and host-to-host copies recheck the destination** before
+  replacing it. A changed destination file or a parent directory replaced by a
+  symlink is detected before commit; planned transfers do not follow a
+  destination changed into a symlink.
+- **An invalid RD Gateway login no longer selects the desktop's credentials.**
+  An explicit login with no account name is refused before a client starts.
+- **Local editing on Linux requires a configured text editor**, rather than
+  opening remote scripts or launchers through the desktop's file handler.
+  Scratch copies on Unix are private and non-executable, with mode 0600.
+
+### Fixed
+
+- **Importing a backup preserves passwords still referenced by other items**
+  when it detaches a git-backed folder. Removing orphaned secrets is part of
+  the import transaction and is rolled back if the import fails.
+- **SSH configuration imports reject unsupported Include directives with an
+  explanation**, instead of silently dropping included host and jump settings.
+  Expand the included settings into the configuration before importing it.
+
 ## 0.33.1
 
 ### Security
