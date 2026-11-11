@@ -12,7 +12,7 @@ the other produces a version nobody can install, which is how 0.1.10 through
 
 - **FreeRDP 3.33.1 and zlib 1.4** replace the native desktop client's older
   libraries. Windows builds use a pinned zlib overlay port; macOS builds use
-  Homebrew zlib explicitly. Packaging checks native versions and rebuilds
+  the same official zlib source release. Packaging checks native versions and rebuilds
   stale caches before they can reach a release.
 - **minimatch 11.0.8 replaces the affected 9.x and 10.x copies** used by the
   build tools (GHSA-g3hv-75wg-m249).

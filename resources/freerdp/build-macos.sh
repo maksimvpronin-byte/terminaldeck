@@ -44,7 +44,7 @@ trap 'code=$?; [ $code -ne 0 ] && printf "\n\033[31mFailed. What went wrong:\033
 # missing tool wastes twenty minutes.
 say "Checking what is needed"
 missing=()
-for tool in cmake ninja pkg-config git; do
+for tool in cmake ninja pkg-config git curl shasum tar; do
   command -v "$tool" >/dev/null 2>&1 || missing+=("$tool")
 done
 if [ ${#missing[@]} -gt 0 ]; then
@@ -63,15 +63,39 @@ fi
 # `FREERDP_SDL=0` leaves it out, which is what CI wants: three Homebrew packages
 # and a few minutes of compiling, for a program no release contains.
 sdl_client="${FREERDP_SDL:-1}"
-libs="openssl@3 openh264 opus zlib"
+libs="openssl@3 openh264 opus"
 [ "$sdl_client" = "1" ] && libs="$libs sdl2 sdl2_ttf sdl2_image"
 for lib in $libs; do
   brew --prefix "$lib" >/dev/null 2>&1 || die "missing: $lib — brew install $lib"
 done
 
-zlib_prefix="$(brew --prefix zlib)"
+# Runner images may have a stale Homebrew catalogue. Build the same pinned
+# release as Windows instead of depending on when a bottle becomes available.
+say "Building zlib $zlib_min"
+zlib_prefix="$here/build/zlib-macos-$arch"
+zlib_archive="$here/build/zlib-$zlib_min.tar.gz"
+zlib_source="$here/src/zlib-$zlib_min"
+zlib_sha256="02dd159783677a749c04adbdd02b55b8a2bcc7e054f51b76b549199a916ad584"
+if [ ! -f "$zlib_archive" ]; then
+  curl --fail --location --retry 3 \
+    "https://github.com/madler/zlib/releases/download/v$zlib_min/zlib-$zlib_min.tar.gz" \
+    --output "$zlib_archive"
+fi
+printf '%s  %s\n' "$zlib_sha256" "$zlib_archive" | shasum -a 256 --check -
+mkdir -p "$here/src"
+if [ ! -d "$zlib_source" ]; then
+  tar -xzf "$zlib_archive" -C "$here/src"
+fi
+cmake -S "$zlib_source" -B "$zlib_source/build-$arch" -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_INSTALL_PREFIX="$zlib_prefix" \
+  -DCMAKE_INSTALL_NAME_DIR="$zlib_prefix/lib" \
+  -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+  -DZLIB_BUILD_TESTING=OFF -DZLIB_BUILD_SHARED=ON -DZLIB_BUILD_STATIC=OFF
+cmake --build "$zlib_source/build-$arch" --parallel
+cmake --install "$zlib_source/build-$arch"
 export PKG_CONFIG_PATH="$zlib_prefix/lib/pkgconfig:$(brew --prefix openssl@3)/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
-pkg-config --atleast-version="$zlib_min" zlib || die "zlib $zlib_min or newer is required — brew upgrade zlib"
+pkg-config --atleast-version="$zlib_min" zlib || die "built zlib is older than $zlib_min"
 export OPENSSL_ROOT_DIR="$(brew --prefix openssl@3)"
 
 # One directory, and the build dies at libfreerdp/codec/dsp.c without it.
