@@ -55,3 +55,7 @@ Grype 0.121.3 установлен из официального релиза с
 Полезные файлы проверки: `native-build.log`, `native-shim.log`, `native-bundle.log`, `grype-native-after.json`, `grype-windows-after.json` и `packages-native/` в `output/security-remediation/`. Предыдущие `packages/` и `grype-windows.json` сохраняют состояние до обновления нативных библиотек.
 
 Реальное подключение SSH/RDP и локальная упаковка macOS/Linux не выполнялись. macOS-рецепты и платформенная релизная процедура обновлены, но требуют проверки на соответствующем runner. Итоговые Windows-пакеты созданы для локальной проверки; релиз не публиковался.
+
+## Проверка в GitHub Actions — 12 ноября 2026
+
+При подготовке релиза выполнены [Checks на трёх ОС](https://github.com/maksimvpronin-byte/terminaldeck/actions/runs/43114155683): все задания прошли. [Проверочная сборка после исправления macOS](https://github.com/maksimvpronin-byte/terminaldeck/actions/runs/43114155471) подтвердила сборку нативных библиотек, пакетов и подпись macOS, а также Linux-пакеты. Windows-задание [первой релизной сборки](https://github.com/maksimvpronin-byte/terminaldeck/actions/runs/43113802035) также завершилось успешно; macOS-задание в этом первом запуске остановилось на старой zlib из каталога runner. Версия 0.33.3 не публиковалась. Исправленный релиз подготовлен как 0.33.4 с отдельной окончательной сборкой по тегу.
