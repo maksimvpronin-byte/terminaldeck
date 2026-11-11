@@ -35,6 +35,8 @@ mac:
   # Only td-rdp travels. The SDL clients in the same directory are for proving
   # the build by hand and have no business in a release.
   extraResources:
+    - from: resources/freerdp/build/macos-${arch}/native-versions.json
+      to: freerdp/native-versions.json
     - from: resources/freerdp/build/macos-${arch}/bin/td-rdp
       to: freerdp/bin/td-rdp
     - from: resources/freerdp/build/macos-${arch}/lib
@@ -72,6 +74,8 @@ mac:
 win:
   icon: resources/icon.png
   extraResources:
+    - from: resources/freerdp/build/windows-${arch}/native-versions.json
+      to: freerdp/native-versions.json
     # The desktop client and the libraries it needs. Windows looks for those
     # beside the executable, so they travel into the same directory rather than
     # a lib/ of their own — see bundle-windows.ps1, which puts them there.

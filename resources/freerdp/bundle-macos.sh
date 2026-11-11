@@ -21,6 +21,9 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 arch="$(uname -m)"
 [ "$arch" = "x86_64" ] && arch="x64"
 prefix="${FREERDP_PREFIX:-$here/build/macos-$arch}"
+versions_current() {
+  node -e 'const fs=require("fs"); const required=require(process.argv[1]); try { const got=JSON.parse(fs.readFileSync(process.argv[2],"utf8")); const atLeast=(a,b)=>{ const x=a.split(".").map(Number),y=b.split(".").map(Number); for(let i=0;i<Math.max(x.length,y.length);i++){const d=(x[i]||0)-(y[i]||0);if(d)return d>0;}return true;}; process.exit(Object.keys(required).every(k=>typeof got[k]==="string"&&/^[0-9]+(\.[0-9]+)+$/.test(got[k])&&atLeast(got[k],required[k]))?0:1); } catch {process.exit(1);}' "$here/native-versions.json" "$prefix/native-versions.json"
+}
 
 say() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 die() { printf '\n\033[31merror: %s\033[0m\n' "$*" >&2; exit 1; }
@@ -28,7 +31,8 @@ die() { printf '\n\033[31merror: %s\033[0m\n' "$*" >&2; exit 1; }
 # Builds it rather than refusing, so packaging is one command from a fresh
 # clone. Said out loud first: somebody who expected two minutes should know why
 # it is going to be thirty, and that it happens once.
-if [ ! -d "$prefix/lib" ]; then
+if [ ! -d "$prefix/lib" ] || ! versions_current; then
+  [ -z "${FREERDP_PREFIX:-}" ] || die "custom FREERDP_PREFIX needs a current build and native-versions.json"
   say "No desktop client yet — building FreeRDP first"
   cat <<'WHY'
 This takes about half an hour and happens once: what it produces stays in

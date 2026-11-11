@@ -16,9 +16,9 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 # is called: the files are FreeRDPConfig.cmake and friends under lib/cmake/
 # FreeRDP3/, and CMake searches by the package name. Asking for FreeRDP3 finds
 # nothing and says so at some length.
-find_package(FreeRDP 3.31 REQUIRED)
-find_package(FreeRDP-Client 3.31 REQUIRED)
-find_package(WinPR 3.31 REQUIRED)
+find_package(FreeRDP 3.33.1 REQUIRED)
+find_package(FreeRDP-Client 3.33.1 REQUIRED)
+find_package(WinPR 3.33.1 REQUIRED)
 
 add_executable(td-rdp td_rdp.c td_proto.c)
 target_link_libraries(td-rdp PRIVATE freerdp-client freerdp winpr)

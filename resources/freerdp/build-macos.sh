@@ -15,11 +15,9 @@
 # Run it yourself; it is not run from any npm script that CI touches yet.
 set -euo pipefail
 
-# Pinned deliberately. 3.31.0 is the version the comparison against IronRDP was
-# made with, so a regression later can be told apart from a version change.
-FREERDP_TAG="${FREERDP_TAG:-3.31.0}"
-
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+FREERDP_TAG="${FREERDP_TAG:-$(node -p 'require(process.argv[1]).freerdp' "$here/native-versions.json")}"
+zlib_min="$(node -p 'require(process.argv[1]).zlib' "$here/native-versions.json")"
 # Named as Node and electron-builder name it, not as uname does: this path is
 # looked up by the application at runtime and by the packager at build time,
 # and a third spelling in the middle is one translation too many.
@@ -65,13 +63,15 @@ fi
 # `FREERDP_SDL=0` leaves it out, which is what CI wants: three Homebrew packages
 # and a few minutes of compiling, for a program no release contains.
 sdl_client="${FREERDP_SDL:-1}"
-libs="openssl@3 openh264 opus"
+libs="openssl@3 openh264 opus zlib"
 [ "$sdl_client" = "1" ] && libs="$libs sdl2 sdl2_ttf sdl2_image"
 for lib in $libs; do
   brew --prefix "$lib" >/dev/null 2>&1 || die "missing: $lib — brew install $lib"
 done
 
-export PKG_CONFIG_PATH="$(brew --prefix openssl@3)/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+zlib_prefix="$(brew --prefix zlib)"
+export PKG_CONFIG_PATH="$zlib_prefix/lib/pkgconfig:$(brew --prefix openssl@3)/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+pkg-config --atleast-version="$zlib_min" zlib || die "zlib $zlib_min or newer is required — brew upgrade zlib"
 export OPENSSL_ROOT_DIR="$(brew --prefix openssl@3)"
 
 # One directory, and the build dies at libfreerdp/codec/dsp.c without it.
@@ -102,6 +102,8 @@ cmake -S "$src" -B "$src/build" -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX="$out" \
   -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+  -DZLIB_INCLUDE_DIR="$zlib_prefix/include" \
+  -DZLIB_LIBRARY="$zlib_prefix/lib/libz.dylib" \
   \
   `# The checks Homebrew leaves on, which is why its build is slower.` \
   -DWITH_VERBOSE_WINPR_ASSERT=OFF \
@@ -164,6 +166,7 @@ cmake --install "$src/build"
 say "Building the shim"
 rm -rf "$here/shim/build"
 FREERDP_PREFIX="$out" bash "$here/build-shim.sh"
+printf '{"freerdp":"%s","zlib":"%s"}\n' "$FREERDP_TAG" "$(pkg-config --modversion zlib)" > "$out/native-versions.json"
 
 # ------------------------------------------------------------------- the result
 say "What came out"

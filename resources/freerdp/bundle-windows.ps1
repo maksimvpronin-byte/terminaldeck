@@ -16,6 +16,7 @@ what is missing and says what it found.
 $ErrorActionPreference = 'Stop'
 
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
+$requiredVersions = Get-Content -Raw (Join-Path $here 'native-versions.json') | ConvertFrom-Json
 $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'x64' }
 $triplet = "$arch-windows"
 $out = if ($env:FREERDP_PREFIX) { $env:FREERDP_PREFIX } else { Join-Path $here "build\windows-$arch" }
@@ -27,14 +28,18 @@ function Die([string]$text) { Write-Host "`nerror: $text" -ForegroundColor Red; 
 # Built rather than refused, so packaging is one command from a fresh clone.
 # Said out loud first: somebody who expected two minutes should know why it is
 # going to be thirty, and that it happens once.
-if (-not (Test-Path (Join-Path $bin 'td-rdp.exe'))) {
+$versionMarker = Join-Path $out 'native-versions.json'
+$currentVersions = if (Test-Path $versionMarker) { Get-Content -Raw $versionMarker | ConvertFrom-Json } else { $null }
+$stale = -not $currentVersions -or [version]$currentVersions.freerdp -lt [version]$requiredVersions.freerdp -or [version]$currentVersions.zlib -lt [version]$requiredVersions.zlib
+if (-not (Test-Path (Join-Path $bin 'td-rdp.exe')) -or $stale) {
+  if ($env:FREERDP_PREFIX) { Die "Custom FREERDP_PREFIX needs a rebuilt client and native-versions.json for FreeRDP $($requiredVersions.freerdp) / zlib $($requiredVersions.zlib)" }
   Step 'No desktop client yet — building FreeRDP first'
   Write-Host @'
 This takes about half an hour and happens once: what it produces stays in
 resources\freerdp\build\ and later packaging runs reuse it. Changing the shim's
 own C afterwards is `npm run build:freerdp:win:shim`, which takes seconds.
 '@
-  & npm run build:freerdp:win
+  & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $here 'build-windows.ps1')
   if ($LASTEXITCODE -ne 0) { Die 'the desktop client did not build — see the log above' }
 }
 

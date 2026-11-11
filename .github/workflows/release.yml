@@ -96,7 +96,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: resources/freerdp/vcpkg
-          key: vcpkg-${{ matrix.os }}-${{ hashFiles(matrix.recipe) }}
+          key: vcpkg-${{ matrix.os }}-${{ hashFiles(matrix.recipe, 'resources/freerdp/ports/**', 'resources/freerdp/native-versions.json') }}
           restore-keys: vcpkg-${{ matrix.os }}-
 
       - name: Cache the desktop client
@@ -105,11 +105,11 @@ jobs:
         uses: actions/cache@v6
         with:
           path: resources/freerdp/build
-          key: freerdp-3.31.0-${{ matrix.os }}-${{ hashFiles(matrix.recipe, 'resources/freerdp/shim/CMakeLists.txt') }}
+          key: freerdp-${{ matrix.os }}-${{ hashFiles(matrix.recipe, 'resources/freerdp/ports/**', 'resources/freerdp/native-versions.json', 'resources/freerdp/shim/CMakeLists.txt') }}
 
       - name: Install what FreeRDP is built against
         if: matrix.freerdp == 'mac' && steps.freerdp.outputs.cache-hit != 'true'
-        run: brew install cmake ninja pkg-config openssl@3 openh264 opus
+        run: brew install cmake ninja pkg-config openssl@3 openh264 opus zlib
 
       - name: Build the desktop client
         if: matrix.freerdp != '' && steps.freerdp.outputs.cache-hit != 'true'
@@ -127,6 +127,12 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Verify dependency security
+        run: npm run verify:security
+
+      - name: Audit dependencies including build tools
+        run: npm audit --audit-level=moderate
 
       - name: Type-check
         run: npm run typecheck

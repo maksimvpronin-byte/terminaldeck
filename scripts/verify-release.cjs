@@ -314,6 +314,11 @@ function verifyPackage(directory, platform) {
   const resources = path.resolve(root, directory, expected.resources)
   assert(fs.existsSync(resources), `The unpacked application is not there: ${resources}`)
 
+  // Inspect the ASAR too: dev-only packagers must not travel inside it.
+  const { verifyPackage: verifySecurity } = require('./verify-security.cjs')
+  const checked = verifySecurity(path.dirname(resources))
+  ok(`security checked ${checked.files} files and ${checked.archives} ASAR archives`)
+
   for (const { file, what } of expected.carry) {
     const target = path.join(resources, file)
     assert(fs.existsSync(target), `The package does not carry ${file} — ${what} would be missing`)

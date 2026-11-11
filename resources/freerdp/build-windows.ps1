@@ -36,9 +36,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$FreeRdpTag = if ($env:FREERDP_TAG) { $env:FREERDP_TAG } else { '3.31.0' }
-
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
+$nativeVersions = Get-Content -Raw (Join-Path $here 'native-versions.json') | ConvertFrom-Json
+$FreeRdpTag = if ($env:FREERDP_TAG) { $env:FREERDP_TAG } else { $nativeVersions.freerdp }
 $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'x64' }
 $triplet = "$arch-windows"
 # What the Visual Studio generator calls the same thing.
@@ -130,8 +130,23 @@ if (-not (Test-Path (Join-Path $vcpkg 'vcpkg.exe'))) {
 # is sound. Named explicitly so a machine that happens to have more installed
 # does not produce a different binary.
 Step "Installing dependencies for $triplet"
-& (Join-Path $vcpkg 'vcpkg.exe') install --triplet $triplet openssl openh264 opus zlib
+$zlibHeaderPath = Join-Path $vcpkg "installed\$triplet\include\zlib.h"
+if (Test-Path $zlibHeaderPath) {
+  $installedZlib = Get-Content -Raw $zlibHeaderPath
+  if ($installedZlib -match '#define ZLIB_VERSION "([0-9.]+)"' -and [version]$Matches[1] -lt [version]$nativeVersions.zlib) {
+    # Classic install leaves an existing older package alone. Upgrade this
+    # package explicitly so a restored cache cannot retain the vulnerable DLL.
+    & (Join-Path $vcpkg 'vcpkg.exe') upgrade "zlib:$triplet" --no-dry-run --overlay-ports="$(Join-Path $here 'ports')"
+    Ran 'upgrading zlib'
+    $ShimOnly = $false
+  }
+}
+& (Join-Path $vcpkg 'vcpkg.exe') install --triplet $triplet --overlay-ports="$(Join-Path $here 'ports')" openssl openh264 opus zlib
 Ran 'vcpkg install'
+$zlibHeader = Get-Content -Raw (Join-Path $vcpkg "installed\$triplet\include\zlib.h")
+if ($zlibHeader -notmatch '#define ZLIB_VERSION "([0-9.]+)"' -or [version]$Matches[1] -lt [version]$nativeVersions.zlib) {
+  Die "zlib $($nativeVersions.zlib) or newer is required — rebuild with the overlay port"
+}
 
 # ----------------------------------------------------------------- the source
 Step "Fetching FreeRDP $FreeRdpTag"
@@ -180,7 +195,9 @@ $toolchain = Join-Path $vcpkg 'scripts\buildsystems\vcpkg.cmake'
 
 if (-not $ShimOnly) {
   Step 'Configuring FreeRDP'
-  Remove-Item -Recurse -Force (Join-Path $src 'build') -ErrorAction SilentlyContinue
+  $sourceBuild = [System.IO.Path]::GetFullPath((Join-Path $src 'build'))
+  if (-not $sourceBuild.StartsWith([System.IO.Path]::GetFullPath((Join-Path $here 'src')) + '\', [System.StringComparison]::OrdinalIgnoreCase)) { Die 'Unsafe source build path' }
+  Remove-Item -LiteralPath $sourceBuild -Recurse -Force -ErrorAction SilentlyContinue
 
   # Every flag here means what the same flag means in build-macos.sh; read that
   # file for why each one is stated rather than left to be discovered. The SDL
@@ -219,7 +236,9 @@ if (-not $ShimOnly) {
   Ran 'building FreeRDP'
 
   Step "Installing into $out"
-  Remove-Item -Recurse -Force $out -ErrorAction SilentlyContinue
+  $installRoot = [System.IO.Path]::GetFullPath($out)
+  if (-not $installRoot.StartsWith([System.IO.Path]::GetFullPath((Join-Path $here 'build')) + '\', [System.StringComparison]::OrdinalIgnoreCase)) { Die 'Unsafe install path' }
+  Remove-Item -LiteralPath $installRoot -Recurse -Force -ErrorAction SilentlyContinue
   cmake --install (Join-Path $src 'build') --config Release
   Ran 'installing FreeRDP'
 }
@@ -231,7 +250,9 @@ if (-not (Test-Path (Join-Path $out 'lib\cmake\FreeRDP3'))) {
 
 Step 'Building td-rdp'
 $shim = Join-Path $here 'shim'
-Remove-Item -Recurse -Force (Join-Path $shim 'build') -ErrorAction SilentlyContinue
+$shimBuild = [System.IO.Path]::GetFullPath((Join-Path $shim 'build'))
+if ($shimBuild -ne [System.IO.Path]::GetFullPath((Join-Path $here 'shim\build'))) { Die 'Unsafe shim build path' }
+Remove-Item -LiteralPath $shimBuild -Recurse -Force -ErrorAction SilentlyContinue
 cmake -S $shim -B (Join-Path $shim 'build') -G $generator -A $vsArch `
   -DCMAKE_BUILD_TYPE=Release `
   -DCMAKE_TOOLCHAIN_FILE="$toolchain" `
@@ -251,6 +272,10 @@ try {
   $env:PATH = $testPath
 }
 cmake --install (Join-Path $shim 'build') --config Release
+Ran 'installing td-rdp'
+$zlibVersion = [regex]::Match((Get-Content -Raw $zlibHeaderPath), '#define ZLIB_VERSION "([0-9.]+)"').Groups[1].Value
+$builtVersions = @{ freerdp = $FreeRdpTag; zlib = $zlibVersion } | ConvertTo-Json
+[System.IO.File]::WriteAllText((Join-Path $out 'native-versions.json'), $builtVersions, [System.Text.UTF8Encoding]::new($false))
 
 # ------------------------------------------------------------------ the result
 Step 'What came out'

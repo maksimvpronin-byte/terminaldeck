@@ -657,6 +657,13 @@ npm install
 npm run dev
 ```
 
+Keep the project's `.npmrc` when installing: it disables automatic peer resolution
+so the unused Squirrel.Windows packager and its obsolete 7-Zip binaries stay out
+of the lock file. Required peers are declared explicitly in `package.json`; npm
+does not validate peer compatibility in this mode. `npm run verify:security`
+checks the lock file and installed packages for the components from the security
+report. Release checks also inspect application resources and ASAR archives.
+
 This opens the app with hot reload. The first `npm run dev` also downloads the Electron binary —
 `npm install` no longer does, since Electron 42 dropped its `postinstall` script — so expect that
 one to take a couple of minutes. On first launch you'll be asked to create a master password for
@@ -680,7 +687,7 @@ brew install cmake ninja pkg-config openssl@3 openh264 opus sdl2 sdl2_ttf sdl2_i
 npm run build:freerdp:mac
 ```
 
-That fetches FreeRDP 3.31.0, builds it and the shim into
+That fetches FreeRDP 3.33.1, builds it and the shim into
 `resources/freerdp/build/macos-<arch>/`, and keeps the whole log beside it. It takes a few
 minutes and prints the failing lines itself if it does not finish. Changing a line of the shim
 afterwards does not need any of that again:
